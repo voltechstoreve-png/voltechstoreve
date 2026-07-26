@@ -1,5 +1,10 @@
 'use client';
 
+// ✅ SOLUCIÓN: Forzar renderizado dinámico para evitar errores de useSearchParams en el build
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'default-no-store';
+
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
