@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   Package, 
@@ -17,7 +17,8 @@ import {
 import { motion } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
-export default function RegistroPage() {
+// Componente interno que contiene toda la lógica y usa useSearchParams
+function RegistroContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [invitationValid, setInvitationValid] = useState(false);
@@ -300,5 +301,18 @@ export default function RegistroPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+// Componente principal que exporta por defecto y envuelve en Suspense
+export default function RegistroPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-voltech-dark flex items-center justify-center p-4">
+        <div className="text-white text-xl font-bold animate-pulse">Cargando registro...</div>
+      </div>
+    }>
+      <RegistroContent />
+    </Suspense>
   );
 }
