@@ -1,5 +1,9 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'default-no-store';
+
 import { useState, useEffect } from 'react';
 import { Users, Plus, Edit, Trash2, X, Shield, UserCheck, UserX, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';

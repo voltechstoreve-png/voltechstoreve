@@ -1,5 +1,9 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'default-no-store';
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ThemeProvider } from '@/app/context/ThemeContext';

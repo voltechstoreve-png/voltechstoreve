@@ -1,5 +1,9 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'default-no-store';
+
 import { useState, useEffect } from 'react';
 import { useTheme } from '@/app/context/ThemeContext'; // ✅ AGREGADO
 import { ShoppingCart, Search, MessageCircle, X, Plus, Minus, Trash2, MapPin } from 'lucide-react';

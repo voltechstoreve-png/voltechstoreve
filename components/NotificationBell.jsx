@@ -1,5 +1,9 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'default-no-store';
+
 import { useState } from 'react';
 import { Bell, CheckCircle, Users, Gift, Trophy, ShoppingCart, AlertTriangle, Trash2, X } from 'lucide-react';
 import { useNotificaciones } from '@/app/context/NotificationContext';

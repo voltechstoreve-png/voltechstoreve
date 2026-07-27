@@ -1,5 +1,9 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'default-no-store';
+
 import { useState, useEffect } from 'react';
 import {
   Building2, Plus, Search, Edit3, Trash2, X, Save,
