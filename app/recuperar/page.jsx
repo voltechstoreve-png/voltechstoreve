@@ -1,8 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-export const fetchCache = 'default-no-store';
 
 import { useState } from 'react';
 import { Mail, Phone, Lock, CheckCircle, ArrowLeft, Key } from 'lucide-react';
