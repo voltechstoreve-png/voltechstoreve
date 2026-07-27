@@ -1,6 +1,5 @@
 'use client';
 
-
 import { useState } from 'react';
 import { Mail, Phone, Lock, CheckCircle, ArrowLeft, Key } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -328,4 +327,4 @@ export default function RecuperarPage() {
       </motion.div>
     </div>
   );
-}nom
+}
