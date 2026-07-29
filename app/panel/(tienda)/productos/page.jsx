@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
+import { supabase } from '@/lib/supabase';
+import { usePermissions } from '@/app/context/PermissionsContext'; // ✅ NUEVO: Sistema de permisos
 import { 
   Plus, Search, Edit, Trash2, X, Package, DollarSign, TrendingUp,
   AlertTriangle, CheckCircle, Image as ImageIcon, Save, Minus,
@@ -13,6 +14,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function ProductosPage() {
+  const { tienePermiso } = usePermissions(); // ✅ NUEVO
+  
   const [productos, setProductos] = useState([]);
   const [carteras, setCarteras] = useState([]);
   const [equipo, setEquipo] = useState([]);
@@ -74,7 +77,6 @@ export default function ProductosPage() {
   const [nuevoCampo, setNuevoCampo] = useState({ tipo: '', valor: '' });
   const [showNuevoCampo, setShowNuevoCampo] = useState({ tipo: '', show: false });
 
-  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
     const cargarDatos = async () => {
       let pData = [], cData = [], sData = {};
@@ -92,7 +94,6 @@ export default function ProductosPage() {
         }
       }
 
-      // Fallback a localStorage
       if (pData.length === 0) {
         const productosGuardados = localStorage.getItem('voltech_productos');
         if (productosGuardados) pData = JSON.parse(productosGuardados);
@@ -341,7 +342,6 @@ export default function ProductosPage() {
     setComboPlataformas([]);
   };
 
-  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
   const guardarProductos = async () => {
     let productosGuardados = 0;
     let productosActualizados = 0;
@@ -483,7 +483,6 @@ export default function ProductosPage() {
     });
   };
 
-  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
   const guardarEdicion = async (id) => {
     if (supabase) {
       await supabase.from('productos').update(editData).eq('id', id);
@@ -501,7 +500,6 @@ export default function ProductosPage() {
     setEditandoId(null);
   };
 
-  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
   const togglePublicado = async (id) => {
     const producto = productos.find(p => p.id === id);
     const nuevoEstado = !producto.publicado;
@@ -518,7 +516,6 @@ export default function ProductosPage() {
     toast.success(`Producto ${nuevoEstado ? 'publicado' : 'ocultado'} en la tienda`);
   };
 
-  // ✅ ACTUALIZADO: Elimina de Supabase y localStorage
   const eliminarProducto = async (id) => {
     if (confirm('¿Estás seguro de eliminar este producto?')) {
       if (supabase) {
@@ -531,7 +528,6 @@ export default function ProductosPage() {
     }
   };
 
-  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
   const agregarCartera = async () => {
     if (!nuevaCartera.nombre || !nuevaCartera.datos) {
       toast.error('Completa todos los campos');
@@ -550,7 +546,6 @@ export default function ProductosPage() {
     toast.success('Cartera agregada');
   };
 
-  // ✅ ACTUALIZADO: Elimina de Supabase y localStorage
   const eliminarCartera = async (id) => {
     if (supabase) {
       await supabase.from('carteras').delete().eq('id', id);
@@ -561,7 +556,6 @@ export default function ProductosPage() {
     toast.success('Cartera eliminada');
   };
 
-  // ✅ ACTUALIZADO: Guarda en Supabase (settings) y localStorage
   const guardarTasa = async () => {
     const tasaData = {
       tasa: usarTasaBCV ? tasaBCV : tasaPersonalizada,
@@ -642,21 +636,25 @@ export default function ProductosPage() {
             <Download className="w-4 h-4" />
             Catálogo
           </button>
+          
+          {/* ✅ OCULTAR A VENDEDORES */}
           <button
             onClick={() => setShowCarterasModal(!showCarterasModal)}
-            className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2"
+            className={`px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}
           >
             <DollarSign className="w-4 h-4" />
             Carteras
           </button>
           <Link
             href="/panel/compras"
-            className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2"
+            className={`px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}
           >
             <Database className="w-4 h-4" />
             Compras
           </Link>
-          {!showForm && (
+          
+          {/* ✅ OCULTAR "NUEVO PRODUCTO" A VENDEDORES */}
+          {!showForm && tienePermiso('puedeVerInventarioCompleto') && (
             <button
               onClick={() => setShowForm(true)}
               className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2"
@@ -785,48 +783,54 @@ export default function ProductosPage() {
             </div>
             <div>
               <p className="text-xs text-voltech-muted">Valor Inventario</p>
-              <p className="text-xl font-bold text-white">${valorInventario.toFixed(2)}</p>
+              {/* ✅ OCULTAR VALOR A VENDEDORES */}
+              <p className="text-xl font-bold text-white">
+                {tienePermiso('puedeVerInventarioCompleto') ? `$${valorInventario.toFixed(2)}` : '---'}
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h3 className="text-sm font-semibold text-white">Tasa de Cambio</h3>
-            <p className="text-xs text-voltech-muted">Configura la tasa para calcular precios en Bs</p>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={usarTasaBCV}
-                onChange={(e) => setUsarTasaBCV(e.target.checked)}
-                className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan"
-              />
-              <span className="text-xs text-voltech-muted">Usar tasa BCV</span>
-            </label>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-voltech-muted">Tasa:</span>
-              <input
-                type="number"
-                step="0.01"
-                value={usarTasaBCV ? tasaBCV : tasaPersonalizada}
-                onChange={(e) => usarTasaBCV ? setTasaBCV(parseFloat(e.target.value)) : setTasaPersonalizada(parseFloat(e.target.value))}
-                className="input-voltech w-24 rounded-lg px-3 py-1 text-sm"
-              />
-              <span className="text-xs text-voltech-muted">Bs/$</span>
+      {/* ✅ OCULTAR CONFIGURACIÓN DE TASA A VENDEDORES */}
+      {tienePermiso('puedeVerConfiguracion') && (
+        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <h3 className="text-sm font-semibold text-white">Tasa de Cambio</h3>
+              <p className="text-xs text-voltech-muted">Configura la tasa para calcular precios en Bs</p>
             </div>
-            <button
-              onClick={guardarTasa}
-              className="px-3 py-1 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors"
-            >
-              Guardar
-            </button>
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={usarTasaBCV}
+                  onChange={(e) => setUsarTasaBCV(e.target.checked)}
+                  className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan"
+                />
+                <span className="text-xs text-voltech-muted">Usar tasa BCV</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-voltech-muted">Tasa:</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={usarTasaBCV ? tasaBCV : tasaPersonalizada}
+                  onChange={(e) => usarTasaBCV ? setTasaBCV(parseFloat(e.target.value)) : setTasaPersonalizada(parseFloat(e.target.value))}
+                  className="input-voltech w-24 rounded-lg px-3 py-1 text-sm"
+                />
+                <span className="text-xs text-voltech-muted">Bs/$</span>
+              </div>
+              <button
+                onClick={guardarTasa}
+                className="px-3 py-1 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors"
+              >
+                Guardar
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <AnimatePresence>
         {showForm && (
@@ -1420,13 +1424,14 @@ export default function ProductosPage() {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Precio Bs</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Estado</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">Publicado</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Acciones</th>
+                  {/* ✅ OCULTAR COLUMNA ACCIONES A VENDEDORES */}
+                  <th className={`text-right px-4 py-3 text-xs font-semibold text-voltech-muted ${!tienePermiso('puedeVerInventarioCompleto') ? 'hidden' : ''}`}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {productosFiltrados.length === 0 ? (
                   <tr>
-                    <td colSpan="12" className="text-center py-12 text-voltech-muted">
+                    <td colSpan={tienePermiso('puedeVerInventarioCompleto') ? 12 : 11} className="text-center py-12 text-voltech-muted">
                       <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
                       <p>No hay productos registrados</p>
                       <p className="text-xs mt-1">Haz clic en "Nuevo Producto" para comenzar</p>
@@ -1506,7 +1511,8 @@ export default function ProductosPage() {
                           {producto.publicado ? <Globe className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      {/* ✅ OCULTAR ACCIONES A VENDEDORES */}
+                      <td className={`px-4 py-3 text-right ${!tienePermiso('puedeVerInventarioCompleto') ? 'hidden' : ''}`}>
                         <div className="flex items-center justify-end gap-2">
                           {editandoId === producto.id ? (
                             <>
@@ -1643,7 +1649,8 @@ export default function ProductosPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  {/* ✅ OCULTAR BOTONES DE EDICIÓN EN GRID A VENDEDORES */}
+                  <div className={`flex gap-2 ${!tienePermiso('puedeVerInventarioCompleto') ? 'hidden' : ''}`}>
                     <button
                       onClick={() => abrirEdicion(producto)}
                       className="flex-1 py-2 bg-voltech-dark border border-voltech-border rounded-lg text-xs text-voltech-muted hover:text-voltech-cyan hover:border-voltech-cyan transition-colors flex items-center justify-center gap-1"
@@ -1665,7 +1672,8 @@ export default function ProductosPage() {
         </div>
       )}
 
-      {editandoId && (
+      {/* ✅ OCULTAR FORMULARIO INLINE DE EDICIÓN A VENDEDORES */}
+      {editandoId && tienePermiso('puedeVerInventarioCompleto') && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

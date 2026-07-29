@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useTheme } from '@/app/context/ThemeContext';
 import { useProductos, useSettings, useTasaBCV, useAuth } from '@/hooks/useVoltech';
+import { supabase } from '@/lib/supabase';
 import { 
   Search, ShoppingCart, MessageCircle, X, Plus, Minus, Trash2, 
   MapPin, Tag, Star, Gift, CheckCircle, Package, TrendingUp, 
   Sun, Moon, Play, Clock, Zap, Truck,
   Sparkles, Trophy, AlertCircle, Ticket, Copy, Users,
-  MessageSquare, ThumbsUp, Upload, Percent, Share2
+  MessageSquare, ThumbsUp, Upload, Percent, Share2,
+  Image as ImageIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -64,6 +66,9 @@ export default function CatalogoPage() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [showBannerSorteo, setShowBannerSorteo] = useState(true);
 
+  const [publicidad, setPublicidad] = useState([]);
+  const [ventas, setVentas] = useState([]); // ✅ NUEVO: Para calcular más vendidos
+
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const refCode = urlParams.get('ref');
@@ -79,6 +84,46 @@ export default function CatalogoPage() {
     if (cartGuardado) setCart(JSON.parse(cartGuardado));
     if (participantesGuardados) setParticipantes(JSON.parse(participantesGuardados));
     if (opinionesGuardadas) setOpiniones(JSON.parse(opinionesGuardadas));
+  }, []);
+
+  // ✅ NUEVO: Cargar publicidad y ventas para calcular más vendidos
+  useEffect(() => {
+    const cargarDatosExtras = async () => {
+      let pubs = [], vts = [];
+      
+      if (supabase) {
+        const [{ data: pData }, { data: vData }] = await Promise.all([
+          supabase.from('publicidad').select('*').eq('estado', 'activo'),
+          supabase.from('ventas').select('*')
+        ]);
+        if (pData) pubs = pData;
+        if (vData) vts = vData;
+      }
+      
+      if (pubs.length === 0) {
+        const localPubs = localStorage.getItem('voltech_publicidad');
+        if (localPubs) pubs = JSON.parse(localPubs).filter(p => p.estado === 'activo');
+      }
+      if (vts.length === 0) {
+        const localVts = localStorage.getItem('voltech_ventas');
+        if (localVts) vts = JSON.parse(localVts);
+      }
+      
+      const now = new Date();
+      const filtradas = pubs.filter(p => {
+        if (p.mostrar_en && p.mostrar_en.catalogo === false) return false;
+        if (p.fecha_inicio && p.fecha_fin) {
+          const start = new Date(p.fecha_inicio + 'T' + (p.hora_inicio || '00:00'));
+          const end = new Date(p.fecha_fin + 'T' + (p.hora_fin || '23:59'));
+          if (now < start || now > end) return false;
+        }
+        return true;
+      });
+
+      setPublicidad(filtradas);
+      setVentas(vts);
+    };
+    cargarDatosExtras();
   }, []);
 
   useEffect(() => {
@@ -134,6 +179,22 @@ export default function CatalogoPage() {
     }, 1000);
     return () => clearInterval(interval);
   }, [sorteoActivo]);
+
+  // ✅ NUEVO: Calcular productos más vendidos basado en el historial de ventas
+  const productosMasVendidos = useMemo(() => {
+    if (!productos.length) return [];
+    const conteo = {};
+    if (ventas.length > 0) {
+      ventas.forEach(v => {
+        if (v.productos && Array.isArray(v.productos)) {
+          v.productos.forEach(p => {
+            conteo[p.productoId] = (conteo[p.productoId] || 0) + (p.cantidad || 1);
+          });
+        }
+      });
+    }
+    return [...productos].sort((a, b) => (conteo[b.id] || 0) - (conteo[a.id] || 0)).slice(0, 3);
+  }, [productos, ventas]);
 
   const tieneSoloProductosDigitales = cart.length > 0 && cart.every(item => item.tipo === 'streaming' || item.categoria?.toUpperCase() === 'STREAMING');
   const calcularPrecioBs = (precioUsd) => (precioUsd * tasaBCV).toFixed(2);
@@ -474,6 +535,41 @@ export default function CatalogoPage() {
   const headerBg = darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-slate-200';
   const totalVotos = productosVotacion.reduce((sum, p) => sum + (p.votos || 0), 0);
 
+  // ✅ NUEVO: Componente reutilizable para tarjetas de publicidad con descripción y botón
+  const renderPubCard = (pub) => (
+    <a 
+      key={pub.id} 
+      href={pub.url_destino || '#'} 
+      target={pub.url_destino ? '_blank' : '_self'}
+      className={`block ${cardBg} border ${cardBorder} rounded-xl overflow-hidden hover:border-voltech-cyan/50 transition-all group`}
+    >
+      <div className="aspect-video bg-voltech-dark relative flex items-center justify-center">
+        {pub.url_imagen ? (
+          <img 
+            src={pub.url_imagen} 
+            alt={pub.titulo} 
+            className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300" 
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-voltech-muted">
+            <ImageIcon className="w-12 h-12 opacity-50" />
+          </div>
+        )}
+      </div>
+      <div className="p-3">
+        <p className="text-sm font-bold text-white truncate">{pub.titulo}</p>
+        {pub.descripcion && <p className="text-xs text-voltech-muted mt-1 line-clamp-2">{pub.descripcion}</p>}
+        <button className="mt-2 w-full bg-voltech-cyan/20 text-voltech-cyan text-xs font-semibold py-1.5 rounded hover:bg-voltech-cyan/30 transition-colors">
+          Ver Oferta
+        </button>
+      </div>
+    </a>
+  );
+
+  // ✅ NUEVO: Filtrar publicidad por lado
+  const pubsIzquierda = publicidad.filter(p => p.lado === 'izquierdo' || p.lado === 'ambos');
+  const pubsDerecha = publicidad.filter(p => p.lado === 'derecho' || p.lado === 'ambos');
+
   return (
     <div className={`min-h-screen ${bg} ${text} flex flex-col transition-colors duration-300`}>
       <Toaster position="top-right" toastOptions={{ style: { background: darkMode ? '#1e293b' : '#fff', color: darkMode ? '#fff' : '#000', border: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}` } }} />
@@ -504,7 +600,6 @@ export default function CatalogoPage() {
           <div className="flex items-center justify-between mb-4">
             <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>VOLTECH <span className="text-purple-600">STOREVE</span></h1>
             
-            {/* ✅ MENÚ MÓVIL (Horizontal scroll) */}
             <nav className="flex md:hidden gap-3 overflow-x-auto pb-1 no-scrollbar flex-1 ml-4">
               {['productos', 'streaming', 'ofertas', 'opiniones', 'sorteos'].map(s => (
                 <button key={s} onClick={() => setActiveSection(s)} className={`whitespace-nowrap text-xs font-medium capitalize px-3 py-1.5 rounded-full transition-colors ${activeSection === s ? 'bg-purple-600/20 text-purple-600 border border-purple-600/30' : 'text-voltech-muted hover:text-white'}`}>
@@ -513,7 +608,6 @@ export default function CatalogoPage() {
               ))}
             </nav>
 
-            {/* ✅ MENÚ DESKTOP */}
             <nav className="hidden md:flex gap-6">
               {['productos', 'streaming', 'ofertas', 'opiniones', 'sorteos'].map(s => (
                 <button key={s} onClick={() => setActiveSection(s)} className={`text-sm font-medium capitalize transition-colors ${activeSection === s ? 'text-purple-600 border-b-2 border-purple-600 pb-1' : darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}>{s}</button>
@@ -547,7 +641,6 @@ export default function CatalogoPage() {
             </div>
           </div>
           
-          {/* ✅ BARRA DE BÚSQUEDA Y FILTROS RESPONSIVE */}
           <div className="mt-4 flex flex-col md:flex-row gap-3 items-stretch md:items-center max-w-4xl">
             <div className="relative flex-1 min-w-[200px]">
               <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
@@ -578,32 +671,37 @@ export default function CatalogoPage() {
       </header>
 
       <main className="max-w-[1800px] xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
-        {/* ✅ GRID RESPONSIVE: order-1 en móvil para productos, sidebars order-2 y order-3 */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
           
-          {/* ✅ LEFT SIDEBAR: Visible en móvil (full width), order-2 */}
-          <aside className="col-span-1 lg:col-span-2 space-y-4 order-2 lg:order-1">
-            <div className={`${cardBg} border ${cardBorder} rounded-xl p-4`}>
-              <h4 className="font-bold text-sm mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-500" /> Super Combos</h4>
-              <div className="space-y-3">
-                <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg p-3 text-white text-center cursor-pointer hover:opacity-90 transition-opacity">
-                  <p className="text-xs font-bold uppercase">Oferta Especial</p>
-                  <p className="text-sm font-bold mt-1">iPhone + AirPods</p>
-                  <p className="text-lg font-extrabold mt-1">$899</p>
-                  <button className="mt-2 w-full bg-white/20 hover:bg-white/30 text-xs py-1.5 rounded transition-colors">Ver Oferta</button>
+          {/* ✅ LEFT SIDEBAR: Condicional a que haya productos */}
+          {productos.length > 0 && (
+            <aside className="col-span-1 lg:col-span-2 space-y-4 order-2 lg:order-1">
+              {pubsIzquierda.length > 0 ? (
+                pubsIzquierda.map(renderPubCard)
+              ) : (
+                <div className={`${cardBg} border ${cardBorder} rounded-xl p-4`}>
+                  <h4 className="font-bold text-sm mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-500" /> Super Combos</h4>
+                  <div className="space-y-3">
+                    <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg p-3 text-white text-center cursor-pointer hover:opacity-90 transition-opacity">
+                      <p className="text-xs font-bold uppercase">Oferta Especial</p>
+                      <p className="text-sm font-bold mt-1">iPhone + AirPods</p>
+                      <p className="text-lg font-extrabold mt-1">$899</p>
+                      <button className="mt-2 w-full bg-white/20 hover:bg-white/30 text-xs py-1.5 rounded transition-colors">Ver Oferta</button>
+                    </div>
+                    <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-100'} rounded-lg p-3 text-center cursor-pointer hover:opacity-90 transition-opacity`}>
+                      <p className="text-xs font-bold text-voltech-muted uppercase">Tienda Hermana</p>
+                      <p className="text-sm font-bold mt-1 text-voltech-cyan">Ropa Deportiva</p>
+                      <p className="text-xs text-voltech-muted mt-1">30% OFF en todo</p>
+                      <button className="mt-2 w-full border border-voltech-cyan text-voltech-cyan hover:bg-voltech-cyan/10 text-xs py-1.5 rounded transition-colors">Visitar</button>
+                    </div>
+                  </div>
                 </div>
-                <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-100'} rounded-lg p-3 text-center cursor-pointer hover:opacity-90 transition-opacity`}>
-                  <p className="text-xs font-bold text-voltech-muted uppercase">Tienda Hermana</p>
-                  <p className="text-sm font-bold mt-1 text-voltech-cyan">Ropa Deportiva</p>
-                  <p className="text-xs text-voltech-muted mt-1">30% OFF en todo</p>
-                  <button className="mt-2 w-full border border-voltech-cyan text-voltech-cyan hover:bg-voltech-cyan/10 text-xs py-1.5 rounded transition-colors">Visitar</button>
-                </div>
-              </div>
-            </div>
-          </aside>
+              )}
+            </aside>
+          )}
 
-          {/* ✅ MAIN CONTENT: order-1 en móvil (se ve primero) */}
-          <div className="col-span-1 lg:col-span-8 xl:col-span-8 order-1 lg:order-2">
+          {/* ✅ MAIN CONTENT */}
+          <div className={`${productos.length === 0 ? 'col-span-full' : 'col-span-1 lg:col-span-8 xl:col-span-8'} order-1 lg:order-2`}>
             {activeSection === 'productos' && (
               <div>
                 <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Productos</h2>
@@ -615,7 +713,7 @@ export default function CatalogoPage() {
                         <div key={p.id} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col cursor-pointer group`}>
                           <div className="aspect-square bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center overflow-hidden relative">
                             {p.imagen ? (
-                              <img src={p.imagen} alt={p.producto} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} />
+                              <img src={p.imagen} alt={p.producto} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} />
                             ) : (
                               <Package className="w-12 h-12 text-slate-300" />
                             )}
@@ -663,7 +761,7 @@ export default function CatalogoPage() {
                     return (
                       <div key={p.id} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-lg transition-all duration-300 h-52 flex cursor-pointer group`}>
                         <div className="w-1/2 bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 relative overflow-hidden flex items-center justify-center">
-                          {p.imagen ? <img src={p.imagen} alt={p.plataforma} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <div className="text-center px-3"><Play className="w-8 h-8 text-white/90 mx-auto mb-1" /><span className="text-white text-sm font-bold tracking-wider block truncate">{p.plataforma?.substring(0, 12).toUpperCase()}</span></div>}
+                          {p.imagen ? <img src={p.imagen} alt={p.plataforma} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <div className="text-center px-3"><Play className="w-8 h-8 text-white/90 mx-auto mb-1" /><span className="text-white text-sm font-bold tracking-wider block truncate">{p.plataforma?.substring(0, 12).toUpperCase()}</span></div>}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                           {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">OFERTA</div>}
                         </div>
@@ -703,7 +801,7 @@ export default function CatalogoPage() {
                       <div key={p.id} onClick={() => setSelectedProduct(p)} className={`${darkMode ? 'bg-gradient-to-br from-orange-900/30 to-red-900/30 border-red-800' : 'bg-gradient-to-br from-orange-50 to-red-50 border-red-200'} rounded-xl shadow-md border-2 overflow-hidden flex flex-col relative hover:shadow-lg transition-all cursor-pointer group`}>
                         <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md z-10">OFERTA</div>
                         <div className="aspect-square bg-slate-100 flex items-center justify-center overflow-hidden">
-                          {p.imagen ? <img src={p.imagen} alt={p.producto || p.plataforma} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-12 h-12 text-slate-300" />}
+                          {p.imagen ? <img src={p.imagen} alt={p.producto || p.plataforma} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-12 h-12 text-slate-300" />}
                         </div>
                         <div className="p-3 flex flex-col flex-1">
                           <h3 className={`font-semibold text-sm mb-2 line-clamp-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto || p.plataforma}</h3>
@@ -780,7 +878,7 @@ export default function CatalogoPage() {
                           </div>
                         ) : (
                           <div className="relative inline-block">
-                            <img src={formDataOpinion.foto} alt="Vista previa" className="w-full max-w-sm h-48 object-cover rounded-xl border border-voltech-border" />
+                            <img src={formDataOpinion.foto} alt="Vista previa" className="w-full max-w-sm h-48 object-contain p-2 bg-voltech-dark rounded-xl border border-voltech-border" />
                             <button type="button" onClick={() => setFormDataOpinion({...formDataOpinion, foto: null})} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs hover:bg-red-600 shadow-lg"><X className="w-4 h-4" /></button>
                           </div>
                         )}
@@ -809,7 +907,7 @@ export default function CatalogoPage() {
                             {opinion.producto && <p className={`text-xs ${mutedText} mb-2`}>Producto: {opinion.producto}</p>}
                             {opinion.foto && (
                               <div className="mb-3">
-                                <img src={opinion.foto} alt={opinion.producto || 'Foto del producto'} className="w-full max-w-xs h-48 object-cover rounded-lg border border-voltech-border cursor-pointer hover:opacity-90 transition-opacity" onClick={() => { const imgWindow = window.open('', '_blank'); imgWindow.document.write(`<html><head><title>${opinion.producto || 'Foto'}</title><style>body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #000; } img { max-width: 100%; max-height: 100vh; object-fit: contain; }</style></head><body><img src="${opinion.foto}" /></body></html>`); }} />
+                                <img src={opinion.foto} alt={opinion.producto || 'Foto del producto'} className="w-full max-w-xs h-48 object-contain p-2 bg-voltech-dark rounded-lg border border-voltech-border cursor-pointer hover:opacity-90 transition-opacity" onClick={() => { const imgWindow = window.open('', '_blank'); imgWindow.document.write(`<html><head><title>${opinion.producto || 'Foto'}</title><style>body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #000; } img { max-width: 100%; max-height: 100vh; object-fit: contain; }</style></head><body><img src="${opinion.foto}" /></body></html>`); }} />
                               </div>
                             )}
                             <p className={`text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'} mb-3`}>{opinion.comentario}</p>
@@ -866,7 +964,7 @@ export default function CatalogoPage() {
                                 if (!prod) return <p className={mutedText}>Producto no disponible</p>;
                                 return (
                                   <div className="flex flex-col md:flex-row gap-6">
-                                    <div className="w-full md:w-1/2 aspect-square bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center overflow-hidden">{prod.imagen ? <img src={prod.imagen} alt={prod.producto} className="w-full h-full object-cover" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Gift className="w-24 h-24 text-slate-300" />}</div>
+                                    <div className="w-full md:w-1/2 aspect-square bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center overflow-hidden">{prod.imagen ? <img src={prod.imagen} alt={prod.producto} className="w-full h-full object-contain p-4" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Gift className="w-24 h-24 text-slate-300" />}</div>
                                     <div className="flex-1">
                                       <p className={`text-xs font-medium uppercase tracking-wide ${mutedText} mb-2`}>{prod.marca} • {prod.categoria}</p>
                                       <h3 className={`text-2xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{prod.producto}</h3>
@@ -892,7 +990,7 @@ export default function CatalogoPage() {
                                     <div key={prod.id} onClick={() => setFormDataSorteo({...formDataSorteo, producto_votado_id: prod.id})} className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${isSelected ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/20' : `${cardBorder} hover:border-purple-400`}`}>
                                       <div className="flex items-center gap-4">
                                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-purple-600 bg-purple-600' : 'border-slate-400'}`}>{isSelected && <div className="w-2 h-2 bg-white rounded-full"></div>}</div>
-                                        <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">{prod.imagen ? <img src={prod.imagen} alt={prod.producto} className="w-full h-full object-cover rounded-lg" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-8 h-8 text-slate-300" />}</div>
+                                        <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">{prod.imagen ? <img src={prod.imagen} alt={prod.producto} className="w-full h-full object-contain p-2 rounded-lg" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-8 h-8 text-slate-300" />}</div>
                                         <div className="flex-1"><h4 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{prod.producto}</h4><p className={`text-sm ${mutedText}`}>{prod.marca} • ${prod.categoria}</p></div>
                                         <div className="text-right">
                                           <div className="flex items-center gap-2"><span className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{porcentaje}%</span></div>
@@ -1032,35 +1130,43 @@ export default function CatalogoPage() {
             )}
           </div>
 
-          {/* ✅ RIGHT SIDEBAR: Visible en móvil (full width), order-3 */}
-          <aside className="col-span-1 lg:col-span-2 space-y-4 order-3 lg:order-3">
-            <div className={`${cardBg} border ${cardBorder} rounded-xl p-4`}>
-              <h4 className="font-bold text-sm mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-voltech-warning" /> Más Vendidos</h4>
-              <div className="space-y-3">
-                {(productos || []).slice(0, 3).map((p, idx) => (
-                  <div key={p.id} className="flex items-center gap-3 cursor-pointer hover:bg-voltech-border/50 p-2 rounded-lg transition-colors" onClick={() => setSelectedProduct(p)}>
-                    <div className="w-10 h-10 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                      {p.imagen ? <img src={p.imagen} className="w-full h-full object-cover rounded-lg" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-5 h-5 text-slate-400" />}
+          {/* ✅ RIGHT SIDEBAR: Condicional a que haya productos */}
+          {productos.length > 0 && (
+            <aside className="col-span-1 lg:col-span-2 space-y-4 order-3 lg:order-3">
+              {pubsDerecha.length > 0 ? (
+                pubsDerecha.map(renderPubCard)
+              ) : (
+                <div className={`${cardBg} border ${cardBorder} rounded-xl p-4`}>
+                  <h4 className="font-bold text-sm mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-voltech-warning" /> Más Vendidos</h4>
+                  <div className="space-y-3">
+                    {productosMasVendidos.length > 0 ? productosMasVendidos.map((p, idx) => (
+                      <div key={p.id} className="flex items-center gap-3 cursor-pointer hover:bg-voltech-border/50 p-2 rounded-lg transition-colors" onClick={() => setSelectedProduct(p)}>
+                        <div className="w-10 h-10 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                          {p.imagen ? <img src={p.imagen} className="w-full h-full object-contain p-1 rounded-lg" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-5 h-5 text-slate-400" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold truncate">{p.producto || p.plataforma}</p>
+                          <p className="text-[10px] text-voltech-muted">${getPrecioMostrar(p).precioPrincipal?.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    )) : (
+                      <p className="text-xs text-voltech-muted text-center py-4">Aún no hay suficientes ventas</p>
+                    )}
+                  </div>
+                  <div className={`mt-4 pt-4 border-t ${cardBorder}`}>
+                    <div className="flex items-center gap-2 text-xs text-voltech-muted mb-2">
+                      <Truck className="w-4 h-4 text-voltech-success" />
+                      <span>Envío GRATIS en compras +$50</span>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold truncate">{p.producto || p.plataforma}</p>
-                      <p className="text-[10px] text-voltech-muted">${getPrecioMostrar(p).precioPrincipal?.toFixed(2)}</p>
+                    <div className="flex items-center gap-2 text-xs text-voltech-muted">
+                      <Clock className="w-4 h-4 text-voltech-cyan" />
+                      <span>Entrega en 24-48h</span>
                     </div>
                   </div>
-                ))}
-              </div>
-              <div className={`mt-4 pt-4 border-t ${cardBorder}`}>
-                <div className="flex items-center gap-2 text-xs text-voltech-muted mb-2">
-                  <Truck className="w-4 h-4 text-voltech-success" />
-                  <span>Envío GRATIS en compras +$50</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-voltech-muted">
-                  <Clock className="w-4 h-4 text-voltech-cyan" />
-                  <span>Entrega en 24-48h</span>
-                </div>
-              </div>
-            </div>
-          </aside>
+              )}
+            </aside>
+          )}
 
         </div>
       </main>
@@ -1117,7 +1223,7 @@ export default function CatalogoPage() {
                       <img 
                         src={selectedProduct.imagen} 
                         alt={selectedProduct.producto || selectedProduct.plataforma} 
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain p-4"
                         onError={(e) => {
                           e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iIzFhMWUyOSIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2MzY2ZjEiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5TaW4gSW1hZ2VuPC90ZXh0Pjwvc3ZnPg==';
                         }}
@@ -1260,7 +1366,7 @@ export default function CatalogoPage() {
                         return (
                           <div key={item.id} className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} p-3 rounded-lg`}>
                             <div className="flex gap-3">
-                              <div className={`w-16 h-16 rounded flex items-center justify-center flex-shrink-0 overflow-hidden ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>{item.imagen ? <img src={item.imagen} className="w-full h-full object-cover" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className={`w-8 h-8 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />}</div>
+                              <div className={`w-16 h-16 rounded flex items-center justify-center flex-shrink-0 overflow-hidden ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>{item.imagen ? <img src={item.imagen} className="w-full h-full object-contain p-2" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className={`w-8 h-8 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />}</div>
                               <div className="flex-1 min-w-0">
                                 <h3 className={`font-semibold text-sm truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{item.producto || item.plataforma}</h3>
                                 <div className="flex items-center gap-2">

@@ -1,478 +1,554 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
+import { supabase } from '@/lib/supabase';
+import { usePermissions } from '@/app/context/PermissionsContext';
 import { 
-  BarChart,
-  LineChart,
-  PieChart,
-  DollarSign,
-  Users,
-  TrendingUp,
-  Clock,
-  Calendar,
-  AlertTriangle,
-  ShoppingCart,
-  PlayCircle
+  Users, Plus, Edit, Trash2, X, Shield, UserCheck, UserX, 
+  Copy, Check, Search, AlertCircle, Mail, Phone, Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
-export default function DashboardVentasPage() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [ventasProductos, setVentasProductos] = useState([]);
-  const [ventasStreaming, setVentasStreaming] = useState([]);
-  const [clientes, setClientes] = useState([]);
-  const [carteras, setCarteras] = useState([]);
-  const [loading, setLoading] = useState(true);
+// ✅ FUNCIÓN PARA GENERAR UUID VÁLIDO
+const generarUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 
-  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage y lógica de fusión intacta
+export default function EquipoPage() {
+  const { tienePermiso, esAdmin, esSocio, usuarioActual } = usePermissions();
+  const [miembros, setMiembros] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showInvitationLink, setShowInvitationLink] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    nombre: '',
+    email: '',
+    telefono: '',
+    rol: 'vendedor',
+    activo: true,
+  });
+
   useEffect(() => {
-    const cargarDatos = async () => {
-      const userLogged = localStorage.getItem('voltech_user');
-      if (userLogged) {
-        setCurrentUser(JSON.parse(userLogged));
-      }
-
-      let vts = [], clts = [], crt = [];
-
-      // 1. Intentar cargar desde Supabase
-      if (supabase) {
-        const [{ data: vData }, { data: cData }, { data: sData }] = await Promise.all([
-          supabase.from('ventas').select('*'),
-          supabase.from('clientes').select('*'),
-          supabase.from('settings').select('valor').eq('clave', 'carteras').single()
-        ]);
-        if (vData) vts = vData;
-        if (cData) clts = cData;
-        if (sData?.valor) crt = sData.valor;
-      }
-
-      // 2. Fallback / Fusión con localStorage si no hay datos en Supabase
-      if (vts.length === 0) {
-        const ventasProductosGuardadas = localStorage.getItem('voltech_ventas_productos');
-        const ventasLegacy = localStorage.getItem('voltech_ventas');
-        
-        let todasVentasProductos = [];
-        
-        if (ventasProductosGuardadas) {
-          const ventas = JSON.parse(ventasProductosGuardadas);
-          todasVentasProductos = [...todasVentasProductos, ...ventas];
-        }
-        
-        if (ventasLegacy) {
-          const ventas = JSON.parse(ventasLegacy);
-          const ventasProductosLegacy = ventas.filter(v => !v.tipo || v.tipo === 'producto' || v.tipo === 'fisico');
-          todasVentasProductos = [...todasVentasProductos, ...ventasProductosLegacy];
-        }
-        
-        const ventasUnicasProductos = [...new Map(todasVentasProductos.map(v => [v.id, { ...v, tipo: 'producto' }])).values()];
-        
-        const ventasStreamingGuardadas = localStorage.getItem('voltech_ventas_streaming');
-        let ventasStream = [];
-        if (ventasStreamingGuardadas) {
-          ventasStream = JSON.parse(ventasStreamingGuardadas).map(v => ({ ...v, tipo: 'streaming' }));
-        }
-        
-        vts = [...ventasUnicasProductos, ...ventasStream];
-      }
-
-      if (clts.length === 0) {
-        const clientesGuardados = localStorage.getItem('voltech_clientes');
-        if (clientesGuardados) clts = JSON.parse(clientesGuardados);
-      }
-
-      if (crt.length === 0) {
-        const carterasGuardadas = localStorage.getItem('voltech_carteras');
-        if (carterasGuardadas) crt = JSON.parse(carterasGuardadas);
-      }
-
-      // 3. Actualizar estados
-      setVentasProductos(vts.filter(v => v.tipo === 'producto' || v.tipo === 'fisico' || !v.tipo));
-      setVentasStreaming(vts.filter(v => v.tipo === 'streaming'));
-      setClientes(clts);
-      setCarteras(crt);
-      setLoading(false);
-    };
-
-    cargarDatos();
+    cargarMiembros();
   }, []);
 
-  const isAdmin = currentUser?.rol === 'admin';
+  const cargarMiembros = async () => {
+    setLoading(true);
+    let miembrosData = [];
 
-  // ✅ FUNCIÓN AUXILIAR: Obtener el nombre de la cartera (maneja tanto 'cartera' como 'carteraId')
-  const obtenerNombreCartera = (venta) => {
-    if (venta.cartera) return venta.cartera; // Formato antiguo o directo
-    if (venta.carteraId) {
-      // Buscar el nombre usando el ID guardado
-      const carteraEncontrada = carteras.find(c => c.id === venta.carteraId || c.nombre === venta.carteraId);
-      return carteraEncontrada ? carteraEncontrada.nombre : venta.carteraId;
+    // 1. Intentar cargar desde Supabase
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('*')
+        .order('fechaRegistro', { ascending: false });
+      
+      if (!error && data && data.length > 0) {
+        miembrosData = data;
+      }
     }
-    return 'Sin cartera';
+
+    // 2. Fallback a localStorage
+    if (miembrosData.length === 0) {
+      const equipoGuardado = localStorage.getItem('voltech_equipo');
+      if (equipoGuardado) {
+        miembrosData = JSON.parse(equipoGuardado);
+      } else {
+        miembrosData = [{ 
+          id: generarUUID(), 
+          nombre: 'Administrador', 
+          email: 'admin@voltech.store', 
+          telefono: '', 
+          rol: 'admin', 
+          activo: true,
+          aprobado: true,
+          registrado: true,
+          password: 'admin123'
+        }];
+      }
+    }
+
+    setMiembros(miembrosData);
+    setLoading(false);
   };
 
-  // Combinar todas las ventas y ordenar por fecha
-  const todasLasVentas = [...ventasProductos, ...ventasStreaming].sort((a, b) => 
-    new Date(b.fecha || b.fechaRegistro) - new Date(a.fecha || a.fechaRegistro)
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData({ ...formData, [name]: type === 'checkbox' ? checked : value });
+  };
+
+  const generarPasswordAleatorio = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
+
+  const generarLinkInvitacion = () => {
+    const token = generarUUID();
+    return `${window.location.origin}/registro?token=${token}`;
+  };
+
+  const emailExiste = (email, excludeId = null) => {
+    return miembros.some(m => 
+      m.email?.toLowerCase() === email.toLowerCase() && m.id !== excludeId
+    );
+  };
+
+  const guardarMiembro = async () => {
+    if (!formData.nombre || !formData.email) {
+      toast.error('Completa los campos obligatorios');
+      return;
+    }
+
+    if (emailExiste(formData.email)) {
+      toast.error('Este correo electrónico ya está registrado');
+      return;
+    }
+
+    const passwordAleatorio = generarPasswordAleatorio();
+    const linkInvitacion = generarLinkInvitacion();
+
+    const nuevoMiembro = {
+      id: generarUUID(), // ✅ UUID válido
+      nombre: formData.nombre,
+      email: formData.email,
+      telefono: formData.telefono,
+      rol: formData.rol,
+      activo: formData.activo,
+      aprobado: true,
+      registrado: false,
+      password: passwordAleatorio,
+      linkInvitacion: linkInvitacion,
+      notificado: false,
+      fechaRegistro: new Date().toISOString(),
+    };
+
+    // Guardar en Supabase
+    if (supabase) {
+      const { error } = await supabase.from('usuarios').insert([nuevoMiembro]);
+      if (error) {
+        toast.error('Error al guardar: ' + error.message);
+        return;
+      }
+    }
+
+    const miembrosActualizados = [...miembros, nuevoMiembro];
+    setMiembros(miembrosActualizados);
+    localStorage.setItem('voltech_equipo', JSON.stringify(miembrosActualizados));
+
+    toast.success(`Miembro agregado. Contraseña: ${passwordAleatorio}`);
+    setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: true });
+    setEditingId(null);
+  };
+
+  const actualizarMiembro = async (id) => {
+    if (!formData.nombre || !formData.email) {
+      toast.error('Completa los campos obligatorios');
+      return;
+    }
+
+    if (emailExiste(formData.email, id)) {
+      toast.error('Este correo electrónico ya está siendo usado');
+      return;
+    }
+
+    if (supabase) {
+      const { error } = await supabase
+        .from('usuarios')
+        .update({
+          nombre: formData.nombre,
+          email: formData.email,
+          telefono: formData.telefono,
+          rol: formData.rol,
+          activo: formData.activo,
+        })
+        .eq('id', id);
+
+      if (error) {
+        toast.error('Error al actualizar: ' + error.message);
+        return;
+      }
+    }
+
+    const miembrosActualizados = miembros.map(m =>
+      m.id === id ? { ...m, ...formData } : m
+    );
+    setMiembros(miembrosActualizados);
+    localStorage.setItem('voltech_equipo', JSON.stringify(miembrosActualizados));
+    toast.success('Miembro actualizado correctamente');
+    setEditingId(null);
+    setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: true });
+  };
+
+  const eliminarMiembro = async (id) => {
+    const miembro = miembros.find(m => m.id === id);
+    
+    // Proteger al último admin
+    if (miembro?.rol === 'admin' && miembros.filter(m => m.rol === 'admin').length === 1) {
+      toast.error('No se puede eliminar al último administrador');
+      return;
+    }
+
+    if (!confirm('¿Estás seguro de eliminar este miembro?')) return;
+
+    if (supabase) {
+      const { error } = await supabase.from('usuarios').delete().eq('id', id);
+      if (error) {
+        toast.error('Error al eliminar: ' + error.message);
+        return;
+      }
+    }
+
+    const miembrosActualizados = miembros.filter(m => m.id !== id);
+    setMiembros(miembrosActualizados);
+    localStorage.setItem('voltech_equipo', JSON.stringify(miembrosActualizados));
+    toast.success('Miembro eliminado');
+  };
+
+  const toggleActivo = async (id) => {
+    const miembro = miembros.find(m => m.id === id);
+    const nuevoEstado = !miembro.activo;
+
+    if (supabase) {
+      const { error } = await supabase
+        .from('usuarios')
+        .update({ activo: nuevoEstado })
+        .eq('id', id);
+      
+      if (error) {
+        toast.error('Error al actualizar estado');
+        return;
+      }
+    }
+
+    const miembrosActualizados = miembros.map(m =>
+      m.id === id ? { ...m, activo: nuevoEstado } : m
+    );
+    setMiembros(miembrosActualizados);
+    localStorage.setItem('voltech_equipo', JSON.stringify(miembrosActualizados));
+  };
+
+  const copiarLink = () => {
+    const link = `${window.location.origin}/registro?invite=voltech`;
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    toast.success('Link copiado al portapapeles');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const editarMiembro = (miembro) => {
+    setEditingId(miembro.id);
+    setFormData({
+      nombre: miembro.nombre,
+      email: miembro.email,
+      telefono: miembro.telefono || '',
+      rol: miembro.rol,
+      activo: miembro.activo,
+    });
+  };
+
+  const cancelarEdicion = () => {
+    setEditingId(null);
+    setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: true });
+  };
+
+  const miembrosFiltrados = miembros.filter(m =>
+    m.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    m.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Estadísticas generales
-  const totalVentas = todasLasVentas.length;
-  const totalIngresos = todasLasVentas.reduce((sum, venta) => sum + (venta.total || 0), 0);
-  const clientesUnicos = new Set(todasLasVentas.map(venta => venta.cliente)).size;
-  
-  const hoy = new Date().toDateString();
-  const ventasHoy = todasLasVentas.filter(venta => 
-    new Date(venta.fecha || venta.fechaRegistro).toDateString() === hoy
-  ).length;
-  
-  const ventaMasAlta = todasLasVentas.reduce((max, venta) => 
-    (venta.total > (max?.total || 0)) ? venta : max, null);
-  
-  // Calcular ventas por vendedor
-  const ventasPorVendedor = todasLasVentas.reduce((acc, venta) => {
-    const vendedor = venta.vendedor || 'Sin vendedor';
-    acc[vendedor] = (acc[vendedor] || 0) + 1;
-    return acc;
-  }, {});
-
-  const vendedorTop = Object.entries(ventasPorVendedor).reduce((a, b) => 
-    a[1] > b[1] ? a : b, ['', 0]);
-
-  // Calcular distribución por tipo
-  const totalProductos = ventasProductos.length;
-  const totalStreaming = ventasStreaming.length;
-  const porcentajeProductos = totalVentas > 0 ? Math.round((totalProductos / totalVentas) * 100) : 0;
-  const porcentajeStreaming = totalVentas > 0 ? Math.round((totalStreaming / totalVentas) * 100) : 0;
-
-  // ✅ Calcular ingresos por cartera usando la función auxiliar
-  const ingresosPorCartera = todasLasVentas.reduce((acc, venta) => {
-    const nombreCartera = obtenerNombreCartera(venta);
-    acc[nombreCartera] = (acc[nombreCartera] || 0) + (venta.total || 0);
-    return acc;
-  }, {});
-
-  // Obtener descripción del producto/servicio
-  const getDescripcionProducto = (venta) => {
-    if (venta.tipo === 'streaming') {
-      // Para streaming, mostrar la plataforma
-      if (venta.plataformas && venta.plataformas.length > 0) {
-        return venta.plataformas[0].plataforma || 'Streaming';
-      }
-      return 'Servicio Streaming';
-    } else {
-      // Para productos, mostrar el nombre del primer producto
-      if (venta.productos && venta.productos.length > 0) {
-        return venta.productos[0].nombre || venta.productos[0].plataforma || 'Producto';
-      }
-      return 'Producto Físico';
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-voltech-cyan mx-auto mb-4"></div>
-          <p className="text-voltech-muted">Cargando dashboard...</p>
-        </div>
-      </div>
-    );
-  }
+  const totalActivos = miembros.filter(m => m.activo).length;
+  const totalInactivos = miembros.filter(m => !m.activo).length;
 
   return (
     <div className="space-y-6">
-      <Toaster position="top-right" toastOptions={{
-        style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' },
-        success: { iconTheme: { primary: '#00ff88', secondary: '#fff' } },
-        error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } },
-      }} />
+      <Toaster position="top-right" />
 
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard de Ventas</h1>
-          <p className="text-sm text-voltech-muted mt-1">Vista general de tu actividad de ventas</p>
+          <h1 className="text-2xl font-bold text-white">Equipo</h1>
+          <p className="text-sm text-voltech-muted mt-1">Gestiona los miembros de tu equipo y sus permisos</p>
         </div>
-        <div className="flex gap-3">
-          <button className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2">
-            <Calendar className="w-4 h-4" /> Filtro por fecha
-          </button>
-          <button className="px-4 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg text-sm hover:bg-voltech-purple/30 transition-colors flex items-center gap-2">
-            <Users className="w-4 h-4" /> Filtro por vendedor
-          </button>
-        </div>
+        {tienePermiso('puedeCrearUsuarios') && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowInvitationLink(!showInvitationLink)}
+              className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2"
+            >
+              <Copy className="w-4 h-4" />
+              Link de Invitación
+            </button>
+            {!editingId && (
+              <button
+                onClick={() => setEditingId('new')}
+                className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Agregar Miembro
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <AnimatePresence>
+        {showInvitationLink && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden"
+          >
+            <div className="p-4">
+              <h3 className="text-sm font-semibold text-white mb-2">Link de Invitación General</h3>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={`${window.location.origin}/registro?invite=voltech`}
+                  className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm font-mono"
+                />
+                <button
+                  onClick={copiarLink}
+                  className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"
+                >
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copied ? 'Copiado' : 'Copiar'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {editingId && tienePermiso('puedeEditarUsuarios') && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="bg-voltech-surface border border-voltech-border rounded-xl p-6"
+          >
+            <h3 className="text-lg font-bold text-white mb-4">
+              {editingId === 'new' ? 'Agregar Nuevo Miembro' : 'Editar Miembro'}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-voltech-muted mb-1 ml-1">Nombre *</label>
+                <input
+                  type="text"
+                  name="nombre"
+                  value={formData.nombre}
+                  onChange={handleChange}
+                  className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-1 ml-1">Email *</label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-1 ml-1">Teléfono</label>
+                <input
+                  type="tel"
+                  name="telefono"
+                  value={formData.telefono}
+                  onChange={handleChange}
+                  className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-1 ml-1">Rol</label>
+                <select
+                  name="rol"
+                  value={formData.rol}
+                  onChange={handleChange}
+                  className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
+                >
+                  <option value="admin">Administrador</option>
+                  <option value="socio">Socio</option>
+                  <option value="vendedor">Vendedor</option>
+                  <option value="logistica">Logística</option>
+                  <option value="marketing">Marketing</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mt-4">
+              <input
+                type="checkbox"
+                name="activo"
+                checked={formData.activo}
+                onChange={handleChange}
+                className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan"
+              />
+              <span className="text-sm text-voltech-muted">Miembro activo</span>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => editingId === 'new' ? guardarMiembro() : actualizarMiembro(editingId)}
+                className="flex-1 btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"
+              >
+                <Check className="w-4 h-4" />
+                {editingId === 'new' ? 'Guardar' : 'Guardar Cambios'}
+              </button>
+              <button
+                onClick={cancelarEdicion}
+                className="px-6 py-3 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-error transition-all flex items-center gap-2"
+              >
+                <X className="w-4 h-4" />
+                Cancelar
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-voltech-cyan/20">
-              <DollarSign className="w-5 h-5 text-voltech-cyan" />
+              <Users className="w-5 h-5 text-voltech-cyan" />
             </div>
             <div>
-              <p className="text-xs text-voltech-muted">Ingresos totales</p>
-              <p className="text-lg font-bold text-white">${totalIngresos.toFixed(2)}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-purple/20">
-              <BarChart className="w-5 h-5 text-voltech-purple" />
-            </div>
-            <div>
-              <p className="text-xs text-voltech-muted">Total de Ventas</p>
-              <p className="text-lg font-bold text-white">{totalVentas}</p>
+              <p className="text-xs text-voltech-muted">Total Miembros</p>
+              <p className="text-xl font-bold text-white">{miembros.length}</p>
             </div>
           </div>
         </div>
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-voltech-success/20">
-              <Users className="w-5 h-5 text-voltech-success" />
+              <UserCheck className="w-5 h-5 text-voltech-success" />
             </div>
             <div>
-              <p className="text-xs text-voltech-muted">Clientes únicos</p>
-              <p className="text-lg font-bold text-white">{clientesUnicos}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-warning/20">
-              <TrendingUp className="w-5 h-5 text-voltech-warning" />
-            </div>
-            <div>
-              <p className="text-xs text-voltech-muted">Ventas hoy</p>
-              <p className="text-lg font-bold text-white">{ventasHoy}</p>
+              <p className="text-xs text-voltech-muted">Activos</p>
+              <p className="text-xl font-bold text-white">{totalActivos}</p>
             </div>
           </div>
         </div>
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-voltech-error/20">
-              <AlertTriangle className="w-5 h-5 text-voltech-error" />
+              <UserX className="w-5 h-5 text-voltech-error" />
             </div>
             <div>
-              <p className="text-xs text-voltech-muted">Venta más alta</p>
-              <p className="text-lg font-bold text-white">${ventaMasAlta?.total ? ventaMasAlta.total.toFixed(2) : '0.00'}</p>
+              <p className="text-xs text-voltech-muted">Inactivos</p>
+              <p className="text-xl font-bold text-white">{totalInactivos}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Gráfico de Ventas por Tipo */}
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6 col-span-1 lg:col-span-2">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-voltech-cyan/20">
-                <BarChart className="w-5 h-5 text-voltech-cyan" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">Ventas por Tipo</h3>
-                <p className="text-xs text-voltech-muted">Distribución de ventas entre productos y streaming</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="h-64 flex items-center justify-center">
-            <div className="w-full h-full flex flex-col items-center justify-center gap-6">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-voltech-purple/20 flex items-center justify-center">
-                    <ShoppingCart className="w-6 h-6 text-voltech-purple" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">Ventas Productos</p>
-                    <p className="text-xs text-voltech-muted">{totalProductos} ventas ({porcentajeProductos}%)</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-voltech-cyan/20 flex items-center justify-center">
-                    <PlayCircle className="w-6 h-6 text-voltech-cyan" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">Ventas Streaming</p>
-                    <p className="text-xs text-voltech-muted">{totalStreaming} ventas ({porcentajeStreaming}%)</p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Barra de progreso visual */}
-              <div className="w-full max-w-md h-4 bg-voltech-dark rounded-full overflow-hidden flex">
-                <div 
-                  className="h-full bg-voltech-purple transition-all duration-500"
-                  style={{ width: `${porcentajeProductos}%` }}
-                ></div>
-                <div 
-                  className="h-full bg-voltech-cyan transition-all duration-500"
-                  style={{ width: `${porcentajeStreaming}%` }}
-                ></div>
-              </div>
-            </div>
+      <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
+        <div className="p-4 border-b border-voltech-border">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-voltech-muted" />
+            <input
+              type="text"
+              placeholder="Buscar por nombre o email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="input-voltech w-full rounded-lg pl-10 pr-4 py-2 text-sm"
+            />
           </div>
         </div>
-
-        {/* Gráfico de Ventas por Vendedor */}
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-voltech-success/20">
-                <Users className="w-5 h-5 text-voltech-success" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">Ventas por Vendedor</h3>
-                <p className="text-xs text-voltech-muted">Desglose de ventas por miembro del equipo</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="h-64 flex items-center justify-center">
-            <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-              {Object.entries(ventasPorVendedor).map(([vendedor, count], index) => (
-                <div key={vendedor} className="flex items-center gap-3 w-full px-4">
-                  <div className="w-10 h-10 rounded-full bg-voltech-cyan/20 flex items-center justify-center flex-shrink-0">
-                    <Users className="w-5 h-5 text-voltech-cyan" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-white">{vendedor}</p>
-                    <p className="text-xs text-voltech-muted">{count} ventas</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-voltech-cyan">{count}</p>
-                  </div>
-                </div>
-              ))}
-              {Object.keys(ventasPorVendedor).length === 0 && (
-                <p className="text-sm text-voltech-muted">No hay ventas registradas</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabla de Ventas Recientes */}
-      <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-voltech-cyan/20">
-              <Clock className="w-5 h-5 text-voltech-cyan" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-white">Ventas Recientes</h3>
-              <p className="text-xs text-voltech-muted">Últimas transacciones realizadas</p>
-            </div>
-          </div>
-        </div>
-        
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-voltech-dark border-b border-voltech-border">
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Fecha</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Cliente</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Tipo</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Producto/Servicio</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Método de Pago</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Cartera</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Total</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Vendedor</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Miembro</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Contacto</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Rol</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Estado</th>
+                {tienePermiso('puedeEditarUsuarios') && (
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Acciones</th>
+                )}
               </tr>
             </thead>
             <tbody>
-              {todasLasVentas.slice(0, 10).map((venta, index) => (
-                <tr key={`${venta.id || index}-${venta.tipo}`} className="border-b border-voltech-border hover:bg-voltech-border/30">
-                  <td className="px-4 py-3 text-sm text-white">
-                    {new Date(venta.fecha || venta.fechaRegistro).toLocaleDateString('es-VE')}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-white">{venta.cliente || 'N/A'}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <span className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 w-fit ${
-                      venta.tipo === 'streaming' 
-                        ? 'bg-voltech-cyan/20 text-voltech-cyan' 
-                        : 'bg-voltech-purple/20 text-voltech-purple'
-                    }`}>
-                      {venta.tipo === 'streaming' ? (
-                        <><PlayCircle className="w-3 h-3" /> Streaming</>
-                      ) : (
-                        <><ShoppingCart className="w-3 h-3" /> Producto</>
-                      )}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-white">
-                    {getDescripcionProducto(venta)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-voltech-muted">
-                    {venta.metodoPago ? venta.metodoPago.replace('_', ' ') : 'N/A'}
-                  </td>
-                  {/* ✅ CORRECCIÓN: Usar la función auxiliar para mostrar el nombre de la cartera */}
-                  <td className="px-4 py-3 text-sm text-voltech-muted">
-                    {obtenerNombreCartera(venta)}
-                  </td>
-                  <td className="px-4 py-3 text-sm font-bold text-voltech-success">
-                    ${(venta.total || 0).toFixed(2)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-voltech-muted">{venta.vendedor || 'N/A'}</td>
-                </tr>
-              ))}
-              {todasLasVentas.length === 0 && (
+              {miembrosFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-4 py-8 text-center text-voltech-muted">
-                    No hay ventas registradas aún
+                  <td colSpan={tienePermiso('puedeEditarUsuarios') ? 5 : 4} className="text-center py-12 text-voltech-muted">
+                    <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No hay miembros registrados</p>
                   </td>
                 </tr>
+              ) : (
+                miembrosFiltrados.map((miembro) => (
+                  <tr key={miembro.id} className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-voltech-cyan to-voltech-purple flex items-center justify-center text-white font-bold">
+                          {miembro.nombre?.charAt(0) || '?'}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-white">{miembro.nombre}</p>
+                          <p className="text-xs text-voltech-muted">{miembro.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-voltech-muted">{miembro.telefono || '-'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        miembro.rol === 'admin' ? 'bg-voltech-purple/20 text-voltech-purple' :
+                        miembro.rol === 'socio' ? 'bg-voltech-warning/20 text-voltech-warning' :
+                        'bg-voltech-cyan/20 text-voltech-cyan'
+                      }`}>
+                        {miembro.rol}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => toggleActivo(miembro.id)}
+                        className={`text-xs px-3 py-1 rounded-full flex items-center gap-1 ${
+                          miembro.activo
+                            ? 'bg-voltech-success/20 text-voltech-success hover:bg-voltech-success/30'
+                            : 'bg-voltech-error/20 text-voltech-error hover:bg-voltech-error/30'
+                        } transition-colors`}
+                      >
+                        {miembro.activo ? <UserCheck className="w-3 h-3" /> : <UserX className="w-3 h-3" />}
+                        {miembro.activo ? 'Activo' : 'Inactivo'}
+                      </button>
+                    </td>
+                    {tienePermiso('puedeEditarUsuarios') && (
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => editarMiembro(miembro)}
+                            className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => eliminarMiembro(miembro.id)}
+                            className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* Resumen por Cartera */}
-      <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-voltech-success/20">
-              <DollarSign className="w-5 h-5 text-voltech-success" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-white">Resumen por Cartera</h3>
-              <p className="text-xs text-voltech-muted">Distribución de ingresos por cartera</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {Object.entries(ingresosPorCartera).map(([cartera, monto], index) => (
-            <div key={index} className="bg-voltech-dark/50 border border-voltech-border rounded-xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-voltech-cyan/20 flex items-center justify-center">
-                    <DollarSign className="w-4 h-4 text-voltech-cyan" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">{cartera}</p>
-                    <p className="text-xs text-voltech-muted">Cartera {index + 1}</p>
-                  </div>
-                </div>
-                <span className="text-sm font-bold text-voltech-success">${monto.toFixed(2)}</span>
-              </div>
-              <div className="h-2 bg-voltech-border rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-voltech-cyan transition-all duration-500" 
-                  style={{ width: `${totalIngresos > 0 ? (monto / totalIngresos) * 100 : 0}%` }}
-                ></div>
-              </div>
-            </div>
-          ))}
-          {Object.keys(ingresosPorCartera).length === 0 && (
-            <div className="col-span-3 text-center py-8 text-voltech-muted">
-              No hay ingresos registrados por cartera
-            </div>
-          )}
         </div>
       </div>
     </div>

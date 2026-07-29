@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
+import { supabase } from '@/lib/supabase';
+import { usePermissions } from '@/app/context/PermissionsContext'; // ✅ NUEVO: Sistema de permisos
 import { 
   ShoppingCart, 
   DollarSign, 
@@ -38,6 +39,8 @@ import 'jspdf-autotable';
 
 export default function VentasProductosPage() {
   const router = useRouter();
+  const { esVendedor, usuarioActual } = usePermissions(); // ✅ NUEVO
+  
   const [ventas, setVentas] = useState([]);
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -48,13 +51,13 @@ export default function VentasProductosPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState(null);
   const [showWhatsappModal, setShowWhatsappModal] = useState(null);
-  const [whatsappMode, setWhatsappMode] = useState('gracias'); // ✅ NUEVO: Modo de WhatsApp
+  const [whatsappMode, setWhatsappMode] = useState('gracias');
   const [editingId, setEditingId] = useState(null);
   const [showProductoModal, setShowProductoModal] = useState(false);
   const [productoModalIndex, setProductoModalIndex] = useState(null);
   const [clienteSearch, setClienteSearch] = useState('');
   const [showClientesDropdown, setShowClientesDropdown] = useState(false);
-  const [showReferralModal, setShowReferralModal] = useState(null); // ✅ NUEVO: Modal de referidos
+  const [showReferralModal, setShowReferralModal] = useState(null);
 
   const [nuevoProducto, setNuevoProducto] = useState({
     plataforma: '',
@@ -69,7 +72,6 @@ export default function VentasProductosPage() {
     cartera: '',
   });
 
-  // ✅ FUNCIÓN PARA GENERAR NÚMERO DE ORDEN (DD-MM-###)
   const generarNumeroOrden = () => {
     const hoy = new Date();
     const dia = String(hoy.getDate()).padStart(2, '0');
@@ -103,7 +105,6 @@ export default function VentasProductosPage() {
     referencia: '',
   });
 
-  // ✅ ACTUALIZADO: Carga datos desde Supabase con fallback a localStorage
   useEffect(() => {
     const cargarDatos = async () => {
       let vts = [], prods = [], clts = [], eqp = [], crt = [], sttngs = {};
@@ -145,6 +146,11 @@ export default function VentasProductosPage() {
         };
       }
 
+      // ✅ FILTRAR VENTAS SI ES VENDEDOR (Privacidad de datos)
+      if (esVendedor && usuarioActual?.nombre) {
+        vts = vts.filter(v => v.vendedor?.toLowerCase() === usuarioActual.nombre.toLowerCase());
+      }
+
       setVentas(vts);
       setProductos(prods);
       setClientes(clts);
@@ -153,13 +159,12 @@ export default function VentasProductosPage() {
       setSettings(sttngs);
     };
     cargarDatos();
-  }, []);
+  }, [esVendedor, usuarioActual]); // ✅ Dependencias actualizadas
 
   const tasaBCV = settings.tasaBCV || 36.5;
   const vendedores = equipo.filter(m => m.activo && (m.rol === 'vendedor' || m.rol === 'admin' || m.rol === 'Admin'));
   const productosDisponibles = productos.filter(p => p.cantidad > 0);
 
-  // ✅ FILTRAR SOLO MÉTODOS DE PAGO Y CARTERAS ACTIVAS DESDE AJUSTES
   const metodosPagoActivos = Object.entries(settings.pagos || {}).filter(([_, val]) => val && val.activo);
   const carterasActivas = (settings.carteras || []).filter(c => c.activo);
 
@@ -252,7 +257,6 @@ export default function VentasProductosPage() {
     }
   }, [nuevoProducto.precioDetal, tasaBCV]);
 
-  // ✅ ACTUALIZADO: Guarda producto en Supabase y localStorage
   const guardarProductoYRedirigir = async () => {
     if (!nuevoProducto.plataforma || !nuevoProducto.categoria || !nuevoProducto.marca) {
       toast.error('Completa los campos obligatorios (Producto, Categoría, Marca)');
@@ -295,7 +299,6 @@ export default function VentasProductosPage() {
       };
     }
 
-    // ✅ Guardar en Supabase
     if (supabase) {
       const { error } = await supabase.from('productos').upsert(productoFinal, { onConflict: 'id' });
       if (error) toast.error('Error al guardar en la nube: ' + error.message);
@@ -324,7 +327,6 @@ export default function VentasProductosPage() {
   const totalVenta = subtotal + (formData.delivery ? formData.montoDelivery : 0);
   const montoPendiente = formData.enCuotas ? totalVenta - formData.montoAbonado : 0;
 
-  // ✅ ACTUALIZADO: Registra venta en Supabase y localStorage
   const registrarVenta = async () => {
     if (!formData.cliente || !formData.telefono || formData.productos.some(p => !p.productoId)) {
       toast.error('Completa los campos obligatorios (Cliente, Teléfono, Productos)');
@@ -407,7 +409,6 @@ export default function VentasProductosPage() {
       ? ventas.map(v => v.id === editingId ? nuevaVenta : v)
       : [nuevaVenta, ...ventas];
 
-    // ✅ Guardar en Supabase
     if (supabase) {
       await supabase.from('ventas').upsert(nuevaVenta, { onConflict: 'id' });
       await supabase.from('clientes').upsert(nuevoCliente, { onConflict: 'id' });
@@ -435,7 +436,7 @@ export default function VentasProductosPage() {
     setFormData({
       numeroOrden: generarNumeroOrden(),
       fecha: new Date().toISOString().split('T')[0],
-      vendedor: '',
+      vendedor: esVendedor ? (usuarioActual?.nombre || '') : '', // ✅ Auto-seleccionar vendedor
       cliente: '',
       telefono: '',
       productos: [{ productoId: '', sku: '', categoria: '', marca: '', cantidad: 1, precioUnitario: 0 }],
@@ -453,7 +454,6 @@ export default function VentasProductosPage() {
     setEditingId(null);
   };
 
-  // ✅ ACTUALIZADO: Marca como pagado en Supabase
   const marcarPagado = async (venta) => {
     const ventaActualizada = { 
       ...venta, 
@@ -480,7 +480,6 @@ export default function VentasProductosPage() {
     toast.success('Venta marcada como pagada');
   };
 
-  // ✅ ACTUALIZADO: Elimina venta y devuelve stock en Supabase
   const eliminarVenta = async (venta) => {
     if (!confirm('¿Estás seguro de eliminar esta venta? El stock será devuelto.')) return;
 
@@ -537,12 +536,10 @@ export default function VentasProductosPage() {
     setShowForm(true);
   };
 
-  // ✅ FUNCIÓN PARA GENERAR PDF (NOTA DE ENTREGA) BASADA EN TU ARCHIVO
   const generarPDF = (venta) => {
     const doc = new jsPDF();
     const tienda = settings.tienda || { nombre: 'VOLTECHSTORE.VE', direccion: 'Caracas, Venezuela', telefono: '04125378515', instagram: '@VoltechStore.ve' };
     
-    // Encabezado
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
     doc.text(tienda.nombre, 105, 15, { align: 'center' });
@@ -555,7 +552,6 @@ export default function VentasProductosPage() {
     doc.setFont("helvetica", "bold");
     doc.text("NOTA DE ENTREGA Y GARANTÍA", 105, 35, { align: 'center' });
 
-    // Datos de la venta
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     let y = 45;
@@ -566,7 +562,6 @@ export default function VentasProductosPage() {
     doc.text(`VENDEDOR: ${venta.vendedor}`, 14, y);
     doc.text(`METODO DE PAGO: ${(venta.metodoPago || 'N/A').replace('_', ' ').toUpperCase()}`, 140, y); y += 10;
 
-    // Tabla de productos
     const tableData = venta.productos.map(p => [
       p.nombre,
       p.cantidad.toString(),
@@ -591,18 +586,16 @@ export default function VentasProductosPage() {
 
     let finalY = doc.lastAutoTable.finalY + 10;
     
-    // Total General
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text(`TOTAL GENERAL: $${venta.total.toFixed(2)}`, 195, finalY, { align: 'right' });
     if (venta.montoPendiente > 0) {
       doc.setFontSize(10);
-      doc.setTextColor(220, 38, 38); // Rojo
+      doc.setTextColor(220, 38, 38);
       doc.text(`PENDIENTE: $${venta.montoPendiente.toFixed(2)}`, 195, finalY + 6, { align: 'right' });
       doc.setTextColor(0, 0, 0);
     }
 
-    // Políticas de Venta y Garantía (Exactas de tu archivo)
     finalY += 15;
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
@@ -631,7 +624,6 @@ export default function VentasProductosPage() {
     toast.success('PDF generado correctamente');
   };
 
-  // ✅ FUNCIÓN PARA CALCULAR DÍAS DE ATRASO
   const calcularDiasAtraso = (venta) => {
     if (venta.estado !== 'pendiente' || !venta.fechaPago) return 0;
     
@@ -643,63 +635,18 @@ export default function VentasProductosPage() {
 
   const enviarWhatsapp = (venta) => {
     const totalBs = (venta.total * tasaBCV).toFixed(2);
-    const pendienteBs = (venta.montoPendiente * tasaBCV).toFixed(2);
     
-    // ✅ MENSAJE DE "GRACIAS POR SU COMPRA"
     if (whatsappMode === 'gracias') {
       const productosTexto = venta.productos.map(p => `• ${p.nombre} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n');
-      
-      const mensaje = `Gracias por su compra 🛍️
-
-Recuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos 
-
-📸 Instagram @Voltechstore.ve
-🎵 Titok @Voltechstore.ve
-
-Nuestro Catálogo 👇🏽
-${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}
-
-Por cada cliente que refieras tendrás descuentos exclusivos
-
-${productosTexto}
-
-💰 Total: $${venta.total.toFixed(2)} (Bs ${totalBs})
-
-¡Gracias por tu compra!
-${settings.tienda?.nombre || 'VOLTECH STORE'}`;
-
+      const mensaje = `Gracias por su compra 🛍️\n\nRecuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos \n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇🏽\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos\n\n${productosTexto}\n\n💰 Total: $${venta.total.toFixed(2)} (Bs ${totalBs})\n\n¡Gracias por tu compra!\n${settings.tienda?.nombre || 'VOLTECH STORE'}`;
       const telefonoLimpio = venta.telefono.replace(/\D/g, '');
-      const url = `https://wa.me/58${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
-      window.open(url, '_blank');
+      window.open(`https://wa.me/58${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`, '_blank');
       setShowWhatsappModal(null);
-    } 
-    // ✅ MENSAJE DE "RECORDATORIO DE PAGO"
-    else {
+    } else {
       const productosTexto = venta.productos.map(p => `• ${p.nombre} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n');
-      
-      const mensaje = `¡Buen día, ${venta.cliente}!
-
-Te escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto 
-
-${productosTexto}
-Monto: $${venta.montoPendiente.toFixed(2)}
-
-Si ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!
-
-Que tengas un excelente día,
-El equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}
-
-📸 Instagram @Voltechstore.ve
-🎵 Titok @Voltechstore.ve
-
-Nuestro Catálogo 👇🏽
-${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}
-
-Por cada cliente que refieras tendrás descuentos exclusivos`;
-
+      const mensaje = `¡Buen día, ${venta.cliente}!\n\nTe escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto \n\n${productosTexto}\nMonto: $${venta.montoPendiente.toFixed(2)}\n\nSi ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!\n\nQue tengas un excelente día,\nEl equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}\n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇🏽\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos`;
       const telefonoLimpio = venta.telefono.replace(/\D/g, '');
-      const url = `https://wa.me/58${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
-      window.open(url, '_blank');
+      window.open(`https://wa.me/58${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`, '_blank');
       setShowWhatsappModal(null);
     }
   };
@@ -725,7 +672,9 @@ Por cada cliente que refieras tendrás descuentos exclusivos`;
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Ventas de Productos</h1>
-          <p className="text-sm text-voltech-muted mt-1">Registra ventas y descuenta inventario automáticamente</p>
+          <p className="text-sm text-voltech-muted mt-1">
+            {esVendedor ? 'Registra y gestiona tus ventas personales' : 'Registra ventas y descuenta inventario automáticamente'}
+          </p>
         </div>
         <button
           onClick={() => { resetForm(); setShowForm(true); }}
@@ -784,7 +733,8 @@ Por cada cliente que refieras tendrás descuentos exclusivos`;
                     <select
                       value={formData.vendedor}
                       onChange={(e) => setFormData({ ...formData, vendedor: e.target.value })}
-                      className="input-voltech w-full rounded-lg px-4 py-2 text-sm"
+                      disabled={esVendedor} // ✅ Deshabilitar para vendedores
+                      className={`input-voltech w-full rounded-lg px-4 py-2 text-sm ${esVendedor ? 'bg-voltech-dark/50 cursor-not-allowed' : ''}`}
                     >
                       <option value="">-- Selecciona --</option>
                       {vendedores.map(v => (
@@ -1076,7 +1026,6 @@ Por cada cliente que refieras tendrás descuentos exclusivos`;
         )}
       </AnimatePresence>
 
-      {/* ✅ MODAL DE CREAR PRODUCTO (INTACTO, SIN CAMBIOS) */}
       <AnimatePresence>
         {showProductoModal && (
           <motion.div
@@ -1480,7 +1429,6 @@ Por cada cliente que refieras tendrás descuentos exclusivos`;
         </div>
       </div>
 
-      {/* ✅ MODAL DE WHATSAPP CON DOS MÓDOS */}
       <AnimatePresence>
         {showWhatsappModal && (
           <motion.div
@@ -1510,42 +1458,7 @@ Por cada cliente que refieras tendrás descuentos exclusivos`;
                 </p>
                 <div className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-3 mb-4 max-h-48 overflow-y-auto">
                   <p className="text-xs text-white whitespace-pre-wrap">
-                    {whatsappMode === 'gracias' ? `Gracias por su compra 🛍️
-
-Recuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos 
-
-📸 Instagram @Voltechstore.ve
-🎵 Titok @Voltechstore.ve
-
-Nuestro Catálogo 👇🏽
-${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}
-
-Por cada cliente que refieras tendrás descuentos exclusivos
-
-${showWhatsappModal.productos.map(p => `• ${p.nombre} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n')}
-
-💰 Total: $${showWhatsappModal.total.toFixed(2)} (Bs ${(showWhatsappModal.total * tasaBCV).toFixed(2)})
-
-¡Gracias por tu compra!
-${settings.tienda?.nombre || 'VOLTECH STORE'}` : `¡Buen día, ${showWhatsappModal.cliente}!
-
-Te escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto 
-
-${showWhatsappModal.productos.map(p => `• ${p.nombre} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n')}
-Monto: $${showWhatsappModal.montoPendiente.toFixed(2)}
-
-Si ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!
-
-Que tengas un excelente día,
-El equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}
-
-📸 Instagram @Voltechstore.ve
-🎵 Titok @Voltechstore.ve
-
-Nuestro Catálogo 👇🏽
-${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}
-
-Por cada cliente que refieras tendrás descuentos exclusivos`}
+                    {whatsappMode === 'gracias' ? `Gracias por su compra 🛍️\n\nRecuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos \n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇🏽\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos\n\n${showWhatsappModal.productos.map(p => `• ${p.nombre} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n')}\n\n💰 Total: $${showWhatsappModal.total.toFixed(2)} (Bs ${(showWhatsappModal.total * tasaBCV).toFixed(2)})\n\n¡Gracias por tu compra!\n${settings.tienda?.nombre || 'VOLTECH STORE'}` : `¡Buen día, ${showWhatsappModal.cliente}!\n\nTe escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto \n\n${showWhatsappModal.productos.map(p => `• ${p.nombre} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n')}\nMonto: $${showWhatsappModal.montoPendiente.toFixed(2)}\n\nSi ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!\n\nQue tengas un excelente día,\nEl equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}\n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇🏽\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos`}
                   </p>
                 </div>
                 <div className="flex items-center justify-between gap-3">

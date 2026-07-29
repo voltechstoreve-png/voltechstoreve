@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
+import { supabase } from '@/lib/supabase';
+import { usePermissions } from '@/app/context/PermissionsContext'; // ✅ NUEVO: Sistema de permisos
 import { 
   DollarSign, BarChart, Target, MessageCircle, CheckCircle, 
   User, Save, Trash2, Plus, Calendar, Bell, X, TrendingUp, 
@@ -9,13 +10,15 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
-import jsPDF from 'jspdf'; // Para el reporte del socio
-import 'jspdf-autotable'; // ✅ Asegurar que autoTable esté disponible
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 export default function MetasYComisionesPage() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [mostrarFormMetas, setMostrarFormMetas] = useState(false); // ✅ Oculto por defecto
+  // ✅ NUEVO: Usamos el contexto de permisos en lugar de leer localStorage manualmente
+  const { esAdmin, esSocio, esVendedor, usuarioActual } = usePermissions();
+  const puedeGestionar = esAdmin || esSocio; // Helper para saber si puede editar
+
+  const [mostrarFormMetas, setMostrarFormMetas] = useState(false);
   
   const [comisiones, setComisiones] = useState({
     metas: [
@@ -32,28 +35,11 @@ export default function MetasYComisionesPage() {
   const [showModalAprobar, setShowModalAprobar] = useState(false);
   const [comentarioSeleccionado, setComentarioSeleccionado] = useState(null);
   
-  // ✅ Estados para el Ranking
   const [ranking, setRanking] = useState([]);
   const [statsReales, setStatsReales] = useState({ ventasMes: 0, metaActual: 0 });
 
-  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
     const cargarDatos = async () => {
-      const userLogged = localStorage.getItem('voltech_user');
-      if (userLogged) {
-        const user = JSON.parse(userLogged);
-        setCurrentUser(user);
-        
-        const equipoGuardado = localStorage.getItem('voltech_equipo');
-        if (equipoGuardado) {
-          const equipo = JSON.parse(equipoGuardado);
-          const miembro = equipo.find(m => m.nombre === user.nombre);
-          setIsAdmin(miembro?.rol === 'admin' || user.rol === 'admin');
-        } else {
-          setIsAdmin(user.rol === 'admin');
-        }
-      }
-
       let savedData = null;
       if (supabase) {
         const { data } = await supabase.from('settings').select('valor').eq('clave', 'metas_comisiones').single();
@@ -72,21 +58,12 @@ export default function MetasYComisionesPage() {
         setMetasTemp(comisiones.metas);
       }
 
-      // ✅ CALCULAR RANKING Y ESTADÍSTICAS REALES
       calcularRankingYStats();
     };
 
     cargarDatos();
-  }, []);
-
-  // ✅ FUNCIÓN AUXILIAR PARA GUARDAR EN SUPABASE Y LOCALSTORAGE
-  const guardarEnSupabaseYLocal = async (nuevosDatos) => {
-    if (supabase) {
-      await supabase.from('settings').upsert({ clave: 'metas_comisiones', valor: nuevosDatos }, { onConflict: 'clave' });
-    }
-    localStorage.setItem('voltech_comisiones', JSON.stringify(nuevosDatos));
-    setComisiones(nuevosDatos);
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Se recalcula cuando cambian las metas o el usuario
 
   const calcularRankingYStats = () => {
     const ventasProd = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
@@ -94,22 +71,18 @@ export default function MetasYComisionesPage() {
     const todasLasVentas = [...ventasProd, ...ventasStream];
     const equipo = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
 
-    // Filtrar ventas del mes actual
     const mesActual = new Date().getMonth();
     const ventasDelMes = todasLasVentas.filter(v => new Date(v.fecha || v.fechaRegistro).getMonth() === mesActual);
 
-    // Calcular ventas por vendedor
     const ventasPorVendedor = {};
     ventasDelMes.forEach(v => {
       const vendedor = v.vendedor || 'Sin Asignar';
       if (!ventasPorVendedor[vendedor]) ventasPorVendedor[vendedor] = 0;
-      ventasPorVendedor[vendedor] += 1; // Contamos por número de ventas (puedes cambiar a monto si prefieres)
+      ventasPorVendedor[vendedor] += 1;
     });
 
-    // Generar ranking
-    const rankingCalculado = equipo.map(miembro => {
+    let rankingCalculado = equipo.map(miembro => {
       const ventasCount = ventasPorVendedor[miembro.nombre] || 0;
-      // Buscar la próxima meta
       const metasOrdenadas = [...(comisiones.metas || [])].sort((a, b) => a.ventas - b.ventas);
       const proximaMeta = metasOrdenadas.find(m => m.ventas > ventasCount) || metasOrdenadas[metasOrdenadas.length - 1];
       const progreso = proximaMeta ? Math.min((ventasCount / proximaMeta.ventas) * 100, 100) : 100;
@@ -122,18 +95,34 @@ export default function MetasYComisionesPage() {
         porcentajeComision: proximaMeta?.porcentaje || 0,
         progreso: progreso
       };
-    }).sort((a, b) => b.ventas - a.ventas); // Ordenar de mayor a menor
+    }).sort((a, b) => b.ventas - a.ventas);
+
+    // ✅ FILTRAR RANKING: Si es vendedor, solo ve su propio progreso
+    if (esVendedor && usuarioActual?.nombre) {
+      rankingCalculado = rankingCalculado.filter(r => r.nombre === usuarioActual.nombre);
+    }
 
     setRanking(rankingCalculado);
     
-    // Stats generales
-    const totalVentasMes = ventasDelMes.length;
+    // ✅ ESTADÍSTICAS: Vendedor ve solo sus ventas, Admin ve el total global
+    const totalVentasMes = (esVendedor && usuarioActual?.nombre) 
+      ? (ventasPorVendedor[usuarioActual.nombre] || 0) 
+      : ventasDelMes.length;
+      
     const metaObj = comisiones.metas?.find(m => m.activo) || comisiones.metas?.[comisiones.metas.length - 1];
     
     setStatsReales({
       ventasMes: totalVentasMes,
       metaActual: metaObj?.ventas || 0
     });
+  };
+
+  const guardarEnSupabaseYLocal = async (nuevosDatos) => {
+    if (supabase) {
+      await supabase.from('settings').upsert({ clave: 'metas_comisiones', valor: nuevosDatos }, { onConflict: 'clave' });
+    }
+    localStorage.setItem('voltech_comisiones', JSON.stringify(nuevosDatos));
+    setComisiones(nuevosDatos);
   };
 
   const handleSave = async () => {
@@ -149,7 +138,7 @@ export default function MetasYComisionesPage() {
 
     const comentario = {
       id: Date.now(),
-      usuario: currentUser?.nombre || 'Socio',
+      usuario: usuarioActual?.nombre || 'Socio',
       texto: nuevoComentario,
       fecha: new Date().toISOString(),
       leido: false,
@@ -186,11 +175,14 @@ export default function MetasYComisionesPage() {
     toast.success(`Sugerencia de ${comentarioSeleccionado.usuario} aprobada.`);
     
     const notificacion = {
+      id: Date.now(),
       tipo: 'sugerencia_aprobada',
       usuario: comentarioSeleccionado.usuario,
       mensaje: `Tu sugerencia ha sido aprobada: "${comentarioSeleccionado.texto}"`,
-      fecha: new Date().toISOString()
+      hora: new Date().toISOString()
     };
+    
+    // Guardar notificación (usando el formato correcto del contexto)
     const notificacionesGuardadas = localStorage.getItem('voltech_notificaciones');
     const notificaciones = notificacionesGuardadas ? JSON.parse(notificacionesGuardadas) : [];
     localStorage.setItem('voltech_notificaciones', JSON.stringify([notificacion, ...notificaciones]));
@@ -234,7 +226,6 @@ export default function MetasYComisionesPage() {
   };
 
   const eliminarMeta = (id) => {
-    // ✅ CORRECCIÓN DEL BUG: Filtramos directamente y actualizamos el estado temporal
     const nuevasMetas = metasTemp.filter(m => m.id !== id);
     setMetasTemp(nuevasMetas);
     toast.success('Meta eliminada de la vista previa. Recuerda guardar.');
@@ -247,19 +238,16 @@ export default function MetasYComisionesPage() {
   };
 
   const guardarMetas = async () => {
-    // ✅ CORRECCIÓN DEL BUG: Sobrescribimos completamente el array de metas en el estado principal
     const nuevasComisiones = {
       ...comisiones,
-      metas: [...metasTemp] // Copia fresca para evitar referencias
+      metas: [...metasTemp]
     };
     
     await guardarEnSupabaseYLocal(nuevasComisiones);
-    
-    // Recalcular ranking con las nuevas metas
     calcularRankingYStats();
     
     toast.success('Metas actualizadas y guardadas correctamente en el sistema');
-    setMostrarFormMetas(false); // Ocultar después de guardar
+    setMostrarFormMetas(false);
   };
 
   const marcarComisionPagada = async (comisionId) => {
@@ -273,7 +261,6 @@ export default function MetasYComisionesPage() {
     toast.success('Comisión marcada como pagada');
   };
 
-  // ✅ FUNCIÓN PARA GENERAR REPORTE PARA EL SOCIO
   const generarReporteSocio = () => {
     const doc = new jsPDF();
     doc.setFontSize(18);
@@ -312,6 +299,11 @@ export default function MetasYComisionesPage() {
   const comentariosNoLeidos = comisiones.comentarios?.filter(c => !c.leido).length || 0;
   const comisionActual = comisiones.metas?.[comisiones.metas.length - 1]?.porcentaje || 0;
 
+  // ✅ Filtrar comisiones pagadas si es vendedor
+  const comisionesVisibles = (esVendedor && usuarioActual?.nombre)
+    ? comisiones.comisionesPagadas.filter(c => c.vendedor === usuarioActual.nombre)
+    : comisiones.comisionesPagadas;
+
   return (
     <div className="space-y-6">
       <Toaster position="top-right" toastOptions={{
@@ -324,10 +316,12 @@ export default function MetasYComisionesPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Metas y Comisiones</h1>
-          <p className="text-sm text-voltech-muted mt-1">Configura porcentajes y monitorea el rendimiento del equipo</p>
+          <p className="text-sm text-voltech-muted mt-1">
+            {esVendedor ? 'Monitorea tu progreso y rendimiento' : 'Configura porcentajes y monitorea el rendimiento del equipo'}
+          </p>
         </div>
         <div className="flex gap-3">
-          {isAdmin && (
+          {puedeGestionar && (
             <button
               onClick={generarReporteSocio}
               className="px-4 py-2 bg-voltech-surface border border-voltech-border text-voltech-cyan rounded-lg text-sm font-medium hover:bg-voltech-cyan/10 transition-all flex items-center gap-2"
@@ -344,7 +338,7 @@ export default function MetasYComisionesPage() {
         </div>
       </div>
 
-      {/* Stats Cards (Ahora dinámicos, inician en 0) */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
@@ -384,13 +378,15 @@ export default function MetasYComisionesPage() {
         </div>
       </div>
 
-      {/* 🏆 RANKING DE VENTAS DEL MES (NUEVO) */}
+      {/* 🏆 RANKING DE VENTAS DEL MES */}
       <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
         <div className="flex items-center gap-2 mb-6">
           <div className="p-2 rounded-lg bg-voltech-warning/20"><Award className="w-5 h-5 text-voltech-warning" /></div>
           <div>
-            <h3 className="text-lg font-bold text-white">Ranking de Ventas del Mes</h3>
-            <p className="text-xs text-voltech-muted">Progreso de cada miembro del equipo hacia la siguiente meta</p>
+            <h3 className="text-lg font-bold text-white">
+              {esVendedor ? 'Tu Progreso del Mes' : 'Ranking de Ventas del Mes'}
+            </h3>
+            <p className="text-xs text-voltech-muted">Progreso hacia la siguiente meta</p>
           </div>
         </div>
         
@@ -402,13 +398,15 @@ export default function MetasYComisionesPage() {
               <div key={r.nombre} className="bg-voltech-dark/50 border border-voltech-border rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                      index === 0 ? 'bg-yellow-500/20 text-yellow-500' : 
-                      index === 1 ? 'bg-gray-400/20 text-gray-400' : 
-                      'bg-orange-700/20 text-orange-700'
-                    }`}>
-                      #{index + 1}
-                    </div>
+                    {!esVendedor && (
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                        index === 0 ? 'bg-yellow-500/20 text-yellow-500' : 
+                        index === 1 ? 'bg-gray-400/20 text-gray-400' : 
+                        'bg-orange-700/20 text-orange-700'
+                      }`}>
+                        #{index + 1}
+                      </div>
+                    )}
                     <div>
                       <p className="text-sm font-medium text-white">{r.nombre}</p>
                       <p className="text-xs text-voltech-muted">{r.ventas} ventas realizadas</p>
@@ -419,7 +417,6 @@ export default function MetasYComisionesPage() {
                     <p className="text-xs text-voltech-muted">Meta: {r.proximaMeta} vtas</p>
                   </div>
                 </div>
-                {/* Barra de progreso */}
                 <div className="w-full h-2 bg-voltech-border rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-gradient-to-r from-voltech-cyan to-voltech-purple transition-all duration-500"
@@ -433,128 +430,128 @@ export default function MetasYComisionesPage() {
         </div>
       </div>
 
-      {/* 🎯 METAS ESCALONADAS (COLAPSABLE) */}
-      <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
-        <button 
-          onClick={() => isAdmin && setMostrarFormMetas(!mostrarFormMetas)}
-          className="w-full p-6 flex items-center justify-between hover:bg-voltech-dark/30 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-purple/20">
-              <Target className="w-5 h-5 text-voltech-purple" />
+      {/* 🎯 METAS ESCALONADAS (COLAPSABLE - SOLO ADMIN/SOCIO) */}
+      {puedeGestionar && (
+        <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
+          <button 
+            onClick={() => setMostrarFormMetas(!mostrarFormMetas)}
+            className="w-full p-6 flex items-center justify-between hover:bg-voltech-dark/30 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-voltech-purple/20">
+                <Target className="w-5 h-5 text-voltech-purple" />
+              </div>
+              <div className="text-left">
+                <h3 className="text-lg font-bold text-white">Metas Escalonadas</h3>
+                <p className="text-xs text-voltech-muted">
+                  {mostrarFormMetas ? 'Ocultar configuración' : 'Clic para gestionar porcentajes y fechas'}
+                </p>
+              </div>
             </div>
-            <div className="text-left">
-              <h3 className="text-lg font-bold text-white">Metas Escalonadas</h3>
-              <p className="text-xs text-voltech-muted">
-                {mostrarFormMetas ? 'Ocultar configuración' : 'Clic para gestionar porcentajes y fechas'}
-              </p>
-            </div>
-          </div>
-          {isAdmin && (
             <motion.div animate={{ rotate: mostrarFormMetas ? 180 : 0 }} transition={{ duration: 0.2 }}>
               <Plus className="w-5 h-5 text-voltech-muted" />
             </motion.div>
-          )}
-        </button>
+          </button>
 
-        <AnimatePresence>
-          {mostrarFormMetas && isAdmin && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="border-t border-voltech-border p-6 bg-voltech-dark/20"
-            >
-              <div className="flex justify-end gap-2 mb-6">
-                <button
-                  onClick={agregarMeta}
-                  className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" /> Agregar Meta
-                </button>
-                <button
-                  onClick={guardarMetas}
-                  className="px-4 py-2 bg-voltech-success/20 text-voltech-success rounded-lg text-sm hover:bg-voltech-success/30 transition-colors flex items-center gap-2"
-                >
-                  <Save className="w-4 h-4" /> Guardar Metas
-                </button>
-              </div>
-              
-              <div className="space-y-4">
-                {metasTemp.map((meta, index) => (
-                  <div key={meta.id} className="bg-voltech-dark/50 border border-voltech-border rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-voltech-cyan/20 flex items-center justify-center">
-                          <Target className="w-4 h-4 text-voltech-cyan" />
+          <AnimatePresence>
+            {mostrarFormMetas && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="border-t border-voltech-border p-6 bg-voltech-dark/20"
+              >
+                <div className="flex justify-end gap-2 mb-6">
+                  <button
+                    onClick={agregarMeta}
+                    className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" /> Agregar Meta
+                  </button>
+                  <button
+                    onClick={guardarMetas}
+                    className="px-4 py-2 bg-voltech-success/20 text-voltech-success rounded-lg text-sm hover:bg-voltech-success/30 transition-colors flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" /> Guardar Metas
+                  </button>
+                </div>
+                
+                <div className="space-y-4">
+                  {metasTemp.map((meta, index) => (
+                    <div key={meta.id} className="bg-voltech-dark/50 border border-voltech-border rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-voltech-cyan/20 flex items-center justify-center">
+                            <Target className="w-4 h-4 text-voltech-cyan" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-white">Meta {index + 1}</p>
+                            <p className="text-xs text-voltech-muted">Comisión del {meta.porcentaje}% al alcanzar {meta.ventas} ventas</p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => eliminarMeta(meta.id)}
+                          className="text-voltech-error hover:text-voltech-error/70 p-2 rounded-lg hover:bg-voltech-error/10 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div>
+                          <label className="block text-xs text-voltech-muted mb-2">Ventas requeridas</label>
+                          <input
+                            type="number" min="0" value={meta.ventas}
+                            onChange={(e) => actualizarMeta(meta.id, 'ventas', parseInt(e.target.value) || 0)}
+                            className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
+                          />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-white">Meta {index + 1}</p>
-                          <p className="text-xs text-voltech-muted">Comisión del {meta.porcentaje}% al alcanzar {meta.ventas} ventas</p>
+                          <label className="block text-xs text-voltech-muted mb-2">Porcentaje (%)</label>
+                          <input
+                            type="number" min="0" max="100" step="0.1" value={meta.porcentaje}
+                            onChange={(e) => actualizarMeta(meta.id, 'porcentaje', parseFloat(e.target.value) || 0)}
+                            className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-voltech-muted mb-2">Fecha Inicio</label>
+                          <input
+                            type="date" value={meta.fechaInicio || ''}
+                            onChange={(e) => actualizarMeta(meta.id, 'fechaInicio', e.target.value)}
+                            className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-voltech-muted mb-2">Fecha Fin</label>
+                          <input
+                            type="date" value={meta.fechaFin || ''}
+                            onChange={(e) => actualizarMeta(meta.id, 'fechaFin', e.target.value)}
+                            className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-voltech-muted mb-2">Estado</label>
+                          <select
+                            value={meta.activo ? 'activo' : 'inactivo'}
+                            onChange={(e) => actualizarMeta(meta.id, 'activo', e.target.value === 'activo')}
+                            className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
+                          >
+                            <option value="activo">Activo</option>
+                            <option value="inactivo">Inactivo</option>
+                          </select>
                         </div>
                       </div>
-                      <button 
-                        onClick={() => eliminarMeta(meta.id)}
-                        className="text-voltech-error hover:text-voltech-error/70 p-2 rounded-lg hover:bg-voltech-error/10 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                      <div>
-                        <label className="block text-xs text-voltech-muted mb-2">Ventas requeridas</label>
-                        <input
-                          type="number" min="0" value={meta.ventas}
-                          onChange={(e) => actualizarMeta(meta.id, 'ventas', parseInt(e.target.value) || 0)}
-                          className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-voltech-muted mb-2">Porcentaje (%)</label>
-                        <input
-                          type="number" min="0" max="100" step="0.1" value={meta.porcentaje}
-                          onChange={(e) => actualizarMeta(meta.id, 'porcentaje', parseFloat(e.target.value) || 0)}
-                          className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-voltech-muted mb-2">Fecha Inicio</label>
-                        <input
-                          type="date" value={meta.fechaInicio || ''}
-                          onChange={(e) => actualizarMeta(meta.id, 'fechaInicio', e.target.value)}
-                          className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-voltech-muted mb-2">Fecha Fin</label>
-                        <input
-                          type="date" value={meta.fechaFin || ''}
-                          onChange={(e) => actualizarMeta(meta.id, 'fechaFin', e.target.value)}
-                          className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-voltech-muted mb-2">Estado</label>
-                        <select
-                          value={meta.activo ? 'activo' : 'inactivo'}
-                          onChange={(e) => actualizarMeta(meta.id, 'activo', e.target.value === 'activo')}
-                          className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
-                        >
-                          <option value="activo">Activo</option>
-                          <option value="inactivo">Inactivo</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
-      {/* Sugerencias del Socio */}
+      {/* Sugerencias del Socio / Equipo */}
       <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
@@ -566,7 +563,7 @@ export default function MetasYComisionesPage() {
           </div>
         </div>
         
-        {!isAdmin && (
+        {!puedeGestionar && (
           <div className="mb-6">
             <textarea
               value={nuevoComentario}
@@ -587,7 +584,7 @@ export default function MetasYComisionesPage() {
           <div className="text-center py-8">
             <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-50 text-voltech-muted" />
             <p className="text-sm text-voltech-muted">
-              {isAdmin ? 'Aún no hay sugerencias del equipo' : 'No has enviado sugerencias aún'}
+              {puedeGestionar ? 'Aún no hay sugerencias del equipo' : 'No has enviado sugerencias aún'}
             </p>
           </div>
         ) : (
@@ -613,7 +610,7 @@ export default function MetasYComisionesPage() {
                       {new Date(comentario.fecha).toLocaleDateString('es-VE')}
                     </span>
                   </div>
-                  {isAdmin && !comentario.aprobado && !comentario.rechazado && (
+                  {puedeGestionar && !comentario.aprobado && !comentario.rechazado && (
                     <div className="flex items-center gap-2">
                       <button onClick={() => aprobarComentario(comentario)} className="text-xs px-3 py-1 bg-voltech-success/20 text-voltech-success rounded hover:bg-voltech-success/30 transition-colors flex items-center gap-1">
                         <CheckCircle className="w-3 h-3" /> Aprobar
@@ -636,15 +633,17 @@ export default function MetasYComisionesPage() {
         )}
       </div>
 
-      {/* Historial de Comisiones Pagadas */}
-      {comisiones.comisionesPagadas && comisiones.comisionesPagadas.length > 0 && (
+      {/* Historial de Comisiones Pagadas (Filtrado para vendedores) */}
+      {comisionesVisibles.length > 0 && (
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <div className="p-2 rounded-lg bg-voltech-success/20"><BarChart className="w-5 h-5 text-voltech-success" /></div>
               <div>
-                <h3 className="text-lg font-bold text-white">Historial de Comisiones Pagadas</h3>
-                <p className="text-xs text-voltech-muted">Registro de pagos realizados</p>
+                <h3 className="text-lg font-bold text-white">Historial de Comisiones</h3>
+                <p className="text-xs text-voltech-muted">
+                  {esVendedor ? 'Tus comisiones registradas' : 'Registro de pagos realizados'}
+                </p>
               </div>
             </div>
           </div>
@@ -654,19 +653,19 @@ export default function MetasYComisionesPage() {
               <thead className="bg-voltech-dark border-b border-voltech-border">
                 <tr>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Fecha</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Vendedor</th>
+                  {!esVendedor && <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Vendedor</th>}
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Ventas</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Monto</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Comisión</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Estado</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Acciones</th>
+                  {puedeGestionar && <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Acciones</th>}
                 </tr>
               </thead>
               <tbody>
-                {comisiones.comisionesPagadas.map((comision) => (
+                {comisionesVisibles.map((comision) => (
                   <tr key={comision.id} className="border-b border-voltech-border hover:bg-voltech-border/30">
                     <td className="px-4 py-3 text-sm text-white">{new Date(comision.fecha).toLocaleDateString('es-VE')}</td>
-                    <td className="px-4 py-3 text-sm text-white">{comision.vendedor}</td>
+                    {!esVendedor && <td className="px-4 py-3 text-sm text-white">{comision.vendedor}</td>}
                     <td className="px-4 py-3 text-sm text-white">{comision.ventas}</td>
                     <td className="px-4 py-3 text-sm text-voltech-success">${comision.monto.toFixed(2)}</td>
                     <td className="px-4 py-3 text-sm text-voltech-cyan">${comision.comision.toFixed(2)}</td>
@@ -675,13 +674,15 @@ export default function MetasYComisionesPage() {
                         {comision.estado === 'pagada' ? 'Pagada' : 'Pendiente'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      {comision.estado !== 'pagada' && isAdmin && (
-                        <button onClick={() => marcarComisionPagada(comision.id)} className="text-voltech-success hover:text-voltech-success/70 flex items-center gap-1">
-                          <CheckCircle className="w-4 h-4" /> Marcar pagada
-                        </button>
-                      )}
-                    </td>
+                    {puedeGestionar && (
+                      <td className="px-4 py-3 text-right">
+                        {comision.estado !== 'pagada' && (
+                          <button onClick={() => marcarComisionPagada(comision.id)} className="text-voltech-success hover:text-voltech-success/70 flex items-center gap-1">
+                            <CheckCircle className="w-4 h-4" /> Marcar pagada
+                          </button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

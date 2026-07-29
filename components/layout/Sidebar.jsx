@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from '@/app/context/ThemeContext';
-import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
+import { usePermissions } from '@/app/context/PermissionsContext'; // ✅ NUEVO: Sistema de permisos
 import { 
   LayoutDashboard, 
   Package, 
@@ -30,89 +30,66 @@ import { motion } from 'framer-motion';
 
 export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }) {
   const pathname = usePathname();
-  const { darkMode, setDarkMode } = useTheme(); 
+  const { darkMode, setDarkMode } = useTheme();
   
-  const [currentUser, setCurrentUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  // ✅ ACTUALIZADO: Obtiene el usuario desde Supabase con fallback a localStorage
-  useEffect(() => {
-    const fetchUser = async () => {
-      const userLoggedStr = localStorage.getItem('voltech_user');
-      if (userLoggedStr) {
-        const localUser = JSON.parse(userLoggedStr);
-        
-        // Intentar obtener datos frescos de Supabase si tenemos un ID válido
-        if (supabase && localUser.id && localUser.id !== 'local-1') {
-          const { data, error } = await supabase
-            .from('usuarios')
-            .select('*')
-            .eq('id', localUser.id)
-            .single();
-          
-          if (!error && data) {
-            setCurrentUser(data);
-            setIsAdmin(data.rol === 'admin' || data.rol === 'superadmin');
-          } else {
-            // Fallback a datos locales si falla la consulta
-            setCurrentUser(localUser);
-            setIsAdmin(localUser.rol === 'admin' || localUser.rol === 'superadmin');
-          }
-        } else {
-          // Fallback a datos locales (o si es el admin por defecto 'local-1')
-          setCurrentUser(localUser);
-          setIsAdmin(localUser.rol === 'admin' || localUser.rol === 'superadmin');
-        }
-      }
-    };
-
-    fetchUser();
-  }, []);
+  // ✅ NUEVO: Obtenemos el usuario y sus permisos directamente del contexto
+  const { usuarioActual, tienePermiso, esAdmin, esSocio } = usePermissions();
 
   const finalIsOpen = sidebarOpen !== undefined ? sidebarOpen : isOpen;
   const finalOnClose = setSidebarOpen ? () => setSidebarOpen(false) : onClose;
 
+  // ✅ MENÚ DINÁMICO: Cada ítem tiene reglas de visibilidad
   const menuItems = [
     {
       section: 'PANEL TIENDA',
       items: [
-        { name: 'Catálogo Público', icon: Package, path: '/catalogo' },
-        { name: 'Productos', icon: Package, path: '/panel/productos' },
-        { name: 'Proveedores', icon: Truck, path: '/panel/proveedores' },
-        { name: 'Sorteos', icon: Gift, path: '/panel/sorteos' },
-        { name: 'Opiniones', icon: MessageSquare, path: '/panel/opiniones' },
+        { name: 'Catálogo Público', icon: Package, path: '/catalogo', siempreVisible: true },
+        { name: 'Productos', icon: Package, path: '/panel/productos', siempreVisible: true },
+        { name: 'Proveedores', icon: Truck, path: '/panel/proveedores', requierePermiso: 'puedeVerConfiguracion' },
+        { name: 'Sorteos', icon: Gift, path: '/panel/sorteos', requierePermiso: 'puedeVerConfiguracion' },
+        { name: 'Opiniones', icon: MessageSquare, path: '/panel/opiniones', requierePermiso: 'puedeVerConfiguracion' },
       ]
     },
     {
       section: 'PANEL VENTAS',
       items: [
-        { name: 'Dashboard Ventas', icon: BarChart, path: '/panel/dashboard-ventas' },
-        { name: 'Ventas Productos', icon: ShoppingCart, path: '/panel/ventas-productos' },
-        { name: 'Ventas Streaming', icon: PlayCircle, path: '/panel/ventas-streaming' },
-        { name: 'Clientes', icon: Users, path: '/panel/clientes' },
+        { name: 'Dashboard Ventas', icon: BarChart, path: '/panel/dashboard-ventas', siempreVisible: true },
+        { name: 'Ventas Productos', icon: ShoppingCart, path: '/panel/ventas-productos', siempreVisible: true },
+        { name: 'Ventas Streaming', icon: PlayCircle, path: '/panel/ventas-streaming', siempreVisible: true },
+        { name: 'Clientes', icon: Users, path: '/panel/clientes', siempreVisible: true },
       ]
     },
     {
       section: 'PANEL FINANZAS',
       items: [
-        { name: 'Dashboard Finanzas', icon: DollarSign, path: '/panel/finanzas' },
-        { name: 'Metas y Comisiones', icon: Target, path: '/panel/metas-comisiones' },
+        { name: 'Dashboard Finanzas', icon: DollarSign, path: '/panel/finanzas', requierePermiso: 'puedeVerFinanzas' },
+        { name: 'Metas y Comisiones', icon: Target, path: '/panel/metas-comisiones', siempreVisible: true },
       ]
     },
     {
       section: 'PANEL MARKETING',
       items: [
-        { name: 'Marketing', icon: Megaphone, path: '/panel/marketing' },
+        { name: 'Marketing', icon: Megaphone, path: '/panel/marketing', siempreVisible: true },
       ]
     },
     {
       section: 'SISTEMA',
       items: [
-        { name: 'Equipo', icon: UserCog, path: '/panel/equipo' },
-        { name: 'Ajustes', icon: Settings, path: '/panel/ajustes' },
+        { name: 'Equipo', icon: UserCog, path: '/panel/equipo', requierePermiso: 'puedeCrearUsuarios' },
+        { name: 'Ajustes', icon: Settings, path: '/panel/ajustes', requierePermiso: 'puedeVerConfiguracion' },
       ]
     }
   ];
+
+  // ✅ FILTRAR MENÚ SEGÚN PERMISOS DEL USUARIO
+  const menuItemsFiltrados = menuItems.map(section => ({
+    ...section,
+    items: section.items.filter(item => {
+      if (item.siempreVisible) return true;
+      if (item.requierePermiso && tienePermiso(item.requierePermiso)) return true;
+      return false;
+    })
+  })).filter(section => section.items.length > 0); // Ocultar secciones vacías
 
   const handleLogout = () => {
     localStorage.removeItem('voltech_user');
@@ -148,7 +125,7 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4 space-y-6">
-          {menuItems.map((section, sectionIndex) => (
+          {menuItemsFiltrados.map((section, sectionIndex) => (
             <div key={sectionIndex}>
               {finalIsOpen && (
                 <motion.h3
@@ -201,12 +178,17 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }
         </nav>
 
         <div className="p-4 border-t border-voltech-border space-y-2">
-          {finalIsOpen && currentUser && (
+          {/* ✅ INFO DEL USUARIO CON ROLES DINÁMICOS */}
+          {finalIsOpen && usuarioActual && (
             <div className="px-3 py-2 mb-2">
               <p className="text-xs text-voltech-muted">Conectado como:</p>
-              <p className="text-sm font-semibold text-white">{currentUser.nombre}</p>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full ${isAdmin ? 'bg-voltech-purple/20 text-voltech-purple' : 'bg-voltech-cyan/20 text-voltech-cyan'}`}>
-                {isAdmin ? 'Administrador' : 'Vendedor'}
+              <p className="text-sm font-semibold text-white">{usuarioActual.nombre}</p>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                esAdmin ? 'bg-voltech-purple/20 text-voltech-purple' : 
+                esSocio ? 'bg-voltech-warning/20 text-voltech-warning' : 
+                'bg-voltech-cyan/20 text-voltech-cyan'
+              }`}>
+                {esAdmin ? 'Administrador' : esSocio ? 'Socio' : 'Vendedor'}
               </span>
             </div>
           )}

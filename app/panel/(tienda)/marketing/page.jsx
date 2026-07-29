@@ -1,18 +1,20 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
+import { supabase } from '@/lib/supabase';
+import { usePermissions } from '@/app/context/PermissionsContext';
 import { 
   MessageSquare, Send, Users, Gift, Copy, Plus, Search, Trash2, 
   Edit3, Save, X, CheckCircle, ShoppingCart, Tag, FileText, 
   ChevronDown, ChevronUp, Share2, Ticket, Percent, Calendar,
   TrendingUp, DollarSign, Package, Megaphone, Store, Image as ImageIcon,
-  Eye, Monitor, Smartphone, Tablet, Clock, Upload
+  Eye, Monitor, Smartphone, Tablet, Clock, Upload, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function MarketingPage() {
+  const { esAdmin, usuarioActual } = usePermissions();
   const [activeTab, setActiveTab] = useState('plantillas');
   
   const [plantillas, setPlantillas] = useState([]);
@@ -33,36 +35,26 @@ export default function MarketingPage() {
   const [plantillaWhatsappSeleccionada, setPlantillaWhatsappSeleccionada] = useState('');
   const [mensajePersonalizado, setMensajePersonalizado] = useState('');
 
+  const [showDiffusionModal, setShowDiffusionModal] = useState(false);
+  const [diffusionIndex, setDiffusionIndex] = useState(0);
+  const [enviados, setEnviados] = useState(new Set());
+
   const [productoMarketplace, setProductoMarketplace] = useState(null);
   const [precioPromocionMarketplace, setPrecioPromocionMarketplace] = useState('');
   const [plantillaMarketplaceSeleccionada, setPlantillaMarketplaceSeleccionada] = useState('');
   const [textoMarketplace, setTextoMarketplace] = useState('');
 
-  // ✅ ESTADOS PARA CUPONES
   const [cupones, setCupones] = useState([]);
   const [showCuponForm, setShowCuponForm] = useState(false);
   const [cuponEditando, setCuponEditando] = useState(null);
   const [busquedaProductoCupon, setBusquedaProductoCupon] = useState('');
   
   const [formDataCupon, setFormDataCupon] = useState({
-    titulo: '',
-    descripcion: '',
-    codigo: '',
-    tipo_descuento: 'porcentaje',
-    valor: 20,
-    aplica_a: 'todos',
-    productos_especificos: [],
-    excluir_ofertas: false,
-    monto_minimo: 0,
-    fecha_inicio: '',
-    fecha_vencimiento: '',
-    limite_usos: 'ilimitado',
-    max_usos: 100,
-    uso_por_cliente: 'una_vez',
-    estado: 'activo'
+    titulo: '', descripcion: '', codigo: '', tipo_descuento: 'porcentaje', valor: 20, aplica_a: 'todos',
+    productos_especificos: [], excluir_ofertas: false, monto_minimo: 0, fecha_inicio: '', fecha_vencimiento: '',
+    limite_usos: 'ilimitado', max_usos: 100, uso_por_cliente: 'una_vez', estado: 'activo'
   });
 
-  // ✅ ESTADOS PARA PUBLICIDAD/BANNERS
   const [publicidad, setPublicidad] = useState([]);
   const [showPublicidadForm, setShowPublicidadForm] = useState(false);
   const [publicidadEditando, setPublicidadEditando] = useState(null);
@@ -70,33 +62,14 @@ export default function MarketingPage() {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef(null);
   
+  // ✅ AGREGADO: campo 'descripcion'
   const [formDataPublicidad, setFormDataPublicidad] = useState({
-    titulo: '',
-    url_destino: '',
-    url_imagen: '',
-    lado: 'izquierdo',
-    posicion: 'sidebar',
-    fecha_inicio: '',
-    hora_inicio: '00:00',
-    fecha_fin: '',
-    hora_fin: '23:59',
-    prioridad: 'normal',
-    mostrar_en: {
-      inicio: true,
-      catalogo: true,
-      streaming: false,
-      ofertas: false
-    },
-    dispositivos: {
-      desktop: true,
-      movil: true,
-      tablet: true
-    },
-    rotacion: 5,
-    estado: 'activo'
+    titulo: '', descripcion: '', url_destino: '', url_imagen: '', lado: 'izquierdo', posicion: 'sidebar',
+    fecha_inicio: '', hora_inicio: '00:00', fecha_fin: '', hora_fin: '23:59', prioridad: 'normal',
+    mostrar_en: { inicio: true, catalogo: true, streaming: false, ofertas: false },
+    dispositivos: { desktop: true, movil: true, tablet: true }, rotacion: 5, estado: 'activo'
   });
 
-  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
     const cargarDatos = async () => {
       let plts = [], cpons = [], pubs = [], prods = [], clts = [], etqs = [];
@@ -125,13 +98,17 @@ export default function MarketingPage() {
       if (clts.length === 0) { const d = localStorage.getItem('voltech_clientes'); if (d) clts = JSON.parse(d); }
       if (etqs.length === 0) { const d = localStorage.getItem('voltech_etiquetas'); if (d) etqs = JSON.parse(d); }
 
+      let clientesFiltrados = clts;
+      if (!esAdmin && usuarioActual?.nombre) {
+        clientesFiltrados = clts.filter(c => c.registradoPor === usuarioActual.nombre);
+      }
+
       setPlantillas(plts); setCupones(cpons); setPublicidad(pubs);
-      setProductos(prods); setClientes(clts); setEtiquetas(etqs);
+      setProductos(prods); setClientes(clientesFiltrados); setEtiquetas(etqs);
     };
     cargarDatos();
-  }, []);
+  }, [esAdmin, usuarioActual]);
 
-  // ✅ MANEJAR SUBIDA DE IMAGEN
   const handleImageUpload = (file) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) { toast.error('Solo se permiten imágenes'); return; }
@@ -157,8 +134,8 @@ export default function MarketingPage() {
     handleImageUpload(file);
   };
 
-  // ✅ ACTUALIZADO: Guardar Publicidad en Supabase y localStorage
   const guardarPublicidad = async () => {
+    if (!esAdmin) return toast.error('Solo el administrador puede gestionar publicidad');
     if (!formDataPublicidad.titulo || !formDataPublicidad.url_imagen || !formDataPublicidad.fecha_inicio || !formDataPublicidad.fecha_fin) {
       toast.error('Título, imagen y fechas son obligatorios');
       return;
@@ -174,7 +151,7 @@ export default function MarketingPage() {
 
     if (supabase) {
       const { error } = await supabase.from('publicidad').upsert(nuevaPublicidad, { onConflict: 'id' });
-      if (error) { toast.error('Error al guardar en la nube'); return; }
+      if (error) { toast.error('Error al guardar en la nube: ' + error.message); return; }
     }
 
     if (publicidadEditando) {
@@ -194,18 +171,28 @@ export default function MarketingPage() {
   const editarPublicidad = (pub) => {
     setPublicidadEditando(pub);
     setFormDataPublicidad({
-      titulo: pub.titulo, url_destino: pub.url_destino || '', url_imagen: pub.url_imagen,
-      lado: pub.lado || 'izquierdo', posicion: pub.posicion || 'sidebar', fecha_inicio: pub.fecha_inicio,
-      hora_inicio: pub.hora_inicio || '00:00', fecha_fin: pub.fecha_fin, hora_fin: pub.hora_fin || '23:59',
-      prioridad: pub.prioridad || 'normal', mostrar_en: pub.mostrar_en || { inicio: true, catalogo: true, streaming: false, ofertas: false },
-      dispositivos: pub.dispositivos || { desktop: true, movil: true, tablet: true }, rotacion: pub.rotacion || 5, estado: pub.estado || 'activo'
+      titulo: pub.titulo, 
+      descripcion: pub.descripcion || '', // ✅ AGREGADO
+      url_destino: pub.url_destino || '', 
+      url_imagen: pub.url_imagen,
+      lado: pub.lado || 'izquierdo', 
+      posicion: pub.posicion || 'sidebar', 
+      fecha_inicio: pub.fecha_inicio,
+      hora_inicio: pub.hora_inicio || '00:00', 
+      fecha_fin: pub.fecha_fin, 
+      hora_fin: pub.hora_fin || '23:59',
+      prioridad: pub.prioridad || 'normal', 
+      mostrar_en: pub.mostrar_en || { inicio: true, catalogo: true, streaming: false, ofertas: false },
+      dispositivos: pub.dispositivos || { desktop: true, movil: true, tablet: true }, 
+      rotacion: pub.rotacion || 5, 
+      estado: pub.estado || 'activo'
     });
     setImagenPreview(pub.url_imagen);
     setShowPublicidadForm(true);
   };
 
-  // ✅ ACTUALIZADO: Eliminar Publicidad de Supabase y localStorage
   const eliminarPublicidad = async (id) => {
+    if (!esAdmin) return toast.error('Solo el administrador puede eliminar publicidad');
     if (!confirm('¿Estás seguro de eliminar esta publicidad?')) return;
     if (supabase) await supabase.from('publicidad').delete().eq('id', id);
     const actualizadas = publicidad.filter(p => p.id !== id);
@@ -214,8 +201,8 @@ export default function MarketingPage() {
     toast.success('Publicidad eliminada');
   };
 
-  // ✅ ACTUALIZADO: Toggle Estado Publicidad en Supabase y localStorage
   const toggleEstadoPublicidad = async (pub) => {
+    if (!esAdmin) return toast.error('Solo el administrador puede cambiar el estado');
     const nuevoEstado = pub.estado === 'activo' ? 'inactivo' : 'activo';
     if (supabase) await supabase.from('publicidad').update({ estado: nuevoEstado }).eq('id', pub.id);
     const actualizadas = publicidad.map(p => p.id === pub.id ? { ...p, estado: nuevoEstado } : p);
@@ -226,7 +213,7 @@ export default function MarketingPage() {
 
   const resetPublicidadForm = () => {
     setFormDataPublicidad({
-      titulo: '', url_destino: '', url_imagen: '', lado: 'izquierdo', posicion: 'sidebar',
+      titulo: '', descripcion: '', url_destino: '', url_imagen: '', lado: 'izquierdo', posicion: 'sidebar', // ✅ AGREGADO
       fecha_inicio: '', hora_inicio: '00:00', fecha_fin: '', hora_fin: '23:59', prioridad: 'normal',
       mostrar_en: { inicio: true, catalogo: true, streaming: false, ofertas: false },
       dispositivos: { desktop: true, movil: true, tablet: true }, rotacion: 5, estado: 'activo'
@@ -236,7 +223,6 @@ export default function MarketingPage() {
 
   const guardarCupones = async (nuevosCupones) => {
     if (supabase) {
-      // Guardamos solo los cupones modificados o todos (upsert maneja la duplicación por ID)
       await supabase.from('cupones').upsert(nuevosCupones, { onConflict: 'id' });
     }
     localStorage.setItem('voltech_cupones', JSON.stringify(nuevosCupones));
@@ -249,8 +235,8 @@ export default function MarketingPage() {
     return `${codigoBase}-${random}`;
   };
 
-  // ✅ ACTUALIZADO: Guardar Cupón en Supabase y localStorage
   const guardarCupon = async () => {
+    if (!esAdmin) return toast.error('Solo el administrador puede crear cupones');
     if (!formDataCupon.titulo || !formDataCupon.descripcion || !formDataCupon.fecha_inicio || !formDataCupon.fecha_vencimiento) {
       toast.error('Completa los campos obligatorios (Título, Descripción, Fechas)');
       return;
@@ -289,8 +275,8 @@ export default function MarketingPage() {
     setShowCuponForm(true);
   };
 
-  // ✅ ACTUALIZADO: Eliminar Cupón de Supabase y localStorage
   const eliminarCupon = async (id) => {
+    if (!esAdmin) return toast.error('Solo el administrador puede eliminar cupones');
     if (!confirm('¿Estás seguro de eliminar este cupón?')) return;
     if (supabase) await supabase.from('cupones').delete().eq('id', id);
     const actualizados = cupones.filter(c => c.id !== id);
@@ -299,8 +285,8 @@ export default function MarketingPage() {
     toast.success('Cupón eliminado');
   };
 
-  // ✅ ACTUALIZADO: Toggle Estado Cupón en Supabase y localStorage
   const toggleEstadoCupon = async (cupon) => {
+    if (!esAdmin) return toast.error('Solo el administrador puede cambiar el estado');
     const nuevoEstado = cupon.estado === 'activo' ? 'inactivo' : 'activo';
     if (supabase) await supabase.from('cupones').update({ estado: nuevoEstado }).eq('id', cupon.id);
     const actualizados = cupones.map(c => c.id === cupon.id ? { ...c, estado: nuevoEstado } : c);
@@ -327,7 +313,6 @@ export default function MarketingPage() {
     descuentoTotal: cupones.reduce((acc, c) => acc + (c.descuento_total || 0), 0)
   };
 
-  // --- LÓGICA EXISTENTE (WHATSAPP & MARKETPLACE) ---
   useEffect(() => {
     if (productoSeleccionado && plantillaWhatsappSeleccionada && clientesSeleccionados.length > 0) {
       const plantilla = plantillas.find(p => p.id === parseInt(plantillaWhatsappSeleccionada));
@@ -355,10 +340,14 @@ export default function MarketingPage() {
     } else { setTextoMarketplace(''); }
   }, [productoMarketplace, plantillaMarketplaceSeleccionada, precioPromocionMarketplace, plantillas]);
 
-  // ✅ ACTUALIZADO: Guardar Plantilla en Supabase y localStorage
   const guardarPlantilla = async () => {
     if (!formDataPlantilla.nombre || !formDataPlantilla.contenido) { toast.error('Nombre y contenido son obligatorios'); return; }
-    const nuevaPlantilla = { id: Date.now().toString(), ...formDataPlantilla, fechaCreacion: new Date().toISOString() };
+    const nuevaPlantilla = { 
+      id: Date.now().toString(), 
+      ...formDataPlantilla, 
+      creadoPor: usuarioActual?.nombre || 'Desconocido', 
+      fechaCreacion: new Date().toISOString() 
+    };
     
     if (supabase) {
       await supabase.from('plantillas').upsert(nuevaPlantilla, { onConflict: 'id' });
@@ -381,8 +370,11 @@ export default function MarketingPage() {
     setPlantillaEditando(plantilla); setShowPlantillaForm(true);
   };
 
-  // ✅ ACTUALIZADO: Eliminar Plantilla de Supabase y localStorage
   const eliminarPlantilla = async (id) => {
+    const plantilla = plantillas.find(p => p.id === id);
+    if (!esAdmin && plantilla?.creadoPor !== usuarioActual?.nombre) {
+      return toast.error('Solo puedes eliminar plantillas que tú hayas creado');
+    }
     if (!confirm('¿Eliminar esta plantilla?')) return;
     if (supabase) await supabase.from('plantillas').delete().eq('id', id);
     const actualizadas = plantillas.filter(p => p.id !== id);
@@ -404,6 +396,7 @@ export default function MarketingPage() {
   };
 
   const toggleClienteSeleccion = (clienteId) => {
+    if (enviados.has(clienteId)) return;
     if (clientesSeleccionados.includes(clienteId)) setClientesSeleccionados(clientesSeleccionados.filter(id => id !== clienteId));
     else setClientesSeleccionados([...clientesSeleccionados, clienteId]);
   };
@@ -413,15 +406,31 @@ export default function MarketingPage() {
     setClientesSeleccionados(clientesSeleccionados.length === filtrados.length ? [] : filtrados.map(c => c.id));
   };
 
-  const enviarWhatsApp = () => {
-    if (clientesSeleccionados.length === 0) { toast.error('Selecciona al menos un cliente'); return; }
-    if (!mensajePersonalizado) { toast.error('Escribe o genera un mensaje'); return; }
-    clientesSeleccionados.forEach(clienteId => {
-      const cliente = clientes.find(c => c.id === clienteId);
-      const telefono = cliente.telefono.replace(/\D/g, '');
-      window.open(`https://wa.me/58${telefono}?text=${encodeURIComponent(mensajePersonalizado)}`, '_blank');
-    });
-    toast.success(`Abriendo WhatsApp para ${clientesSeleccionados.length} cliente(s)`);
+  const iniciarDifusion = () => {
+    if (clientesSeleccionados.length === 0) return toast.error('Selecciona al menos un cliente');
+    if (!mensajePersonalizado) return toast.error('Genera o escribe un mensaje primero');
+    setDiffusionIndex(0);
+    setEnviados(new Set());
+    setShowDiffusionModal(true);
+  };
+
+  const enviarAlSiguiente = () => {
+    const clienteActual = clientes.find(c => c.id === clientesSeleccionados[diffusionIndex]);
+    if (clienteActual) {
+      setEnviados(prev => new Set(prev).add(clienteActual.id));
+    }
+    if (diffusionIndex + 1 < clientesSeleccionados.length) {
+      setDiffusionIndex(prev => prev + 1);
+    } else {
+      setShowDiffusionModal(false);
+      toast.success('¡Difusión completada exitosamente!');
+      setClientesSeleccionados([]);
+    }
+  };
+
+  const generarLinkWhatsApp = (cliente, mensaje) => {
+    const telefonoLimpio = cliente.telefono?.replace(/\D/g, '') || '';
+    return `https://wa.me/58${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
   };
 
   const estadisticas = { totalPlantillas: plantillas.length };
@@ -458,7 +467,6 @@ export default function MarketingPage() {
         </div>
       </div>
 
-      {/* Estadísticas */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
@@ -486,7 +494,6 @@ export default function MarketingPage() {
         </div>
       </div>
 
-      {/* PESTAÑAS DE NAVEGACIÓN */}
       <div className="border-b border-voltech-border">
         <div className="flex gap-6 overflow-x-auto pb-1">
           {[
@@ -512,9 +519,7 @@ export default function MarketingPage() {
         </div>
       </div>
 
-      {/* CONTENIDO DE PESTAÑAS */}
       <div>
-        {/* PESTAÑA 1: PLANTILLAS */}
         {activeTab === 'plantillas' && (
           <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
             <div className="flex items-center justify-between p-6">
@@ -559,6 +564,7 @@ export default function MarketingPage() {
                           <span className="text-xs px-2 py-0.5 rounded-full bg-voltech-cyan/20 text-voltech-cyan">{plantilla.tipo === 'whatsapp' ? '📱 WhatsApp' : ' Marketplace'}</span>
                           <span className="text-xs text-voltech-muted capitalize">{plantilla.categoria}</span>
                         </div>
+                        <p className="text-[10px] text-voltech-muted mt-1">Creado por: {plantilla.creadoPor || 'Desconocido'}</p>
                       </div>
                       <div className="flex gap-1">
                         <button onClick={() => editarPlantilla(plantilla)} className="p-1 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit3 className="w-3 h-3" /></button>
@@ -574,7 +580,6 @@ export default function MarketingPage() {
           </div>
         )}
 
-        {/* PESTAÑA 2: WHATSAPP */}
         {activeTab === 'whatsapp' && (
           <div className="space-y-6">
             <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
@@ -586,7 +591,7 @@ export default function MarketingPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                   <div className="space-y-6">
                     <div className="bg-voltech-dark/30 border border-voltech-border rounded-lg p-4">
-                      <h4 className="text-sm font-semibold text-white mb-3">1️ Seleccionar Producto</h4>
+                      <h4 className="text-sm font-semibold text-white mb-3">1️⃣ Seleccionar Producto</h4>
                       <select value={productoSeleccionado?.id || ''} onChange={(e) => { const prod = productos.find(p => p.id === parseInt(e.target.value)); setProductoSeleccionado(prod || null); setPrecioPromocion(''); }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm mb-3">
                         <option value="">Buscar producto...</option>
                         {productos.filter(p => p.cantidad > 0).map(p => (<option key={p.id} value={p.id}>{p.nombre || p.plataforma} - ${p.precioDetal?.toFixed(2) || '0.00'} (Stock: {p.cantidad})</option>))}
@@ -601,11 +606,6 @@ export default function MarketingPage() {
                               <p className="text-sm font-medium text-white">{productoSeleccionado.nombre || productoSeleccionado.plataforma}</p>
                               <p className="text-xs text-voltech-success font-bold">${productoSeleccionado.precioDetal?.toFixed(2) || '0.00'}</p>
                               <p className="text-xs text-voltech-muted">{productoSeleccionado.cantidad > 10 ? '✅ Stock disponible' : '⚠️ Pocas unidades'}</p>
-                              {productoSeleccionado.imagen && (
-                                <div className="mt-2">
-                                  <p className="text-[10px] text-voltech-cyan break-all"> {productoSeleccionado.imagen}</p>
-                                </div>
-                              )}
                               <div className="mt-2">
                                 <label className="text-xs text-voltech-muted block mb-1">💰 Precio para esta promoción:</label>
                                 <input type="number" step="0.01" placeholder={productoSeleccionado.precioDetal?.toFixed(2) || '0.00'} value={precioPromocion} onChange={(e) => setPrecioPromocion(e.target.value)} className="input-voltech w-full rounded px-3 py-1.5 text-xs" />
@@ -617,7 +617,7 @@ export default function MarketingPage() {
                       )}
                     </div>
                     <div className="bg-voltech-dark/30 border border-voltech-border rounded-lg p-4">
-                      <h4 className="text-sm font-semibold text-white mb-3">2️ Seleccionar Destinatarios</h4>
+                      <h4 className="text-sm font-semibold text-white mb-3">2️⃣ Seleccionar Destinatarios</h4>
                       <div className="space-y-3 mb-4">
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
@@ -635,10 +635,25 @@ export default function MarketingPage() {
                       </div>
                       <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
                         {filtrarClientes().map(cliente => (
-                          <label key={cliente.id} className="flex items-start gap-3 p-3 bg-voltech-surface border border-voltech-border rounded-lg cursor-pointer hover:border-voltech-cyan transition-colors">
-                            <input type="checkbox" checked={clientesSeleccionados.includes(cliente.id)} onChange={() => toggleClienteSeleccion(cliente.id)} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan mt-1" />
+                          <label key={cliente.id} className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                            enviados.has(cliente.id) ? 'bg-voltech-success/10 border-voltech-success' : 'bg-voltech-surface border-voltech-border hover:border-voltech-cyan'
+                          }`}>
+                            <input 
+                              type="checkbox" 
+                              checked={clientesSeleccionados.includes(cliente.id) || enviados.has(cliente.id)} 
+                              disabled={enviados.has(cliente.id)}
+                              onChange={() => toggleClienteSeleccion(cliente.id)} 
+                              className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan mt-1" 
+                            />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm text-white font-medium truncate">{cliente.nombre}</p>
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm text-white font-medium truncate">{cliente.nombre}</p>
+                                {enviados.has(cliente.id) && (
+                                  <span className="text-[10px] px-2 py-0.5 bg-voltech-success/20 text-voltech-success rounded-full flex items-center gap-1">
+                                    <CheckCircle className="w-3 h-3" /> Enviado ✓
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-xs text-voltech-muted flex items-center gap-1 mb-1"><span className="w-3 h-3"><Send className="w-3 h-3 inline" /></span> {cliente.telefono}</p>
                               {cliente.etiquetas && cliente.etiquetas.length > 0 && (
                                 <div className="flex flex-wrap gap-1">
@@ -658,7 +673,7 @@ export default function MarketingPage() {
                     </div>
                   </div>
                   <div className="bg-voltech-dark/30 border border-voltech-border rounded-lg p-4">
-                    <h4 className="text-sm font-semibold text-white mb-3">3️ Seleccionar Plantilla</h4>
+                    <h4 className="text-sm font-semibold text-white mb-3">3️⃣ Seleccionar Plantilla</h4>
                     <select value={plantillaWhatsappSeleccionada} onChange={(e) => setPlantillaWhatsappSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm mb-3">
                       <option value="">Seleccionar plantilla de WhatsApp...</option>
                       {plantillasWhatsapp.map(p => (<option key={p.id} value={p.id}>📱 {p.nombre}</option>))}
@@ -677,7 +692,13 @@ export default function MarketingPage() {
                       <h4 className="text-sm font-semibold text-white flex items-center gap-2"><CheckCircle className="w-4 h-4 text-voltech-success" /> 4️⃣ Mensaje Generado (Vista Previa)</h4>
                       <div className="flex gap-2">
                         <button onClick={() => copiarTexto(mensajePersonalizado)} className="px-3 py-1.5 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors flex items-center gap-1 font-medium"><Copy className="w-3.5 h-3.5" /> Copiar</button>
-                        <button onClick={enviarWhatsApp} className="px-3 py-1.5 bg-voltech-success/20 text-voltech-success rounded-lg text-xs hover:bg-voltech-success/30 transition-colors flex items-center gap-1 font-medium"><Send className="w-3.5 h-3.5" /> Enviar a {clientesSeleccionados.length}</button>
+                        <button 
+                          onClick={iniciarDifusion} 
+                          disabled={clientesSeleccionados.length === 0}
+                          className="px-4 py-1.5 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition-colors flex items-center gap-1 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Send className="w-3.5 h-3.5" /> Lanzar Difusión (1 a 1) ({clientesSeleccionados.length})
+                        </button>
                       </div>
                     </div>
                     <div className="bg-voltech-surface border border-voltech-border rounded-lg p-4">
@@ -690,7 +711,6 @@ export default function MarketingPage() {
           </div>
         )}
 
-        {/* PESTAÑA 3: MARKETPLACE */}
         {activeTab === 'marketplace' && (
           <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
             <div className="p-6">
@@ -754,17 +774,18 @@ export default function MarketingPage() {
           </div>
         )}
 
-        {/* PESTAÑA 4: CUPONES PROMOCIONALES */}
         {activeTab === 'cupones' && (
           <div className="space-y-6">
             <div className="flex justify-end">
-              <button onClick={() => setShowCuponForm(true)} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2">
-                <Plus className="w-4 h-4" /> Crear Nuevo Cupón
-              </button>
+              {esAdmin && (
+                <button onClick={() => setShowCuponForm(true)} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2">
+                  <Plus className="w-4 h-4" /> Crear Nuevo Cupón
+                </button>
+              )}
             </div>
 
             <AnimatePresence>
-              {showCuponForm && (
+              {showCuponForm && esAdmin && (
                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
                   <div className="p-6">
                     <div className="flex items-center justify-between mb-6">
@@ -1007,7 +1028,6 @@ export default function MarketingPage() {
           </div>
         )}
 
-        {/* ✅ PESTAÑA 5: PUBLICIDAD/BANNERS CON SUBIDA DE IMAGEN */}
         {activeTab === 'publicidad' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -1018,18 +1038,19 @@ export default function MarketingPage() {
                 </h2>
                 <p className="text-sm text-voltech-muted">Crea y gestiona banners publicitarios para el catálogo</p>
               </div>
-              <button
-                onClick={() => setShowPublicidadForm(true)}
-                className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Nueva Publicidad
-              </button>
+              {esAdmin && (
+                <button
+                  onClick={() => setShowPublicidadForm(true)}
+                  className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Nueva Publicidad
+                </button>
+              )}
             </div>
 
-            {/* Formulario Crear/Editar Publicidad */}
             <AnimatePresence>
-              {showPublicidadForm && (
+              {showPublicidadForm && esAdmin && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
@@ -1056,6 +1077,17 @@ export default function MarketingPage() {
                             onChange={(e) => setFormDataPublicidad({...formDataPublicidad, titulo: e.target.value})}
                             className="input-voltech w-full rounded-lg px-4 py-2"
                             placeholder="Ej: Tienda Hermana - Ropa Deportiva"
+                          />
+                        </div>
+
+                        {/* ✅ AGREGADO: Campo de Descripción */}
+                        <div>
+                          <label className="block text-sm font-medium text-voltech-muted mb-2">Descripción</label>
+                          <textarea
+                            value={formDataPublicidad.descripcion}
+                            onChange={(e) => setFormDataPublicidad({...formDataPublicidad, descripcion: e.target.value})}
+                            className="input-voltech w-full rounded-lg px-4 py-2 h-20 resize-none"
+                            placeholder="Breve descripción de la oferta o promoción..."
                           />
                         </div>
 
@@ -1092,7 +1124,7 @@ export default function MarketingPage() {
                           >
                             {imagenPreview ? (
                               <div className="space-y-3">
-                                <img src={imagenPreview} alt="Preview" className="max-h-48 mx-auto rounded-lg" />
+                                <img src={imagenPreview} alt="Preview" className="max-h-48 mx-auto rounded-lg object-contain" />
                                 <p className="text-sm text-voltech-muted">Haz clic para cambiar la imagen</p>
                               </div>
                             ) : (
@@ -1107,6 +1139,9 @@ export default function MarketingPage() {
                               </div>
                             )}
                           </div>
+                          <p className="text-[10px] text-voltech-muted flex items-center gap-1 mt-2">
+                            <AlertCircle className="w-3 h-3" /> 💡 Tip: Para mejores resultados en WhatsApp y Facebook, usa imágenes cuadradas (800x800px) u horizontales (1200x630px). El sistema las adaptará automáticamente.
+                          </p>
                         </div>
 
                         <div>
@@ -1370,7 +1405,6 @@ export default function MarketingPage() {
               )}
             </AnimatePresence>
 
-            {/* Lista de Publicidades */}
             <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
               <div className="p-6 border-b border-voltech-border">
                 <h3 className="text-lg font-bold text-white">Publicidades Creadas</h3>
@@ -1402,6 +1436,11 @@ export default function MarketingPage() {
                             </span>
                           </div>
                           
+                          {/* ✅ AGREGADO: Mostrar descripción en la lista */}
+                          {pub.descripcion && (
+                            <p className="text-xs text-voltech-muted line-clamp-2 w-full mb-2 italic">"{pub.descripcion}"</p>
+                          )}
+
                           <div className="flex flex-wrap gap-4 text-sm text-voltech-muted mb-3">
                             <span className="flex items-center gap-1">
                               <span className="capitalize">{pub.lado}</span>
@@ -1465,6 +1504,86 @@ export default function MarketingPage() {
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {showDiffusionModal && clientes.length > 0 && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-voltech-surface border border-voltech-border rounded-2xl w-full max-w-md p-6 shadow-2xl">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Send className="w-5 h-5 text-voltech-cyan" /> Difusión 1 a 1
+                </h3>
+                <button onClick={() => setShowDiffusionModal(false)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {clientesSeleccionados[diffusionIndex] && (
+                <>
+                  <div className="bg-voltech-dark/50 border border-voltech-border rounded-xl p-4 mb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs text-voltech-muted uppercase tracking-wider">Progreso</span>
+                      <span className="text-sm font-bold text-voltech-cyan">{diffusionIndex + 1} de {clientesSeleccionados.length}</span>
+                    </div>
+                    <div className="w-full h-2 bg-voltech-border rounded-full overflow-hidden mb-4">
+                      <div className="h-full bg-voltech-cyan transition-all duration-300" style={{ width: `${((diffusionIndex + 1) / clientesSeleccionados.length) * 100}%` }}></div>
+                    </div>
+                    
+                    {(() => {
+                      const clienteActual = clientes.find(c => c.id === clientesSeleccionados[diffusionIndex]);
+                      return clienteActual ? (
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-voltech-cyan to-voltech-purple flex items-center justify-center text-white font-bold text-lg">
+                            {clienteActual.nombre.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-white">{clienteActual.nombre} {clienteActual.apellido}</p>
+                            <p className="text-xs text-voltech-muted">📱 {clienteActual.telefono}</p>
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+
+                  <div className="bg-voltech-warning/10 border border-voltech-warning/30 rounded-lg p-3 mb-6">
+                    <p className="text-xs text-voltech-warning flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      <span>
+                        <strong>Importante:</strong> WhatsApp Web no permite adjuntar imágenes automáticamente. 
+                        Al hacer clic en "Enviar", se abrirá el chat. ¡No olvides adjuntar la imagen del producto manualmente antes de enviar!
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    {(() => {
+                      const clienteActual = clientes.find(c => c.id === clientesSeleccionados[diffusionIndex]);
+                      return clienteActual ? (
+                        <a 
+                          href={generarLinkWhatsApp(clienteActual, mensajePersonalizado)} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="w-full py-3 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
+                          onClick={() => setEnviados(prev => new Set(prev).add(clienteActual.id))}
+                        >
+                          <Send className="w-5 h-5" /> Enviar a {clienteActual.nombre.split(' ')[0]} por WhatsApp
+                        </a>
+                      ) : null;
+                    })()}
+                    
+                    <button 
+                      onClick={enviarAlSiguiente}
+                      className="w-full py-3 bg-voltech-cyan/20 text-voltech-cyan border border-voltech-cyan/30 rounded-lg font-bold hover:bg-voltech-cyan/30 transition-colors flex items-center justify-center gap-2"
+                    >
+                      Siguiente cliente ➔
+                    </button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
