@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '@/app/context/ThemeContext';
+import { useProductos, useSettings, useTasaBCV, useAuth } from '@/hooks/useVoltech';
 import { 
   Search, ShoppingCart, MessageCircle, X, Plus, Minus, Trash2, 
   MapPin, Tag, Star, Gift, CheckCircle, Package, TrendingUp, 
@@ -14,9 +15,12 @@ import toast, { Toaster } from 'react-hot-toast';
 
 export default function CatalogoPage() {
   const [activeSection, setActiveSection] = useState('productos');
-  const [productos, setProductos] = useState([]);
-  const [settings, setSettings] = useState({});
-  const [tasaBCV, setTasaBCV] = useState(36.5);
+  
+  const { productos } = useProductos();
+  const { settings } = useSettings();
+  const { tasa: tasaBCV, setTasa: setTasaBCV } = useTasaBCV();
+  const { currentUser, setCurrentUser } = useAuth();
+
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -29,7 +33,6 @@ export default function CatalogoPage() {
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [customerLocation, setCustomerLocation] = useState('');
   const [selectedAddress, setSelectedAddress] = useState('');
-  const [currentUser, setCurrentUser] = useState(null);
   const [showPreciosMayor, setShowPreciosMayor] = useState(false);
   const { darkMode, setDarkMode } = useTheme();
   
@@ -62,12 +65,6 @@ export default function CatalogoPage() {
   const [showBannerSorteo, setShowBannerSorteo] = useState(true);
 
   useEffect(() => {
-    const userLogged = localStorage.getItem('voltech_user');
-    if (userLogged) {
-      const user = JSON.parse(userLogged);
-      setCurrentUser(user);
-    }
-
     const urlParams = new URLSearchParams(window.location.search);
     const refCode = urlParams.get('ref');
     if (refCode) {
@@ -75,47 +72,43 @@ export default function CatalogoPage() {
       toast.success(`Referido por: ${refCode.toUpperCase()}`);
     }
 
-    const productosGuardados = localStorage.getItem('voltech_productos');
-    const settingsGuardados = localStorage.getItem('voltech_settings');
-    const tasaGuardada = localStorage.getItem('voltech_tasa_bcv');
-    const cartGuardado = localStorage.getItem('voltech_cart');
-    const sorteosGuardados = localStorage.getItem('voltech_sorteos');
     const participantesGuardados = localStorage.getItem('voltech_participantes');
     const opinionesGuardadas = localStorage.getItem('voltech_opiniones');
+    const cartGuardado = localStorage.getItem('voltech_cart');
+
+    if (cartGuardado) setCart(JSON.parse(cartGuardado));
+    if (participantesGuardados) setParticipantes(JSON.parse(participantesGuardados));
+    if (opinionesGuardadas) setOpiniones(JSON.parse(opinionesGuardadas));
+  }, []);
+
+  useEffect(() => {
+    if (productos.length === 0) return;
+
+    const sorteosGuardados = localStorage.getItem('voltech_sorteos');
     const votosGuardados = localStorage.getItem('voltech_sorteo_votos');
 
-    if (productosGuardados) {
-      const todosProductos = JSON.parse(productosGuardados);
-      const productosPublicados = todosProductos.filter(p => p.publicado === true || p.publicado === undefined);
-      setProductos(productosPublicados);
-      console.log('📦 Productos cargados:', productosPublicados.length);
-    }
-    if (settingsGuardados) setSettings(JSON.parse(settingsGuardados));
-    if (tasaGuardada) setTasaBCV(JSON.parse(tasaGuardada).tasa || 36.5);
-    if (cartGuardado) setCart(JSON.parse(cartGuardado));
-    
     if (sorteosGuardados) {
       const sorteos = JSON.parse(sorteosGuardados);
       const activo = sorteos.find(s => s.estado === 'activo');
       if (activo) {
         setSorteoActivo(activo);
         if (activo.tipo_sorteo === 'votacion' && activo.productos_candidatos) {
-          const productosFisicos = JSON.parse(productosGuardados || '[]');
-          const candidatos = productosFisicos.filter(p => activo.productos_candidatos.includes(p.id));
+          const candidatos = productos.filter(p => activo.productos_candidatos.includes(p.id));
           setProductosVotacion(candidatos);
         }
       }
     }
-    if (participantesGuardados) setParticipantes(JSON.parse(participantesGuardados));
-    if (opinionesGuardadas) setOpiniones(JSON.parse(opinionesGuardadas));
+    
     if (votosGuardados) {
-      const votos = JSON.parse(votosGuardados);
-      if (sorteoActivo && sorteoActivo.tipo_sorteo === 'votacion') {
-        const votosSorteo = votos[sorteoActivo.id] || {};
+      const sorteos = JSON.parse(localStorage.getItem('voltech_sorteos') || '[]');
+      const activo = sorteos.find(s => s.estado === 'activo');
+      if (activo && activo.tipo_sorteo === 'votacion') {
+        const votos = JSON.parse(votosGuardados);
+        const votosSorteo = votos[activo.id] || {};
         setProductosVotacion(prev => prev.map(p => ({ ...p, votos: votosSorteo[p.id] || 0 })));
       }
     }
-  }, []);
+  }, [productos]);
 
   useEffect(() => { 
     localStorage.setItem('voltech_cart', JSON.stringify(cart)); 
@@ -298,9 +291,9 @@ export default function CatalogoPage() {
     window.open(`https://wa.me/58${telefono.replace(/\D/g, '')}?text=${encodeURIComponent(mensaje)}`, '_blank');
   };
 
-  const categorias = [...new Set(productos.filter(p => p.categoria && p.categoria.toUpperCase() !== 'STREAMING').map(p => p.categoria).filter(Boolean))].sort();
-  const marcas = [...new Set(productos.map(p => p.marca).filter(Boolean))].sort();
-  const plataformas = [...new Set(productos.filter(p => p.tipo === 'streaming' && p.plataforma).map(p => p.plataforma).filter(Boolean))].sort();
+  const categorias = [...new Set((productos || []).filter(p => p.categoria && p.categoria.toUpperCase() !== 'STREAMING').map(p => p.categoria).filter(Boolean))].sort();
+  const marcas = [...new Set((productos || []).map(p => p.marca).filter(Boolean))].sort();
+  const plataformas = [...new Set((productos || []).filter(p => p.tipo === 'streaming' && p.plataforma).map(p => p.plataforma).filter(Boolean))].sort();
   const puntosEntrega = settings.envios?.puntosEntrega || settings.tienda?.direcciones || [];
   const metodosPagoActivos = settings.pagos ? Object.entries(settings.pagos).filter(([_, a]) => a).map(([m]) => m) : ['efectivo', 'pago_movil'];
   const opinionesAprobadas = opiniones.filter(o => o.estado === 'aprobada');
@@ -418,7 +411,6 @@ export default function CatalogoPage() {
     e.preventDefault();
     if (!formDataOpinion.nombre || !formDataOpinion.comentario) { toast.error('Nombre y comentario son obligatorios'); return; }
     
-    // Guardar teléfono en clientes si es proporcionado
     if (formDataOpinion.telefono) {
       const clientes = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
       const clienteExistente = clientes.find(c => c.telefono === formDataOpinion.telefono);
@@ -461,17 +453,17 @@ export default function CatalogoPage() {
     handleFileChange(e.dataTransfer.files[0]);
   };
 
-  const productosFiltrados = productos.filter(p => {
+  const productosFiltrados = (productos || []).filter(p => {
     const match = (p.producto || '').toLowerCase().includes(searchTerm.toLowerCase()) || (p.marca || '').toLowerCase().includes(searchTerm.toLowerCase()) || (p.categoria || '').toLowerCase().includes(searchTerm.toLowerCase());
     return match && (!filterCategory || p.categoria === filterCategory) && (!filterBrand || p.marca === filterBrand) && p.tipo === 'fisico' && !p.esCombo;
   });
 
-  const streamingFiltrados = productos.filter(p => {
+  const streamingFiltrados = (productos || []).filter(p => {
     const match = (p.plataforma || '').toLowerCase().includes(searchTerm.toLowerCase());
     return match && (!filterPlatform || p.plataforma === filterPlatform) && p.tipo === 'streaming' && !p.esCombo;
   });
 
-  const ofertas = productos.filter(p => p.publicado && (p.estado === 'oferta' || p.precio_oferta || p.precioOferta));
+  const ofertas = (productos || []).filter(p => p.publicado && (p.estado === 'oferta' || p.precio_oferta || p.precioOferta));
 
   const bg = darkMode ? 'bg-slate-950' : 'bg-slate-50';
   const text = darkMode ? 'text-slate-100' : 'text-slate-900';
@@ -509,13 +501,25 @@ export default function CatalogoPage() {
 
       <header className={`${headerBg} backdrop-blur-lg shadow-sm sticky top-0 z-40 border-b transition-colors duration-300`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>VOLTECH <span className="text-purple-600">STOREVE</span></h1>
+            
+            {/* ✅ MENÚ MÓVIL (Horizontal scroll) */}
+            <nav className="flex md:hidden gap-3 overflow-x-auto pb-1 no-scrollbar flex-1 ml-4">
+              {['productos', 'streaming', 'ofertas', 'opiniones', 'sorteos'].map(s => (
+                <button key={s} onClick={() => setActiveSection(s)} className={`whitespace-nowrap text-xs font-medium capitalize px-3 py-1.5 rounded-full transition-colors ${activeSection === s ? 'bg-purple-600/20 text-purple-600 border border-purple-600/30' : 'text-voltech-muted hover:text-white'}`}>
+                  {s}
+                </button>
+              ))}
+            </nav>
+
+            {/* ✅ MENÚ DESKTOP */}
             <nav className="hidden md:flex gap-6">
               {['productos', 'streaming', 'ofertas', 'opiniones', 'sorteos'].map(s => (
                 <button key={s} onClick={() => setActiveSection(s)} className={`text-sm font-medium capitalize transition-colors ${activeSection === s ? 'text-purple-600 border-b-2 border-purple-600 pb-1' : darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}>{s}</button>
               ))}
             </nav>
+
             <div className="flex items-center gap-3">
               <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-slate-800 text-yellow-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
                 {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -543,25 +547,28 @@ export default function CatalogoPage() {
             </div>
           </div>
           
-          <div className="mt-4 flex flex-wrap gap-3 items-center max-w-4xl">
+          {/* ✅ BARRA DE BÚSQUEDA Y FILTROS RESPONSIVE */}
+          <div className="mt-4 flex flex-col md:flex-row gap-3 items-stretch md:items-center max-w-4xl">
             <div className="relative flex-1 min-w-[200px]">
               <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
               <input type="text" placeholder={activeSection === 'productos' ? 'Buscar productos...' : activeSection === 'streaming' ? 'Buscar plataformas...' : 'Buscar...'} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${inputBg}`} />
             </div>
+            
             {activeSection === 'productos' && (
-              <>
-                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className={`px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors ${inputBg}`}>
+              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className={`w-full md:w-auto px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors ${inputBg}`}>
                   <option value="">Todas las categorías</option>
                   {categorias.map(c => <option key={c} value={c} className="text-slate-900 bg-white">{c}</option>)}
                 </select>
-                <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)} className={`px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors ${inputBg}`}>
+                <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)} className={`w-full md:w-auto px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors ${inputBg}`}>
                   <option value="">Todas las marcas</option>
                   {marcas.map(m => <option key={m} value={m} className="text-slate-900 bg-white">{m}</option>)}
                 </select>
-              </>
+              </div>
             )}
+            
             {activeSection === 'streaming' && (
-              <select value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)} className={`px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors ${inputBg}`}>
+              <select value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)} className={`w-full md:w-auto px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors ${inputBg}`}>
                 <option value="">Todas las plataformas</option>
                 {plataformas.map(p => <option key={p} value={p} className="text-slate-900 bg-white">{p}</option>)}
               </select>
@@ -571,10 +578,12 @@ export default function CatalogoPage() {
       </header>
 
       <main className="max-w-[1800px] xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 xl:gap-8">
+        {/* ✅ GRID RESPONSIVE: order-1 en móvil para productos, sidebars order-2 y order-3 */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
           
-          <aside className="hidden lg:block lg:col-span-2 space-y-4">
-            <div className={`${cardBg} border ${cardBorder} rounded-xl p-4 sticky top-24`}>
+          {/* ✅ LEFT SIDEBAR: Visible en móvil (full width), order-2 */}
+          <aside className="col-span-1 lg:col-span-2 space-y-4 order-2 lg:order-1">
+            <div className={`${cardBg} border ${cardBorder} rounded-xl p-4`}>
               <h4 className="font-bold text-sm mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-500" /> Super Combos</h4>
               <div className="space-y-3">
                 <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg p-3 text-white text-center cursor-pointer hover:opacity-90 transition-opacity">
@@ -593,11 +602,12 @@ export default function CatalogoPage() {
             </div>
           </aside>
 
-          <div className="lg:col-span-8 xl:col-span-8">
+          {/* ✅ MAIN CONTENT: order-1 en móvil (se ve primero) */}
+          <div className="col-span-1 lg:col-span-8 xl:col-span-8 order-1 lg:order-2">
             {activeSection === 'productos' && (
               <div>
-                <h2 className={`text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Productos</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-4">
+                <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Productos</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
                   {productosFiltrados.length > 0 ? (
                     productosFiltrados.map(p => {
                       const precioInfo = getPrecioMostrar(p);
@@ -637,7 +647,7 @@ export default function CatalogoPage() {
                     <div className="col-span-full text-center py-20">
                       <Package className={`w-16 h-16 mx-auto mb-3 opacity-30 ${mutedText}`} />
                       <p className={`text-lg ${mutedText}`}>No hay productos disponibles</p>
-                      <p className={`text-sm ${mutedText} mt-2`}>Total en sistema: {productos.length}</p>
+                      <p className={`text-sm ${mutedText} mt-2`}>Total en sistema: {(productos || []).length}</p>
                     </div>
                   )}
                 </div>
@@ -646,7 +656,7 @@ export default function CatalogoPage() {
 
             {activeSection === 'streaming' && (
               <div>
-                <h2 className={`text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Streaming</h2>
+                <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Streaming</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {streamingFiltrados.map(p => {
                     const precioInfo = getPrecioMostrar(p);
@@ -685,8 +695,8 @@ export default function CatalogoPage() {
 
             {activeSection === 'ofertas' && (
               <div>
-                <h2 className={`text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}> Ofertas Especiales</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-4">
+                <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}> Ofertas Especiales</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
                   {ofertas.map(p => {
                     const precioInfo = getPrecioMostrar(p);
                     return (
@@ -722,8 +732,8 @@ export default function CatalogoPage() {
             {activeSection === 'opiniones' && (
               <div>
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>⭐ Opiniones de Clientes</h2>
-                  <button onClick={() => setShowOpinionForm(!showOpinionForm)} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"><Plus className="w-5 h-5" /> Dejar Opinión</button>
+                  <h2 className={`text-2xl md:text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>⭐ Opiniones de Clientes</h2>
+                  <button onClick={() => setShowOpinionForm(!showOpinionForm)} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 text-sm"><Plus className="w-4 h-4" /> Dejar Opinión</button>
                 </div>
 
                 {showOpinionForm && (
@@ -1022,11 +1032,12 @@ export default function CatalogoPage() {
             )}
           </div>
 
-          <aside className="hidden lg:block lg:col-span-2 space-y-4">
-            <div className={`${cardBg} border ${cardBorder} rounded-xl p-4 sticky top-24`}>
+          {/* ✅ RIGHT SIDEBAR: Visible en móvil (full width), order-3 */}
+          <aside className="col-span-1 lg:col-span-2 space-y-4 order-3 lg:order-3">
+            <div className={`${cardBg} border ${cardBorder} rounded-xl p-4`}>
               <h4 className="font-bold text-sm mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-voltech-warning" /> Más Vendidos</h4>
               <div className="space-y-3">
-                {productos.slice(0, 3).map((p, idx) => (
+                {(productos || []).slice(0, 3).map((p, idx) => (
                   <div key={p.id} className="flex items-center gap-3 cursor-pointer hover:bg-voltech-border/50 p-2 rounded-lg transition-colors" onClick={() => setSelectedProduct(p)}>
                     <div className="w-10 h-10 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
                       {p.imagen ? <img src={p.imagen} className="w-full h-full object-cover rounded-lg" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-5 h-5 text-slate-400" />}

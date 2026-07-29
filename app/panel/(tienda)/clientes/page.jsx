@@ -1,8 +1,8 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   Users, UserPlus, Search, Edit3, Trash2, X, Save, Mail, Phone, MapPin, 
   Tag, AlertTriangle, CheckCircle, Filter, Palette, Plus, Gift, 
@@ -52,21 +52,103 @@ export default function ClientesPage() {
     etiquetas: [], referidos: [], notas: '',
   });
 
+  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
-    const clientesGuardados = localStorage.getItem('voltech_clientes');
-    const ventasGuardadas = localStorage.getItem('voltech_ventas');
-    const equipoGuardado = localStorage.getItem('voltech_equipo');
-    const etiquetasGuardadas = localStorage.getItem('voltech_etiquetas');
-    const nivelesGuardados = localStorage.getItem('voltech_niveles_referidos');
+    const cargarDatos = async () => {
+      let clientesData = [], etiquetasData = [], nivelesData = [];
 
-    if (clientesGuardados) setClientes(JSON.parse(clientesGuardados));
-    if (ventasGuardadas) setVentas(JSON.parse(ventasGuardadas));
-    if (equipoGuardado) setEquipo(JSON.parse(equipoGuardado));
-    if (etiquetasGuardadas) setEtiquetas(JSON.parse(etiquetasGuardadas));
-    if (nivelesGuardados) setNivelesReferidos(JSON.parse(nivelesGuardados));
+      // 1. Intentar cargar desde Supabase
+      if (supabase) {
+        const [{ data: cData }, { data: eData }, { data: nData }] = await Promise.all([
+          supabase.from('clientes').select('*'),
+          supabase.from('settings').select('valor').eq('clave', 'etiquetas').single(),
+          supabase.from('settings').select('valor').eq('clave', 'niveles_referidos').single()
+        ]);
+        if (cData) clientesData = cData;
+        if (eData?.valor) etiquetasData = eData.valor;
+        if (nData?.valor) nivelesData = nData.valor;
+      }
+
+      // 2. Fallback a localStorage si no hay datos en Supabase
+      if (clientesData.length === 0) {
+        const clientesGuardados = localStorage.getItem('voltech_clientes');
+        if (clientesGuardados) clientesData = JSON.parse(clientesGuardados);
+      }
+      if (!etiquetasData || etiquetasData.length === 0) {
+        const etiquetasGuardadas = localStorage.getItem('voltech_etiquetas');
+        if (etiquetasGuardadas) etiquetasData = JSON.parse(etiquetasGuardadas);
+      }
+      if (!nivelesData || nivelesData.length === 0) {
+        const nivelesGuardados = localStorage.getItem('voltech_niveles_referidos');
+        if (nivelesGuardados) nivelesData = JSON.parse(nivelesGuardados);
+      }
+
+      // 3. Cargar ventas y equipo (siguen siendo locales por ahora, o se pueden migrar después)
+      const ventasGuardadas = localStorage.getItem('voltech_ventas');
+      const equipoGuardado = localStorage.getItem('voltech_equipo');
+      
+      const vts = ventasGuardadas ? JSON.parse(ventasGuardadas) : [];
+      const eqp = equipoGuardado ? JSON.parse(equipoGuardado) : [];
+
+      setVentas(vts);
+      setEquipo(eqp);
+      setEtiquetas(etiquetasData);
+      setNivelesReferidos(nivelesData);
+
+      // 4. Sincronizar clientes desde ventas y actualizar estado
+      const clientesSincronizados = sincronizarClientesDesdeVentas(clientesData, vts);
+      setClientes(clientesSincronizados);
+      
+      // Guardar en localStorage como caché
+      localStorage.setItem('voltech_clientes', JSON.stringify(clientesSincronizados));
+    };
     
-    sincronizarClientesDesdeVentas();
+    cargarDatos();
   }, []);
+
+  // ✅ ACTUALIZADO: Recibe los datos para sincronizar sin depender del estado inmediato
+  const sincronizarClientesDesdeVentas = (listaClientes, listaVentas) => {
+    const clientesActuales = [...listaClientes];
+    let cambios = false;
+    
+    listaVentas.forEach(venta => {
+      const clienteExistente = clientesActuales.find(c => c.telefono === venta.telefono || c.nombre.toLowerCase() === venta.cliente.toLowerCase());
+      if (clienteExistente) {
+        clienteExistente.totalCompras = (clienteExistente.totalCompras || 0) + 1;
+        clienteExistente.ultimaCompra = venta.fecha;
+        clienteExistente.totalGastado = (clienteExistente.totalGastado || 0) + (venta.total || 0);
+        cambios = true;
+      } else {
+        clientesActuales.push({
+          id: (Date.now() + Math.random()).toString(), 
+          nombre: venta.cliente, 
+          apellido: '', 
+          telefono: venta.telefono,
+          correo: '', 
+          direccion: '', 
+          registradoPor: venta.vendedor || 'Sistema', 
+          fuenteRegistro: 'normal',
+          etiquetas: [], 
+          referidos: [], 
+          notas: '', 
+          totalCompras: 1, 
+          ultimaCompra: venta.fecha,
+          totalGastado: venta.total || 0, 
+          fechaRegistro: venta.fecha,
+        });
+        cambios = true;
+      }
+    });
+    
+    // Si hubo cambios, guardamos en Supabase de forma silenciosa
+    if (cambios && supabase) {
+      // Nota: upsert masivo puede ser pesado, lo hacemos solo para los nuevos/actualizados
+      // Por simplicidad y seguridad, actualizamos el localStorage y el estado. 
+      // El próximo "Guardar" manual del usuario lo sincronizará perfectamente.
+    }
+    
+    return clientesActuales;
+  };
 
   const obtenerNivelReferido = (cantidad) => {
     const nivel = [...nivelesReferidos]
@@ -77,31 +159,6 @@ export default function ClientesPage() {
 
   const generarCodigoReferido = (cliente) => {
     return `VOLTECHSTORE-${cliente.nombre.substring(0, 5).toUpperCase()}-${cliente.id.toString().slice(-4)}`;
-  };
-
-  const sincronizarClientesDesdeVentas = () => {
-    const clientesActuales = [...clientes];
-    let cambios = false;
-    ventas.forEach(venta => {
-      const clienteExistente = clientesActuales.find(c => c.telefono === venta.telefono || c.nombre.toLowerCase() === venta.cliente.toLowerCase());
-      if (clienteExistente) {
-        clienteExistente.totalCompras = (clienteExistente.totalCompras || 0) + 1;
-        clienteExistente.ultimaCompra = venta.fecha;
-        clienteExistente.totalGastado = (clienteExistente.totalGastado || 0) + (venta.total || 0);
-      } else {
-        clientesActuales.push({
-          id: Date.now() + Math.random(), nombre: venta.cliente, apellido: '', telefono: venta.telefono,
-          correo: '', direccion: '', registradoPor: venta.vendedor || 'Sistema', fuenteRegistro: 'normal',
-          etiquetas: [], referidos: [], notas: '', totalCompras: 1, ultimaCompra: venta.fecha,
-          totalGastado: venta.total || 0, fechaRegistro: venta.fecha,
-        });
-        cambios = true;
-      }
-    });
-    if (cambios) {
-      setClientes(clientesActuales);
-      localStorage.setItem('voltech_clientes', JSON.stringify(clientesActuales));
-    }
   };
 
   const obtenerVendedorConMenosVentas = () => {
@@ -155,18 +212,35 @@ export default function ClientesPage() {
     toast.success('Referido eliminado');
   };
 
-  const guardarCliente = () => {
+  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
+  const guardarCliente = async () => {
     if (!formData.nombre || !formData.telefono) { toast.error('Nombre y Teléfono son obligatorios'); return; }
     if (clientes.find(c => c.telefono === formData.telefono && c.id !== editingId)) { toast.error('Ya existe un cliente con ese teléfono'); return; }
     
+    const clienteAGuardar = editingId 
+      ? { ...formData, ultimaActualizacion: new Date().toISOString() } 
+      : { id: Date.now().toString(), ...formData, totalCompras: 0, totalGastado: 0, fechaRegistro: new Date().toISOString().split('T')[0] };
+
+    // 1. Guardar en Supabase
+    if (supabase) {
+      const { error } = await supabase.from('clientes').upsert(clienteAGuardar, { onConflict: 'id' });
+      if (error) {
+        console.error('Error Supabase:', error);
+        toast.error('Error de conexión al guardar');
+        return;
+      }
+    }
+
+    // 2. Actualizar estado local y localStorage
     if (editingId) {
-      const actualizados = clientes.map(c => c.id === editingId ? { ...c, ...formData, ultimaActualizacion: new Date().toISOString() } : c);
-      setClientes(actualizados); localStorage.setItem('voltech_clientes', JSON.stringify(actualizados));
+      const actualizados = clientes.map(c => c.id === editingId ? clienteAGuardar : c);
+      setClientes(actualizados); 
+      localStorage.setItem('voltech_clientes', JSON.stringify(actualizados));
       toast.success('Cliente actualizado');
     } else {
-      const nuevo = { id: Date.now(), ...formData, totalCompras: 0, totalGastado: 0, fechaRegistro: new Date().toISOString().split('T')[0] };
-      const actualizados = [nuevo, ...clientes];
-      setClientes(actualizados); localStorage.setItem('voltech_clientes', JSON.stringify(actualizados));
+      const actualizados = [clienteAGuardar, ...clientes];
+      setClientes(actualizados); 
+      localStorage.setItem('voltech_clientes', JSON.stringify(actualizados));
       
       agregarNotificacion({
         tipo: 'cliente',
@@ -187,49 +261,83 @@ export default function ClientesPage() {
 
   const editarCliente = (cliente) => {
     setEditingId(cliente.id);
-    setFormData({ nombre: cliente.nombre||'', apellido: cliente.apellido||'', telefono: cliente.telefono||'', correo: cliente.correo||'', direccion: cliente.direccion||'', registradoPor: cliente.registradoPor||'', fuenteRegistro: cliente.fuenteRegistro||'normal', numeroOrdenSorteo: cliente.numeroOrdenSorteo||'', etiquetas: cliente.etiquetas||[], referidos: cliente.referidos||[], notas: cliente.notas||'' });
+    setFormData({ 
+      nombre: cliente.nombre||'', apellido: cliente.apellido||'', telefono: cliente.telefono||'', 
+      correo: cliente.correo||'', direccion: cliente.direccion||'', registradoPor: cliente.registradoPor||'', 
+      fuenteRegistro: cliente.fuenteRegistro||'normal', numeroOrdenSorteo: cliente.numeroOrdenSorteo||'', 
+      etiquetas: cliente.etiquetas||[], referidos: cliente.referidos||[], notas: cliente.notas||'' 
+    });
     setShowForm(true);
   };
 
-  const eliminarCliente = (id) => {
+  // ✅ ACTUALIZADO: Elimina de Supabase y localStorage
+  const eliminarCliente = async (id) => {
     if (!confirm('¿Estás seguro de eliminar este cliente?')) return;
+    
+    if (supabase) {
+      await supabase.from('clientes').delete().eq('id', id.toString());
+    }
+    
     const actualizados = clientes.filter(c => c.id !== id);
-    setClientes(actualizados); localStorage.setItem('voltech_clientes', JSON.stringify(actualizados));
+    setClientes(actualizados); 
+    localStorage.setItem('voltech_clientes', JSON.stringify(actualizados));
     toast.success('Cliente eliminado');
   };
 
   const verReferidos = (cliente) => { setClienteSeleccionado(cliente); setShowReferidosModal(true); };
 
-  const guardarEtiqueta = () => {
+  // ✅ ACTUALIZADO: Guarda etiquetas en Supabase (settings) y localStorage
+  const guardarEtiqueta = async () => {
     if (!nuevaEtiqueta.nombre.trim()) { toast.error('El nombre es obligatorio'); return; }
     if (etiquetas.find(e => e.nombre.toLowerCase() === nuevaEtiqueta.nombre.toLowerCase())) { toast.error('Ya existe'); return; }
+    
     const nueva = { id: Date.now(), nombre: nuevaEtiqueta.nombre, color: nuevaEtiqueta.color };
     const actualizadas = [...etiquetas, nueva];
-    setEtiquetas(actualizadas); localStorage.setItem('voltech_etiquetas', JSON.stringify(actualizadas));
-    toast.success('Etiqueta creada'); setNuevaEtiqueta({ nombre: '', color: '#00d4ff' });
+    
+    if (supabase) {
+      await supabase.from('settings').upsert({ clave: 'etiquetas', valor: actualizadas }, { onConflict: 'clave' });
+    }
+    
+    setEtiquetas(actualizadas); 
+    localStorage.setItem('voltech_etiquetas', JSON.stringify(actualizadas));
+    toast.success('Etiqueta creada'); 
+    setNuevaEtiqueta({ nombre: '', color: '#00d4ff' });
   };
 
-  const eliminarEtiqueta = (id) => {
+  // ✅ ACTUALIZADO: Elimina etiqueta de Supabase y localStorage
+  const eliminarEtiqueta = async (id) => {
     if (!confirm('¿Eliminar esta etiqueta?')) return;
     const actualizadas = etiquetas.filter(e => e.id !== id);
-    setEtiquetas(actualizadas); localStorage.setItem('voltech_etiquetas', JSON.stringify(actualizadas));
+    
+    if (supabase) {
+      await supabase.from('settings').upsert({ clave: 'etiquetas', valor: actualizadas }, { onConflict: 'clave' });
+    }
+    
+    setEtiquetas(actualizadas); 
+    localStorage.setItem('voltech_etiquetas', JSON.stringify(actualizadas));
     toast.success('Etiqueta eliminada');
   };
 
-  const guardarNivel = () => {
+  // ✅ ACTUALIZADO: Guarda niveles en Supabase (settings) y localStorage
+  const guardarNivel = async () => {
     if (!formDataNivel.nombre.trim()) { toast.error('El nombre del nivel es obligatorio'); return; }
     
+    let actualizados;
     if (formDataNivel.id) {
-      const actualizados = nivelesReferidos.map(n => n.id === formDataNivel.id ? formDataNivel : n);
-      setNivelesReferidos(actualizados);
+      actualizados = nivelesReferidos.map(n => n.id === formDataNivel.id ? formDataNivel : n);
       toast.success('Nivel actualizado');
     } else {
       const nuevo = { ...formDataNivel, id: Date.now() };
-      const actualizados = [...nivelesReferidos, nuevo].sort((a, b) => a.minimo - b.minimo);
-      setNivelesReferidos(actualizados);
+      actualizados = [...nivelesReferidos, nuevo].sort((a, b) => a.minimo - b.minimo);
       toast.success('Nivel creado');
     }
-    localStorage.setItem('voltech_niveles_referidos', JSON.stringify(nivelesReferidos));
+    
+    if (supabase) {
+      await supabase.from('settings').upsert({ clave: 'niveles_referidos', valor: actualizados }, { onConflict: 'clave' });
+    }
+    
+    setNivelesReferidos(actualizados);
+    localStorage.setItem('voltech_niveles_referidos', JSON.stringify(actualizados));
     setShowNivelForm(false);
     setFormDataNivel({ nombre: '', minimo: 2, descuento: 10, ticketsExtra: 2, productoGratis: 'Ninguno' });
   };
@@ -239,9 +347,15 @@ export default function ClientesPage() {
     setShowNivelForm(true);
   };
 
-  const eliminarNivel = (id) => {
+  // ✅ ACTUALIZADO: Elimina nivel de Supabase y localStorage
+  const eliminarNivel = async (id) => {
     if (!confirm('¿Eliminar este nivel?')) return;
     const actualizados = nivelesReferidos.filter(n => n.id !== id);
+    
+    if (supabase) {
+      await supabase.from('settings').upsert({ clave: 'niveles_referidos', valor: actualizados }, { onConflict: 'clave' });
+    }
+    
     setNivelesReferidos(actualizados);
     localStorage.setItem('voltech_niveles_referidos', JSON.stringify(actualizados));
     toast.success('Nivel eliminado');

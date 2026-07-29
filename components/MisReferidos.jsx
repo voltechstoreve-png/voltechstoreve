@@ -1,10 +1,7 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-export const fetchCache = 'default-no-store';
-
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { Copy, TrendingUp, DollarSign, MousePointer } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -18,41 +15,79 @@ export default function MisReferidos({ clienteActual }) {
   useEffect(() => {
     if (!clienteActual) return;
 
-    // Calcular estadísticas reales desde localStorage
-    const ventasProductos = JSON.parse(localStorage.getItem('voltech_ventas_productos') || '[]');
-    const ventasStreaming = JSON.parse(localStorage.getItem('voltech_ventas_streaming') || '[]');
-    const clientes = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
-    
-    const codigoReferido = `VOLTECHSTORE-${clienteActual.nombre.substring(0, 5).toUpperCase()}-${clienteActual.id.toString().slice(-4)}`;
-    
-    // Contar clics (simulado - en producción sería tracking real)
-    const clics = parseInt(localStorage.getItem(`clics_${codigoReferido}`) || '0');
-    
-    // Contar ventas de clientes referidos
-    let ventasCount = 0;
-    let comisionesTotal = 0;
-    
-    clientes.forEach(cliente => {
-      // Verificar si este cliente fue referido por clienteActual
-      if (cliente.referidoPor === clienteActual.id) {
-        // Sumar ventas de este cliente referido
-        const ventasDeEsteCliente = [...ventasProductos, ...ventasStreaming].filter(
-          v => v.clienteId === cliente.id || v.clienteTelefono === cliente.telefono
-        );
-        
-        ventasCount += ventasDeEsteCliente.length;
-        
-        // Calcular comisión (10% del total de ventas)
-        const totalVentas = ventasDeEsteCliente.reduce((acc, v) => acc + (v.total || 0), 0);
-        comisionesTotal += totalVentas * 0.10;
+    const calcularStats = async () => {
+      const codigoReferido = `VOLTECHSTORE-${clienteActual.nombre.substring(0, 5).toUpperCase()}-${clienteActual.id.toString().slice(-4)}`;
+      
+      // Valor base de clics (simulado o desde localStorage)
+      let clics = parseInt(localStorage.getItem(`clics_${codigoReferido}`) || '0') || 15;
+      let ventasCount = 0;
+      let comisionesTotal = 0;
+
+      // ✅ 1. INTENTAR OBTENER DATOS DESDE SUPABASE
+      if (supabase && clienteActual.id) {
+        // Buscar clientes que fueron referidos por este usuario
+        const { data: clientesReferidos, error: errorClientes } = await supabase
+          .from('clientes')
+          .select('id, telefono')
+          .or(`referidoPor.eq.${clienteActual.id},codigoReferido.eq.${codigoReferido}`);
+
+        if (!errorClientes && clientesReferidos && clientesReferidos.length > 0) {
+          const idsClientes = clientesReferidos.map(c => c.id);
+          const telefonosClientes = clientesReferidos.map(c => c.telefono).filter(Boolean);
+
+          // Obtener todas las ventas para filtrar en memoria (más seguro que queries OR complejas con arrays)
+          const { data: todasLasVentas, error: errorVentas } = await supabase
+            .from('ventas')
+            .select('total, clienteId, clienteTelefono');
+
+          if (!errorVentas && todasLasVentas) {
+            const ventasFiltradas = todasLasVentas.filter(v => 
+              (v.clienteId && idsClientes.includes(v.clienteId)) ||
+              (v.clienteTelefono && telefonosClientes.includes(v.clienteTelefono))
+            );
+
+            ventasCount = ventasFiltradas.length;
+            comisionesTotal = ventasFiltradas.reduce((acc, v) => acc + (parseFloat(v.total) || 0), 0) * 0.10;
+          }
+        }
       }
-    });
-    
-    setStats({
-      clics: clics || 15, // Valor de ejemplo si no hay tracking
-      ventas: ventasCount || 8,
-      comisiones: comisionesTotal || 120,
-    });
+
+      // ✅ 2. FALLBACK A LOCALSTORAGE (Si Supabase falla o no hay datos)
+      if (ventasCount === 0 && comisionesTotal === 0) {
+        const ventasProductos = JSON.parse(localStorage.getItem('voltech_ventas_productos') || '[]');
+        const ventasStreaming = JSON.parse(localStorage.getItem('voltech_ventas_streaming') || '[]');
+        const clientes = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
+        
+        let fallbackVentas = 0;
+        let fallbackComisiones = 0;
+        
+        clientes.forEach(cliente => {
+          if (cliente.referidoPor === clienteActual.id || cliente.codigoReferido === codigoReferido) {
+            const ventasDeEsteCliente = [...ventasProductos, ...ventasStreaming].filter(
+              v => v.clienteId === cliente.id || v.clienteTelefono === cliente.telefono
+            );
+            
+            fallbackVentas += ventasDeEsteCliente.length;
+            const totalVentas = ventasDeEsteCliente.reduce((acc, v) => acc + (v.total || 0), 0);
+            fallbackComisiones += totalVentas * 0.10;
+          }
+        });
+
+        // Si el fallback encontró datos, usarlos. Si no, mantener los de Supabase (o los valores por defecto)
+        if (fallbackVentas > 0 || fallbackComisiones > 0) {
+          ventasCount = fallbackVentas;
+          comisionesTotal = fallbackComisiones;
+        }
+      }
+      
+      setStats({
+        clics: clics,
+        ventas: ventasCount || 8, // Valor de ejemplo si no hay datos
+        comisiones: comisionesTotal || 120, // Valor de ejemplo si no hay datos
+      });
+    };
+
+    calcularStats();
   }, [clienteActual]);
 
   const generarLinkReferido = () => {

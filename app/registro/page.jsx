@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { supabase } from '../lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   Package, 
   User, 
@@ -71,7 +72,8 @@ function RegistroContent() {
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleRegistro = () => {
+  // ✅ ACTUALIZADO: Función asíncrona para guardar en Supabase
+  const handleRegistro = async () => {
     if (!formData.nombre || !formData.email || !formData.password) {
       toast.error('Completa todos los campos obligatorios');
       return;
@@ -87,53 +89,90 @@ function RegistroContent() {
       return;
     }
 
+    const emailLower = formData.email.toLowerCase();
+
+    // 1. VALIDACIÓN DE CORREO DUPLICADO (Supabase + Fallback Local)
+    if (supabase) {
+      const { data: existingUser } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq('email', emailLower)
+        .single();
+      
+      if (existingUser && (!invitationData || existingUser.id !== invitationData.id)) {
+        toast.error('Este correo electrónico ya está registrado en el sistema');
+        return;
+      }
+    } else {
+      const equipoGuardado = localStorage.getItem('voltech_equipo');
+      if (equipoGuardado) {
+        const equipo = JSON.parse(equipoGuardado);
+        const emailExiste = equipo.some(m => 
+          m.email.toLowerCase() === emailLower && m.id !== (invitationData?.id || 0)
+        );
+        if (emailExiste) {
+          toast.error('Este correo electrónico ya está registrado en el sistema');
+          return;
+        }
+      }
+    }
+
+    // 2. Preparar datos del usuario
+    const userData = {
+      nombre: formData.nombre,
+      email: emailLower,
+      telefono: formData.telefono,
+      password: formData.password,
+      rol: invitationData ? invitationData.rol : 'vendedor',
+      activo: true,
+      registrado: true,
+      fechaRegistro: new Date().toISOString()
+    };
+
+    // 3. Guardar o Actualizar en Supabase
+    if (supabase) {
+      let error;
+      if (invitationData && invitationData.id) {
+        const { error: updateError } = await supabase
+          .from('usuarios')
+          .update(userData)
+          .eq('id', invitationData.id);
+        error = updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from('usuarios')
+          .insert([userData])
+          .select()
+          .single();
+        error = insertError;
+      }
+
+      if (error) {
+        toast.error('Error al registrar: ' + error.message);
+        return;
+      }
+    }
+
+    // 4. Respaldo en localStorage (para mantener compatibilidad con flujos existentes)
     const equipoGuardado = localStorage.getItem('voltech_equipo');
     let equipo = equipoGuardado ? JSON.parse(equipoGuardado) : [];
 
-    // 1. VALIDACIÓN DE CORREO DUPLICADO
-    const emailExiste = equipo.some(m => 
-      m.email.toLowerCase() === formData.email.toLowerCase() && 
-      m.id !== (invitationData?.id || 0)
-    );
-
-    if (emailExiste) {
-      toast.error('Este correo electrónico ya está registrado en el sistema');
-      return;
-    }
-
-    // 2. Guardar o Actualizar
     if (invitationData) {
       equipo = equipo.map(m => 
-        m.id === invitationData.id ? {
-          ...m,
-          nombre: formData.nombre,
-          email: formData.email,
-          telefono: formData.telefono,
-          password: formData.password,
-          registrado: true,
-          fechaRegistro: new Date().toISOString()
-        } : m
+        m.id === invitationData.id ? { ...m, ...userData } : m
       );
     } else {
-      const nuevoMiembro = {
-        id: Date.now(),
-        nombre: formData.nombre,
-        email: formData.email,
-        telefono: formData.telefono,
-        password: formData.password,
-        rol: 'vendedor',
-        activo: true,
-        registrado: true,
-        fechaRegistro: new Date().toISOString()
-      };
-      equipo.push(nuevoMiembro);
+      equipo.push({
+        id: invitationData?.id || Date.now(),
+        ...userData
+      });
     }
 
     localStorage.setItem('voltech_equipo', JSON.stringify(equipo));
     localStorage.setItem('voltech_user', JSON.stringify({
       nombre: formData.nombre,
-      email: formData.email,
-      rol: invitationData ? invitationData.rol : 'vendedor'
+      email: emailLower,
+      rol: userData.rol
     }));
 
     toast.success('¡Registro exitoso! Bienvenido a VOLTECH');

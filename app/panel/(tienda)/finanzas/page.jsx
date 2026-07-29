@@ -1,7 +1,7 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   DollarSign, 
   TrendingUp, 
@@ -41,47 +41,81 @@ export default function FinanzasPage() {
   });
 
   useEffect(() => {
-    const productosGuardados = localStorage.getItem('voltech_productos');
-    const ventasGuardadas = localStorage.getItem('voltech_ventas');
-    
-    if (productosGuardados) {
-      const prods = JSON.parse(productosGuardados);
-      setProductos(prods);
+    const cargarDatos = async () => {
+      let productosData = [];
+      let ventasData = [];
 
-      const inversion = prods.reduce((acc, p) => acc + (p.precioMayor * p.cantidad), 0);
-      const valorVenta = prods.reduce((acc, p) => acc + ((p.precioDetal || p.precioMayor) * p.cantidad), 0);
+      // ✅ 1. INTENTAR OBTENER DATOS DESDE SUPABASE
+      if (supabase) {
+        // Obtener productos
+        const { data: prodsData, error: errorProds } = await supabase
+          .from('productos')
+          .select('*')
+          .eq('publicado', true);
+
+        if (!errorProds && prodsData) {
+          productosData = prodsData;
+        }
+
+        // Obtener ventas
+        const { data: vtsData, error: errorVentas } = await supabase
+          .from('ventas')
+          .select('*');
+
+        if (!errorVentas && vtsData) {
+          ventasData = vtsData;
+        }
+      }
+
+      // ✅ 2. FALLBACK A LOCALSTORAGE (Si Supabase está vacío o falla)
+      if (productosData.length === 0) {
+        const productosGuardados = localStorage.getItem('voltech_productos');
+        if (productosGuardados) {
+          productosData = JSON.parse(productosGuardados);
+        }
+      }
+
+      if (ventasData.length === 0) {
+        const ventasGuardadas = localStorage.getItem('voltech_ventas');
+        if (ventasGuardadas) {
+          ventasData = JSON.parse(ventasGuardadas);
+        }
+      }
+
+      // ✅ 3. CALCULAR ESTADÍSTICAS
+      setProductos(productosData);
+      setVentas(ventasData);
+
+      // Calcular stats de productos
+      const inversion = productosData.reduce((acc, p) => acc + ((p.precioMayor || 0) * (p.cantidad || 0)), 0);
+      const valorVenta = productosData.reduce((acc, p) => acc + (((p.precioDetal || p.precioMayor) || 0) * (p.cantidad || 0)), 0);
       const ganancia = valorVenta - inversion;
       const margen = inversion > 0 ? (ganancia / inversion) * 100 : 0;
-      const conMargen = prods.filter(p => (p.precioDetal || 0) > p.precioMayor).length;
+      const conMargen = productosData.filter(p => (p.precioDetal || 0) > (p.precioMayor || 0)).length;
 
-      setStats(prev => ({
-        ...prev,
+      // Calcular stats de ventas
+      const ingresosTotales = ventasData.reduce((acc, v) => acc + (v.montoAbonado || v.total || 0), 0);
+
+      setStats({
         inversionTotal: inversion,
         valorVentaTotal: valorVenta,
         gananciaPotencial: ganancia,
         margenPromedio: margen,
         productosConMargen: conMargen,
-      }));
-    }
-
-    if (ventasGuardadas) {
-      const vts = JSON.parse(ventasGuardadas);
-      setVentas(vts);
-      const ingresosTotales = vts.reduce((acc, v) => acc + (v.montoAbonado || v.total || 0), 0);
-      setStats(prev => ({
-        ...prev,
         ingresosTotales: ingresosTotales,
-        ventasTotales: vts.length,
-      }));
-    }
+        ventasTotales: ventasData.length,
+      });
+    };
+
+    cargarDatos();
   }, []);
 
   const datosMargenes = productos
     .filter(p => (p.precioDetal || 0) > 0)
     .map(p => ({
       nombre: (p.plataforma || p.producto || '').length > 15 ? (p.plataforma || p.producto || '').substring(0, 15) + '...' : (p.plataforma || p.producto || ''),
-      margen: p.precioMayor > 0 ? ((p.precioDetal - p.precioMayor) / p.precioMayor * 100) : 0,
-      ganancia: ((p.precioDetal || 0) - p.precioMayor) * p.cantidad,
+      margen: (p.precioMayor || 0) > 0 ? (((p.precioDetal || 0) - (p.precioMayor || 0)) / (p.precioMayor || 0) * 100) : 0,
+      ganancia: (((p.precioDetal || 0) - (p.precioMayor || 0)) * (p.cantidad || 0)),
     }))
     .sort((a, b) => b.margen - a.margen)
     .slice(0, 6);
@@ -92,7 +126,7 @@ export default function FinanzasPage() {
     if (!categoriasData[cat]) {
       categoriasData[cat] = 0;
     }
-    categoriasData[cat] += p.precioMayor * p.cantidad;
+    categoriasData[cat] += (p.precioMayor || 0) * (p.cantidad || 0);
   });
 
   const datosCategorias = Object.entries(categoriasData).map(([name, value]) => ({ name, value }));
@@ -262,10 +296,12 @@ export default function FinanzasPage() {
                 </tr>
               ) : (
                 productos.map((producto) => {
-                  const precioDetal = producto.precioDetal || producto.precioMayor;
-                  const gananciaUnid = precioDetal - producto.precioMayor;
-                  const margen = producto.precioMayor > 0 ? (gananciaUnid / producto.precioMayor * 100) : 0;
-                  const gananciaTotal = gananciaUnid * producto.cantidad;
+                  const precioDetal = producto.precioDetal || producto.precioMayor || 0;
+                  const precioMayor = producto.precioMayor || 0;
+                  const cantidad = producto.cantidad || 0;
+                  const gananciaUnid = precioDetal - precioMayor;
+                  const margen = precioMayor > 0 ? (gananciaUnid / precioMayor * 100) : 0;
+                  const gananciaTotal = gananciaUnid * cantidad;
 
                   return (
                     <tr key={producto.id} className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
@@ -275,13 +311,13 @@ export default function FinanzasPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-sm font-medium ${
-                          producto.cantidad === 0 ? 'text-voltech-error' :
-                          producto.cantidad <= 2 ? 'text-voltech-warning' : 'text-voltech-success'
+                          cantidad === 0 ? 'text-voltech-error' :
+                          cantidad <= 2 ? 'text-voltech-warning' : 'text-voltech-success'
                         }`}>
-                          {producto.cantidad}
+                          {cantidad}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-voltech-muted">${producto.precioMayor.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-sm text-voltech-muted">${precioMayor.toFixed(2)}</td>
                       <td className="px-4 py-3 text-sm text-white">${precioDetal.toFixed(2)}</td>
                       <td className="px-4 py-3">
                         <span className={`text-sm font-medium ${gananciaUnid >= 0 ? 'text-voltech-success' : 'text-voltech-error'}`}>

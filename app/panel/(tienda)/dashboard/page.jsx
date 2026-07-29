@@ -1,7 +1,7 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   DollarSign, 
   ShoppingCart, 
@@ -44,50 +44,67 @@ export default function DashboardPage() {
     ingresosHoy: 0,
   });
 
+  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
-    const productosGuardados = localStorage.getItem('voltech_productos');
-    const equipoGuardado = localStorage.getItem('voltech_equipo');
-    const ventasGuardadas = localStorage.getItem('voltech_ventas');
+    const cargarDatos = async () => {
+      let prods = [], eq = [], vts = [];
 
-    if (productosGuardados) {
-      const prods = JSON.parse(productosGuardados);
+      // 1. Intentar cargar desde Supabase
+      if (supabase) {
+        const [{ data: pData }, { data: eData }, { data: vData }] = await Promise.all([
+          supabase.from('productos').select('*'),
+          supabase.from('usuarios').select('*'), // Equipo
+          supabase.from('ventas').select('*')
+        ]);
+        if (pData) prods = pData;
+        if (eData) eq = eData;
+        if (vData) vts = vData;
+      }
+
+      // 2. Fallback a localStorage si no hay datos en Supabase
+      if (prods.length === 0) {
+        const productosGuardados = localStorage.getItem('voltech_productos');
+        if (productosGuardados) prods = JSON.parse(productosGuardados);
+      }
+      if (eq.length === 0) {
+        const equipoGuardado = localStorage.getItem('voltech_equipo');
+        if (equipoGuardado) eq = JSON.parse(equipoGuardado);
+      }
+      if (vts.length === 0) {
+        const ventasGuardadas = localStorage.getItem('voltech_ventas');
+        if (ventasGuardadas) vts = JSON.parse(ventasGuardadas);
+      }
+
+      // 3. Actualizar estados
       setProductos(prods);
-      
-      const valorInv = prods.reduce((acc, p) => acc + (p.precioMayor * p.cantidad), 0);
-      const publicados = prods.filter(p => p.publicado).length;
-      const stockBajo = prods.filter(p => p.cantidad > 0 && p.cantidad <= 2).length;
-      const agotados = prods.filter(p => p.cantidad === 0).length;
+      setEquipo(eq);
+      setVentas(vts);
 
-      setStats(prev => ({
-        ...prev,
+      // 4. Calcular estadísticas (Lógica original intacta)
+      const valorInv = prods.reduce((acc, p) => acc + ((p.precioMayor || 0) * (p.cantidad || 0)), 0);
+      const publicados = prods.filter(p => p.publicado).length;
+      const stockBajo = prods.filter(p => (p.cantidad || 0) > 0 && (p.cantidad || 0) <= 2).length;
+      const agotados = prods.filter(p => (p.cantidad || 0) === 0).length;
+      const miembrosActivos = eq.filter(m => m.activo).length;
+
+      const hoy = new Date().toISOString().split('T')[0];
+      const ventasHoyArr = vts.filter(v => v.fecha === hoy);
+      const ingresosHoy = ventasHoyArr.reduce((acc, v) => acc + (v.montoAbonado || v.total || 0), 0);
+
+      setStats({
+        ventasHoy: ventasHoyArr.length,
+        ventasMes: 0, // Se puede expandir luego
+        pedidos: vts.length,
+        clientesActivos: miembrosActivos,
         productosPublicados: publicados,
         valorInventario: valorInv,
         stockBajo: stockBajo,
         agotados: agotados,
-      }));
-    }
-
-    if (equipoGuardado) {
-      const eq = JSON.parse(equipoGuardado);
-      setEquipo(eq);
-      setStats(prev => ({
-        ...prev,
-        clientesActivos: eq.filter(m => m.activo).length,
-      }));
-    }
-
-    if (ventasGuardadas) {
-      const vts = JSON.parse(ventasGuardadas);
-      setVentas(vts);
-      const hoy = new Date().toISOString().split('T')[0];
-      const ventasHoy = vts.filter(v => v.fecha === hoy);
-      const ingresosHoy = ventasHoy.reduce((acc, v) => acc + (v.montoAbonado || v.total || 0), 0);
-      setStats(prev => ({
-        ...prev,
-        ventasHoy: ventasHoy.length,
         ingresosHoy: ingresosHoy,
-      }));
-    }
+      });
+    };
+
+    cargarDatos();
   }, []);
 
   const ventasSemanales = [

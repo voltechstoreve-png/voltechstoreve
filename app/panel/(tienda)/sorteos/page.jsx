@@ -1,8 +1,8 @@
 'use client';
 
-
 import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '@/app/context/ThemeContext';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   Gift, Plus, Users, X, Search, Check, Clock,
   Edit, Trash2, Play, Calendar, Eye, Settings, 
@@ -129,7 +129,7 @@ export default function PanelSorteosPage() {
   const [sorteos, setSorteos] = useState([]);
   const [productos, setProductos] = useState([]);
   const [participantes, setParticipantes] = useState([]);
-  const [activeTab, setActiveTab] = useState('activos'); // 'activos', 'finalizados', 'configuracion'
+  const [activeTab, setActiveTab] = useState('activos');
   
   const [showForm, setShowForm] = useState(false);
   const [sorteoEditando, setSorteoEditando] = useState(null);
@@ -150,7 +150,7 @@ export default function PanelSorteosPage() {
 
   const [formData, setFormData] = useState({
     titulo: '',
-    tipo_sorteo: 'fijo', // 'fijo', 'votacion', 'descuento'
+    tipo_sorteo: 'fijo',
     producto_id: '',
     productos_candidatos: [],
     porcentaje_descuento: 20,
@@ -161,34 +161,136 @@ export default function PanelSorteosPage() {
     configuracion: { ...configGlobal }
   });
 
+  // ✅ ACTUALIZADO: Carga datos desde Supabase con fallback a localStorage
   useEffect(() => {
-    const sorteosGuardados = localStorage.getItem('voltech_sorteos');
-    const productosGuardados = localStorage.getItem('voltech_productos');
-    const participantesGuardados = localStorage.getItem('voltech_participantes');
-    const configGuardada = localStorage.getItem('voltech_config_sorteos');
+    const cargarDatos = async () => {
+      let sorteosData = [];
+      let productosData = [];
+      let participantesData = [];
+      let configData = null;
 
-    if (sorteosGuardados) setSorteos(JSON.parse(sorteosGuardados));
-    if (productosGuardados) setProductos(JSON.parse(productosGuardados));
-    if (participantesGuardados) setParticipantes(JSON.parse(participantesGuardados));
-    if (configGuardada) {
-      const config = JSON.parse(configGuardada);
-      setConfigGlobal(config);
-      setFormData(prev => ({ ...prev, configuracion: config }));
-    }
+      // ✅ 1. INTENTAR OBTENER DATOS DESDE SUPABASE
+      if (supabase) {
+        // Obtener sorteos
+        const { data: sorteosResult, error: errorSorteos } = await supabase
+          .from('sorteos')
+          .select('*')
+          .order('fecha_creacion', { ascending: false });
+
+        if (!errorSorteos && sorteosResult) {
+          sorteosData = sorteosResult;
+        }
+
+        // Obtener productos
+        const { data: productosResult, error: errorProductos } = await supabase
+          .from('productos')
+          .select('*')
+          .eq('publicado', true);
+
+        if (!errorProductos && productosResult) {
+          productosData = productosResult;
+        }
+
+        // Obtener participantes
+        const { data: participantesResult, error: errorParticipantes } = await supabase
+          .from('participantes')
+          .select('*');
+
+        if (!errorParticipantes && participantesResult) {
+          participantesData = participantesResult;
+        }
+
+        // Obtener configuración global
+        const { data: configResult, error: errorConfig } = await supabase
+          .from('settings')
+          .select('valor')
+          .eq('clave', 'config_sorteos')
+          .single();
+
+        if (!errorConfig && configResult) {
+          configData = configResult.valor;
+        }
+      }
+
+      // ✅ 2. FALLBACK A LOCALSTORAGE (Si Supabase está vacío o falla)
+      if (sorteosData.length === 0) {
+        const sorteosGuardados = localStorage.getItem('voltech_sorteos');
+        if (sorteosGuardados) {
+          sorteosData = JSON.parse(sorteosGuardados);
+        }
+      }
+
+      if (productosData.length === 0) {
+        const productosGuardados = localStorage.getItem('voltech_productos');
+        if (productosGuardados) {
+          productosData = JSON.parse(productosGuardados);
+        }
+      }
+
+      if (participantesData.length === 0) {
+        const participantesGuardados = localStorage.getItem('voltech_participantes');
+        if (participantesGuardados) {
+          participantesData = JSON.parse(participantesGuardados);
+        }
+      }
+
+      if (!configData) {
+        const configGuardada = localStorage.getItem('voltech_config_sorteos');
+        if (configGuardada) {
+          configData = JSON.parse(configGuardada);
+        }
+      }
+
+      // ✅ 3. ACTUALIZAR ESTADO
+      setSorteos(sorteosData);
+      setProductos(productosData);
+      setParticipantes(participantesData);
+      
+      if (configData) {
+        setConfigGlobal(configData);
+        setFormData(prev => ({ ...prev, configuracion: configData }));
+      }
+    };
+
+    cargarDatos();
   }, []);
 
-  const guardarSorteos = (nuevosSorteos) => {
-    localStorage.setItem('voltech_sorteos', JSON.stringify(nuevosSorteos));
+  // ✅ ACTUALIZADO: Guarda en Supabase con fallback a localStorage
+  const guardarSorteos = async (nuevosSorteos) => {
     setSorteos(nuevosSorteos);
+    
+    if (supabase) {
+      const { error } = await supabase
+        .from('sorteos')
+        .upsert(nuevosSorteos, { onConflict: 'id' });
+      
+      if (error) {
+        console.error('Error al guardar sorteos en Supabase:', error);
+      }
+    }
+    
+    localStorage.setItem('voltech_sorteos', JSON.stringify(nuevosSorteos));
   };
 
-  const guardarConfigGlobal = () => {
-    localStorage.setItem('voltech_config_sorteos', JSON.stringify(configGlobal));
+  // ✅ ACTUALIZADO: Guarda configuración en Supabase con fallback a localStorage
+  const guardarConfigGlobal = async () => {
     setFormData(prev => ({ ...prev, configuracion: configGlobal }));
+    
+    if (supabase) {
+      const { error } = await supabase
+        .from('settings')
+        .upsert({ clave: 'config_sorteos', valor: configGlobal }, { onConflict: 'clave' });
+      
+      if (error) {
+        console.error('Error al guardar configuración en Supabase:', error);
+      }
+    }
+    
+    localStorage.setItem('voltech_config_sorteos', JSON.stringify(configGlobal));
     toast.success('Configuración global guardada');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!formData.titulo || !formData.fecha_fin) {
@@ -220,10 +322,10 @@ export default function PanelSorteosPage() {
 
     if (sorteoEditando) {
       const actualizados = sorteos.map(s => s.id === sorteoEditando.id ? nuevoSorteo : s);
-      guardarSorteos(actualizados);
+      await guardarSorteos(actualizados);
       toast.success('Sorteo actualizado correctamente');
     } else {
-      guardarSorteos([...sorteos, nuevoSorteo]);
+      await guardarSorteos([...sorteos, nuevoSorteo]);
       toast.success('Sorteo creado y publicado exitosamente');
     }
 
@@ -253,14 +355,20 @@ export default function PanelSorteosPage() {
     setShowForm(true);
   };
 
-  const handleEliminar = (id) => {
+  const handleEliminar = async (id) => {
     if (confirm('¿Estás seguro de eliminar este sorteo?')) {
-      guardarSorteos(sorteos.filter(s => s.id !== id));
+      const nuevosSorteos = sorteos.filter(s => s.id !== id);
+      await guardarSorteos(nuevosSorteos);
+      
+      if (supabase) {
+        await supabase.from('sorteos').delete().eq('id', id);
+      }
+      
       toast.success('Sorteo eliminado correctamente');
     }
   };
 
-  const handleSortearGanador = (sorteo) => {
+  const handleSortearGanador = async (sorteo) => {
     const participantesDelSorteo = participantes.filter(p => p.sorteo_id === sorteo.id);
     if (participantesDelSorteo.length === 0) {
       toast.error('No hay participantes para sortear un ganador');
@@ -291,7 +399,7 @@ export default function PanelSorteosPage() {
       };
 
       const sorteosActualizados = sorteos.map(s => s.id === sorteo.id ? sorteoActualizado : s);
-      guardarSorteos(sorteosActualizados);
+      await guardarSorteos(sorteosActualizados);
       
       setGanadorData(sorteoActualizado.ganador);
       setShowGanador(true);
@@ -360,7 +468,7 @@ export default function PanelSorteosPage() {
           </motion.div>
         </div>
 
-        {/* Pestañas de Navegación (Estilo Streaming) */}
+        {/* Pestañas de Navegación */}
         <div className="border-b border-voltech-border">
           <div className="flex gap-6">
             <button onClick={() => setActiveTab('activos')} className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'activos' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>
@@ -406,7 +514,7 @@ export default function PanelSorteosPage() {
           </motion.div>
         )}
 
-        {/* CONTENIDO: LISTA DE SORTEOS (Activos o Finalizados) */}
+        {/* CONTENIDO: LISTA DE SORTEOS */}
         {activeTab !== 'configuracion' && (
           <>
             {/* Formulario Desplegable */}
@@ -445,7 +553,6 @@ export default function PanelSorteosPage() {
                           </button>
                         </div>
 
-                        {/* Campos dinámicos según el tipo */}
                         {formData.tipo_sorteo === 'fijo' && (
                           <div><label className="block text-sm font-medium text-voltech-muted mb-2">Producto a Sortear *</label><ProductSearchSelect productos={productos} seleccionados={formData.producto_id ? [formData.producto_id] : []} onChange={(ids) => setFormData({ ...formData, producto_id: ids[0] || '' })} maxSeleccion={1} modo="fijo" /></div>
                         )}

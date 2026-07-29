@@ -1,8 +1,8 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   Search, 
   Eye, 
@@ -24,54 +24,78 @@ export default function ComprasPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    const productosGuardados = localStorage.getItem('voltech_productos');
-    if (productosGuardados) {
-      const prods = JSON.parse(productosGuardados);
-      setProductos(prods);
-      
-      const todasLasCompras = [];
-      
-      prods.forEach(producto => {
-        if (producto.historial && producto.historial.length > 0) {
-          producto.historial.forEach((compra, index) => {
-            todasLasCompras.push({
-              ...compra,
-              id: `${producto.id}-hist-${index}`,
-              productoId: producto.id,
-              producto: producto.plataforma || producto.producto,
-              plataforma: producto.plataforma || producto.producto,
-              sku: producto.sku,
-              categoria: producto.categoria,
-              marca: producto.marca,
-              imagen: producto.imagen,
-            });
-          });
-        } else {
-          todasLasCompras.push({
-            id: `${producto.id}-current`,
-            productoId: producto.id,
-            producto: producto.plataforma || producto.producto,
-            plataforma: producto.plataforma || producto.producto,
-            sku: producto.sku,
-            categoria: producto.categoria,
-            marca: producto.marca,
-            imagen: producto.imagen,
-            fecha: producto.fecha || new Date().toISOString().split('T')[0],
-            cantidad: producto.cantidad,
-            precioUnitario: producto.precioMayor,
-            precioTotal: producto.precioMayor * producto.cantidad,
-            proveedor: producto.proveedor,
-            comprador: producto.comprador,
-            metodoPago: producto.metodoPago,
-            cartera: producto.cartera,
-            esFallback: true
-          });
+    const cargarCompras = async () => {
+      let comprasData = [];
+
+      // ✅ 1. INTENTAR OBTENER DATOS DESDE SUPABASE
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('compras')
+          .select('*')
+          .order('fecha', { ascending: false });
+
+        if (!error && data && data.length > 0) {
+          comprasData = data.map(c => ({ ...c, esFallback: false }));
         }
-      });
-      
-      todasLasCompras.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
-      setCompras(todasLasCompras);
-    }
+      }
+
+      // ✅ 2. FALLBACK A LOCALSTORAGE (Si Supabase está vacío o falla)
+      if (comprasData.length === 0) {
+        const productosGuardados = localStorage.getItem('voltech_productos');
+        if (productosGuardados) {
+          const prods = JSON.parse(productosGuardados);
+          setProductos(prods);
+          
+          const todasLasCompras = [];
+          
+          prods.forEach(producto => {
+            if (producto.historial && producto.historial.length > 0) {
+              producto.historial.forEach((compra, index) => {
+                todasLasCompras.push({
+                  ...compra,
+                  id: `${producto.id}-hist-${index}`,
+                  productoId: producto.id,
+                  producto: producto.plataforma || producto.producto,
+                  plataforma: producto.plataforma || producto.producto,
+                  sku: producto.sku,
+                  categoria: producto.categoria,
+                  marca: producto.marca,
+                  imagen: producto.imagen,
+                  esFallback: true
+                });
+              });
+            } else {
+              todasLasCompras.push({
+                id: `${producto.id}-current`,
+                productoId: producto.id,
+                producto: producto.plataforma || producto.producto,
+                plataforma: producto.plataforma || producto.producto,
+                sku: producto.sku,
+                categoria: producto.categoria,
+                marca: producto.marca,
+                imagen: producto.imagen,
+                fecha: producto.fecha || new Date().toISOString().split('T')[0],
+                cantidad: producto.cantidad || 0,
+                precioUnitario: producto.precioMayor || 0,
+                precioTotal: (producto.precioMayor || 0) * (producto.cantidad || 0),
+                proveedor: producto.proveedor,
+                comprador: producto.comprador,
+                metodoPago: producto.metodoPago,
+                cartera: producto.cartera,
+                esFallback: true
+              });
+            }
+          });
+          
+          todasLasCompras.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+          comprasData = todasLasCompras;
+        }
+      }
+
+      setCompras(comprasData);
+    };
+
+    cargarCompras();
   }, []);
 
   const comprasFiltradas = compras.filter(c =>
@@ -190,7 +214,7 @@ export default function ComprasPage() {
                     <div className="text-right">
                       <p className="text-xs text-voltech-muted">Cantidad</p>
                       <p className="text-lg font-bold text-white">{compra.cantidad} unid.</p>
-                      <p className="text-sm text-voltech-success">${compra.precioTotal?.toFixed(2) || '0.00'}</p>
+                      <p className="text-sm text-voltech-success">${(compra.precioTotal || 0).toFixed(2)}</p>
                     </div>
                   </div>
                 </div>
@@ -224,11 +248,11 @@ export default function ComprasPage() {
                         </div>
                         <div className="bg-voltech-dark/50 rounded-lg p-4">
                           <p className="text-xs text-voltech-muted">Precio Unitario</p>
-                          <p className="text-xl font-bold text-white">${compra.precioUnitario?.toFixed(2) || '0.00'}</p>
+                          <p className="text-xl font-bold text-white">${(compra.precioUnitario || 0).toFixed(2)}</p>
                         </div>
                         <div className="bg-voltech-cyan/10 border border-voltech-cyan/30 rounded-lg p-4">
                           <p className="text-xs text-voltech-muted">Total</p>
-                          <p className="text-xl font-bold text-voltech-cyan">${compra.precioTotal?.toFixed(2) || '0.00'}</p>
+                          <p className="text-xl font-bold text-voltech-cyan">${(compra.precioTotal || 0).toFixed(2)}</p>
                         </div>
                       </div>
 

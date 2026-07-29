@@ -1,7 +1,7 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   Bell, 
   Shield,
@@ -40,23 +40,68 @@ export default function ConfiguracionPage() {
     }
   });
 
+  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
-    const savedConfig = localStorage.getItem('voltech_config');
-    if (savedConfig) {
-      const parsed = JSON.parse(savedConfig);
-      setConfig(prev => ({
-        ...prev,
-        ...parsed,
-        recordatoriosStreaming: { ...prev.recordatoriosStreaming, ...parsed.recordatoriosStreaming },
-        recordatoriosProductos: { ...prev.recordatoriosProductos, ...parsed.recordatoriosProductos },
-        comisiones: { ...prev.comisiones, ...parsed.comisiones }
-      }));
-    }
+    const cargarConfig = async () => {
+      let configData = null;
+
+      // 1. Intentar cargar desde Supabase
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('settings')
+          .select('valor')
+          .eq('clave', 'configuracion_panel')
+          .single();
+        
+        if (!error && data) {
+          configData = data.valor;
+        }
+      }
+
+      // 2. Fallback a localStorage si no hay datos en Supabase
+      if (!configData) {
+        const savedConfig = localStorage.getItem('voltech_config');
+        if (savedConfig) {
+          configData = JSON.parse(savedConfig);
+        }
+      }
+
+      // 3. Fusionar con los valores por defecto
+      if (configData) {
+        setConfig(prev => ({
+          ...prev,
+          ...configData,
+          recordatoriosStreaming: { ...prev.recordatoriosStreaming, ...configData.recordatoriosStreaming },
+          recordatoriosProductos: { ...prev.recordatoriosProductos, ...configData.recordatoriosProductos },
+          comisiones: { ...prev.comisiones, ...configData.comisiones }
+        }));
+      }
+    };
+    
+    cargarConfig();
   }, []);
 
-  const handleSave = () => {
-    localStorage.setItem('voltech_config', JSON.stringify(config));
-    toast.success('Configuración guardada correctamente');
+  // ✅ ACTUALIZADO: Guarda en Supabase y mantiene el respaldo en localStorage
+  const handleSave = async () => {
+    try {
+      // 1. Guardar en Supabase
+      if (supabase) {
+        const { error } = await supabase
+          .from('settings')
+          .upsert({ clave: 'configuracion_panel', valor: config }, { onConflict: 'clave' });
+        
+        if (error) throw error;
+      }
+
+      // 2. Guardar en localStorage (caché y respaldo)
+      localStorage.setItem('voltech_config', JSON.stringify(config));
+      toast.success('Configuración guardada correctamente');
+    } catch (error) {
+      console.error('Error al guardar en Supabase:', error);
+      // Aún así guardamos localmente si falla la conexión
+      localStorage.setItem('voltech_config', JSON.stringify(config));
+      toast.error('Error de conexión. Guardado solo en modo local.');
+    }
   };
 
   return (

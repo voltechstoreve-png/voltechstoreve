@@ -1,11 +1,8 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-export const fetchCache = 'default-no-store';
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   Menu, 
   Search,
@@ -45,91 +42,129 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
 
   const { notificaciones } = useNotificaciones();
 
+  // ✅ ACTUALIZADO: Obtiene datos de Supabase con fallback a localStorage
   useEffect(() => {
-    const userLogged = localStorage.getItem('voltech_user');
-    if (userLogged) {
-      const user = JSON.parse(userLogged);
-      setUserData(prev => ({
-        ...prev,
-        nombre: user.nombre || 'Administrador',
-        email: user.email || 'admin@voltech.store',
-        rol: user.rol || 'Admin',
-        avatar: user.avatar || `https://ui-avatars.com/api/?name=${user.nombre || 'Admin'}&background=00d4ff&color=fff&bold=true`,
-        id: user.id || null
-      }));
-
-      // ✅ CORREGIDO: Usar 'voltech_ventas' en lugar de 'voltech_ventas_productos'
-      const ventasProductos = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
-      const ventasStreaming = JSON.parse(localStorage.getItem('voltech_ventas_streaming') || '[]');
+    const fetchUserDataAndStats = async () => {
+      let user = null;
+      const userLoggedStr = localStorage.getItem('voltech_user');
       
-      const nombreVendedor = user.nombre?.toLowerCase() || '';
-      
-      let ventasCount = 0;
-      let comisionesTotal = 0;
-
-      const normalizarNombre = (nombre) => {
-        if (!nombre) return '';
-        return nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-      };
-
-      const nombreNormalizado = normalizarNombre(nombreVendedor);
-
-      // Buscar en ventas de productos
-      ventasProductos.forEach(venta => {
-        const vendedorVenta = normalizarNombre(
-          venta.vendedor || 
-          venta.vendedorNombre || 
-          venta.usuario || 
-          venta.user || 
-          venta.empleado || 
-          venta.nombreVendedor ||
-          ''
-        );
+      if (userLoggedStr) {
+        const localUser = JSON.parse(userLoggedStr);
         
-        const coincide = 
-          vendedorVenta === nombreNormalizado ||
-          vendedorVenta.includes(nombreNormalizado) ||
-          nombreNormalizado.includes(vendedorVenta);
-
-        if (coincide) {
-          ventasCount += 1;
-          const total = venta.total || 0;
-          comisionesTotal += total * 0.10;
+        // Intentar obtener datos frescos de Supabase si tenemos el ID
+        if (supabase && localUser.id) {
+          const { data, error } = await supabase
+            .from('usuarios')
+            .select('*')
+            .eq('id', localUser.id)
+            .single();
+          
+          if (!error && data) {
+            user = data;
+          } else {
+            user = localUser; // Fallback a local si falla
+          }
+        } else {
+          user = localUser;
         }
-      });
+      }
 
-      // Buscar en ventas de streaming
-      ventasStreaming.forEach(venta => {
-        const vendedorVenta = normalizarNombre(
-          venta.vendedor || 
-          venta.vendedorNombre || 
-          venta.usuario || 
-          venta.user || 
-          venta.empleado || 
-          venta.nombreVendedor ||
-          ''
-        );
+      if (user) {
+        setUserData(prev => ({
+          ...prev,
+          nombre: user.nombre || 'Administrador',
+          email: user.email || 'admin@voltech.store',
+          rol: user.rol || 'Admin',
+          avatar: user.avatar || `https://ui-avatars.com/api/?name=${user.nombre || 'Admin'}&background=00d4ff&color=fff&bold=true`,
+          id: user.id || null
+        }));
+
+        let ventasCount = 0;
+        let comisionesTotal = 0;
+        const nombreVendedor = user.nombre?.toLowerCase() || '';
         
-        const coincide = 
-          vendedorVenta === nombreNormalizado ||
-          vendedorVenta.includes(nombreNormalizado) ||
-          nombreNormalizado.includes(vendedorVenta);
+        const normalizarNombre = (nombre) => {
+          if (!nombre) return '';
+          return nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        };
+        const nombreNormalizado = normalizarNombre(nombreVendedor);
 
-        if (coincide) {
-          ventasCount += 1;
-          const total = venta.total || 0;
-          comisionesTotal += total * 0.10;
+        // Función de respaldo para calcular desde localStorage
+        const calcularDesdeLocalStorage = () => {
+          const ventasProductos = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
+          const ventasStreaming = JSON.parse(localStorage.getItem('voltech_ventas_streaming') || '[]');
+          
+          [...ventasProductos, ...ventasStreaming].forEach(venta => {
+            const vendedorVenta = normalizarNombre(
+              venta.vendedor || 
+              venta.vendedorNombre || 
+              venta.usuario || 
+              venta.user || 
+              venta.empleado || 
+              venta.nombreVendedor ||
+              ''
+            );
+            
+            const coincide = 
+              vendedorVenta === nombreNormalizado ||
+              vendedorVenta.includes(nombreNormalizado) ||
+              nombreNormalizado.includes(vendedorVenta);
+
+            if (coincide) {
+              ventasCount += 1;
+              const total = venta.total || 0;
+              comisionesTotal += total * 0.10;
+            }
+          });
+        };
+
+        // Intentar calcular desde Supabase
+        if (supabase) {
+          const { data: ventasData, error } = await supabase
+            .from('ventas')
+            .select('*');
+          
+          if (!error && ventasData) {
+            ventasData.forEach(venta => {
+              const vendedorVenta = normalizarNombre(
+                venta.vendedor || 
+                venta.vendedorNombre || 
+                venta.usuario || 
+                venta.user || 
+                venta.empleado || 
+                venta.nombreVendedor ||
+                ''
+              );
+              
+              const coincide = 
+                vendedorVenta === nombreNormalizado ||
+                vendedorVenta.includes(nombreNormalizado) ||
+                nombreNormalizado.includes(vendedorVenta);
+
+              if (coincide) {
+                ventasCount += 1;
+                const total = venta.total || 0;
+                comisionesTotal += total * 0.10;
+              }
+            });
+          } else {
+            calcularDesdeLocalStorage(); // Fallback si la consulta falla
+          }
+        } else {
+          calcularDesdeLocalStorage();
         }
-      });
 
-      const clics = parseInt(localStorage.getItem(`clics_ref_${user.nombre}`) || '0') || 8;
+        const clics = parseInt(localStorage.getItem(`clics_ref_${user.nombre}`) || '0') || 8;
 
-      setSalesStats({
-        clics,
-        ventas: ventasCount,
-        comisiones: comisionesTotal
-      });
-    }
+        setSalesStats({
+          clics,
+          ventas: ventasCount,
+          comisiones: comisionesTotal
+        });
+      }
+    };
+
+    fetchUserDataAndStats();
   }, []);
 
   const referralCode = userData.nombre ? `VOLTECHSTORE-${userData.nombre.substring(0, 5).toUpperCase()}-${(userData.id || '0000').toString().slice(-4)}` : 'voltech2024';

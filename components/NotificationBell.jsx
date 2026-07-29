@@ -1,8 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-export const fetchCache = 'default-no-store';
+// ✅ SE ELIMINARON LAS LÍNEAS 'export const dynamic...' PORQUE ROMPEN LOS CLIENT COMPONENTS
 
 import { useState } from 'react';
 import { Bell, CheckCircle, Users, Gift, Trophy, ShoppingCart, AlertTriangle, Trash2, X } from 'lucide-react';
@@ -128,7 +126,8 @@ export default function NotificationBell() {
                             {notificacion.mensaje}
                           </p>
                           <p className="text-[10px] text-voltech-muted mt-1">
-                            {new Date(notificacion.hora).toLocaleString('es-VE')}
+                            {/* ✅ COMPATIBLE CON SUPABASE (created_at) Y LOCALSTORAGE (hora) */}
+                            {new Date(notificacion.created_at || notificacion.hora).toLocaleString('es-VE')}
                           </p>
                         </div>
                       </div>

@@ -1,7 +1,7 @@
 'use client';
 
-
 import { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   MessageSquare, Send, Users, Gift, Copy, Plus, Search, Trash2, 
   Edit3, Save, X, CheckCircle, ShoppingCart, Tag, FileText, 
@@ -96,36 +96,46 @@ export default function MarketingPage() {
     estado: 'activo'
   });
 
+  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
-    const plantillasGuardadas = localStorage.getItem('voltech_plantillas');
-    const productosGuardados = localStorage.getItem('voltech_productos');
-    const clientesGuardados = localStorage.getItem('voltech_clientes');
-    const etiquetasGuardadas = localStorage.getItem('voltech_etiquetas');
-    const cuponesGuardados = localStorage.getItem('voltech_cupones');
-    const publicidadGuardada = localStorage.getItem('voltech_publicidad');
+    const cargarDatos = async () => {
+      let plts = [], cpons = [], pubs = [], prods = [], clts = [], etqs = [];
 
-    if (plantillasGuardadas) setPlantillas(JSON.parse(plantillasGuardadas));
-    if (productosGuardados) setProductos(JSON.parse(productosGuardados));
-    if (clientesGuardados) setClientes(JSON.parse(clientesGuardados));
-    if (etiquetasGuardadas) setEtiquetas(JSON.parse(etiquetasGuardadas));
-    if (cuponesGuardados) setCupones(JSON.parse(cuponesGuardados));
-    if (publicidadGuardada) setPublicidad(JSON.parse(publicidadGuardada));
+      if (supabase) {
+        const [{ data: pData }, { data: cData }, { data: puData }, { data: prData }, { data: clData }, { data: etData }] = await Promise.all([
+          supabase.from('plantillas').select('*'),
+          supabase.from('cupones').select('*'),
+          supabase.from('publicidad').select('*'),
+          supabase.from('productos').select('*'),
+          supabase.from('clientes').select('*'),
+          supabase.from('settings').select('valor').eq('clave', 'etiquetas').single()
+        ]);
+        if (pData) plts = pData;
+        if (cData) cpons = cData;
+        if (puData) pubs = puData;
+        if (prData) prods = prData;
+        if (clData) clts = clData;
+        if (etData?.valor) etqs = etData.valor;
+      }
+
+      if (plts.length === 0) { const d = localStorage.getItem('voltech_plantillas'); if (d) plts = JSON.parse(d); }
+      if (cpons.length === 0) { const d = localStorage.getItem('voltech_cupones'); if (d) cpons = JSON.parse(d); }
+      if (pubs.length === 0) { const d = localStorage.getItem('voltech_publicidad'); if (d) pubs = JSON.parse(d); }
+      if (prods.length === 0) { const d = localStorage.getItem('voltech_productos'); if (d) prods = JSON.parse(d); }
+      if (clts.length === 0) { const d = localStorage.getItem('voltech_clientes'); if (d) clts = JSON.parse(d); }
+      if (etqs.length === 0) { const d = localStorage.getItem('voltech_etiquetas'); if (d) etqs = JSON.parse(d); }
+
+      setPlantillas(plts); setCupones(cpons); setPublicidad(pubs);
+      setProductos(prods); setClientes(clts); setEtiquetas(etqs);
+    };
+    cargarDatos();
   }, []);
 
   // ✅ MANEJAR SUBIDA DE IMAGEN
   const handleImageUpload = (file) => {
     if (!file) return;
-    
-    if (!file.type.startsWith('image/')) {
-      toast.error('Solo se permiten imágenes');
-      return;
-    }
-    
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('La imagen no debe pesar más de 5MB');
-      return;
-    }
-
+    if (!file.type.startsWith('image/')) { toast.error('Solo se permiten imágenes'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('La imagen no debe pesar más de 5MB'); return; }
     const reader = new FileReader();
     reader.onloadend = () => {
       const base64 = reader.result;
@@ -147,8 +157,8 @@ export default function MarketingPage() {
     handleImageUpload(file);
   };
 
-  // ✅ GUARDAR PUBLICIDAD
-  const guardarPublicidad = () => {
+  // ✅ ACTUALIZADO: Guardar Publicidad en Supabase y localStorage
+  const guardarPublicidad = async () => {
     if (!formDataPublicidad.titulo || !formDataPublicidad.url_imagen || !formDataPublicidad.fecha_inicio || !formDataPublicidad.fecha_fin) {
       toast.error('Título, imagen y fechas son obligatorios');
       return;
@@ -162,82 +172,73 @@ export default function MarketingPage() {
       clics: publicidadEditando?.clics || 0
     };
 
+    if (supabase) {
+      const { error } = await supabase.from('publicidad').upsert(nuevaPublicidad, { onConflict: 'id' });
+      if (error) { toast.error('Error al guardar en la nube'); return; }
+    }
+
     if (publicidadEditando) {
       const actualizadas = publicidad.map(p => p.id === publicidadEditando.id ? nuevaPublicidad : p);
       localStorage.setItem('voltech_publicidad', JSON.stringify(actualizadas));
       setPublicidad(actualizadas);
       toast.success('Publicidad actualizada');
     } else {
-      localStorage.setItem('voltech_publicidad', JSON.stringify([...publicidad, nuevaPublicidad]));
-      setPublicidad([...publicidad, nuevaPublicidad]);
+      const actualizadas = [...publicidad, nuevaPublicidad];
+      localStorage.setItem('voltech_publicidad', JSON.stringify(actualizadas));
+      setPublicidad(actualizadas);
       toast.success('Publicidad creada exitosamente');
     }
-
     resetPublicidadForm();
   };
 
   const editarPublicidad = (pub) => {
     setPublicidadEditando(pub);
     setFormDataPublicidad({
-      titulo: pub.titulo,
-      url_destino: pub.url_destino || '',
-      url_imagen: pub.url_imagen,
-      lado: pub.lado || 'izquierdo',
-      posicion: pub.posicion || 'sidebar',
-      fecha_inicio: pub.fecha_inicio,
-      hora_inicio: pub.hora_inicio || '00:00',
-      fecha_fin: pub.fecha_fin,
-      hora_fin: pub.hora_fin || '23:59',
-      prioridad: pub.prioridad || 'normal',
-      mostrar_en: pub.mostrar_en || { inicio: true, catalogo: true, streaming: false, ofertas: false },
-      dispositivos: pub.dispositivos || { desktop: true, movil: true, tablet: true },
-      rotacion: pub.rotacion || 5,
-      estado: pub.estado || 'activo'
+      titulo: pub.titulo, url_destino: pub.url_destino || '', url_imagen: pub.url_imagen,
+      lado: pub.lado || 'izquierdo', posicion: pub.posicion || 'sidebar', fecha_inicio: pub.fecha_inicio,
+      hora_inicio: pub.hora_inicio || '00:00', fecha_fin: pub.fecha_fin, hora_fin: pub.hora_fin || '23:59',
+      prioridad: pub.prioridad || 'normal', mostrar_en: pub.mostrar_en || { inicio: true, catalogo: true, streaming: false, ofertas: false },
+      dispositivos: pub.dispositivos || { desktop: true, movil: true, tablet: true }, rotacion: pub.rotacion || 5, estado: pub.estado || 'activo'
     });
     setImagenPreview(pub.url_imagen);
     setShowPublicidadForm(true);
   };
 
-  const eliminarPublicidad = (id) => {
+  // ✅ ACTUALIZADO: Eliminar Publicidad de Supabase y localStorage
+  const eliminarPublicidad = async (id) => {
     if (!confirm('¿Estás seguro de eliminar esta publicidad?')) return;
+    if (supabase) await supabase.from('publicidad').delete().eq('id', id);
     const actualizadas = publicidad.filter(p => p.id !== id);
     localStorage.setItem('voltech_publicidad', JSON.stringify(actualizadas));
     setPublicidad(actualizadas);
     toast.success('Publicidad eliminada');
   };
 
-  const toggleEstadoPublicidad = (pub) => {
-    const actualizadas = publicidad.map(p => 
-      p.id === pub.id ? { ...p, estado: p.estado === 'activo' ? 'inactivo' : 'activo' } : p
-    );
+  // ✅ ACTUALIZADO: Toggle Estado Publicidad en Supabase y localStorage
+  const toggleEstadoPublicidad = async (pub) => {
+    const nuevoEstado = pub.estado === 'activo' ? 'inactivo' : 'activo';
+    if (supabase) await supabase.from('publicidad').update({ estado: nuevoEstado }).eq('id', pub.id);
+    const actualizadas = publicidad.map(p => p.id === pub.id ? { ...p, estado: nuevoEstado } : p);
     localStorage.setItem('voltech_publicidad', JSON.stringify(actualizadas));
     setPublicidad(actualizadas);
-    toast.success(pub.estado === 'activo' ? 'Publicidad desactivada' : 'Publicidad activada');
+    toast.success(nuevoEstado === 'activo' ? 'Publicidad activada' : 'Publicidad desactivada');
   };
 
   const resetPublicidadForm = () => {
     setFormDataPublicidad({
-      titulo: '',
-      url_destino: '',
-      url_imagen: '',
-      lado: 'izquierdo',
-      posicion: 'sidebar',
-      fecha_inicio: '',
-      hora_inicio: '00:00',
-      fecha_fin: '',
-      hora_fin: '23:59',
-      prioridad: 'normal',
+      titulo: '', url_destino: '', url_imagen: '', lado: 'izquierdo', posicion: 'sidebar',
+      fecha_inicio: '', hora_inicio: '00:00', fecha_fin: '', hora_fin: '23:59', prioridad: 'normal',
       mostrar_en: { inicio: true, catalogo: true, streaming: false, ofertas: false },
-      dispositivos: { desktop: true, movil: true, tablet: true },
-      rotacion: 5,
-      estado: 'activo'
+      dispositivos: { desktop: true, movil: true, tablet: true }, rotacion: 5, estado: 'activo'
     });
-    setImagenPreview('');
-    setShowPublicidadForm(false);
-    setPublicidadEditando(null);
+    setImagenPreview(''); setShowPublicidadForm(false); setPublicidadEditando(null);
   };
 
-  const guardarCupones = (nuevosCupones) => {
+  const guardarCupones = async (nuevosCupones) => {
+    if (supabase) {
+      // Guardamos solo los cupones modificados o todos (upsert maneja la duplicación por ID)
+      await supabase.from('cupones').upsert(nuevosCupones, { onConflict: 'id' });
+    }
     localStorage.setItem('voltech_cupones', JSON.stringify(nuevosCupones));
     setCupones(nuevosCupones);
   };
@@ -248,14 +249,14 @@ export default function MarketingPage() {
     return `${codigoBase}-${random}`;
   };
 
-  const guardarCupon = () => {
+  // ✅ ACTUALIZADO: Guardar Cupón en Supabase y localStorage
+  const guardarCupon = async () => {
     if (!formDataCupon.titulo || !formDataCupon.descripcion || !formDataCupon.fecha_inicio || !formDataCupon.fecha_vencimiento) {
       toast.error('Completa los campos obligatorios (Título, Descripción, Fechas)');
       return;
     }
 
     const codigo = formDataCupon.codigo || generarCodigo(formDataCupon.titulo);
-    
     const nuevoCupon = {
       id: cuponEditando ? cuponEditando.id : `cupon-${Date.now()}`,
       ...formDataCupon,
@@ -265,22 +266,13 @@ export default function MarketingPage() {
       fecha_creacion: cuponEditando?.fecha_creacion || new Date().toISOString()
     };
 
-    if (cuponEditando) {
-      const actualizados = cupones.map(c => c.id === cuponEditando.id ? nuevoCupon : c);
-      guardarCupones(actualizados);
-      toast.success('Cupón actualizado');
-    } else {
-      guardarCupones([...cupones, nuevoCupon]);
-      toast.success(`Cupón creado: ${codigo}`);
-    }
+    await guardarCupones(cuponEditando ? cupones.map(c => c.id === cuponEditando.id ? nuevoCupon : c) : [...cupones, nuevoCupon]);
+    toast.success(cuponEditando ? 'Cupón actualizado' : `Cupón creado: ${codigo}`);
 
-    setShowCuponForm(false);
-    setCuponEditando(null);
-    setBusquedaProductoCupon('');
+    setShowCuponForm(false); setCuponEditando(null); setBusquedaProductoCupon('');
     setFormDataCupon({
-      titulo: '', descripcion: '', codigo: '', tipo_descuento: 'porcentaje',
-      valor: 20, aplica_a: 'todos', productos_especificos: [], excluir_ofertas: false,
-      monto_minimo: 0, fecha_inicio: '', fecha_vencimiento: '',
+      titulo: '', descripcion: '', codigo: '', tipo_descuento: 'porcentaje', valor: 20, aplica_a: 'todos',
+      productos_especificos: [], excluir_ofertas: false, monto_minimo: 0, fecha_inicio: '', fecha_vencimiento: '',
       limite_usos: 'ilimitado', max_usos: 100, uso_por_cliente: 'una_vez', estado: 'activo'
     });
   };
@@ -288,34 +280,36 @@ export default function MarketingPage() {
   const editarCupon = (cupon) => {
     setCuponEditando(cupon);
     setFormDataCupon({
-      titulo: cupon.titulo, descripcion: cupon.descripcion, codigo: cupon.codigo,
-      tipo_descuento: cupon.tipo_descuento, valor: cupon.valor, aplica_a: cupon.aplica_a,
-      productos_especificos: cupon.productos_especificos || [], excluir_ofertas: cupon.excluir_ofertas || false,
-      monto_minimo: cupon.monto_minimo || 0, fecha_inicio: cupon.fecha_inicio,
-      fecha_vencimiento: cupon.fecha_vencimiento, limite_usos: cupon.limite_usos,
-      max_usos: cupon.max_usos || 100, uso_por_cliente: cupon.uso_por_cliente, estado: cupon.estado
+      titulo: cupon.titulo, descripcion: cupon.descripcion, codigo: cupon.codigo, tipo_descuento: cupon.tipo_descuento,
+      valor: cupon.valor, aplica_a: cupon.aplica_a, productos_especificos: cupon.productos_especificos || [],
+      excluir_ofertas: cupon.excluir_ofertas || false, monto_minimo: cupon.monto_minimo || 0, fecha_inicio: cupon.fecha_inicio,
+      fecha_vencimiento: cupon.fecha_vencimiento, limite_usos: cupon.limite_usos, max_usos: cupon.max_usos || 100,
+      uso_por_cliente: cupon.uso_por_cliente, estado: cupon.estado
     });
     setShowCuponForm(true);
   };
 
-  const eliminarCupon = (id) => {
+  // ✅ ACTUALIZADO: Eliminar Cupón de Supabase y localStorage
+  const eliminarCupon = async (id) => {
     if (!confirm('¿Estás seguro de eliminar este cupón?')) return;
-    guardarCupones(cupones.filter(c => c.id !== id));
+    if (supabase) await supabase.from('cupones').delete().eq('id', id);
+    const actualizados = cupones.filter(c => c.id !== id);
+    localStorage.setItem('voltech_cupones', JSON.stringify(actualizados));
+    setCupones(actualizados);
     toast.success('Cupón eliminado');
   };
 
-  const toggleEstadoCupon = (cupon) => {
-    const actualizados = cupones.map(c => 
-      c.id === cupon.id ? { ...c, estado: c.estado === 'activo' ? 'inactivo' : 'activo' } : c
-    );
-    guardarCupones(actualizados);
-    toast.success(cupon.estado === 'activo' ? 'Cupón desactivado' : 'Cupón activado');
+  // ✅ ACTUALIZADO: Toggle Estado Cupón en Supabase y localStorage
+  const toggleEstadoCupon = async (cupon) => {
+    const nuevoEstado = cupon.estado === 'activo' ? 'inactivo' : 'activo';
+    if (supabase) await supabase.from('cupones').update({ estado: nuevoEstado }).eq('id', cupon.id);
+    const actualizados = cupones.map(c => c.id === cupon.id ? { ...c, estado: nuevoEstado } : c);
+    localStorage.setItem('voltech_cupones', JSON.stringify(actualizados));
+    setCupones(actualizados);
+    toast.success(nuevoEstado === 'activo' ? 'Cupón activado' : 'Cupón desactivado');
   };
 
-  const copiarCodigo = (codigo) => {
-    navigator.clipboard.writeText(codigo);
-    toast.success('Código copiado');
-  };
+  const copiarCodigo = (codigo) => { navigator.clipboard.writeText(codigo); toast.success('Código copiado'); };
 
   const toggleProductoCupon = (productoId) => {
     const actuales = formDataCupon.productos_especificos;
@@ -345,9 +339,7 @@ export default function MarketingPage() {
         const imagen = productoSeleccionado.imagen ? `\n📸 ${productoSeleccionado.imagen}` : '';
         setMensajePersonalizado(`*${plantilla.nombre}*\n\n👤 ${primerCliente.nombre}\n\n📦 *${nombre}*\n💰 Precio: $${precioFinal}\n ${descripcion}${imagen}\n\n${plantilla.contenido}`);
       }
-    } else {
-      setMensajePersonalizado('');
-    }
+    } else { setMensajePersonalizado(''); }
   }, [productoSeleccionado, plantillaWhatsappSeleccionada, clientesSeleccionados, precioPromocion, plantillas, clientes]);
 
   useEffect(() => {
@@ -360,16 +352,21 @@ export default function MarketingPage() {
         const imagen = productoMarketplace.imagen ? `\n📸 ${productoMarketplace.imagen}` : '';
         setTextoMarketplace(`*${plantilla.nombre}*\n\n📦 *${nombre}*\n Precio: $${precioFinal}\n ${descripcion}${imagen}\n\n${plantilla.contenido}\n\n🏢 Somos Tienda Online en Caracas\n🛵 Delivery Gratis / Envíos a nivel nacional\n📲 ¡Escríbenos al directo para coordinar tu pedido!`);
       }
-    } else {
-      setTextoMarketplace('');
-    }
+    } else { setTextoMarketplace(''); }
   }, [productoMarketplace, plantillaMarketplaceSeleccionada, precioPromocionMarketplace, plantillas]);
 
-  const guardarPlantilla = () => {
+  // ✅ ACTUALIZADO: Guardar Plantilla en Supabase y localStorage
+  const guardarPlantilla = async () => {
     if (!formDataPlantilla.nombre || !formDataPlantilla.contenido) { toast.error('Nombre y contenido son obligatorios'); return; }
-    const nuevaPlantilla = { id: Date.now(), ...formDataPlantilla, fechaCreacion: new Date().toISOString() };
+    const nuevaPlantilla = { id: Date.now().toString(), ...formDataPlantilla, fechaCreacion: new Date().toISOString() };
+    
+    if (supabase) {
+      await supabase.from('plantillas').upsert(nuevaPlantilla, { onConflict: 'id' });
+    }
+    
     const actualizadas = plantillaEditando ? plantillas.map(p => p.id === plantillaEditando.id ? nuevaPlantilla : p) : [...plantillas, nuevaPlantilla];
-    setPlantillas(actualizadas); localStorage.setItem('voltech_plantillas', JSON.stringify(actualizadas));
+    localStorage.setItem('voltech_plantillas', JSON.stringify(actualizadas));
+    setPlantillas(actualizadas);
     toast.success(plantillaEditando ? 'Plantilla actualizada' : 'Plantilla guardada');
     resetPlantillaForm();
   };
@@ -384,10 +381,13 @@ export default function MarketingPage() {
     setPlantillaEditando(plantilla); setShowPlantillaForm(true);
   };
 
-  const eliminarPlantilla = (id) => {
+  // ✅ ACTUALIZADO: Eliminar Plantilla de Supabase y localStorage
+  const eliminarPlantilla = async (id) => {
     if (!confirm('¿Eliminar esta plantilla?')) return;
+    if (supabase) await supabase.from('plantillas').delete().eq('id', id);
     const actualizadas = plantillas.filter(p => p.id !== id);
-    setPlantillas(actualizadas); localStorage.setItem('voltech_plantillas', JSON.stringify(actualizadas));
+    localStorage.setItem('voltech_plantillas', JSON.stringify(actualizadas));
+    setPlantillas(actualizadas);
     toast.success('Plantilla eliminada');
   };
 

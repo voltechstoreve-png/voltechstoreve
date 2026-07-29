@@ -1,8 +1,8 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   Search, 
   ShoppingCart, 
@@ -51,36 +51,56 @@ export default function TiendaPage() {
   const [showAdminStats, setShowAdminStats] = useState(false);
   const [showPreciosMayor, setShowPreciosMayor] = useState(false);
 
+  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
-    // Verificar si está logueado
-    const userLogged = localStorage.getItem('voltech_user');
-    if (userLogged) {
-      setCurrentUser(JSON.parse(userLogged));
-    }
+    const cargarDatos = async () => {
+      const userLogged = localStorage.getItem('voltech_user');
+      if (userLogged) {
+        setCurrentUser(JSON.parse(userLogged));
+      }
 
-    const productosGuardados = localStorage.getItem('voltech_productos');
-    const settingsGuardados = localStorage.getItem('voltech_settings');
-    const tasaGuardada = localStorage.getItem('voltech_tasa_bcv');
-    const cartGuardado = localStorage.getItem('voltech_cart');
+      let prods = [], settingsData = {}, tasaData = 36.5;
 
-    if (productosGuardados) {
-      const prods = JSON.parse(productosGuardados);
-      setProductos(prods.filter(p => p.publicado));
-    }
+      // 1. Intentar cargar desde Supabase
+      if (supabase) {
+        const [{ data: pData }, { data: sData }, { data: tData }] = await Promise.all([
+          supabase.from('productos').select('*').eq('publicado', true),
+          supabase.from('settings').select('clave, valor'),
+          supabase.from('settings').select('valor').eq('clave', 'tasaBCV').single()
+        ]);
 
-    if (settingsGuardados) {
-      const settingsData = JSON.parse(settingsGuardados);
+        if (pData) prods = pData;
+        if (sData) {
+          sData.forEach(item => { settingsData[item.clave] = item.valor; });
+        }
+        if (tData?.valor) tasaData = tData.valor;
+      }
+
+      // 2. Fallback a localStorage si no hay datos de Supabase
+      if (prods.length === 0) {
+        const productosGuardados = localStorage.getItem('voltech_productos');
+        if (productosGuardados) prods = JSON.parse(productosGuardados).filter(p => p.publicado);
+      }
+      if (Object.keys(settingsData).length === 0) {
+        const settingsGuardados = localStorage.getItem('voltech_settings');
+        if (settingsGuardados) settingsData = JSON.parse(settingsGuardados);
+      }
+      if (tasaData === 36.5) {
+        const tasaGuardada = localStorage.getItem('voltech_tasa_bcv');
+        if (tasaGuardada) tasaData = JSON.parse(tasaGuardada).tasa || 36.5;
+      }
+
+      setProductos(prods);
       setSettings(settingsData);
-    }
+      setTasaBCV(tasaData);
 
-    if (tasaGuardada) {
-      const tasaData = JSON.parse(tasaGuardada);
-      setTasaBCV(tasaData.tasa || 36.5);
-    }
+      const cartGuardado = localStorage.getItem('voltech_cart');
+      if (cartGuardado) {
+        setCart(JSON.parse(cartGuardado));
+      }
+    };
 
-    if (cartGuardado) {
-      setCart(JSON.parse(cartGuardado));
-    }
+    cargarDatos();
   }, []);
 
   useEffect(() => {
@@ -93,17 +113,11 @@ export default function TiendaPage() {
 
   const addToCart = (producto) => {
     const existingItem = cart.find(item => item.id === producto.id);
-    
     if (existingItem) {
-      setCart(cart.map(item => 
-        item.id === producto.id 
-          ? { ...item, cantidad: item.cantidad + 1 }
-          : item
-      ));
+      setCart(cart.map(item => item.id === producto.id ? { ...item, cantidad: item.cantidad + 1 } : item));
     } else {
       setCart([...cart, { ...producto, cantidad: 1 }]);
     }
-    
     toast.success('Producto agregado al carrito');
   };
 
@@ -116,40 +130,58 @@ export default function TiendaPage() {
     if (cantidad <= 0) {
       removeFromCart(productoId);
     } else {
-      setCart(cart.map(item => 
-        item.id === productoId 
-          ? { ...item, cantidad }
-          : item
-      ));
+      setCart(cart.map(item => item.id === productoId ? { ...item, cantidad } : item));
     }
   };
 
-  const applyCoupon = () => {
+  // ✅ ACTUALIZADO: Busca cupones en Supabase y fallback a localStorage (corrige el bug original que buscaba en sorteos)
+  const applyCoupon = async () => {
     if (!couponCode.trim()) {
       toast.error('Ingresa un código de cupón');
       return;
     }
 
-    const sorteosGuardados = localStorage.getItem('voltech_sorteos');
-    if (sorteosGuardados) {
-      const sorteos = JSON.parse(sorteosGuardados);
-      const sorteo = sorteos.find(s => 
-        s.codigo === couponCode && 
-        s.activo && 
-        new Date(s.fechaExpiracion) > new Date()
-      );
+    let cuponEncontrado = null;
 
-      if (sorteo) {
-        setAppliedCoupon(sorteo);
-        toast.success(`Cupón aplicado: ${sorteo.descuento}% de descuento`);
-      } else {
-        toast.error('Cupón inválido o expirado');
+    // 1. Intentar buscar en Supabase
+    if (supabase) {
+      const { data } = await supabase
+        .from('cupones')
+        .select('*')
+        .eq('codigo', couponCode.toUpperCase())
+        .eq('estado', 'activo')
+        .single();
+      
+      if (data && new Date(data.fecha_vencimiento) > new Date()) {
+        cuponEncontrado = data;
       }
+    }
+
+    // 2. Fallback a localStorage
+    if (!cuponEncontrado) {
+      const cuponesGuardados = localStorage.getItem('voltech_cupones');
+      if (cuponesGuardados) {
+        const cupones = JSON.parse(cuponesGuardados);
+        cuponEncontrado = cupones.find(c => 
+          c.codigo === couponCode.toUpperCase() && 
+          c.estado === 'activo' && 
+          new Date(c.fecha_vencimiento) > new Date()
+        );
+      }
+    }
+
+    if (cuponEncontrado) {
+      setAppliedCoupon(cuponEncontrado);
+      const descuentoTexto = cuponEncontrado.tipo_descuento === 'porcentaje' 
+        ? `${cuponEncontrado.valor}%` 
+        : `$${cuponEncontrado.valor}`;
+      toast.success(`Cupón aplicado: ${descuentoTexto} de descuento`);
     } else {
-      toast.error('Cupón inválido');
+      toast.error('Cupón inválido o expirado');
     }
   };
 
+  // ✅ ACTUALIZADO: Soporta tanto porcentaje como monto fijo
   const calculateTotal = () => {
     let subtotal = cart.reduce((sum, item) => {
       const precio = item.precioDetal || 0;
@@ -157,7 +189,11 @@ export default function TiendaPage() {
     }, 0);
 
     if (appliedCoupon) {
-      subtotal = subtotal * (1 - appliedCoupon.descuento / 100);
+      if (appliedCoupon.tipo_descuento === 'porcentaje') {
+        subtotal = subtotal * (1 - appliedCoupon.valor / 100);
+      } else {
+        subtotal = Math.max(0, subtotal - appliedCoupon.valor);
+      }
     }
 
     return subtotal;
@@ -188,7 +224,10 @@ export default function TiendaPage() {
     mensaje += `\nSubtotal: $${total.toFixed(2)} (Bs ${totalBs})\n`;
     
     if (appliedCoupon) {
-      mensaje += `Cupón aplicado: ${appliedCoupon.codigo} (${appliedCoupon.descuento}% descuento)\n`;
+      const descuentoTexto = appliedCoupon.tipo_descuento === 'porcentaje' 
+        ? `${appliedCoupon.valor}%` 
+        : `$${appliedCoupon.valor}`;
+      mensaje += `Cupón aplicado: ${appliedCoupon.codigo} (${descuentoTexto} descuento)\n`;
     }
 
     mensaje += `\nMétodo de entrega: ${deliveryMethod === 'local' ? 'Retiro en tienda' : 'Delivery'}\n`;
@@ -202,7 +241,7 @@ export default function TiendaPage() {
     mensaje += `\nMétodo de pago: ${paymentMethod}\n`;
     mensaje += `\n¿Cómo procedo con el pago?`;
 
-    const telefonoTienda = settings.tienda?.whatsapp || '04121234567';
+    const telefonoTienda = settings.tienda?.telefono || settings.tienda?.whatsapp || '04121234567';
     const telefonoLimpio = telefonoTienda.replace(/\D/g, '');
     const url = `https://wa.me/58${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
     
@@ -219,7 +258,7 @@ export default function TiendaPage() {
     mensaje += `Precio: $${precio.toFixed(2)} (Bs ${precioBs})\n\n`;
     mensaje += `¿Cómo procedo con el pago?`;
 
-    const telefonoTienda = settings.tienda?.whatsapp || '04121234567';
+    const telefonoTienda = settings.tienda?.telefono || settings.tienda?.whatsapp || '04121234567';
     const telefonoLimpio = telefonoTienda.replace(/\D/g, '');
     const url = `https://wa.me/58${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
     
@@ -252,7 +291,7 @@ export default function TiendaPage() {
 
   const categorias = [...new Set(productos.map(p => p.categoria).filter(Boolean))];
   const marcas = [...new Set(productos.map(p => p.marca).filter(Boolean))];
-  const plataformas = [...new Set(productos.map(p => p.plataforma).filter(p => p.tipo === 'streaming').filter(Boolean))];
+  const plataformas = [...new Set(productos.filter(p => p.tipo === 'streaming').map(p => p.plataforma).filter(Boolean))];
 
   const handleLogout = () => {
     if (confirm('¿Estás seguro de que deseas cerrar sesión?')) {
@@ -925,7 +964,7 @@ export default function TiendaPage() {
                         <input
                           type="text"
                           value={couponCode}
-                          onChange={(e) => setCouponCode(e.target.value)}
+                          onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                           placeholder="Ingresa tu cupón"
                           className="flex-1 px-4 py-2 border border-gray-300 rounded-lg"
                         />
@@ -939,7 +978,7 @@ export default function TiendaPage() {
                       {appliedCoupon && (
                         <p className="text-sm text-green-600 mt-2 flex items-center gap-1">
                           <CheckCircle className="w-4 h-4" />
-                          Cupón aplicado: {appliedCoupon.descuento}% descuento
+                          Cupón aplicado: {appliedCoupon.tipo_descuento === 'porcentaje' ? `${appliedCoupon.valor}%` : `$${appliedCoupon.valor}`} descuento
                         </p>
                       )}
                     </div>

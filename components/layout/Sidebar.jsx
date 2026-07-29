@@ -1,13 +1,10 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-export const fetchCache = 'default-no-store';
-
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from '@/app/context/ThemeContext';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   LayoutDashboard, 
   Package, 
@@ -38,21 +35,38 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }
   const [currentUser, setCurrentUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // ✅ ACTUALIZADO: Obtiene el usuario desde Supabase con fallback a localStorage
   useEffect(() => {
-    const userLogged = localStorage.getItem('voltech_user');
-    if (userLogged) {
-      const user = JSON.parse(userLogged);
-      setCurrentUser(user);
-      
-      const equipoGuardado = localStorage.getItem('voltech_equipo');
-      if (equipoGuardado) {
-        const equipo = JSON.parse(equipoGuardado);
-        const miembro = equipo.find(m => m.nombre === user.nombre || m.email === user.email);
-        setIsAdmin(miembro?.rol === 'admin' || user.rol === 'admin');
-      } else {
-        setIsAdmin(user.rol === 'admin');
+    const fetchUser = async () => {
+      const userLoggedStr = localStorage.getItem('voltech_user');
+      if (userLoggedStr) {
+        const localUser = JSON.parse(userLoggedStr);
+        
+        // Intentar obtener datos frescos de Supabase si tenemos un ID válido
+        if (supabase && localUser.id && localUser.id !== 'local-1') {
+          const { data, error } = await supabase
+            .from('usuarios')
+            .select('*')
+            .eq('id', localUser.id)
+            .single();
+          
+          if (!error && data) {
+            setCurrentUser(data);
+            setIsAdmin(data.rol === 'admin' || data.rol === 'superadmin');
+          } else {
+            // Fallback a datos locales si falla la consulta
+            setCurrentUser(localUser);
+            setIsAdmin(localUser.rol === 'admin' || localUser.rol === 'superadmin');
+          }
+        } else {
+          // Fallback a datos locales (o si es el admin por defecto 'local-1')
+          setCurrentUser(localUser);
+          setIsAdmin(localUser.rol === 'admin' || localUser.rol === 'superadmin');
+        }
       }
-    }
+    };
+
+    fetchUser();
   }, []);
 
   const finalIsOpen = sidebarOpen !== undefined ? sidebarOpen : isOpen;

@@ -1,7 +1,7 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase'; // ✅ Conexión a Supabase
 import { Users, Plus, Edit, Trash2, X, Shield, UserCheck, UserX, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -19,23 +19,47 @@ export default function EquipoPage() {
   const [showInvitationLink, setShowInvitationLink] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // ✅ Cargar equipo desde Supabase (con fallback a localStorage)
   useEffect(() => {
-    const equipoGuardado = localStorage.getItem('voltech_equipo');
-    if (equipoGuardado) {
-      setEquipo(JSON.parse(equipoGuardado));
-    } else {
-      const adminDefault = [{ 
-        id: 1, 
-        nombre: 'Administrador', 
-        email: 'admin@voltech.store', 
-        telefono: '', 
-        rol: 'admin', 
-        activo: true,
-        password: 'admin123'
-      }];
-      setEquipo(adminDefault);
-      localStorage.setItem('voltech_equipo', JSON.stringify(adminDefault));
-    }
+    const cargarEquipo = async () => {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('usuarios')
+          .select('*')
+          .order('fechaRegistro', { ascending: false });
+        
+        if (!error && data) {
+          setEquipo(data);
+        } else {
+          console.warn('Error cargando equipo, usando fallback local:', error?.message);
+          cargarDesdeLocal();
+        }
+      } else {
+        cargarDesdeLocal();
+      }
+    };
+
+    const cargarDesdeLocal = () => {
+      const equipoGuardado = localStorage.getItem('voltech_equipo');
+      if (equipoGuardado) {
+        setEquipo(JSON.parse(equipoGuardado));
+      } else {
+        const adminDefault = [{ 
+          id: 1, 
+          nombre: 'Administrador', 
+          email: 'admin@voltech.store', 
+          telefono: '', 
+          rol: 'admin', 
+          activo: true,
+          password: 'admin123',
+          notificado: true
+        }];
+        setEquipo(adminDefault);
+        localStorage.setItem('voltech_equipo', JSON.stringify(adminDefault));
+      }
+    };
+
+    cargarEquipo();
   }, []);
 
   const handleChange = (e) => {
@@ -57,17 +81,16 @@ export default function EquipoPage() {
     return `${window.location.origin}/registro?token=${token}`;
   };
 
-  // Validar correo duplicado
   const emailExiste = (email, excludeId = null) => {
     return equipo.some(m => m.email.toLowerCase() === email.toLowerCase() && m.id !== excludeId);
   };
 
-  const guardarMiembro = () => {
+  // ✅ Guardar nuevo miembro en Supabase
+  const guardarMiembro = async () => {
     if (!formData.nombre || !formData.email) {
       toast.error('Completa los campos obligatorios');
       return;
     }
-
     if (emailExiste(formData.email)) {
       toast.error('Este correo electrónico ya está registrado');
       return;
@@ -75,67 +98,129 @@ export default function EquipoPage() {
 
     const passwordAleatorio = generarPasswordAleatorio();
     const linkInvitacion = generarLinkInvitacion();
-
-    const nuevoMiembro = { 
-      ...formData, 
-      id: Date.now(),
+    const nuevoMiembroData = { 
+      nombre: formData.nombre,
+      email: formData.email,
+      telefono: formData.telefono,
+      rol: formData.rol,
+      activo: formData.activo,
       password: passwordAleatorio,
       linkInvitacion: linkInvitacion,
-      notificado: false
+      notificado: false,
+      registrado: false,
+      fechaRegistro: new Date().toISOString()
     };
     
-    const equipoActualizado = [...equipo, nuevoMiembro];
-    setEquipo(equipoActualizado);
-    localStorage.setItem('voltech_equipo', JSON.stringify(equipoActualizado));
-    
-    toast.success('Miembro agregado. Enviando notificación...');
-    setTimeout(() => {
-      toast.success(`Contraseña temporal generada: ${passwordAleatorio}`);
-    }, 1000);
+    if (supabase) {
+      const { data, error } = await supabase.from('usuarios').insert([nuevoMiembroData]).select().single();
+      if (!error && data) {
+        setEquipo(prev => [data, ...prev]);
+        toast.success('Miembro agregado a la base de datos.');
+        setTimeout(() => toast.success(`Contraseña temporal: ${passwordAleatorio}`), 1000);
+      } else {
+        toast.error('Error al guardar: ' + error.message);
+        return;
+      }
+    } else {
+      // Fallback local
+      const nuevoMiembro = { ...nuevoMiembroData, id: Date.now() };
+      const equipoActualizado = [...equipo, nuevoMiembro];
+      setEquipo(equipoActualizado);
+      localStorage.setItem('voltech_equipo', JSON.stringify(equipoActualizado));
+      toast.success('Miembro agregado (Modo Local).');
+      setTimeout(() => toast.success(`Contraseña temporal: ${passwordAleatorio}`), 1000);
+    }
     
     setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: true });
     setEditingId(null);
   };
 
-  const actualizarMiembro = (id) => {
+  // ✅ Actualizar miembro en Supabase
+  const actualizarMiembro = async (id) => {
     if (!formData.nombre || !formData.email) {
       toast.error('Completa los campos obligatorios');
       return;
     }
-
     if (emailExiste(formData.email, id)) {
       toast.error('Este correo electrónico ya está siendo usado por otro miembro');
       return;
     }
 
-    const equipoActualizado = equipo.map(m => 
-      m.id === id ? { ...m, ...formData } : m
-    );
-    setEquipo(equipoActualizado);
-    localStorage.setItem('voltech_equipo', JSON.stringify(equipoActualizado));
-    toast.success('Miembro actualizado correctamente');
+    if (supabase) {
+      const { error } = await supabase
+        .from('usuarios')
+        .update({
+          nombre: formData.nombre,
+          email: formData.email,
+          telefono: formData.telefono,
+          rol: formData.rol,
+          activo: formData.activo
+        })
+        .eq('id', id);
+
+      if (!error) {
+        setEquipo(prev => prev.map(m => m.id === id ? { ...m, ...formData } : m));
+        toast.success('Miembro actualizado en la base de datos');
+      } else {
+        toast.error('Error al actualizar: ' + error.message);
+        return;
+      }
+    } else {
+      // Fallback local
+      const equipoActualizado = equipo.map(m => m.id === id ? { ...m, ...formData } : m);
+      setEquipo(equipoActualizado);
+      localStorage.setItem('voltech_equipo', JSON.stringify(equipoActualizado));
+      toast.success('Miembro actualizado (Modo Local)');
+    }
+    
     setEditingId(null);
     setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: true });
   };
 
-  const toggleActivo = (id) => {
-    const equipoActualizado = equipo.map(m => 
-      m.id === id ? { ...m, activo: !m.activo } : m
-    );
-    setEquipo(equipoActualizado);
-    localStorage.setItem('voltech_equipo', JSON.stringify(equipoActualizado));
+  // ✅ Toggle activo/inactivo en Supabase
+  const toggleActivo = async (id) => {
+    const miembro = equipo.find(m => m.id === id);
+    const nuevoEstado = !miembro.activo;
+
+    if (supabase) {
+      const { error } = await supabase.from('usuarios').update({ activo: nuevoEstado }).eq('id', id);
+      if (!error) {
+        setEquipo(prev => prev.map(m => m.id === id ? { ...m, activo: nuevoEstado } : m));
+      } else {
+        toast.error('Error al actualizar estado');
+        return;
+      }
+    } else {
+      // Fallback local
+      const equipoActualizado = equipo.map(m => m.id === id ? { ...m, activo: nuevoEstado } : m);
+      setEquipo(equipoActualizado);
+      localStorage.setItem('voltech_equipo', JSON.stringify(equipoActualizado));
+    }
   };
 
-  const eliminarMiembro = (id) => {
-    if (id === 1) {
+  // ✅ Eliminar miembro en Supabase
+  const eliminarMiembro = async (id) => {
+    const miembro = equipo.find(m => m.id === id);
+    if (miembro.rol === 'admin' || miembro.email === 'admin@voltech.store') {
       toast.error('No se puede eliminar al administrador principal');
       return;
     }
     if (confirm('¿Estás seguro de eliminar este miembro?')) {
-      const equipoActualizado = equipo.filter(m => m.id !== id);
-      setEquipo(equipoActualizado);
-      localStorage.setItem('voltech_equipo', JSON.stringify(equipoActualizado));
-      toast.success('Miembro eliminado');
+      if (supabase) {
+        const { error } = await supabase.from('usuarios').delete().eq('id', id);
+        if (!error) {
+          setEquipo(prev => prev.filter(m => m.id !== id));
+          toast.success('Miembro eliminado de la base de datos');
+        } else {
+          toast.error('Error al eliminar: ' + error.message);
+        }
+      } else {
+        // Fallback local
+        const equipoActualizado = equipo.filter(m => m.id !== id);
+        setEquipo(equipoActualizado);
+        localStorage.setItem('voltech_equipo', JSON.stringify(equipoActualizado));
+        toast.success('Miembro eliminado (Modo Local)');
+      }
     }
   };
 

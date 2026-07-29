@@ -1,7 +1,7 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import {
   Building2, Plus, Search, Edit3, Trash2, X, Save,
   Phone, Mail, Globe, MapPin, Clock, DollarSign,
@@ -49,24 +49,48 @@ export default function ProveedoresPage() {
     notas: ''
   });
 
+  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
-    const guardados = localStorage.getItem('voltech_proveedores');
-    if (guardados) {
-      try {
-        const data = JSON.parse(guardados);
-        if (Array.isArray(data)) {
-          setProveedores(data);
-        } else {
-          setProveedores([]);
+    const cargarProveedores = async () => {
+      let data = [];
+
+      if (supabase) {
+        const { data: supaData, error } = await supabase
+          .from('proveedores')
+          .select('*')
+          .order('fecha_creacion', { ascending: false });
+        
+        if (!error && supaData) {
+          data = supaData;
         }
-      } catch (e) {
-        console.error('Error al cargar proveedores:', e);
-        setProveedores([]);
       }
-    }
+
+      // Fallback a localStorage si no hay datos en Supabase
+      if (data.length === 0) {
+        const guardados = localStorage.getItem('voltech_proveedores');
+        if (guardados) {
+          try {
+            const parsed = JSON.parse(guardados);
+            if (Array.isArray(parsed)) {
+              data = parsed;
+            }
+          } catch (e) {
+            console.error('Error al cargar proveedores:', e);
+          }
+        }
+      }
+
+      setProveedores(data);
+    };
+
+    cargarProveedores();
   }, []);
 
-  const guardarProveedores = (nuevos) => {
+  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
+  const guardarProveedores = async (nuevos) => {
+    if (supabase) {
+      await supabase.from('proveedores').upsert(nuevos, { onConflict: 'id' });
+    }
     localStorage.setItem('voltech_proveedores', JSON.stringify(nuevos));
     setProveedores(nuevos);
   };
@@ -84,7 +108,8 @@ export default function ProveedoresPage() {
     setShowForm(false);
   };
 
-  const handleSubmit = (e) => {
+  // ✅ ACTUALIZADO: Maneja creación y edición con Supabase
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.nombre.trim()) {
       toast.error('El nombre del proveedor es obligatorio');
@@ -104,10 +129,10 @@ export default function ProveedoresPage() {
 
     if (proveedorEditando) {
       const actualizados = proveedores.map(p => p.id === proveedorEditando.id ? nuevo : p);
-      guardarProveedores(actualizados);
+      await guardarProveedores(actualizados);
       toast.success('Proveedor actualizado');
     } else {
-      guardarProveedores([...proveedores, nuevo]);
+      await guardarProveedores([...proveedores, nuevo]);
       toast.success('Proveedor creado exitosamente');
     }
     resetForm();
@@ -135,18 +160,33 @@ export default function ProveedoresPage() {
     setShowForm(true);
   };
 
-  const handleEliminar = (id) => {
+  // ✅ ACTUALIZADO: Elimina de Supabase y localStorage
+  const handleEliminar = async (id) => {
     if (!confirm('¿Estás seguro de eliminar este proveedor?')) return;
-    guardarProveedores(proveedores.filter(p => p.id !== id));
+    if (supabase) {
+      await supabase.from('proveedores').delete().eq('id', id);
+    }
+    const filtrados = proveedores.filter(p => p.id !== id);
+    localStorage.setItem('voltech_proveedores', JSON.stringify(filtrados));
+    setProveedores(filtrados);
     toast.success('Proveedor eliminado');
   };
 
-  const toggleEstado = (proveedor) => {
+  // ✅ ACTUALIZADO: Cambia estado en Supabase y localStorage
+  const toggleEstado = async (proveedor) => {
+    const nuevoEstado = proveedor.estado === 'activo' ? 'inactivo' : 'activo';
+    if (supabase) {
+      await supabase.from('proveedores').update({ 
+        estado: nuevoEstado, 
+        fecha_actualizacion: new Date().toISOString() 
+      }).eq('id', proveedor.id);
+    }
     const actualizados = proveedores.map(p =>
-      p.id === proveedor.id ? { ...p, estado: p.estado === 'activo' ? 'inactivo' : 'activo' } : p
+      p.id === proveedor.id ? { ...p, estado: nuevoEstado } : p
     );
-    guardarProveedores(actualizados);
-    toast.success(proveedor.estado === 'activo' ? 'Proveedor desactivado' : 'Proveedor activado');
+    localStorage.setItem('voltech_proveedores', JSON.stringify(actualizados));
+    setProveedores(actualizados);
+    toast.success(nuevoEstado === 'activo' ? 'Proveedor activado' : 'Proveedor desactivado');
   };
 
   const agregarAsesor = () => {

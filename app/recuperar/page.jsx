@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { supabase } from '../lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { Mail, Phone, Lock, CheckCircle, ArrowLeft, Key } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -25,12 +26,28 @@ export default function RecuperarPage() {
     setFormData({ ...formData, [name]: value });
   };
 
-  // Paso 1: Enviar código
-  const handleEnviarCodigo = (e) => {
+  // ✅ Paso 1: Verificar usuario en Supabase y "enviar" código
+  const handleEnviarCodigo = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    // Simular envío de código
+    // 1. Verificar si el usuario existe en la base de datos
+    if (supabase) {
+      const campo = formData.metodo === 'email' ? 'email' : 'telefono';
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq(campo, formData.email)
+        .single();
+
+      if (error || !data) {
+        toast.error('No se encontró una cuenta registrada con ese dato');
+        setLoading(false);
+        return;
+      }
+    }
+
+    // 2. Simular envío de código (Aquí iría la integración real con Email/SMS)
     setTimeout(() => {
       setLoading(false);
       toast.success(`Código enviado a tu ${formData.metodo === 'email' ? 'correo' : 'WhatsApp'}`);
@@ -38,8 +55,8 @@ export default function RecuperarPage() {
     }, 1500);
   };
 
-  // Paso 2: Verificar código y cambiar contraseña
-  const handleCambiarPassword = (e) => {
+  // ✅ Paso 2: Actualizar contraseña en Supabase
+  const handleCambiarPassword = async (e) => {
     e.preventDefault();
     
     if (formData.nuevaPassword !== formData.confirmarPassword) {
@@ -54,13 +71,26 @@ export default function RecuperarPage() {
 
     setLoading(true);
 
-    // Simular cambio de contraseña
+    // 1. Actualizar la contraseña en la base de datos
+    if (supabase) {
+      const campo = formData.metodo === 'email' ? 'email' : 'telefono';
+      const { error } = await supabase
+        .from('usuarios')
+        .update({ password: formData.nuevaPassword })
+        .eq(campo, formData.email);
+
+      if (error) {
+        toast.error('Error al cambiar la contraseña en la base de datos');
+        setLoading(false);
+        return;
+      }
+    }
+
+    // 2. Éxito y redirección
+    setLoading(false);
+    toast.success('Contraseña cambiada exitosamente');
     setTimeout(() => {
-      setLoading(false);
-      toast.success('Contraseña cambiada exitosamente');
-      setTimeout(() => {
-        window.location.href = '/login';
-      }, 1500);
+      window.location.href = '/login';
     }, 1500);
   };
 

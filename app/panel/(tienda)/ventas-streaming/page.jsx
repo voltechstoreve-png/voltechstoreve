@@ -1,7 +1,7 @@
 'use client';
 
-
 import { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   MonitorPlay, Database, AlertTriangle, DollarSign, Package, Search, 
   Edit3, Trash2, X, Save, Calendar, MessageCircle, Mail, RefreshCw,
@@ -90,58 +90,98 @@ export default function VentasStreamingPage() {
 
   const [historialReemplazos, setHistorialReemplazos] = useState({});
 
+  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
-    const userLogged = localStorage.getItem('voltech_user');
-    if (userLogged) setCurrentUser(JSON.parse(userLogged));
+    const cargarDatos = async () => {
+      const userLogged = localStorage.getItem('voltech_user');
+      if (userLogged) setCurrentUser(JSON.parse(userLogged));
 
-    const ventasGuardadas = localStorage.getItem('voltech_ventas_streaming');
-    const cuentasGuardadas = localStorage.getItem('voltech_cuentas_streaming');
-    const inventarioGuardado = localStorage.getItem('voltech_inventario_streaming');
-    const clientesGuardados = localStorage.getItem('voltech_clientes');
-    const equipoGuardado = localStorage.getItem('voltech_equipo');
-    const plataformasGuardadas = localStorage.getItem('voltech_plataformas_streaming');
-    const historialGuardado = localStorage.getItem('voltech_historial_reemplazos');
+      let vData = [], cData = [], iData = [], pData = null;
 
-    if (ventasGuardadas) {
-      const ventasData = JSON.parse(ventasGuardadas);
-      const ventasMigradas = ventasData.map(v => {
-        if (!v.plataformas && v.plataforma) {
-          return {
-            ...v,
-            plataformas: [{
-              plataforma: v.plataforma, fechaVencimiento: v.fechaVencimiento,
-              diasDisponibles: v.diasDisponibles || 30,
-              precioMayor: v.precioMayor || 0, precioDetal: v.precioDetal || 0,
-            }],
-            total: v.total || (v.precioDetal || 0),
-            metodoPago: v.metodoPago || 'efectivo',
-            cartera: v.cartera || 'Caja Principal',
-          };
+      if (supabase) {
+        const [{ data: v }, { data: c }, { data: i }, { data: p }] = await Promise.all([
+          supabase.from('ventas_streaming').select('*'),
+          supabase.from('cuentas_streaming').select('*'),
+          supabase.from('inventario_streaming').select('*'),
+          supabase.from('settings').select('valor').eq('clave', 'plataformas_streaming').single()
+        ]);
+        if (v) vData = v;
+        if (c) cData = c;
+        if (i) iData = i;
+        if (p?.valor) pData = p.valor;
+      }
+
+      // Fallback y migración de datos
+      if (vData.length === 0) {
+        const ventasGuardadas = localStorage.getItem('voltech_ventas_streaming');
+        if (ventasGuardadas) {
+          const ventasData = JSON.parse(ventasGuardadas);
+          vData = ventasData.map(v => {
+            if (!v.plataformas && v.plataforma) {
+              return {
+                ...v,
+                plataformas: [{
+                  plataforma: v.plataforma, fechaVencimiento: v.fechaVencimiento,
+                  diasDisponibles: v.diasDisponibles || 30,
+                  precioMayor: v.precioMayor || 0, precioDetal: v.precioDetal || 0,
+                }],
+                total: v.total || (v.precioDetal || 0),
+                metodoPago: v.metodoPago || 'efectivo',
+                cartera: v.cartera || 'Caja Principal',
+              };
+            }
+            return v;
+          });
         }
-        return v;
-      });
-      setVentas(ventasMigradas);
-      localStorage.setItem('voltech_ventas_streaming', JSON.stringify(ventasMigradas));
-    }
+      }
 
-    if (cuentasGuardadas) setCuentas(JSON.parse(cuentasGuardadas));
-    if (inventarioGuardado) setInventario(JSON.parse(inventarioGuardado));
-    if (clientesGuardados) {
-      try {
-        const clientesData = JSON.parse(clientesGuardados);
-        setClientes(Array.isArray(clientesData) ? clientesData : []);
-      } catch (error) { setClientes([]); }
-    }
-    if (equipoGuardado) setEquipo(JSON.parse(equipoGuardado));
-    if (historialGuardado) setHistorialReemplazos(JSON.parse(historialGuardado));
-    
-    if (plataformasGuardadas) {
-      setPlataformas(JSON.parse(plataformasGuardadas));
-    } else {
-      const plataformasDefault = ['Netflix Premium', 'Netflix Estándar', 'Disney+', 'HBO Max', 'Spotify', 'Amazon Prime', 'YouTube Premium', 'Apple TV+'];
-      setPlataformas(plataformasDefault);
-      localStorage.setItem('voltech_plataformas_streaming', JSON.stringify(plataformasDefault));
-    }
+      if (cData.length === 0) {
+        const cuentasGuardadas = localStorage.getItem('voltech_cuentas_streaming');
+        if (cuentasGuardadas) cData = JSON.parse(cuentasGuardadas);
+      }
+
+      if (iData.length === 0) {
+        const inventarioGuardado = localStorage.getItem('voltech_inventario_streaming');
+        if (inventarioGuardado) iData = JSON.parse(inventarioGuardado);
+      }
+
+      if (clientes.length === 0) {
+        const clientesGuardados = localStorage.getItem('voltech_clientes');
+        if (clientesGuardados) {
+          try {
+            const parsed = JSON.parse(clientesGuardados);
+            setClientes(Array.isArray(parsed) ? parsed : []);
+          } catch (error) { setClientes([]); }
+        }
+      }
+
+      if (equipo.length === 0) {
+        const equipoGuardado = localStorage.getItem('voltech_equipo');
+        if (equipoGuardado) setEquipo(JSON.parse(equipoGuardado));
+      }
+
+      const historialGuardado = localStorage.getItem('voltech_historial_reemplazos');
+      if (historialGuardado) setHistorialReemplazos(JSON.parse(historialGuardado));
+      
+      if (!pData) {
+        const plataformasGuardadas = localStorage.getItem('voltech_plataformas_streaming');
+        if (plataformasGuardadas) {
+          setPlataformas(JSON.parse(plataformasGuardadas));
+        } else {
+          const plataformasDefault = ['Netflix Premium', 'Netflix Estándar', 'Disney+', 'HBO Max', 'Spotify', 'Amazon Prime', 'YouTube Premium', 'Apple TV+'];
+          setPlataformas(plataformasDefault);
+          localStorage.setItem('voltech_plataformas_streaming', JSON.stringify(plataformasDefault));
+        }
+      } else {
+        setPlataformas(pData);
+      }
+
+      setVentas(vData);
+      setCuentas(cData);
+      setInventario(iData);
+    };
+
+    cargarDatos();
   }, []);
 
   const calcularFechaVencimiento = (fechaInicio, dias) => {
@@ -221,7 +261,8 @@ export default function VentasStreamingPage() {
     setFormDataNueva(prev => ({ ...prev, plataformas: nuevasPlataformas }));
   };
 
-  const aplicarRegaloFalla = () => {
+  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
+  const aplicarRegaloFalla = async () => {
     const { ventaId, plataformaIndex, dias, tipo, nota } = regaloData;
     if (!ventaId || dias === 0) {
       toast.error('Selecciona una venta y especifica los días');
@@ -247,6 +288,11 @@ export default function VentasStreamingPage() {
       return { ...v, plataformas: nuevasPlataformas };
     });
 
+    if (supabase) {
+      const ventaActualizada = ventasActualizadas.find(v => v.id === ventaId);
+      await supabase.from('ventas_streaming').update({ plataformas: ventaActualizada.plataformas }).eq('id', ventaId);
+    }
+
     setVentas(ventasActualizadas);
     localStorage.setItem('voltech_ventas_streaming', JSON.stringify(ventasActualizadas));
     toast.success(`${tipo === 'regalo' ? 'Días de regalo' : 'Días de falla'} aplicados correctamente`);
@@ -254,7 +300,8 @@ export default function VentasStreamingPage() {
     setRegaloData({ ventaId: null, plataformaIndex: 0, dias: 0, tipo: 'regalo', nota: '' });
   };
 
-  const guardarNuevaPlataforma = () => {
+  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
+  const guardarNuevaPlataforma = async () => {
     if (!formDataNueva.cliente || !formDataNueva.vendedor || formDataNueva.plataformas.some(p => !p.plataforma)) {
       toast.error('Completa los campos obligatorios');
       return;
@@ -262,15 +309,19 @@ export default function VentasStreamingPage() {
 
     const total = formDataNueva.plataformas.reduce((sum, p) => sum + (p.precioDetal || 0), 0);
     const nuevaVenta = {
-      id: editingId || Date.now(), ...formDataNueva, total,
+      id: editingId || Date.now().toString(), ...formDataNueva, total,
       estado: 'activa', fechaRegistro: new Date().toISOString(),
       registradoPor: currentUser?.nombre || 'Admin',
     };
 
+    let cuentasActualizadas = cuentas;
     if (formDataNueva.cuentaAsignada) {
-      const cuentasActualizadas = cuentas.map(c =>
+      cuentasActualizadas = cuentas.map(c =>
         c.id === formDataNueva.cuentaAsignada.id ? { ...c, estado: 'ocupada', ventaId: nuevaVenta.id } : c
       );
+      if (supabase) {
+        await supabase.from('cuentas_streaming').upsert(cuentasActualizadas.filter(c => c.id === formDataNueva.cuentaAsignada.id), { onConflict: 'id' });
+      }
       setCuentas(cuentasActualizadas);
       localStorage.setItem('voltech_cuentas_streaming', JSON.stringify(cuentasActualizadas));
     }
@@ -278,6 +329,10 @@ export default function VentasStreamingPage() {
     const ventasActualizadas = editingId
       ? ventas.map(v => v.id === editingId ? nuevaVenta : v)
       : [nuevaVenta, ...ventas];
+
+    if (supabase) {
+      await supabase.from('ventas_streaming').upsert(nuevaVenta, { onConflict: 'id' });
+    }
 
     setVentas(ventasActualizadas);
     localStorage.setItem('voltech_ventas_streaming', JSON.stringify(ventasActualizadas));
@@ -289,7 +344,7 @@ export default function VentasStreamingPage() {
 
       if (!clienteExistente) {
         const nuevoCliente = {
-          id: Date.now(), nombre: formDataNueva.cliente, telefono: formDataNueva.telefono,
+          id: Date.now().toString(), nombre: formDataNueva.cliente, telefono: formDataNueva.telefono,
           email: '', direccion: '', fechaRegistro: new Date().toISOString().split('T')[0],
           ultimaCompra: new Date().toISOString().split('T')[0], totalCompras: 1,
           totalGastado: total, etiquetas: ['Streaming'],
@@ -297,6 +352,7 @@ export default function VentasStreamingPage() {
         };
         const clientesActualizados = [...clientes, nuevoCliente];
         setClientes(clientesActualizados);
+        if (supabase) await supabase.from('clientes').upsert(nuevoCliente, { onConflict: 'id' });
         localStorage.setItem('voltech_clientes', JSON.stringify(clientesActualizados));
         toast.success(`Cliente "${formDataNueva.cliente}" creado automáticamente`);
       } else {
@@ -306,6 +362,10 @@ export default function VentasStreamingPage() {
             : c
         );
         setClientes(clientesActualizados);
+        if (supabase) {
+          const cToUpdate = clientesActualizados.find(c => c.id === clienteExistente.id);
+          await supabase.from('clientes').update(cToUpdate).eq('id', clienteExistente.id);
+        }
         localStorage.setItem('voltech_clientes', JSON.stringify(clientesActualizados));
       }
     }
@@ -321,7 +381,8 @@ export default function VentasStreamingPage() {
     setFormDataCuenta(prev => ({ ...prev, pins: nuevosPins }));
   };
 
-  const guardarCuenta = () => {
+  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
+  const guardarCuenta = async () => {
     if (!formDataCuenta.plataforma || !formDataCuenta.correo || !formDataCuenta.contraseña) {
       toast.error('Completa los campos obligatorios');
       return;
@@ -330,7 +391,7 @@ export default function VentasStreamingPage() {
     const nuevasCuentas = [];
     for (let i = 0; i < formDataCuenta.cantidad; i++) {
       nuevasCuentas.push({
-        id: Date.now() + i, plataforma: formDataCuenta.plataforma,
+        id: (Date.now() + i).toString(), plataforma: formDataCuenta.plataforma,
         correo: formDataCuenta.correo, contraseña: formDataCuenta.contraseña,
         nombrePerfil: formDataCuenta.nombrePerfil,
         pin: formDataCuenta.pins[i] || '',
@@ -338,6 +399,10 @@ export default function VentasStreamingPage() {
         fechaRegistro: new Date().toISOString(), registradoPor: currentUser?.nombre || 'Admin',
         perfil: i + 1,
       });
+    }
+
+    if (supabase) {
+      await supabase.from('cuentas_streaming').insert(nuevasCuentas);
     }
 
     const cuentasActualizadas = [...nuevasCuentas, ...cuentas];
@@ -354,16 +419,21 @@ export default function VentasStreamingPage() {
     setFormDataInventario(prev => ({ ...prev, pins: nuevosPins }));
   };
 
-  const guardarInventario = () => {
+  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
+  const guardarInventario = async () => {
     if (!formDataInventario.plataforma || !formDataInventario.correo) {
       toast.error('Completa los campos obligatorios');
       return;
     }
 
     const nuevoInventario = {
-      id: Date.now(), ...formDataInventario, estado: 'disponible',
+      id: Date.now().toString(), ...formDataInventario, estado: 'disponible',
       fechaRegistro: new Date().toISOString(), registradoPor: currentUser?.nombre || 'Admin',
     };
+
+    if (supabase) {
+      await supabase.from('inventario_streaming').insert(nuevoInventario);
+    }
 
     const inventarioActualizado = [nuevoInventario, ...inventario];
     setInventario(inventarioActualizado);
@@ -373,7 +443,8 @@ export default function VentasStreamingPage() {
     setShowFormInventario(false);
   };
 
-  const reemplazarCuenta = () => {
+  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
+  const reemplazarCuenta = async () => {
     if (!reemplazoData.cuentaId || !reemplazoData.nuevoCorreo || !reemplazoData.nuevaContraseña) {
       toast.error('Completa los datos de la nueva cuenta');
       return;
@@ -384,7 +455,7 @@ export default function VentasStreamingPage() {
 
     const nuevaCuenta = {
       ...cuentaOriginal,
-      id: Date.now(),
+      id: Date.now().toString(),
       plataforma: reemplazoData.nuevaPlataforma || cuentaOriginal.plataforma,
       correo: reemplazoData.nuevoCorreo,
       contraseña: reemplazoData.nuevaContraseña,
@@ -401,14 +472,22 @@ export default function VentasStreamingPage() {
       }
     };
 
+    const cuentaOriginalActualizada = { 
+      ...cuentaOriginal, 
+      estado: 'reemplazada', 
+      tieneHistorial: true, 
+      cuentaReemplazadaPor: nuevaCuenta.id 
+    };
+
     const cuentasActualizadas = cuentas.map(c => {
-      if (c.id === reemplazoData.cuentaId) {
-        return { ...c, estado: 'reemplazada', tieneHistorial: true, cuentaReemplazadaPor: nuevaCuenta.id };
-      }
+      if (c.id === reemplazoData.cuentaId) return cuentaOriginalActualizada;
       return c;
     });
-
     cuentasActualizadas.unshift(nuevaCuenta);
+
+    if (supabase) {
+      await supabase.from('cuentas_streaming').upsert([cuentaOriginalActualizada, nuevaCuenta], { onConflict: 'id' });
+    }
 
     setCuentas(cuentasActualizadas);
     localStorage.setItem('voltech_cuentas_streaming', JSON.stringify(cuentasActualizadas));
@@ -428,7 +507,8 @@ export default function VentasStreamingPage() {
     setReemplazoData({ cuentaId: null, nuevaPlataforma: '', nuevoCorreo: '', nuevaContraseña: '', nuevosPins: [''], observacion: '' });
   };
 
-  const asignarCuentaAVenta = (venta, cuenta) => {
+  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
+  const asignarCuentaAVenta = async (venta, cuenta) => {
     const ventasActualizadas = ventas.map(v => v.id === venta.id ? { ...v, cuentaAsignada: cuenta } : v);
     
     const cuentasActualizadas = cuentas.map(c => {
@@ -442,6 +522,11 @@ export default function VentasStreamingPage() {
       }
       return c;
     });
+
+    if (supabase) {
+      await supabase.from('ventas_streaming').update({ cuentaAsignada: cuenta }).eq('id', venta.id);
+      await supabase.from('cuentas_streaming').update({ estado: 'ocupada', ventaId: venta.id, nombrePerfil: venta.cliente || cuenta.nombrePerfil }).eq('id', cuenta.id);
+    }
 
     setVentas(ventasActualizadas);
     setCuentas(cuentasActualizadas);
@@ -594,28 +679,40 @@ El equipo de Voltechstore.ve`;
     setShowFormNueva(true);
   };
 
-  const eliminarVenta = (id) => {
+  // ✅ ACTUALIZADO: Elimina de Supabase y localStorage
+  const eliminarVenta = async (id) => {
     if (!confirm('¿Estás seguro de eliminar esta venta?')) return;
+    if (supabase) {
+      await supabase.from('ventas_streaming').delete().eq('id', id);
+    }
     const ventasActualizadas = ventas.filter(v => v.id !== id);
     setVentas(ventasActualizadas);
     localStorage.setItem('voltech_ventas_streaming', JSON.stringify(ventasActualizadas));
     toast.success('Venta eliminada');
   };
 
-  const agregarPlataforma = () => {
+  // ✅ ACTUALIZADO: Guarda en Supabase (settings) y localStorage
+  const agregarPlataforma = async () => {
     if (!nuevaPlataforma.trim()) { toast.error('Ingresa un nombre para la plataforma'); return; }
     if (plataformas.includes(nuevaPlataforma)) { toast.error('Esta plataforma ya existe'); return; }
 
     const plataformasActualizadas = [...plataformas, nuevaPlataforma];
+    if (supabase) {
+      await supabase.from('settings').upsert({ clave: 'plataformas_streaming', valor: plataformasActualizadas }, { onConflict: 'clave' });
+    }
     setPlataformas(plataformasActualizadas);
     localStorage.setItem('voltech_plataformas_streaming', JSON.stringify(plataformasActualizadas));
     toast.success('Plataforma agregada');
     setNuevaPlataforma('');
   };
 
-  const eliminarPlataforma = (nombre) => {
+  // ✅ ACTUALIZADO: Elimina de Supabase (settings) y localStorage
+  const eliminarPlataforma = async (nombre) => {
     if (!confirm(`¿Estás seguro de eliminar "${nombre}"?`)) return;
     const plataformasActualizadas = plataformas.filter(p => p !== nombre);
+    if (supabase) {
+      await supabase.from('settings').upsert({ clave: 'plataformas_streaming', valor: plataformasActualizadas }, { onConflict: 'clave' });
+    }
     setPlataformas(plataformasActualizadas);
     localStorage.setItem('voltech_plataformas_streaming', JSON.stringify(plataformasActualizadas));
     toast.success('Plataforma eliminada');
@@ -1095,7 +1192,13 @@ El equipo de Voltechstore.ve`;
                           )}
                           <button onClick={() => { setReemplazoData({ cuentaId: cuenta.id, nuevaPlataforma: cuenta.plataforma, nuevoCorreo: '', nuevaContraseña: '', nuevosPins: [''], observacion: '' }); setShowReemplazoCuentaModal(true); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-purple transition-colors" title="Reemplazar"><RefreshCw className="w-4 h-4" /></button>
                           <button onClick={() => { setFormDataCuenta({ plataforma: cuenta.plataforma, correo: cuenta.correo, contraseña: cuenta.contraseña, nombrePerfil: cuenta.nombrePerfil || '', pins: cuenta.pins || [cuenta.pin || ''], cantidad: cuenta.cantidad || 1, vendedor: cuenta.vendedor || '' }); setShowFormCuenta(true); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors" title="Editar"><Edit3 className="w-4 h-4" /></button>
-                          <button onClick={() => { setCuentas(cuentas.filter(c => c.id !== cuenta.id)); localStorage.setItem('voltech_cuentas_streaming', JSON.stringify(cuentas.filter(c => c.id !== cuenta.id))); toast.success('Cuenta eliminada'); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
+                          <button onClick={async () => { 
+                            if (supabase) await supabase.from('cuentas_streaming').delete().eq('id', cuenta.id);
+                            const filtradas = cuentas.filter(c => c.id !== cuenta.id); 
+                            setCuentas(filtradas); 
+                            localStorage.setItem('voltech_cuentas_streaming', JSON.stringify(filtradas)); 
+                            toast.success('Cuenta eliminada'); 
+                          }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       </td>
                     </tr>
@@ -1201,7 +1304,13 @@ El equipo de Voltechstore.ve`;
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1">
                             <button onClick={() => { setReemplazoData({ cuentaId: item.id, nuevaPlataforma: item.plataforma, nuevoCorreo: item.correo, nuevaContraseña: item.contraseña, nuevosPins: item.pins, observacion: '' }); setShowReemplazoCuentaModal(true); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-purple transition-colors" title="Editar/Reemplazar"><Edit3 className="w-4 h-4" /></button>
-                            <button onClick={() => { const inv = inventario.filter(i => i.id !== item.id); setInventario(inv); localStorage.setItem('voltech_inventario_streaming', JSON.stringify(inv)); toast.success('Item eliminado del inventario'); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"><Trash2 className="w-4 h-4" /></button>
+                            <button onClick={async () => { 
+                              if (supabase) await supabase.from('inventario_streaming').delete().eq('id', item.id);
+                              const inv = inventario.filter(i => i.id !== item.id); 
+                              setInventario(inv); 
+                              localStorage.setItem('voltech_inventario_streaming', JSON.stringify(inv)); 
+                              toast.success('Item eliminado del inventario'); 
+                            }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </td>
                       </tr>

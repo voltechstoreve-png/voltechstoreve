@@ -1,35 +1,13 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
-  Plus, 
-  Search, 
-  Edit, 
-  Trash2, 
-  X, 
-  Package, 
-  DollarSign, 
-  TrendingUp,
-  AlertTriangle,
-  CheckCircle,
-  Image as ImageIcon,
-  Save,
-  Minus,
-  Upload,
-  Eye,
-  EyeOff,
-  Globe,
-  LayoutGrid,
-  Table,
-  Download,
-  Database,
-  MonitorPlay,
-  Tag,
-  Layers,
-  Calendar,
-  Percent
+  Plus, Search, Edit, Trash2, X, Package, DollarSign, TrendingUp,
+  AlertTriangle, CheckCircle, Image as ImageIcon, Save, Minus,
+  Upload, Eye, EyeOff, Globe, LayoutGrid, Table, Download,
+  Database, MonitorPlay, Tag, Layers, Calendar, Percent
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -96,48 +74,66 @@ export default function ProductosPage() {
   const [nuevoCampo, setNuevoCampo] = useState({ tipo: '', valor: '' });
   const [showNuevoCampo, setShowNuevoCampo] = useState({ tipo: '', show: false });
 
+  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
-    const productosGuardados = localStorage.getItem('voltech_productos');
-    const carterasGuardadas = localStorage.getItem('voltech_carteras');
-    const equipoGuardado = localStorage.getItem('voltech_equipo');
-    const tasaGuardada = localStorage.getItem('voltech_tasa_bcv');
-    const categoriasGuardadas = localStorage.getItem('voltech_categorias');
-    const marcasGuardadas = localStorage.getItem('voltech_marcas');
+    const cargarDatos = async () => {
+      let pData = [], cData = [], sData = {};
 
-    if (productosGuardados) {
-      const prods = JSON.parse(productosGuardados);
-      setProductos(prods);
-      const cats = [...new Set(prods.map(p => p.categoria).filter(Boolean))];
-      const mar = [...new Set(prods.map(p => p.marca).filter(Boolean))];
-      setCategorias(cats);
-      setMarcas(mar);
-    }
-    if (carterasGuardadas) setCarteras(JSON.parse(carterasGuardadas));
-    if (equipoGuardado) setEquipo(JSON.parse(equipoGuardado));
-    if (tasaGuardada) {
-      const tasaData = JSON.parse(tasaGuardada);
-      setTasaBCV(tasaData.tasa);
-      setUsarTasaBCV(tasaData.usarBCV);
-      setTasaPersonalizada(tasaData.tasaPersonalizada || tasaData.tasa);
-    }
-    if (categoriasGuardadas) setCategorias(JSON.parse(categoriasGuardadas));
-    if (marcasGuardadas) setMarcas(JSON.parse(marcasGuardadas));
+      if (supabase) {
+        const [{ data: p }, { data: c }, { data: s }] = await Promise.all([
+          supabase.from('productos').select('*'),
+          supabase.from('carteras').select('*'),
+          supabase.from('settings').select('clave, valor')
+        ]);
+        if (p) pData = p;
+        if (c) cData = c;
+        if (s) {
+          s.forEach(item => { sData[item.clave] = item.valor; });
+        }
+      }
 
-    if (!equipoGuardado) {
-      const adminDefault = [{ id: 1, nombre: 'Administrador', rol: 'Admin', email: 'admin@voltech.store' }];
-      setEquipo(adminDefault);
-      localStorage.setItem('voltech_equipo', JSON.stringify(adminDefault));
-    }
+      // Fallback a localStorage
+      if (pData.length === 0) {
+        const productosGuardados = localStorage.getItem('voltech_productos');
+        if (productosGuardados) pData = JSON.parse(productosGuardados);
+      }
+      if (cData.length === 0) {
+        const carterasGuardadas = localStorage.getItem('voltech_carteras');
+        if (carterasGuardadas) cData = JSON.parse(carterasGuardadas);
+      }
 
-    if (!carterasGuardadas) {
-      const carterasDefault = [
-        { id: 1, nombre: 'Pago Móvil Principal', tipo: 'pago_movil', datos: '0412-1234567 - 12345678 - 0102' },
-        { id: 2, nombre: 'Zelle', tipo: 'zelle', datos: 'voltech@email.com' },
-        { id: 3, nombre: 'Binance', tipo: 'cripto', datos: 'voltech@binance.com' },
-      ];
-      setCarteras(carterasDefault);
-      localStorage.setItem('voltech_carteras', JSON.stringify(carterasDefault));
-    }
+      const equipoGuardado = localStorage.getItem('voltech_equipo');
+      const eqData = equipoGuardado ? JSON.parse(equipoGuardado) : [{ id: 1, nombre: 'Administrador', rol: 'Admin', email: 'admin@voltech.store' }];
+      
+      const catsData = sData.categorias || (localStorage.getItem('voltech_categorias') ? JSON.parse(localStorage.getItem('voltech_categorias')) : []);
+      const marData = sData.marcas || (localStorage.getItem('voltech_marcas') ? JSON.parse(localStorage.getItem('voltech_marcas')) : []);
+      const tasaData = sData.tasa_bcv || (localStorage.getItem('voltech_tasa_bcv') ? JSON.parse(localStorage.getItem('voltech_tasa_bcv')) : { tasa: 36.50, usarBCV: true, tasaPersonalizada: 36.50 });
+
+      setProductos(pData);
+      setCarteras(cData);
+      setEquipo(eqData);
+      setCategorias(Array.isArray(catsData) ? catsData : []);
+      setMarcas(Array.isArray(marData) ? marData : []);
+      setTasaBCV(tasaData.tasa || 36.50);
+      setUsarTasaBCV(tasaData.usarBCV !== undefined ? tasaData.usarBCV : true);
+      setTasaPersonalizada(tasaData.tasaPersonalizada || tasaData.tasa || 36.50);
+
+      if (!equipoGuardado) {
+        localStorage.setItem('voltech_equipo', JSON.stringify(eqData));
+      }
+      if (cData.length === 0 && !localStorage.getItem('voltech_carteras')) {
+        const carterasDefault = [
+          { id: '1', nombre: 'Pago Móvil Principal', tipo: 'pago_movil', datos: '0412-1234567 - 12345678 - 0102' },
+          { id: '2', nombre: 'Zelle', tipo: 'zelle', datos: 'voltech@email.com' },
+          { id: '3', nombre: 'Binance', tipo: 'cripto', datos: 'voltech@binance.com' },
+        ];
+        setCarteras(carterasDefault);
+        if (supabase) await supabase.from('carteras').insert(carterasDefault);
+        else localStorage.setItem('voltech_carteras', JSON.stringify(carterasDefault));
+      }
+    };
+
+    cargarDatos();
   }, []);
 
   const generarSKU = (plataforma, categoria, marca, existente = 0) => {
@@ -269,7 +265,7 @@ export default function ProductosPage() {
     setNuevoCampo({ tipo, valor: '' });
   };
 
-  const guardarNuevoCampo = () => {
+  const guardarNuevoCampo = async () => {
     if (!nuevoCampo.valor.trim()) {
       toast.error('Ingresa un valor');
       return;
@@ -279,6 +275,7 @@ export default function ProductosPage() {
       if (!categorias.includes(nuevoCampo.valor)) {
         const nuevasCategorias = [...categorias, nuevoCampo.valor];
         setCategorias(nuevasCategorias);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'categorias', valor: nuevasCategorias }, { onConflict: 'clave' });
         localStorage.setItem('voltech_categorias', JSON.stringify(nuevasCategorias));
         toast.success('Categoría agregada');
       } else {
@@ -288,6 +285,7 @@ export default function ProductosPage() {
       if (!marcas.includes(nuevoCampo.valor)) {
         const nuevasMarcas = [...marcas, nuevoCampo.valor];
         setMarcas(nuevasMarcas);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'marcas', valor: nuevasMarcas }, { onConflict: 'clave' });
         localStorage.setItem('voltech_marcas', JSON.stringify(nuevasMarcas));
         toast.success('Marca agregada');
       } else {
@@ -307,14 +305,14 @@ export default function ProductosPage() {
     setShowComboModal(true);
   };
 
-  const crearCombo = () => {
+  const crearCombo = async () => {
     if (!comboNombre || comboPlataformas.length < 2) {
       toast.error('Selecciona al menos 2 plataformas y ponle nombre al combo');
       return;
     }
 
     const nuevoCombo = {
-      id: Date.now(),
+      id: Date.now().toString(),
       tipo: 'streaming',
       plataforma: comboNombre,
       categoria: 'COMBO',
@@ -330,6 +328,10 @@ export default function ProductosPage() {
       sku: generarSKU(comboNombre, 'COMBO', '', 0),
     };
 
+    if (supabase) {
+      await supabase.from('productos').insert(nuevoCombo);
+    }
+
     const productosActualizados = [...productos, nuevoCombo];
     setProductos(productosActualizados);
     localStorage.setItem('voltech_productos', JSON.stringify(productosActualizados));
@@ -339,7 +341,8 @@ export default function ProductosPage() {
     setComboPlataformas([]);
   };
 
-  const guardarProductos = () => {
+  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
+  const guardarProductos = async () => {
     let productosGuardados = 0;
     let productosActualizados = 0;
     const nuevosProductos = [];
@@ -374,7 +377,7 @@ export default function ProductosPage() {
       } else {
         const nuevoProducto = {
           ...item,
-          id: Date.now() + index,
+          id: (Date.now() + index).toString(),
           precioDetal: item.precioDetal || item.precioMayor,
           precioOferta: 0,
           estado: 'nuevo',
@@ -388,8 +391,11 @@ export default function ProductosPage() {
     });
 
     if (productosGuardados > 0 || productosActualizados > 0) {
+      if (supabase) {
+        await supabase.from('productos').upsert(nuevosProductos, { onConflict: 'id' });
+      }
+
       let productosFinales = [...productos];
-      
       nuevosProductos.forEach(p => {
         const index = productosFinales.findIndex(existing => 
           existing.plataforma === p.plataforma && 
@@ -418,6 +424,10 @@ export default function ProductosPage() {
       });
       setCategorias(nuevasCategorias);
       setMarcas(nuevasMarcas);
+      if (supabase) {
+        await supabase.from('settings').upsert({ clave: 'categorias', valor: nuevasCategorias }, { onConflict: 'clave' });
+        await supabase.from('settings').upsert({ clave: 'marcas', valor: nuevasMarcas }, { onConflict: 'clave' });
+      }
       localStorage.setItem('voltech_categorias', JSON.stringify(nuevasCategorias));
       localStorage.setItem('voltech_marcas', JSON.stringify(nuevasMarcas));
 
@@ -473,11 +483,13 @@ export default function ProductosPage() {
     });
   };
 
-  const guardarEdicion = (id) => {
+  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
+  const guardarEdicion = async (id) => {
+    if (supabase) {
+      await supabase.from('productos').update(editData).eq('id', id);
+    }
     const productosActualizados = productos.map(p => 
-      p.id === id 
-        ? { ...p, ...editData }
-        : p
+      p.id === id ? { ...p, ...editData } : p
     );
     setProductos(productosActualizados);
     localStorage.setItem('voltech_productos', JSON.stringify(productosActualizados));
@@ -489,20 +501,29 @@ export default function ProductosPage() {
     setEditandoId(null);
   };
 
-  const togglePublicado = (id) => {
+  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
+  const togglePublicado = async (id) => {
+    const producto = productos.find(p => p.id === id);
+    const nuevoEstado = !producto.publicado;
+    
+    if (supabase) {
+      await supabase.from('productos').update({ publicado: nuevoEstado }).eq('id', id);
+    }
+    
     const productosActualizados = productos.map(p => 
-      p.id === id 
-        ? { ...p, publicado: !p.publicado }
-        : p
+      p.id === id ? { ...p, publicado: nuevoEstado } : p
     );
     setProductos(productosActualizados);
     localStorage.setItem('voltech_productos', JSON.stringify(productosActualizados));
-    const producto = productos.find(p => p.id === id);
-    toast.success(`Producto ${producto.publicado ? 'ocultado' : 'publicado'} en la tienda`);
+    toast.success(`Producto ${nuevoEstado ? 'publicado' : 'ocultado'} en la tienda`);
   };
 
-  const eliminarProducto = (id) => {
+  // ✅ ACTUALIZADO: Elimina de Supabase y localStorage
+  const eliminarProducto = async (id) => {
     if (confirm('¿Estás seguro de eliminar este producto?')) {
+      if (supabase) {
+        await supabase.from('productos').delete().eq('id', id);
+      }
       const productosActualizados = productos.filter(p => p.id !== id);
       setProductos(productosActualizados);
       localStorage.setItem('voltech_productos', JSON.stringify(productosActualizados));
@@ -510,12 +531,18 @@ export default function ProductosPage() {
     }
   };
 
-  const agregarCartera = () => {
+  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
+  const agregarCartera = async () => {
     if (!nuevaCartera.nombre || !nuevaCartera.datos) {
       toast.error('Completa todos los campos');
       return;
     }
-    const nueva = { ...nuevaCartera, id: Date.now() };
+    const nueva = { ...nuevaCartera, id: Date.now().toString() };
+    
+    if (supabase) {
+      await supabase.from('carteras').insert(nueva);
+    }
+    
     const carterasActualizadas = [...carteras, nueva];
     setCarteras(carterasActualizadas);
     localStorage.setItem('voltech_carteras', JSON.stringify(carterasActualizadas));
@@ -523,19 +550,27 @@ export default function ProductosPage() {
     toast.success('Cartera agregada');
   };
 
-  const eliminarCartera = (id) => {
+  // ✅ ACTUALIZADO: Elimina de Supabase y localStorage
+  const eliminarCartera = async (id) => {
+    if (supabase) {
+      await supabase.from('carteras').delete().eq('id', id);
+    }
     const carterasActualizadas = carteras.filter(c => c.id !== id);
     setCarteras(carterasActualizadas);
     localStorage.setItem('voltech_carteras', JSON.stringify(carterasActualizadas));
     toast.success('Cartera eliminada');
   };
 
-  const guardarTasa = () => {
+  // ✅ ACTUALIZADO: Guarda en Supabase (settings) y localStorage
+  const guardarTasa = async () => {
     const tasaData = {
       tasa: usarTasaBCV ? tasaBCV : tasaPersonalizada,
       usarBCV: usarTasaBCV,
       tasaPersonalizada,
     };
+    if (supabase) {
+      await supabase.from('settings').upsert({ clave: 'tasa_bcv', valor: tasaData }, { onConflict: 'clave' });
+    }
     localStorage.setItem('voltech_tasa_bcv', JSON.stringify(tasaData));
     toast.success('Tasa actualizada');
   };

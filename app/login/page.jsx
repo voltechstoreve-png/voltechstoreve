@@ -1,7 +1,7 @@
 'use client';
 
-
 import { useState } from 'react';
+import { supabase } from '@/lib/supabase'; // ✅ ESTA ES LA LÍNEA QUE ARREGLA EL ERROR
 import { Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -43,7 +43,7 @@ export default function LoginPage() {
   const strengthColors = ['bg-gray-700', 'bg-voltech-error', 'bg-voltech-warning', 'bg-voltech-cyan', 'bg-voltech-success'];
   const strengthTexts = ['Muy débil', 'Débil', 'Media', 'Fuerte', 'Muy fuerte'];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
@@ -60,20 +60,65 @@ export default function LoginPage() {
       }
     }
 
-    setTimeout(() => {
-      setLoading(false);
-      if (isLogin) {
+    if (isLogin) {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('usuarios')
+          .select('*')
+          .eq('email', formData.email)
+          .eq('password', formData.password)
+          .eq('activo', true)
+          .single();
+
+        if (error || !data) {
+          toast.error('Credenciales incorrectas o usuario inactivo');
+          setLoading(false);
+          return;
+        }
+
+        localStorage.setItem('voltech_user', JSON.stringify(data));
         toast.success('¡Bienvenido de vuelta! Redirigiendo...');
-        localStorage.setItem('voltech_user', JSON.stringify({ nombre: 'Administrador', rol: 'Admin' }));
-    setTimeout(() => {
-       window.location.href = '/panel/dashboard';
-      }, 1500);
+        setTimeout(() => {
+          window.location.href = '/panel/dashboard';
+        }, 1500);
       } else {
-        toast.success('Solicitud enviada. Tu cuenta está pendiente de aprobación por el administrador.');
-        setIsLogin(true);
-        setFormData({ ...formData, password: '', confirmPassword: '' });
+        localStorage.setItem('voltech_user', JSON.stringify({ 
+          id: 'local-1', 
+          nombre: 'Administrador', 
+          email: formData.email, 
+          rol: 'admin' 
+        }));
+        toast.success('¡Bienvenido de vuelta! Redirigiendo... (Modo Local)');
+        setTimeout(() => {
+          window.location.href = '/panel/dashboard';
+        }, 1500);
       }
-    }, 1500);
+    } else {
+      if (supabase) {
+        const { error } = await supabase.from('usuarios').insert({
+          nombre: formData.nombre,
+          email: formData.email,
+          telefono: formData.telefono,
+          password: formData.password,
+          rol: 'vendedor',
+          activo: true,
+          registrado: true,
+          fechaRegistro: new Date().toISOString()
+        });
+
+        if (error) {
+          toast.error('Error al crear la cuenta: ' + (error.message || 'El correo ya está registrado'));
+          setLoading(false);
+          return;
+        }
+      }
+      
+      toast.success('Solicitud enviada. Tu cuenta está pendiente de aprobación por el administrador.');
+      setIsLogin(true);
+      setFormData({ ...formData, password: '', confirmPassword: '' });
+    }
+    
+    setLoading(false);
   };
 
   return (
@@ -88,7 +133,7 @@ export default function LoginPage() {
       />
 
       <div className="absolute top-0 left-0 w-96 h-96 bg-voltech-cyan/10 rounded-full blur-[120px] -translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-voltech-purple/10 rounded-full blur-[120px] translate-x/2 translate-y-1/2 pointer-events-none"></div>
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-voltech-purple/10 rounded-full blur-[120px] translate-x-1/2 translate-y-1/2 pointer-events-none"></div>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -108,7 +153,6 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          
           <AnimatePresence>
             {!isLogin && (
               <motion.div

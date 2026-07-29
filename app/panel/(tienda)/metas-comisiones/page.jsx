@@ -1,7 +1,7 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   DollarSign, BarChart, Target, MessageCircle, CheckCircle, 
   User, Save, Trash2, Plus, Calendar, Bell, X, TrendingUp, 
@@ -10,6 +10,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import jsPDF from 'jspdf'; // Para el reporte del socio
+import 'jspdf-autotable'; // ✅ Asegurar que autoTable esté disponible
 
 export default function MetasYComisionesPage() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -35,34 +36,57 @@ export default function MetasYComisionesPage() {
   const [ranking, setRanking] = useState([]);
   const [statsReales, setStatsReales] = useState({ ventasMes: 0, metaActual: 0 });
 
+  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
-    const userLogged = localStorage.getItem('voltech_user');
-    if (userLogged) {
-      const user = JSON.parse(userLogged);
-      setCurrentUser(user);
-      
-      const equipoGuardado = localStorage.getItem('voltech_equipo');
-      if (equipoGuardado) {
-        const equipo = JSON.parse(equipoGuardado);
-        const miembro = equipo.find(m => m.nombre === user.nombre);
-        setIsAdmin(miembro?.rol === 'admin' || user.rol === 'admin');
-      } else {
-        setIsAdmin(user.rol === 'admin');
+    const cargarDatos = async () => {
+      const userLogged = localStorage.getItem('voltech_user');
+      if (userLogged) {
+        const user = JSON.parse(userLogged);
+        setCurrentUser(user);
+        
+        const equipoGuardado = localStorage.getItem('voltech_equipo');
+        if (equipoGuardado) {
+          const equipo = JSON.parse(equipoGuardado);
+          const miembro = equipo.find(m => m.nombre === user.nombre);
+          setIsAdmin(miembro?.rol === 'admin' || user.rol === 'admin');
+        } else {
+          setIsAdmin(user.rol === 'admin');
+        }
       }
-    }
 
-    const savedComisiones = localStorage.getItem('voltech_comisiones');
-    if (savedComisiones) {
-      const parsed = JSON.parse(savedComisiones);
-      setComisiones(parsed);
-      setMetasTemp(parsed.metas || []);
-    } else {
-      setMetasTemp(comisiones.metas);
-    }
+      let savedData = null;
+      if (supabase) {
+        const { data } = await supabase.from('settings').select('valor').eq('clave', 'metas_comisiones').single();
+        if (data?.valor) savedData = data.valor;
+      }
+      
+      if (!savedData) {
+        const localData = localStorage.getItem('voltech_comisiones');
+        if (localData) savedData = JSON.parse(localData);
+      }
 
-    // ✅ CALCULAR RANKING Y ESTADÍSTICAS REALES
-    calcularRankingYStats();
+      if (savedData) {
+        setComisiones(savedData);
+        setMetasTemp(savedData.metas || []);
+      } else {
+        setMetasTemp(comisiones.metas);
+      }
+
+      // ✅ CALCULAR RANKING Y ESTADÍSTICAS REALES
+      calcularRankingYStats();
+    };
+
+    cargarDatos();
   }, []);
+
+  // ✅ FUNCIÓN AUXILIAR PARA GUARDAR EN SUPABASE Y LOCALSTORAGE
+  const guardarEnSupabaseYLocal = async (nuevosDatos) => {
+    if (supabase) {
+      await supabase.from('settings').upsert({ clave: 'metas_comisiones', valor: nuevosDatos }, { onConflict: 'clave' });
+    }
+    localStorage.setItem('voltech_comisiones', JSON.stringify(nuevosDatos));
+    setComisiones(nuevosDatos);
+  };
 
   const calcularRankingYStats = () => {
     const ventasProd = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
@@ -112,12 +136,12 @@ export default function MetasYComisionesPage() {
     });
   };
 
-  const handleSave = () => {
-    localStorage.setItem('voltech_comisiones', JSON.stringify(comisiones));
+  const handleSave = async () => {
+    await guardarEnSupabaseYLocal(comisiones);
     toast.success('Configuración guardada correctamente');
   };
 
-  const agregarComentario = () => {
+  const agregarComentario = async () => {
     if (!nuevoComentario.trim()) {
       toast.error('Escribe un comentario o sugerencia');
       return;
@@ -137,9 +161,8 @@ export default function MetasYComisionesPage() {
       ...comisiones,
       comentarios: [comentario, ...comisiones.comentarios]
     };
-    setComisiones(nuevasComisiones);
-    localStorage.setItem('voltech_comisiones', JSON.stringify(nuevasComisiones));
     
+    await guardarEnSupabaseYLocal(nuevasComisiones);
     setNuevoComentario('');
     toast.success('Sugerencia enviada. El admin la revisará.');
   };
@@ -149,7 +172,7 @@ export default function MetasYComisionesPage() {
     setShowModalAprobar(true);
   };
 
-  const confirmarAprobacion = () => {
+  const confirmarAprobacion = async () => {
     if (!comentarioSeleccionado) return;
 
     const nuevasComisiones = {
@@ -158,9 +181,8 @@ export default function MetasYComisionesPage() {
         c.id === comentarioSeleccionado.id ? { ...c, aprobado: true, leido: true } : c
       )
     };
-    setComisiones(nuevasComisiones);
-    localStorage.setItem('voltech_comisiones', JSON.stringify(nuevasComisiones));
-
+    
+    await guardarEnSupabaseYLocal(nuevasComisiones);
     toast.success(`Sugerencia de ${comentarioSeleccionado.usuario} aprobada.`);
     
     const notificacion = {
@@ -177,25 +199,23 @@ export default function MetasYComisionesPage() {
     setComentarioSeleccionado(null);
   };
 
-  const rechazarComentario = (id) => {
+  const rechazarComentario = async (id) => {
     const nuevasComisiones = {
       ...comisiones,
       comentarios: comisiones.comentarios.map(c => 
         c.id === id ? { ...c, rechazado: true, leido: true } : c
       )
     };
-    setComisiones(nuevasComisiones);
-    localStorage.setItem('voltech_comisiones', JSON.stringify(nuevasComisiones));
+    await guardarEnSupabaseYLocal(nuevasComisiones);
     toast.success('Sugerencia rechazada');
   };
 
-  const eliminarComentario = (id) => {
+  const eliminarComentario = async (id) => {
     const nuevasComisiones = {
       ...comisiones,
       comentarios: comisiones.comentarios.filter(c => c.id !== id)
     };
-    setComisiones(nuevasComisiones);
-    localStorage.setItem('voltech_comisiones', JSON.stringify(nuevasComisiones));
+    await guardarEnSupabaseYLocal(nuevasComisiones);
     toast.success('Comentario eliminado');
   };
 
@@ -226,15 +246,14 @@ export default function MetasYComisionesPage() {
     ));
   };
 
-  const guardarMetas = () => {
+  const guardarMetas = async () => {
     // ✅ CORRECCIÓN DEL BUG: Sobrescribimos completamente el array de metas en el estado principal
     const nuevasComisiones = {
       ...comisiones,
       metas: [...metasTemp] // Copia fresca para evitar referencias
     };
     
-    setComisiones(nuevasComisiones);
-    localStorage.setItem('voltech_comisiones', JSON.stringify(nuevasComisiones));
+    await guardarEnSupabaseYLocal(nuevasComisiones);
     
     // Recalcular ranking con las nuevas metas
     calcularRankingYStats();
@@ -243,15 +262,14 @@ export default function MetasYComisionesPage() {
     setMostrarFormMetas(false); // Ocultar después de guardar
   };
 
-  const marcarComisionPagada = (comisionId) => {
+  const marcarComisionPagada = async (comisionId) => {
     const nuevasComisiones = {
       ...comisiones,
       comisionesPagadas: comisiones.comisionesPagadas.map(c => 
         c.id === comisionId ? { ...c, estado: 'pagada', fechaPago: new Date().toISOString() } : c
       )
     };
-    setComisiones(nuevasComisiones);
-    localStorage.setItem('voltech_comisiones', JSON.stringify(nuevasComisiones));
+    await guardarEnSupabaseYLocal(nuevasComisiones);
     toast.success('Comisión marcada como pagada');
   };
 

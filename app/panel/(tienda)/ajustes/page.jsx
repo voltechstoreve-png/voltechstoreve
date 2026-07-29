@@ -1,7 +1,7 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   Store, 
   CreditCard, 
@@ -80,45 +80,70 @@ export default function AjustesPage() {
     terminos: true,
   });
 
+  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
-    const savedSettings = localStorage.getItem('voltech_settings');
-    if (savedSettings) {
-      const parsed = JSON.parse(savedSettings);
-      setSettings(prev => {
-        const merged = {
-          ...prev,
-          tienda: { ...prev.tienda, ...parsed.tienda },
-          envios: { ...prev.envios, ...parsed.envios },
-          politicas: { ...prev.politicas, ...parsed.politicas },
-        };
-        
-        if (parsed.pagos) {
-          const migratedPagos = {};
-          Object.entries(parsed.pagos).forEach(([key, value]) => {
-            if (typeof value === 'boolean') {
-              migratedPagos[key] = { 
-                activo: value, 
-                publico: value,
-                nombre: key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
-              };
-            } else {
-              migratedPagos[key] = {
-                activo: value.activo ?? true,
-                publico: value.publico ?? true,
-                nombre: value.nombre || key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
-              };
-            }
+    const cargarAjustes = async () => {
+      let datosCargados = null;
+
+      // 1. Intentar cargar desde Supabase
+      if (supabase) {
+        const { data, error } = await supabase.from('settings').select('clave, valor');
+        if (!error && data && data.length > 0) {
+          datosCargados = {};
+          data.forEach(item => {
+            datosCargados[item.clave] = item.valor;
           });
-          merged.pagos = migratedPagos;
         }
-        
-        if (parsed.carteras) {
-          merged.carteras = parsed.carteras;
+      }
+
+      // 2. Si no hay datos en Supabase, cargar desde localStorage
+      if (!datosCargados) {
+        const savedSettings = localStorage.getItem('voltech_settings');
+        if (savedSettings) {
+          datosCargados = JSON.parse(savedSettings);
         }
-        
-        return merged;
-      });
-    }
+      }
+
+      // 3. Fusionar con los valores por defecto
+      if (datosCargados) {
+        setSettings(prev => {
+          const merged = {
+            ...prev,
+            tienda: { ...prev.tienda, ...datosCargados.tienda },
+            envios: { ...prev.envios, ...datosCargados.envios },
+            politicas: { ...prev.politicas, ...datosCargados.politicas },
+          };
+          
+          if (datosCargados.pagos) {
+            const migratedPagos = {};
+            Object.entries(datosCargados.pagos).forEach(([key, value]) => {
+              if (typeof value === 'boolean') {
+                migratedPagos[key] = { 
+                  activo: value, 
+                  publico: value,
+                  nombre: key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+                };
+              } else {
+                migratedPagos[key] = {
+                  activo: value.activo ?? true,
+                  publico: value.publico ?? true,
+                  nombre: value.nombre || key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+                };
+              }
+            });
+            merged.pagos = migratedPagos;
+          }
+          
+          if (datosCargados.carteras) {
+            merged.carteras = datosCargados.carteras;
+          }
+          
+          return merged;
+        });
+      }
+    };
+    
+    cargarAjustes();
     
     const handleScroll = () => {
       setShowScrollTop(window.scrollY > 300);
@@ -127,9 +152,33 @@ export default function AjustesPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const handleSave = () => {
-    localStorage.setItem('voltech_settings', JSON.stringify(settings));
-    toast.success('Ajustes guardados correctamente');
+  // ✅ ACTUALIZADO: Guarda en Supabase y mantiene el respaldo en localStorage
+  const handleSave = async () => {
+    try {
+      // 1. Guardar en Supabase
+      if (supabase) {
+        const settingsToSave = [
+          { clave: 'tienda', valor: settings.tienda },
+          { clave: 'pagos', valor: settings.pagos },
+          { clave: 'carteras', valor: settings.carteras },
+          { clave: 'envios', valor: settings.envios },
+          { clave: 'politicas', valor: settings.politicas }
+        ];
+        
+        const { error } = await supabase.from('settings').upsert(settingsToSave, { onConflict: 'clave' });
+        if (error) throw error;
+      }
+
+      // 2. Guardar en localStorage (caché local y respaldo)
+      localStorage.setItem('voltech_settings', JSON.stringify(settings));
+      
+      toast.success('Ajustes guardados correctamente');
+    } catch (error) {
+      console.error('Error al guardar en Supabase:', error);
+      // Aún así guardamos localmente si falla la conexión
+      localStorage.setItem('voltech_settings', JSON.stringify(settings));
+      toast.error('Error de conexión. Guardado solo en modo local.');
+    }
   };
 
   const scrollToTop = () => {

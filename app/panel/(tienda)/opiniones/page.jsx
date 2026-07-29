@@ -1,7 +1,7 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { useTheme } from '@/app/context/ThemeContext';
 import { 
   MessageSquare, Star, Search, Trash2, Edit, CheckCircle, 
@@ -29,19 +29,47 @@ export default function OpinionesPage() {
     fecha: new Date().toISOString()
   });
 
+  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
-    const opinionesGuardadas = localStorage.getItem('voltech_opiniones');
-    if (opinionesGuardadas) {
-      setOpiniones(JSON.parse(opinionesGuardadas));
-    }
+    const cargarOpiniones = async () => {
+      let opinionesData = [];
+      
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('opiniones')
+          .select('*')
+          .order('fecha', { ascending: false });
+        
+        if (!error && data) {
+          opinionesData = data;
+        }
+      }
+
+      // Fallback a localStorage si no hay datos en Supabase
+      if (opinionesData.length === 0) {
+        const opinionesGuardadas = localStorage.getItem('voltech_opiniones');
+        if (opinionesGuardadas) {
+          opinionesData = JSON.parse(opinionesGuardadas);
+        }
+      }
+      
+      setOpiniones(opinionesData);
+    };
+
+    cargarOpiniones();
   }, []);
 
-  const guardarOpiniones = (nuevasOpiniones) => {
+  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
+  const guardarOpiniones = async (nuevasOpiniones) => {
+    if (supabase) {
+      await supabase.from('opiniones').upsert(nuevasOpiniones, { onConflict: 'id' });
+    }
     localStorage.setItem('voltech_opiniones', JSON.stringify(nuevasOpiniones));
     setOpiniones(nuevasOpiniones);
   };
 
-  const handleSubmit = (e) => {
+  // ✅ ACTUALIZADO: Maneja creación y edición con Supabase
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!formData.nombre || !formData.comentario) {
@@ -49,18 +77,16 @@ export default function OpinionesPage() {
       return;
     }
 
+    const opinionData = editingOpinion 
+      ? { ...formData, id: editingOpinion.id }
+      : { id: `opinion-${Date.now()}`, ...formData };
+
     if (editingOpinion) {
-      const actualizadas = opiniones.map(o => 
-        o.id === editingOpinion.id ? { ...formData, id: editingOpinion.id } : o
-      );
-      guardarOpiniones(actualizadas);
+      const actualizadas = opiniones.map(o => o.id === editingOpinion.id ? opinionData : o);
+      await guardarOpiniones(actualizadas);
       toast.success('Opinión actualizada');
     } else {
-      const nuevaOpinion = {
-        id: `opinion-${Date.now()}`,
-        ...formData
-      };
-      guardarOpiniones([...opiniones, nuevaOpinion]);
+      await guardarOpiniones([...opiniones, opinionData]);
       toast.success('Opinión agregada');
     }
 
@@ -77,18 +103,25 @@ export default function OpinionesPage() {
     });
   };
 
-  const eliminarOpinion = (id) => {
+  // ✅ ACTUALIZADO: Elimina de Supabase y localStorage
+  const eliminarOpinion = async (id) => {
     if (confirm('¿Estás seguro de eliminar esta opinión?')) {
-      guardarOpiniones(opiniones.filter(o => o.id !== id));
+      if (supabase) {
+        await supabase.from('opiniones').delete().eq('id', id);
+      }
+      const filtradas = opiniones.filter(o => o.id !== id);
+      localStorage.setItem('voltech_opiniones', JSON.stringify(filtradas));
+      setOpiniones(filtradas);
       toast.success('Opinión eliminada');
     }
   };
 
-  const cambiarEstado = (opinion, nuevoEstado) => {
+  // ✅ ACTUALIZADO: Cambia estado en Supabase y localStorage
+  const cambiarEstado = async (opinion, nuevoEstado) => {
     const actualizadas = opiniones.map(o => 
       o.id === opinion.id ? { ...o, estado: nuevoEstado } : o
     );
-    guardarOpiniones(actualizadas);
+    await guardarOpiniones(actualizadas);
     toast.success(`Opinión ${nuevoEstado === 'aprobada' ? 'aprobada' : 'rechazada'}`);
   };
 

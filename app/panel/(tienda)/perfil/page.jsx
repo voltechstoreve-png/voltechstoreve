@@ -1,8 +1,8 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   User, 
   Mail, 
@@ -19,6 +19,7 @@ import toast, { Toaster } from 'react-hot-toast';
 
 export default function PerfilPage() {
   const router = useRouter();
+  const [loading, setLoading] = useState(true); // ✅ NUEVO: Estado de carga
   const [userData, setUserData] = useState({
     nombre: '',
     email: '',
@@ -29,27 +30,51 @@ export default function PerfilPage() {
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({ ...userData });
 
+  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
-    const userLogged = localStorage.getItem('voltech_user');
-    if (userLogged) {
-      const user = JSON.parse(userLogged);
-      setUserData({
-        nombre: user.nombre || 'Administrador',
-        email: user.email || 'admin@voltech.store',
-        telefono: user.telefono || '',
-        rol: user.rol || 'Admin',
-        avatar: user.avatar || `https://ui-avatars.com/api/?name=${user.nombre || 'Admin'}&background=00d4ff&color=fff&bold=true`,
-      });
-      setFormData({
-        nombre: user.nombre || 'Administrador',
-        email: user.email || 'admin@voltech.store',
-        telefono: user.telefono || '',
-        rol: user.rol || 'Admin',
-        avatar: user.avatar || `https://ui-avatars.com/api/?name=${user.nombre || 'Admin'}&background=00d4ff&color=fff&bold=true`,
-      });
-    } else {
-      router.push('/login');
-    }
+    const cargarPerfil = async () => {
+      const userLoggedStr = localStorage.getItem('voltech_user');
+      if (!userLoggedStr) {
+        router.push('/login');
+        return;
+      }
+      
+      const localUser = JSON.parse(userLoggedStr);
+      let dataToSet = {
+        nombre: localUser.nombre || 'Administrador',
+        email: localUser.email || 'admin@voltech.store',
+        telefono: localUser.telefono || '',
+        rol: localUser.rol || 'Admin',
+        avatar: localUser.avatar || `https://ui-avatars.com/api/?name=${localUser.nombre || 'Admin'}&background=00d4ff&color=fff&bold=true`,
+      };
+
+      // Intentar obtener datos frescos de Supabase si tenemos un ID válido
+      if (supabase && localUser.id && localUser.id !== 'local-1') {
+        const { data, error } = await supabase
+          .from('usuarios')
+          .select('nombre, email, telefono, rol, avatar')
+          .eq('id', localUser.id)
+          .single();
+        
+        if (!error && data) {
+          dataToSet = {
+            nombre: data.nombre || dataToSet.nombre,
+            email: data.email || dataToSet.email,
+            telefono: data.telefono || dataToSet.telefono,
+            rol: data.rol || dataToSet.rol,
+            avatar: data.avatar || dataToSet.avatar,
+          };
+          // Actualizar localStorage con los datos frescos
+          localStorage.setItem('voltech_user', JSON.stringify({ ...localUser, ...data }));
+        }
+      }
+
+      setUserData(dataToSet);
+      setFormData(dataToSet);
+      setLoading(false);
+    };
+
+    cargarPerfil();
   }, [router]);
 
   const handleChange = (e) => {
@@ -57,20 +82,42 @@ export default function PerfilPage() {
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleSave = () => {
+  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
+  const handleSave = async () => {
     if (!formData.nombre || !formData.email) {
       toast.error('Nombre y email son obligatorios');
       return;
     }
 
-    const userLogged = localStorage.getItem('voltech_user');
+    const userLoggedStr = localStorage.getItem('voltech_user');
+    if (!userLoggedStr) return;
+    
+    const localUser = JSON.parse(userLoggedStr);
     const updatedUser = {
-      ...JSON.parse(userLogged),
+      ...localUser,
       nombre: formData.nombre,
       email: formData.email,
       telefono: formData.telefono,
     };
 
+    // Actualizar en Supabase
+    if (supabase && localUser.id && localUser.id !== 'local-1') {
+      const { error } = await supabase
+        .from('usuarios')
+        .update({
+          nombre: formData.nombre,
+          email: formData.email,
+          telefono: formData.telefono,
+        })
+        .eq('id', localUser.id);
+
+      if (error) {
+        toast.error('Error al actualizar en la base de datos');
+        return;
+      }
+    }
+
+    // Actualizar en localStorage (caché)
     localStorage.setItem('voltech_user', JSON.stringify(updatedUser));
     setUserData(formData);
     setEditMode(false);
@@ -81,6 +128,16 @@ export default function PerfilPage() {
     setFormData(userData);
     setEditMode(false);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-voltech-muted animate-pulse flex items-center gap-2">
+          <User className="w-5 h-5 animate-spin" /> Cargando perfil...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

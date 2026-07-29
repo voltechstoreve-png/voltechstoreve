@@ -1,7 +1,7 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   BarChart,
   LineChart,
@@ -26,56 +26,76 @@ export default function DashboardVentasPage() {
   const [carteras, setCarteras] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage y lógica de fusión intacta
   useEffect(() => {
-    const userLogged = localStorage.getItem('voltech_user');
-    if (userLogged) {
-      setCurrentUser(JSON.parse(userLogged));
-    }
+    const cargarDatos = async () => {
+      const userLogged = localStorage.getItem('voltech_user');
+      if (userLogged) {
+        setCurrentUser(JSON.parse(userLogged));
+      }
 
-    // ✅ CORRECCIÓN: Cargar ventas de productos de AMBAS fuentes
-    const ventasProductosGuardadas = localStorage.getItem('voltech_ventas_productos');
-    const ventasLegacy = localStorage.getItem('voltech_ventas'); // Clave antigua
-    
-    let todasVentasProductos = [];
-    
-    if (ventasProductosGuardadas) {
-      const ventas = JSON.parse(ventasProductosGuardadas);
-      todasVentasProductos = [...todasVentasProductos, ...ventas];
-    }
-    
-    if (ventasLegacy) {
-      const ventas = JSON.parse(ventasLegacy);
-      // Filtrar solo las que sean tipo producto o no tengan tipo definido (asumir producto)
-      const ventasProductosLegacy = ventas.filter(v => !v.tipo || v.tipo === 'producto' || v.tipo === 'fisico');
-      todasVentasProductos = [...todasVentasProductos, ...ventasProductosLegacy];
-    }
-    
-    // Agregar tipo 'producto' a cada venta y eliminar duplicados por ID
-    const ventasUnicasProductos = [...new Map(todasVentasProductos.map(v => [v.id, { ...v, tipo: 'producto' }])).values()];
-    setVentasProductos(ventasUnicasProductos);
+      let vts = [], clts = [], crt = [];
 
-    // Cargar ventas de streaming
-    const ventasStreamingGuardadas = localStorage.getItem('voltech_ventas_streaming');
-    if (ventasStreamingGuardadas) {
-      const ventas = JSON.parse(ventasStreamingGuardadas);
-      // Agregar tipo 'streaming' a cada venta
-      const ventasConTipo = ventas.map(v => ({ ...v, tipo: 'streaming' }));
-      setVentasStreaming(ventasConTipo);
-    }
+      // 1. Intentar cargar desde Supabase
+      if (supabase) {
+        const [{ data: vData }, { data: cData }, { data: sData }] = await Promise.all([
+          supabase.from('ventas').select('*'),
+          supabase.from('clientes').select('*'),
+          supabase.from('settings').select('valor').eq('clave', 'carteras').single()
+        ]);
+        if (vData) vts = vData;
+        if (cData) clts = cData;
+        if (sData?.valor) crt = sData.valor;
+      }
 
-    // Cargar clientes
-    const clientesGuardados = localStorage.getItem('voltech_clientes');
-    if (clientesGuardados) {
-      setClientes(JSON.parse(clientesGuardados));
-    }
+      // 2. Fallback / Fusión con localStorage si no hay datos en Supabase
+      if (vts.length === 0) {
+        const ventasProductosGuardadas = localStorage.getItem('voltech_ventas_productos');
+        const ventasLegacy = localStorage.getItem('voltech_ventas');
+        
+        let todasVentasProductos = [];
+        
+        if (ventasProductosGuardadas) {
+          const ventas = JSON.parse(ventasProductosGuardadas);
+          todasVentasProductos = [...todasVentasProductos, ...ventas];
+        }
+        
+        if (ventasLegacy) {
+          const ventas = JSON.parse(ventasLegacy);
+          const ventasProductosLegacy = ventas.filter(v => !v.tipo || v.tipo === 'producto' || v.tipo === 'fisico');
+          todasVentasProductos = [...todasVentasProductos, ...ventasProductosLegacy];
+        }
+        
+        const ventasUnicasProductos = [...new Map(todasVentasProductos.map(v => [v.id, { ...v, tipo: 'producto' }])).values()];
+        
+        const ventasStreamingGuardadas = localStorage.getItem('voltech_ventas_streaming');
+        let ventasStream = [];
+        if (ventasStreamingGuardadas) {
+          ventasStream = JSON.parse(ventasStreamingGuardadas).map(v => ({ ...v, tipo: 'streaming' }));
+        }
+        
+        vts = [...ventasUnicasProductos, ...ventasStream];
+      }
 
-    // Cargar carteras
-    const carterasGuardadas = localStorage.getItem('voltech_carteras');
-    if (carterasGuardadas) {
-      setCarteras(JSON.parse(carterasGuardadas));
-    }
+      if (clts.length === 0) {
+        const clientesGuardados = localStorage.getItem('voltech_clientes');
+        if (clientesGuardados) clts = JSON.parse(clientesGuardados);
+      }
 
-    setLoading(false);
+      if (crt.length === 0) {
+        const carterasGuardadas = localStorage.getItem('voltech_carteras');
+        if (carterasGuardadas) crt = JSON.parse(carterasGuardadas);
+      }
+
+      // 3. Actualizar estados
+      setVentasProductos(vts.filter(v => v.tipo === 'producto' || v.tipo === 'fisico' || !v.tipo));
+      setVentasStreaming(vts.filter(v => v.tipo === 'streaming'));
+      setClientes(clts);
+      setCarteras(crt);
+      setLoading(false);
+    };
+
+    cargarDatos();
   }, []);
 
   const isAdmin = currentUser?.rol === 'admin';

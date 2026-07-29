@@ -1,8 +1,8 @@
 'use client';
 
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   ShoppingCart, 
   DollarSign, 
@@ -103,35 +103,56 @@ export default function VentasProductosPage() {
     referencia: '',
   });
 
+  // ✅ ACTUALIZADO: Carga datos desde Supabase con fallback a localStorage
   useEffect(() => {
-    const ventasGuardadas = localStorage.getItem('voltech_ventas');
-    const productosGuardados = localStorage.getItem('voltech_productos');
-    const clientesGuardados = localStorage.getItem('voltech_clientes');
-    const equipoGuardado = localStorage.getItem('voltech_equipo');
-    const carterasGuardadas = localStorage.getItem('voltech_carteras');
-    const settingsGuardados = localStorage.getItem('voltech_settings');
-    const tasaGuardada = localStorage.getItem('voltech_tasa_bcv');
+    const cargarDatos = async () => {
+      let vts = [], prods = [], clts = [], eqp = [], crt = [], sttngs = {};
+      
+      if (supabase) {
+        const [{ data: d1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }] = await Promise.all([
+          supabase.from('ventas').select('*').order('fechaRegistro', { ascending: false }),
+          supabase.from('productos').select('*'),
+          supabase.from('clientes').select('*'),
+          supabase.from('usuarios').select('*'),
+          supabase.from('settings').select('clave, valor')
+        ]);
+        if (d1) vts = d1;
+        if (d2) prods = d2;
+        if (d3) clts = d3;
+        if (d4) eqp = d4;
+        if (d5) {
+          const tienda = d5.find(s => s.clave === 'tienda')?.valor || {};
+          const pagos = d5.find(s => s.clave === 'pagos')?.valor || {};
+          sttngs = { tienda, pagos, carteras: [], tasaBCV: 36.5 };
+        }
+      }
 
-    if (ventasGuardadas) setVentas(JSON.parse(ventasGuardadas));
-    if (productosGuardados) setProductos(JSON.parse(productosGuardados));
-    if (clientesGuardados) setClientes(JSON.parse(clientesGuardados));
-    if (equipoGuardado) setEquipo(JSON.parse(equipoGuardado));
-    if (carterasGuardadas) setCarteras(JSON.parse(carterasGuardadas));
-    
-    if (settingsGuardados) {
-      const parsed = JSON.parse(settingsGuardados);
-      setSettings({
-        pagos: parsed.pagos || {},
-        carteras: parsed.carteras || [],
-        tienda: parsed.tienda || {},
-        tasaBCV: parsed.tasaBCV || 36.5
-      });
-    }
-    
-    if (tasaGuardada) {
-      const tasaData = JSON.parse(tasaGuardada);
-      setSettings(prev => ({ ...prev, tasaBCV: tasaData.tasa || 36.5 }));
-    }
+      if (vts.length === 0) vts = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
+      if (prods.length === 0) prods = JSON.parse(localStorage.getItem('voltech_productos') || '[]');
+      if (clts.length === 0) clts = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
+      if (eqp.length === 0) eqp = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
+      crt = JSON.parse(localStorage.getItem('voltech_carteras') || '[]');
+      
+      const settingsLocales = JSON.parse(localStorage.getItem('voltech_settings') || '{}');
+      const tasaLocales = JSON.parse(localStorage.getItem('voltech_tasa_bcv') || '{"tasa": 36.5}');
+      
+      if (!sttngs.tienda) {
+        sttngs = { 
+          pagos: settingsLocales.pagos || {}, 
+          carteras: settingsLocales.carteras || crt, 
+          tienda: settingsLocales.tienda || {}, 
+          tasaBCV: tasaLocales.tasa || 36.5 
+        };
+      }
+
+      setVentas(vts);
+      setProductos(prods);
+      setClientes(clts);
+      setEquipo(eqp);
+      setCarteras(crt);
+      setSettings(sttngs);
+    };
+    cargarDatos();
   }, []);
 
   const tasaBCV = settings.tasaBCV || 36.5;
@@ -231,7 +252,8 @@ export default function VentasProductosPage() {
     }
   }, [nuevoProducto.precioDetal, tasaBCV]);
 
-  const guardarProductoYRedirigir = () => {
+  // ✅ ACTUALIZADO: Guarda producto en Supabase y localStorage
+  const guardarProductoYRedirigir = async () => {
     if (!nuevoProducto.plataforma || !nuevoProducto.categoria || !nuevoProducto.marca) {
       toast.error('Completa los campos obligatorios (Producto, Categoría, Marca)');
       return;
@@ -273,6 +295,12 @@ export default function VentasProductosPage() {
       };
     }
 
+    // ✅ Guardar en Supabase
+    if (supabase) {
+      const { error } = await supabase.from('productos').upsert(productoFinal, { onConflict: 'id' });
+      if (error) toast.error('Error al guardar en la nube: ' + error.message);
+    }
+
     const productosActualizados = productoExistente 
       ? productos.map(p => p.id === productoExistente.id ? productoFinal : p)
       : [...productos, productoFinal];
@@ -296,7 +324,8 @@ export default function VentasProductosPage() {
   const totalVenta = subtotal + (formData.delivery ? formData.montoDelivery : 0);
   const montoPendiente = formData.enCuotas ? totalVenta - formData.montoAbonado : 0;
 
-  const registrarVenta = () => {
+  // ✅ ACTUALIZADO: Registra venta en Supabase y localStorage
+  const registrarVenta = async () => {
     if (!formData.cliente || !formData.telefono || formData.productos.some(p => !p.productoId)) {
       toast.error('Completa los campos obligatorios (Cliente, Teléfono, Productos)');
       return;
@@ -316,22 +345,18 @@ export default function VentasProductosPage() {
     );
 
     let clientesActualizados = [...clientes];
+    const nuevoCliente = clienteExistente ? 
+      { ...clienteExistente, nombre: formData.cliente, telefono: formData.telefono, ultimaCompra: new Date().toISOString() } :
+      { id: Date.now(), nombre: formData.cliente, telefono: formData.telefono, email: '', fechaRegistro: new Date().toISOString(), ultimaCompra: new Date().toISOString(), totalCompras: 0 };
+
     if (clienteExistente) {
       clientesActualizados = clientes.map(c => 
         c.id === clienteExistente.id 
-          ? { ...c, nombre: formData.cliente, telefono: formData.telefono, ultimaCompra: new Date().toISOString() }
+          ? nuevoCliente
           : c
       );
     } else {
-      clientesActualizados.push({
-        id: Date.now(),
-        nombre: formData.cliente,
-        telefono: formData.telefono,
-        email: '',
-        fechaRegistro: new Date().toISOString(),
-        ultimaCompra: new Date().toISOString(),
-        totalCompras: 0,
-      });
+      clientesActualizados.push(nuevoCliente);
     }
 
     const nuevaVenta = {
@@ -382,6 +407,18 @@ export default function VentasProductosPage() {
       ? ventas.map(v => v.id === editingId ? nuevaVenta : v)
       : [nuevaVenta, ...ventas];
 
+    // ✅ Guardar en Supabase
+    if (supabase) {
+      await supabase.from('ventas').upsert(nuevaVenta, { onConflict: 'id' });
+      await supabase.from('clientes').upsert(nuevoCliente, { onConflict: 'id' });
+      for (const prod of formData.productos) {
+        const pActual = productosActualizados.find(p => p.id === Number(prod.productoId));
+        if (pActual) {
+          await supabase.from('productos').update({ cantidad: pActual.cantidad }).eq('id', pActual.id);
+        }
+      }
+    }
+
     setVentas(ventasActualizadas);
     setProductos(productosActualizados);
     setClientes(clientesActualizados);
@@ -416,18 +453,35 @@ export default function VentasProductosPage() {
     setEditingId(null);
   };
 
-  const marcarPagado = (venta) => {
+  // ✅ ACTUALIZADO: Marca como pagado en Supabase
+  const marcarPagado = async (venta) => {
+    const ventaActualizada = { 
+      ...venta, 
+      estado: 'pagado', 
+      montoPendiente: 0, 
+      montoAbonado: venta.total, 
+      fechaPago: new Date().toISOString().split('T')[0] 
+    };
     const ventasActualizadas = ventas.map(v => 
-      v.id === venta.id 
-        ? { ...v, estado: 'pagado', montoPendiente: 0, montoAbonado: v.total, fechaPago: new Date().toISOString().split('T')[0] }
-        : v
+      v.id === venta.id ? ventaActualizada : v
     );
+    
+    if (supabase) {
+      await supabase.from('ventas').update({ 
+        estado: 'pagado', 
+        montoPendiente: 0, 
+        montoAbonado: venta.total, 
+        fechaPago: ventaActualizada.fechaPago 
+      }).eq('id', venta.id);
+    }
+    
     setVentas(ventasActualizadas);
     localStorage.setItem('voltech_ventas', JSON.stringify(ventasActualizadas));
     toast.success('Venta marcada como pagada');
   };
 
-  const eliminarVenta = (venta) => {
+  // ✅ ACTUALIZADO: Elimina venta y devuelve stock en Supabase
+  const eliminarVenta = async (venta) => {
     if (!confirm('¿Estás seguro de eliminar esta venta? El stock será devuelto.')) return;
 
     const productosActualizados = productos.map(p => {
@@ -439,6 +493,14 @@ export default function VentasProductosPage() {
     });
 
     const ventasActualizadas = ventas.filter(v => v.id !== venta.id);
+    
+    if (supabase) {
+      await supabase.from('ventas').delete().eq('id', venta.id);
+      for (const p of productosActualizados) {
+        await supabase.from('productos').update({ cantidad: p.cantidad }).eq('id', p.id);
+      }
+    }
+    
     setVentas(ventasActualizadas);
     setProductos(productosActualizados);
     localStorage.setItem('voltech_ventas', JSON.stringify(ventasActualizadas));
