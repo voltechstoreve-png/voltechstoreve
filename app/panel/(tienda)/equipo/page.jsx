@@ -1,69 +1,58 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase'; // ✅ Conexión a Supabase
-import { Users, Plus, Edit, Trash2, X, Shield, UserCheck, UserX, Copy, Check } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { Users, Plus, Edit, Trash2, X, Shield, UserCheck, UserX, Copy, Check, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function EquipoPage() {
   const [equipo, setEquipo] = useState([]);
-  const [editingId, setEditingId] = useState(null); // Puede ser 'new' o el ID del miembro
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     nombre: '',
     email: '',
     telefono: '',
     rol: 'vendedor',
     activo: true,
-    aprobado: false, // ✅ NUEVO: Campo para sistema de aprobación
   });
   const [showInvitationLink, setShowInvitationLink] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
-  // ✅ Cargar equipo desde Supabase (con fallback a localStorage)
   useEffect(() => {
-    const cargarEquipo = async () => {
-      if (supabase) {
-        const { data, error } = await supabase
-          .from('usuarios')
-          .select('*')
-          .order('fechaRegistro', { ascending: false });
-        
-        if (!error && data) {
-          setEquipo(data);
-          localStorage.setItem('voltech_equipo', JSON.stringify(data));
-        } else {
-          console.warn('Error cargando equipo, usando fallback local:', error?.message);
-          cargarDesdeLocal();
-        }
-      } else {
-        cargarDesdeLocal();
-      }
-    };
-
-    const cargarDesdeLocal = () => {
-      const equipoGuardado = localStorage.getItem('voltech_equipo');
-      if (equipoGuardado) {
-        setEquipo(JSON.parse(equipoGuardado));
-      } else {
-        const adminDefault = [{ 
-          id: 1, 
-          nombre: 'Administrador', 
-          email: 'admin@voltech.store', 
-          telefono: '', 
-          rol: 'admin', 
-          activo: true,
-          aprobado: true,
-          password: 'admin123',
-          notificado: true
-        }];
-        setEquipo(adminDefault);
-        localStorage.setItem('voltech_equipo', JSON.stringify(adminDefault));
-      }
-    };
-
+    const userLogged = localStorage.getItem('voltech_user');
+    if (userLogged) {
+      setCurrentUser(JSON.parse(userLogged));
+    }
     cargarEquipo();
   }, []);
+
+  const cargarEquipo = async () => {
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('*')
+        .order('fechaRegistro', { ascending: false });
+      
+      if (!error && data) {
+        setEquipo(data);
+        localStorage.setItem('voltech_equipo', JSON.stringify(data));
+      } else {
+        console.warn('Error cargando equipo:', error?.message);
+        cargarDesdeLocal();
+      }
+    } else {
+      cargarDesdeLocal();
+    }
+  };
+
+  const cargarDesdeLocal = () => {
+    const equipoGuardado = localStorage.getItem('voltech_equipo');
+    if (equipoGuardado) {
+      setEquipo(JSON.parse(equipoGuardado));
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -84,12 +73,11 @@ export default function EquipoPage() {
     return `${window.location.origin}/registro?token=${token}`;
   };
 
-  // ✅ VALIDACIÓN: Verificar email duplicado
   const emailExiste = (email, excludeId = null) => {
     return equipo.some(m => m.email.toLowerCase() === email.toLowerCase() && m.id !== excludeId);
   };
 
-  // ✅ NUEVA FUNCIÓN: Limpiar formulario al agregar nuevo miembro (corrige el bug)
+  // ✅ CORRECCIÓN 1: Función dedicada para limpiar el formulario al agregar
   const handleNuevoMiembro = () => {
     setEditingId('new');
     setFormData({
@@ -97,12 +85,10 @@ export default function EquipoPage() {
       email: '',
       telefono: '',
       rol: 'vendedor',
-      activo: false,
-      aprobado: false,
+      activo: true,
     });
   };
 
-  // ✅ Guardar nuevo miembro en Supabase
   const guardarMiembro = async () => {
     if (!formData.nombre || !formData.email) {
       toast.error('Completa los campos obligatorios');
@@ -120,8 +106,8 @@ export default function EquipoPage() {
       email: formData.email,
       telefono: formData.telefono,
       rol: formData.rol,
-      activo: formData.activo,
-      aprobado: false, // ✅ Nuevo miembro pendiente de aprobación
+      activo: false,
+      aprobado: false,
       password: passwordAleatorio,
       linkInvitacion: linkInvitacion,
       notificado: false,
@@ -133,27 +119,24 @@ export default function EquipoPage() {
       const { data, error } = await supabase.from('usuarios').insert([nuevoMiembroData]).select().single();
       if (!error && data) {
         setEquipo(prev => [data, ...prev]);
-        toast.success('Miembro agregado a la base de datos.');
+        toast.success('Miembro creado. Link de invitación generado.');
         setTimeout(() => toast.success(`Contraseña temporal: ${passwordAleatorio}`), 1000);
       } else {
         toast.error('Error al guardar: ' + error.message);
         return;
       }
     } else {
-      // Fallback local
       const nuevoMiembro = { ...nuevoMiembroData, id: Date.now() };
       const equipoActualizado = [...equipo, nuevoMiembro];
       setEquipo(equipoActualizado);
       localStorage.setItem('voltech_equipo', JSON.stringify(equipoActualizado));
       toast.success('Miembro agregado (Modo Local).');
-      setTimeout(() => toast.success(`Contraseña temporal: ${passwordAleatorio}`), 1000);
     }
     
-    setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: false, aprobado: false });
+    setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: true });
     setEditingId(null);
   };
 
-  // ✅ Actualizar miembro en Supabase
   const actualizarMiembro = async (id) => {
     if (!formData.nombre || !formData.email) {
       toast.error('Completa los campos obligatorios');
@@ -178,13 +161,12 @@ export default function EquipoPage() {
 
       if (!error) {
         setEquipo(prev => prev.map(m => m.id === id ? { ...m, ...formData } : m));
-        toast.success('Miembro actualizado en la base de datos');
+        toast.success('Miembro actualizado');
       } else {
         toast.error('Error al actualizar: ' + error.message);
         return;
       }
     } else {
-      // Fallback local
       const equipoActualizado = equipo.map(m => m.id === id ? { ...m, ...formData } : m);
       setEquipo(equipoActualizado);
       localStorage.setItem('voltech_equipo', JSON.stringify(equipoActualizado));
@@ -192,10 +174,9 @@ export default function EquipoPage() {
     }
     
     setEditingId(null);
-    setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: true, aprobado: false });
+    setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: true });
   };
 
-  // ✅ Toggle activo/inactivo en Supabase
   const toggleActivo = async (id) => {
     const miembro = equipo.find(m => m.id === id);
     const nuevoEstado = !miembro.activo;
@@ -209,48 +190,64 @@ export default function EquipoPage() {
         return;
       }
     } else {
-      // Fallback local
       const equipoActualizado = equipo.map(m => m.id === id ? { ...m, activo: nuevoEstado } : m);
       setEquipo(equipoActualizado);
       localStorage.setItem('voltech_equipo', JSON.stringify(equipoActualizado));
     }
   };
 
-  // ✅ NUEVA FUNCIÓN: Aprobar miembro pendiente
+  // ✅ CORRECCIÓN 3: Función de aprobación mejorada con manejo de errores
   const aprobarMiembro = async (id) => {
-    if (supabase) {
-      const { error } = await supabase.from('usuarios').update({ 
-        aprobado: true, 
-        activo: true 
-      }).eq('id', id);
-      
-      if (error) {
-        toast.error('Error al aprobar: ' + error.message);
-        return;
-      }
-    }
-    
-    setEquipo(prev => prev.map(m => 
-      m.id === id ? { ...m, aprobado: true, activo: true } : m
-    ));
-    
-    // Actualizar localStorage también
-    const equipoActualizado = equipo.map(m => 
-      m.id === id ? { ...m, aprobado: true, activo: true } : m
-    );
-    localStorage.setItem('voltech_equipo', JSON.stringify(equipoActualizado));
-    
-    toast.success('Miembro aprobado exitosamente');
-  };
-
-  // ✅ Eliminar miembro en Supabase
-  const eliminarMiembro = async (id) => {
     const miembro = equipo.find(m => m.id === id);
-    if (miembro.rol === 'admin' || miembro.email === 'admin@voltech.store') {
-      toast.error('No se puede eliminar al administrador principal');
+    if (!miembro) {
+      toast.error('Miembro no encontrado');
       return;
     }
-    if (confirm('¿Estás seguro de eliminar este miembro?')) {
+
+    try {
+      if (supabase) {
+        const { error } = await supabase
+          .from('usuarios')
+          .update({ 
+            aprobado: true, 
+            activo: true 
+          })
+          .eq('id', id);
+        
+        if (error) {
+          console.error('Error Supabase:', error);
+          toast.error('Error al aprobar: ' + error.message);
+          return;
+        }
+      }
+      
+      setEquipo(prev => prev.map(m => 
+        m.id === id ? { ...m, aprobado: true, activo: true } : m
+      ));
+      
+      const equipoActualizado = equipo.map(m => 
+        m.id === id ? { ...m, aprobado: true, activo: true } : m
+      );
+      localStorage.setItem('voltech_equipo', JSON.stringify(equipoActualizado));
+      
+      toast.success(`${miembro.nombre} aprobado exitosamente`);
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Error inesperado al aprobar');
+    }
+  };
+
+  // ✅ CORRECCIÓN 2: Solo bloquea la eliminación del admin PRINCIPAL
+  const eliminarMiembro = async (id) => {
+    const miembro = equipo.find(m => m.id === id);
+    
+    // Solo bloquear si es el admin principal (el primero o marcado como tal)
+    if (miembro.esAdminPrincipal || (miembro.rol === 'admin' && equipo.filter(m => m.rol === 'admin').length === 1)) {
+      toast.error('No se puede eliminar al administrador principal del sistema');
+      return;
+    }
+    
+    if (confirm(`¿Estás seguro de eliminar a ${miembro.nombre}?`)) {
       if (supabase) {
         const { error } = await supabase.from('usuarios').delete().eq('id', id);
         if (!error) {
@@ -260,7 +257,6 @@ export default function EquipoPage() {
           toast.error('Error al eliminar: ' + error.message);
         }
       } else {
-        // Fallback local
         const equipoActualizado = equipo.filter(m => m.id !== id);
         setEquipo(equipoActualizado);
         localStorage.setItem('voltech_equipo', JSON.stringify(equipoActualizado));
@@ -285,13 +281,12 @@ export default function EquipoPage() {
       telefono: miembro.telefono || '',
       rol: miembro.rol,
       activo: miembro.activo,
-      aprobado: miembro.aprobado || false,
     });
   };
 
   const cancelarEdicion = () => {
     setEditingId(null);
-    setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: true, aprobado: false });
+    setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: true });
   };
 
   const totalActivos = equipo.filter(m => m.activo).length;
@@ -324,7 +319,7 @@ export default function EquipoPage() {
           </button>
           {!editingId && (
             <button
-              onClick={handleNuevoMiembro} // ✅ CORREGIDO: Ahora limpia el formulario
+              onClick={handleNuevoMiembro}
               className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
@@ -334,7 +329,6 @@ export default function EquipoPage() {
         </div>
       </div>
 
-      {/* Link de Invitación */}
       <AnimatePresence>
         {showInvitationLink && (
           <motion.div
@@ -368,7 +362,6 @@ export default function EquipoPage() {
         )}
       </AnimatePresence>
 
-      {/* Formulario Inline (Agregar o Editar) */}
       <AnimatePresence>
         {editingId && (
           <motion.div
@@ -430,17 +423,15 @@ export default function EquipoPage() {
                 </select>
               </div>
             </div>
-            <div className="flex items-center gap-4 mt-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="activo"
-                  checked={formData.activo}
-                  onChange={handleChange}
-                  className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan"
-                />
-                <span className="text-sm text-voltech-muted">Miembro activo</span>
-              </label>
+            <div className="flex items-center gap-2 mt-4">
+              <input
+                type="checkbox"
+                name="activo"
+                checked={formData.activo}
+                onChange={handleChange}
+                className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan"
+              />
+              <span className="text-sm text-voltech-muted">Miembro activo</span>
             </div>
             <div className="flex gap-3 mt-6">
               <button
@@ -448,7 +439,7 @@ export default function EquipoPage() {
                 className="flex-1 btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"
               >
                 <Check className="w-4 h-4" />
-                {editingId === 'new' ? 'Guardar y Notificar' : 'Guardar Cambios'}
+                {editingId === 'new' ? 'Guardar y Generar Link' : 'Guardar Cambios'}
               </button>
               <button
                 onClick={cancelarEdicion}
@@ -496,11 +487,10 @@ export default function EquipoPage() {
             </div>
           </div>
         </div>
-        {/* ✅ NUEVA TARJETA: Pendientes de Aprobación */}
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-voltech-warning/20">
-              <Shield className="w-5 h-5 text-voltech-warning" />
+              <AlertCircle className="w-5 h-5 text-voltech-warning" />
             </div>
             <div>
               <p className="text-xs text-voltech-muted">Pendientes</p>
@@ -562,11 +552,10 @@ export default function EquipoPage() {
                     {miembro.activo ? 'Activo' : 'Inactivo'}
                   </button>
                 </td>
-                {/* ✅ NUEVA COLUMNA: Aprobación */}
                 <td className="px-4 py-3">
-                  {miembro.rol === 'admin' ? (
+                  {miembro.rol === 'admin' && miembro.esAdminPrincipal ? (
                     <span className="text-xs text-voltech-success flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Admin
+                      <Shield className="w-3 h-3" /> Principal
                     </span>
                   ) : miembro.aprobado ? (
                     <span className="text-xs text-voltech-success flex items-center gap-1">
@@ -612,7 +601,7 @@ export default function EquipoPage() {
                         <button
                           onClick={() => editarMiembro(miembro)}
                           className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors"
-                          title="Editar toda la información"
+                          title="Editar"
                         >
                           <Edit className="w-4 h-4" />
                         </button>

@@ -2,23 +2,14 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase'; // ✅ Ruta absoluta corregida
+import { supabase } from '@/lib/supabase';
 import { 
-  Package, 
-  User, 
-  Mail, 
-  Phone, 
-  Lock, 
-  Eye, 
-  EyeOff, 
-  CheckCircle,
-  AlertCircle,
-  ArrowRight
+  Package, User, Mail, Phone, Lock, Eye, EyeOff, 
+  CheckCircle, AlertCircle, ArrowRight
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
-// Componente interno que contiene toda la lógica y usa useSearchParams
 function RegistroContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -38,11 +29,25 @@ function RegistroContent() {
       const token = searchParams.get('token');
       const invite = searchParams.get('invite');
 
-      if (token || invite) {
+      // ✅ CORRECCIÓN: Si es el link general, mostrar formulario vacío
+      if (invite === 'voltech' && !token) {
+        setInvitationValid(true);
+        setInvitationData(null);
+        setFormData({
+          nombre: '',
+          email: '',
+          telefono: '',
+          password: '',
+          confirmPassword: '',
+        });
+        return;
+      }
+
+      if (token) {
         let miembroPendiente = null;
 
         // 1. Intentar validar en Supabase primero
-        if (supabase && token) {
+        if (supabase) {
           const { data, error } = await supabase
             .from('usuarios')
             .select('*')
@@ -54,30 +59,27 @@ function RegistroContent() {
           }
         }
 
-        // 2. Fallback a localStorage si no se encontró en Supabase
+        // 2. Fallback a localStorage
         if (!miembroPendiente) {
           const equipoGuardado = localStorage.getItem('voltech_equipo');
           if (equipoGuardado) {
             const equipo = JSON.parse(equipoGuardado);
             miembroPendiente = equipo.find(m => 
-              (m.linkInvitacion && m.linkInvitacion.includes(token)) ||
-              (invite === 'voltech')
+              m.linkInvitacion && m.linkInvitacion.includes(token)
             );
           }
         }
 
-        if (miembroPendiente || invite === 'voltech') {
+        if (miembroPendiente) {
           setInvitationValid(true);
-          if (miembroPendiente) {
-            setInvitationData(miembroPendiente);
-            setFormData({
-              nombre: miembroPendiente.nombre || '',
-              email: miembroPendiente.email || '',
-              telefono: miembroPendiente.telefono || '',
-              password: '',
-              confirmPassword: '',
-            });
-          }
+          setInvitationData(miembroPendiente);
+          setFormData({
+            nombre: miembroPendiente.nombre || '',
+            email: miembroPendiente.email || '',
+            telefono: miembroPendiente.telefono || '',
+            password: '',
+            confirmPassword: '',
+          });
         } else {
           toast.error('Link de invitación inválido o expirado');
         }
@@ -112,33 +114,20 @@ function RegistroContent() {
 
     const emailLower = formData.email.toLowerCase();
 
-    // 1. VALIDACIÓN DE CORREO DUPLICADO (Supabase + Fallback Local)
+    // Validación de correo duplicado
     if (supabase) {
-      const { data: existingUser, error } = await supabase
+      const { data: existingUser } = await supabase
         .from('usuarios')
         .select('id')
         .eq('email', emailLower)
         .single();
       
       if (existingUser && (!invitationData || existingUser.id !== invitationData.id)) {
-        toast.error('Este correo electrónico ya está registrado en el sistema');
+        toast.error('Este correo electrónico ya está registrado');
         return;
-      }
-    } else {
-      const equipoGuardado = localStorage.getItem('voltech_equipo');
-      if (equipoGuardado) {
-        const equipo = JSON.parse(equipoGuardado);
-        const emailExiste = equipo.some(m => 
-          m.email.toLowerCase() === emailLower && m.id !== (invitationData?.id || 0)
-        );
-        if (emailExiste) {
-          toast.error('Este correo electrónico ya está registrado en el sistema');
-          return;
-        }
       }
     }
 
-    // 2. Preparar datos del usuario
     const userData = {
       nombre: formData.nombre,
       email: emailLower,
@@ -146,12 +135,11 @@ function RegistroContent() {
       password: formData.password,
       rol: invitationData ? invitationData.rol : 'vendedor',
       activo: true,
-      aprobado: true, // ✅ Se aprueba automáticamente al registrarse con el link
+      aprobado: true,
       registrado: true,
       fechaRegistro: new Date().toISOString()
     };
 
-    // 3. Guardar o Actualizar en Supabase
     if (supabase) {
       let error;
       if (invitationData && invitationData.id) {
@@ -175,7 +163,7 @@ function RegistroContent() {
       }
     }
 
-    // 4. Respaldo en localStorage (para mantener compatibilidad con flujos existentes)
+    // Respaldo en localStorage
     const equipoGuardado = localStorage.getItem('voltech_equipo');
     let equipo = equipoGuardado ? JSON.parse(equipoGuardado) : [];
 
@@ -185,7 +173,7 @@ function RegistroContent() {
       );
     } else {
       equipo.push({
-        id: invitationData?.id || `user-${Date.now()}`,
+        id: `user-${Date.now()}`,
         ...userData
       });
     }
@@ -264,7 +252,9 @@ function RegistroContent() {
               {invitationData ? 'Completa tu Registro' : 'Crear Cuenta'}
             </h2>
             <p className="text-sm text-voltech-muted">
-              {invitationData ? 'Tu invitación está lista. Verifica tus datos y crea tu contraseña.' : 'Regístrate para unirte al equipo de VOLTECH'}
+              {invitationData 
+                ? 'Tu invitación está lista. Verifica tus datos y crea tu contraseña.' 
+                : 'Regístrate para unirte al equipo de VOLTECH'}
             </p>
           </div>
 
@@ -365,7 +355,6 @@ function RegistroContent() {
   );
 }
 
-// Componente principal que exporta por defecto y envuelve en Suspense
 export default function RegistroPage() {
   return (
     <Suspense fallback={
