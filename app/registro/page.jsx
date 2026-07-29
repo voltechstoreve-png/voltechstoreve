@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase'; // ✅ Ruta absoluta corregida
 import { 
   Package, 
   User, 
@@ -34,25 +34,45 @@ function RegistroContent() {
   });
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    const invite = searchParams.get('invite');
+    const validarInvitacion = async () => {
+      const token = searchParams.get('token');
+      const invite = searchParams.get('invite');
 
-    if (token || invite) {
-      const equipoGuardado = localStorage.getItem('voltech_equipo');
-      if (equipoGuardado) {
-        const equipo = JSON.parse(equipoGuardado);
-        const miembroPendiente = equipo.find(m => 
-          (m.linkInvitacion && m.linkInvitacion.includes(token)) ||
-          (invite === 'voltech')
-        );
+      if (token || invite) {
+        let miembroPendiente = null;
+
+        // 1. Intentar validar en Supabase primero
+        if (supabase && token) {
+          const { data, error } = await supabase
+            .from('usuarios')
+            .select('*')
+            .ilike('linkInvitacion', `%${token}%`)
+            .single();
+          
+          if (!error && data) {
+            miembroPendiente = data;
+          }
+        }
+
+        // 2. Fallback a localStorage si no se encontró en Supabase
+        if (!miembroPendiente) {
+          const equipoGuardado = localStorage.getItem('voltech_equipo');
+          if (equipoGuardado) {
+            const equipo = JSON.parse(equipoGuardado);
+            miembroPendiente = equipo.find(m => 
+              (m.linkInvitacion && m.linkInvitacion.includes(token)) ||
+              (invite === 'voltech')
+            );
+          }
+        }
 
         if (miembroPendiente || invite === 'voltech') {
           setInvitationValid(true);
           if (miembroPendiente) {
             setInvitationData(miembroPendiente);
             setFormData({
-              nombre: miembroPendiente.nombre,
-              email: miembroPendiente.email,
+              nombre: miembroPendiente.nombre || '',
+              email: miembroPendiente.email || '',
               telefono: miembroPendiente.telefono || '',
               password: '',
               confirmPassword: '',
@@ -61,10 +81,12 @@ function RegistroContent() {
         } else {
           toast.error('Link de invitación inválido o expirado');
         }
+      } else {
+        toast.error('No se encontró un link de invitación válido');
       }
-    } else {
-      toast.error('No se encontró un link de invitación válido');
-    }
+    };
+    
+    validarInvitacion();
   }, [searchParams]);
 
   const handleChange = (e) => {
@@ -72,7 +94,6 @@ function RegistroContent() {
     setFormData({ ...formData, [name]: value });
   };
 
-  // ✅ ACTUALIZADO: Función asíncrona para guardar en Supabase
   const handleRegistro = async () => {
     if (!formData.nombre || !formData.email || !formData.password) {
       toast.error('Completa todos los campos obligatorios');
@@ -93,7 +114,7 @@ function RegistroContent() {
 
     // 1. VALIDACIÓN DE CORREO DUPLICADO (Supabase + Fallback Local)
     if (supabase) {
-      const { data: existingUser } = await supabase
+      const { data: existingUser, error } = await supabase
         .from('usuarios')
         .select('id')
         .eq('email', emailLower)
@@ -125,6 +146,7 @@ function RegistroContent() {
       password: formData.password,
       rol: invitationData ? invitationData.rol : 'vendedor',
       activo: true,
+      aprobado: true, // ✅ Se aprueba automáticamente al registrarse con el link
       registrado: true,
       fechaRegistro: new Date().toISOString()
     };
@@ -163,7 +185,7 @@ function RegistroContent() {
       );
     } else {
       equipo.push({
-        id: invitationData?.id || Date.now(),
+        id: invitationData?.id || `user-${Date.now()}`,
         ...userData
       });
     }

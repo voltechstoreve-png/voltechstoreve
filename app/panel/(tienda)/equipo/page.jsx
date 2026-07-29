@@ -15,6 +15,7 @@ export default function EquipoPage() {
     telefono: '',
     rol: 'vendedor',
     activo: true,
+    aprobado: false, // ✅ NUEVO: Campo para sistema de aprobación
   });
   const [showInvitationLink, setShowInvitationLink] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -30,6 +31,7 @@ export default function EquipoPage() {
         
         if (!error && data) {
           setEquipo(data);
+          localStorage.setItem('voltech_equipo', JSON.stringify(data));
         } else {
           console.warn('Error cargando equipo, usando fallback local:', error?.message);
           cargarDesdeLocal();
@@ -51,6 +53,7 @@ export default function EquipoPage() {
           telefono: '', 
           rol: 'admin', 
           activo: true,
+          aprobado: true,
           password: 'admin123',
           notificado: true
         }];
@@ -81,8 +84,22 @@ export default function EquipoPage() {
     return `${window.location.origin}/registro?token=${token}`;
   };
 
+  // ✅ VALIDACIÓN: Verificar email duplicado
   const emailExiste = (email, excludeId = null) => {
     return equipo.some(m => m.email.toLowerCase() === email.toLowerCase() && m.id !== excludeId);
+  };
+
+  // ✅ NUEVA FUNCIÓN: Limpiar formulario al agregar nuevo miembro (corrige el bug)
+  const handleNuevoMiembro = () => {
+    setEditingId('new');
+    setFormData({
+      nombre: '',
+      email: '',
+      telefono: '',
+      rol: 'vendedor',
+      activo: false,
+      aprobado: false,
+    });
   };
 
   // ✅ Guardar nuevo miembro en Supabase
@@ -104,6 +121,7 @@ export default function EquipoPage() {
       telefono: formData.telefono,
       rol: formData.rol,
       activo: formData.activo,
+      aprobado: false, // ✅ Nuevo miembro pendiente de aprobación
       password: passwordAleatorio,
       linkInvitacion: linkInvitacion,
       notificado: false,
@@ -131,7 +149,7 @@ export default function EquipoPage() {
       setTimeout(() => toast.success(`Contraseña temporal: ${passwordAleatorio}`), 1000);
     }
     
-    setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: true });
+    setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: false, aprobado: false });
     setEditingId(null);
   };
 
@@ -174,7 +192,7 @@ export default function EquipoPage() {
     }
     
     setEditingId(null);
-    setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: true });
+    setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: true, aprobado: false });
   };
 
   // ✅ Toggle activo/inactivo en Supabase
@@ -196,6 +214,33 @@ export default function EquipoPage() {
       setEquipo(equipoActualizado);
       localStorage.setItem('voltech_equipo', JSON.stringify(equipoActualizado));
     }
+  };
+
+  // ✅ NUEVA FUNCIÓN: Aprobar miembro pendiente
+  const aprobarMiembro = async (id) => {
+    if (supabase) {
+      const { error } = await supabase.from('usuarios').update({ 
+        aprobado: true, 
+        activo: true 
+      }).eq('id', id);
+      
+      if (error) {
+        toast.error('Error al aprobar: ' + error.message);
+        return;
+      }
+    }
+    
+    setEquipo(prev => prev.map(m => 
+      m.id === id ? { ...m, aprobado: true, activo: true } : m
+    ));
+    
+    // Actualizar localStorage también
+    const equipoActualizado = equipo.map(m => 
+      m.id === id ? { ...m, aprobado: true, activo: true } : m
+    );
+    localStorage.setItem('voltech_equipo', JSON.stringify(equipoActualizado));
+    
+    toast.success('Miembro aprobado exitosamente');
   };
 
   // ✅ Eliminar miembro en Supabase
@@ -240,16 +285,18 @@ export default function EquipoPage() {
       telefono: miembro.telefono || '',
       rol: miembro.rol,
       activo: miembro.activo,
+      aprobado: miembro.aprobado || false,
     });
   };
 
   const cancelarEdicion = () => {
     setEditingId(null);
-    setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: true });
+    setFormData({ nombre: '', email: '', telefono: '', rol: 'vendedor', activo: true, aprobado: false });
   };
 
   const totalActivos = equipo.filter(m => m.activo).length;
   const totalInactivos = equipo.filter(m => !m.activo).length;
+  const pendientesAprobacion = equipo.filter(m => !m.aprobado && m.rol !== 'admin').length;
 
   return (
     <div className="space-y-6">
@@ -277,7 +324,7 @@ export default function EquipoPage() {
           </button>
           {!editingId && (
             <button
-              onClick={() => setEditingId('new')}
+              onClick={handleNuevoMiembro} // ✅ CORREGIDO: Ahora limpia el formulario
               className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
@@ -383,15 +430,17 @@ export default function EquipoPage() {
                 </select>
               </div>
             </div>
-            <div className="flex items-center gap-2 mt-4">
-              <input
-                type="checkbox"
-                name="activo"
-                checked={formData.activo}
-                onChange={handleChange}
-                className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan"
-              />
-              <span className="text-sm text-voltech-muted">Miembro activo</span>
+            <div className="flex items-center gap-4 mt-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="activo"
+                  checked={formData.activo}
+                  onChange={handleChange}
+                  className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan"
+                />
+                <span className="text-sm text-voltech-muted">Miembro activo</span>
+              </label>
             </div>
             <div className="flex gap-3 mt-6">
               <button
@@ -413,7 +462,7 @@ export default function EquipoPage() {
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-voltech-cyan/20">
@@ -447,6 +496,18 @@ export default function EquipoPage() {
             </div>
           </div>
         </div>
+        {/* ✅ NUEVA TARJETA: Pendientes de Aprobación */}
+        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-voltech-warning/20">
+              <Shield className="w-5 h-5 text-voltech-warning" />
+            </div>
+            <div>
+              <p className="text-xs text-voltech-muted">Pendientes</p>
+              <p className="text-xl font-bold text-white">{pendientesAprobacion}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
@@ -457,6 +518,7 @@ export default function EquipoPage() {
               <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Contacto</th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Rol</th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Estado</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Aprobación</th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Notificación</th>
               <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Acciones</th>
             </tr>
@@ -499,6 +561,25 @@ export default function EquipoPage() {
                     {miembro.activo ? <UserCheck className="w-3 h-3" /> : <UserX className="w-3 h-3" />}
                     {miembro.activo ? 'Activo' : 'Inactivo'}
                   </button>
+                </td>
+                {/* ✅ NUEVA COLUMNA: Aprobación */}
+                <td className="px-4 py-3">
+                  {miembro.rol === 'admin' ? (
+                    <span className="text-xs text-voltech-success flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Admin
+                    </span>
+                  ) : miembro.aprobado ? (
+                    <span className="text-xs text-voltech-success flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Aprobado
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => aprobarMiembro(miembro.id)}
+                      className="text-xs px-2 py-1 rounded-full bg-voltech-warning/20 text-voltech-warning hover:bg-voltech-warning/30 transition-colors flex items-center gap-1"
+                    >
+                      <UserCheck className="w-3 h-3" /> Aprobar
+                    </button>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   {miembro.notificado ? (
