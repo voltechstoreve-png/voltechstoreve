@@ -24,7 +24,8 @@ import {
   BarChart,      
   Target,        
   DollarSign,
-  Truck
+  Truck,
+  Wallet // ✅ ÚNICO CAMBIO 1: Agregado para el ícono de Pagos
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -63,6 +64,7 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }
       section: 'PANEL FINANZAS',
       items: [
         { name: 'Dashboard Finanzas', icon: DollarSign, path: '/panel/finanzas', requierePermiso: 'puedeVerFinanzas' },
+        { name: 'Pagos al Equipo', icon: Wallet, path: '/panel/finanzas/pagos-equipos', requierePermiso: 'puedeVerFinanzas' }, // ✅ ÚNICO CAMBIO 2: Agregado aquí
         { name: 'Metas y Comisiones', icon: Target, path: '/panel/metas-comisiones', siempreVisible: true },
       ]
     },

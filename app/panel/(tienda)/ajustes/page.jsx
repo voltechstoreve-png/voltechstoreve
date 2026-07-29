@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
+import { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/lib/supabase';
+import { usePermissions } from '@/app/context/PermissionsContext';
 import { 
   Store, 
   CreditCard, 
@@ -18,11 +19,16 @@ import {
   EyeOff,
   ChevronDown,
   ArrowUp,
-  Info
+  Info,
+  Image as ImageIcon,
+  Palette,
+  AlertCircle,
+  Sparkles
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function AjustesPage() {
+  const { esAdmin } = usePermissions();
   const [settings, setSettings] = useState({
     tienda: {
       nombre: 'VOLTECH STORE',
@@ -33,6 +39,7 @@ export default function AjustesPage() {
       facebookUrl: 'https://facebook.com/voltechstore',
       tiktokUrl: 'https://tiktok.com/@voltechstore',
       whatsappUrl: 'https://wa.me/584121234567',
+      logo: '',
     },
     pagos: {
       efectivo: { activo: true, publico: true, nombre: 'Efectivo' },
@@ -51,17 +58,22 @@ export default function AjustesPage() {
     envios: {
       puntosEntrega: ['Plaza Venezuela', 'Sambil Chacao', 'CC Ciudad Caracas', 'Metro Los Símbolos'],
       deliveryGratisDesde: 5.00,
-      costoEnvioNacional: 3.00,
       montoMinimoEnvioGratis: 50.00,
       descripcionEnvioNacional: 'Envíos menores a $50: cobro a destino',
-      tipo: 'nacional',
-      empresas: ['MRW', 'Tealca', 'Zoom', 'Domesa'],
       tiempo: '24-48 horas',
       notas: 'Los envíos se realizan de lunes a viernes',
     },
     politicas: {
       terminos: '1. POLÍTICA DE PAGO ANTICIPADO: Para garantizar la disponibilidad de inventario y el procesamiento logístico con nuestros proveedores, todo despacho se gestionará exclusivamente previa recepción y conciliación del pago total.\n2. PRESENTACIÓN: Es obligatorio presentar este comprobante para cualquier reclamo.\n3. TIEMPO DE GARANTÍA: El producto tiene una garantía de 3 días continuos.\n4. EXCLUSIONES: No cubre daños físicos, humedad, sobrecargas o sellos removidos.\n5. EMPAQUE: Es obligatorio conservar la caja y accesorios originales en buen estado.\n6. GESTIÓN DE CAMBIOS: Sujeto a revisión técnica(24-48h). Es condición indispensable la entrega del producto defectuoso en su empaque original; no se entregará un reemplazo sin la verificación previa del equipo anterior.\n7. REEMBOLSOS Y CONFORMIDAD: Al recibir, el cliente acepta el estado del producto. Bajo ninguna circunstancia se realizará la devolución de dinero; se procederá exclusivamente al cambio por un producto igual o de similares características.',
       privacidad: 'Tus datos están protegidos y no serán compartidos con terceros.',
+    },
+    colores: {
+      primario: '#00ff88',
+      secundario: '#8b5cf6',
+      acento: '#06b6d4',
+      fondo: '#0a0a0f',
+      texto: '#ffffff',
+      difuminado: 'horizontal', // ✅ NUEVO: horizontal, vertical, radial, none
     }
   });
 
@@ -70,22 +82,24 @@ export default function AjustesPage() {
   const [nuevaCartera, setNuevaCartera] = useState('');
   const [mostrarTerminos, setMostrarTerminos] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [logoPreview, setLogoPreview] = useState('');
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef(null);
   
-  // Estados para secciones colapsables
+  // ✅ TODAS LAS SECCIONES CONTRAÍDAS POR DEFECTO
   const [expandedSections, setExpandedSections] = useState({
-    datosTienda: true,
-    envios: true,
+    datosTienda: false,
+    envios: false,
     metodosPago: false,
     carteras: false,
-    terminos: true,
+    terminos: false,
+    colores: false,
   });
 
-  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
     const cargarAjustes = async () => {
       let datosCargados = null;
 
-      // 1. Intentar cargar desde Supabase
       if (supabase) {
         const { data, error } = await supabase.from('settings').select('clave, valor');
         if (!error && data && data.length > 0) {
@@ -96,7 +110,6 @@ export default function AjustesPage() {
         }
       }
 
-      // 2. Si no hay datos en Supabase, cargar desde localStorage
       if (!datosCargados) {
         const savedSettings = localStorage.getItem('voltech_settings');
         if (savedSettings) {
@@ -104,7 +117,6 @@ export default function AjustesPage() {
         }
       }
 
-      // 3. Fusionar con los valores por defecto
       if (datosCargados) {
         setSettings(prev => {
           const merged = {
@@ -137,6 +149,10 @@ export default function AjustesPage() {
           if (datosCargados.carteras) {
             merged.carteras = datosCargados.carteras;
           }
+
+          if (datosCargados.colores) {
+            merged.colores = { ...prev.colores, ...datosCargados.colores };
+          }
           
           return merged;
         });
@@ -152,30 +168,34 @@ export default function AjustesPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // ✅ ACTUALIZADO: Guarda en Supabase y mantiene el respaldo en localStorage
   const handleSave = async () => {
+    if (!esAdmin) {
+      toast.error('Solo el administrador puede modificar los ajustes');
+      return;
+    }
+
     try {
-      // 1. Guardar en Supabase
       if (supabase) {
         const settingsToSave = [
           { clave: 'tienda', valor: settings.tienda },
           { clave: 'pagos', valor: settings.pagos },
           { clave: 'carteras', valor: settings.carteras },
           { clave: 'envios', valor: settings.envios },
-          { clave: 'politicas', valor: settings.politicas }
+          { clave: 'politicas', valor: settings.politicas },
+          { clave: 'colores', valor: settings.colores }
         ];
         
         const { error } = await supabase.from('settings').upsert(settingsToSave, { onConflict: 'clave' });
         if (error) throw error;
       }
 
-      // 2. Guardar en localStorage (caché local y respaldo)
       localStorage.setItem('voltech_settings', JSON.stringify(settings));
       
       toast.success('Ajustes guardados correctamente');
+      
+      window.dispatchEvent(new CustomEvent('settings-updated', { detail: settings }));
     } catch (error) {
       console.error('Error al guardar en Supabase:', error);
-      // Aún así guardamos localmente si falla la conexión
       localStorage.setItem('voltech_settings', JSON.stringify(settings));
       toast.error('Error de conexión. Guardado solo en modo local.');
     }
@@ -231,6 +251,40 @@ export default function AjustesPage() {
       ...prev,
       [section]: { ...prev[section], [key]: value }
     }));
+  };
+
+  const handleLogoUpload = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Solo se permiten imágenes');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('La imagen no debe pesar más de 2MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result;
+      setLogoPreview(base64);
+      setSettings(prev => ({
+        ...prev,
+        tienda: { ...prev.tienda, logo: base64 }
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files[0];
+    handleLogoUpload(file);
+  };
+
+  const handleFileInput = (e) => {
+    const file = e.target.files[0];
+    handleLogoUpload(file);
   };
 
   const agregarPuntoEntrega = () => {
@@ -333,6 +387,39 @@ export default function AjustesPage() {
     }));
   };
 
+  const updateColor = (key, value) => {
+    setSettings(prev => ({
+      ...prev,
+      colores: { ...prev.colores, [key]: value }
+    }));
+  };
+
+  const aplicarColoresGlobales = () => {
+    const root = document.documentElement;
+    root.style.setProperty('--color-primario', settings.colores.primario);
+    root.style.setProperty('--color-secundario', settings.colores.secundario);
+    root.style.setProperty('--color-acento', settings.colores.acento);
+    toast.success('Colores aplicados (vista previa). Guarda para aplicar permanentemente.');
+  };
+
+  // ✅ NUEVO: Función para obtener el gradiente según el tipo de difuminado
+  const getGradientStyle = () => {
+    const { primario, secundario, difuminado } = settings.colores;
+    
+    switch(difuminado) {
+      case 'horizontal':
+        return { background: `linear-gradient(90deg, ${primario}, ${secundario})` };
+      case 'vertical':
+        return { background: `linear-gradient(180deg, ${primario}, ${secundario})` };
+      case 'radial':
+        return { background: `radial-gradient(circle, ${primario}, ${secundario})` };
+      case 'diagonal':
+        return { background: `linear-gradient(135deg, ${primario}, ${secundario})` };
+      default:
+        return { background: primario };
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Toaster position="top-right" toastOptions={{
@@ -346,12 +433,24 @@ export default function AjustesPage() {
           <h1 className="text-2xl font-bold text-white">Ajustes</h1>
           <p className="text-sm text-voltech-muted mt-1">Configura tu tienda y preferencias</p>
         </div>
-        <button onClick={() => { handleSave(); scrollToTop(); }} className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2">
-          <Save className="w-4 h-4" /> Guardar Cambios
-        </button>
+        {esAdmin && (
+          <button onClick={() => { handleSave(); scrollToTop(); }} className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2">
+            <Save className="w-4 h-4" /> Guardar Cambios
+          </button>
+        )}
       </div>
 
-      {/* Datos de la Tienda - COLAPSABLE */}
+      {!esAdmin && (
+        <div className="bg-voltech-warning/10 border border-voltech-warning/30 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-voltech-warning flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-voltech-warning font-medium">Solo lectura</p>
+            <p className="text-xs text-voltech-muted mt-1">No tienes permisos para modificar los ajustes. Contacta al administrador.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Datos de la Tienda */}
       <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
         <button 
           onClick={() => toggleSection('datosTienda')}
@@ -370,44 +469,278 @@ export default function AjustesPage() {
         </button>
         
         {expandedSections.datosTienda && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
+          <div className="space-y-6 animate-in slide-in-from-top-2 duration-300">
+            {/* Logo de la Tienda */}
             <div>
-              <label className="block text-xs text-voltech-muted mb-2 ml-1">Nombre de la tienda</label>
-              <input type="text" value={settings.tienda.nombre} onChange={(e) => updateSetting('tienda', 'nombre', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" />
+              <label className="block text-xs text-voltech-muted mb-2">Logo de la Tienda</label>
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                onChange={handleFileInput}
+                className="hidden"
+              />
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+                  isDragOver 
+                    ? 'border-voltech-cyan bg-voltech-cyan/10' 
+                    : 'border-voltech-border hover:border-voltech-cyan/50'
+                }`}
+              >
+                {logoPreview || settings.tienda.logo ? (
+                  <div className="space-y-3">
+                    <img 
+                      src={logoPreview || settings.tienda.logo} 
+                      alt="Logo Preview" 
+                      className="max-h-32 mx-auto rounded-lg object-contain" 
+                    />
+                    <p className="text-sm text-voltech-muted">Haz clic para cambiar el logo</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="p-3 rounded-full bg-voltech-cyan/20">
+                      <ImageIcon className="w-6 h-6 text-voltech-cyan" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">Arrastra una imagen o haz clic para seleccionar</p>
+                      <p className="text-xs text-voltech-muted mt-1">Recomendado: PNG o SVG con fondo transparente (Máx. 2MB)</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {settings.tienda.logo && (
+                <button 
+                  onClick={() => { setLogoPreview(''); setSettings(prev => ({ ...prev, tienda: { ...prev.tienda, logo: '' } })); }}
+                  className="mt-2 text-xs text-voltech-error hover:text-voltech-error/70 flex items-center gap-1"
+                >
+                  <Trash2 className="w-3 h-3" /> Eliminar logo
+                </button>
+              )}
             </div>
-            <div>
-              <label className="block text-xs text-voltech-muted mb-2 ml-1">Correo electrónico</label>
-              <input type="email" value={settings.tienda.email} onChange={(e) => updateSetting('tienda', 'email', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs text-voltech-muted mb-2 ml-1">Teléfono de contacto</label>
-              <input type="text" value={settings.tienda.telefono} onChange={(e) => updateSetting('tienda', 'telefono', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs text-voltech-muted mb-2 ml-1">Dirección general</label>
-              <input type="text" value={settings.tienda.direccion} onChange={(e) => updateSetting('tienda', 'direccion', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs text-voltech-muted mb-2 ml-1">Instagram (URL completa)</label>
-              <input type="url" value={settings.tienda.instagramUrl} onChange={(e) => updateSetting('tienda', 'instagramUrl', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" placeholder="https://instagram.com/..." />
-            </div>
-            <div>
-              <label className="block text-xs text-voltech-muted mb-2 ml-1">TikTok (URL completa)</label>
-              <input type="url" value={settings.tienda.tiktokUrl} onChange={(e) => updateSetting('tienda', 'tiktokUrl', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" placeholder="https://tiktok.com/@..." />
-            </div>
-            <div>
-              <label className="block text-xs text-voltech-muted mb-2 ml-1">Facebook (URL completa)</label>
-              <input type="url" value={settings.tienda.facebookUrl} onChange={(e) => updateSetting('tienda', 'facebookUrl', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" placeholder="https://facebook.com/..." />
-            </div>
-            <div>
-              <label className="block text-xs text-voltech-muted mb-2 ml-1">WhatsApp (URL completa)</label>
-              <input type="url" value={settings.tienda.whatsappUrl} onChange={(e) => updateSetting('tienda', 'whatsappUrl', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" placeholder="https://wa.me/58..." />
+
+            {/* Datos básicos */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-voltech-muted mb-2 ml-1">Nombre de la tienda</label>
+                <input 
+                  type="text" 
+                  value={settings.tienda.nombre} 
+                  onChange={(e) => updateSetting('tienda', 'nombre', e.target.value)} 
+                  className="input-voltech w-full rounded-lg px-4 py-3 text-sm" 
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-2 ml-1">Correo electrónico</label>
+                <input type="email" value={settings.tienda.email} onChange={(e) => updateSetting('tienda', 'email', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-2 ml-1">Teléfono de contacto</label>
+                <input type="text" value={settings.tienda.telefono} onChange={(e) => updateSetting('tienda', 'telefono', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-2 ml-1">Dirección general</label>
+                <input type="text" value={settings.tienda.direccion} onChange={(e) => updateSetting('tienda', 'direccion', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-2 ml-1">Instagram (URL completa)</label>
+                <input type="url" value={settings.tienda.instagramUrl} onChange={(e) => updateSetting('tienda', 'instagramUrl', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" placeholder="https://instagram.com/..." />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-2 ml-1">TikTok (URL completa)</label>
+                <input type="url" value={settings.tienda.tiktokUrl} onChange={(e) => updateSetting('tienda', 'tiktokUrl', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" placeholder="https://tiktok.com/@..." />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-2 ml-1">Facebook (URL completa)</label>
+                <input type="url" value={settings.tienda.facebookUrl} onChange={(e) => updateSetting('tienda', 'facebookUrl', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" placeholder="https://facebook.com/..." />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-2 ml-1">WhatsApp (URL completa)</label>
+                <input type="url" value={settings.tienda.whatsappUrl} onChange={(e) => updateSetting('tienda', 'whatsappUrl', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" placeholder="https://wa.me/58..." />
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Envíos y Entregas - COLAPSABLE */}
+      {/* Colores Personalizables */}
+      <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
+        <button 
+          onClick={() => toggleSection('colores')}
+          className="w-full flex items-center justify-between mb-6"
+        >
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-voltech-purple/20"><Palette className="w-5 h-5 text-voltech-purple" /></div>
+            <div className="text-left">
+              <h3 className="text-lg font-bold text-white">Colores Personalizables</h3>
+              <p className="text-xs text-voltech-muted">Personaliza los colores de tu tienda</p>
+            </div>
+          </div>
+          <div className={`p-2 rounded-lg transition-transform ${expandedSections.colores ? 'rotate-180' : ''}`}>
+            <ChevronDown className="w-5 h-5 text-voltech-muted" />
+          </div>
+        </button>
+        
+        {expandedSections.colores && (
+          <div className="space-y-6 animate-in slide-in-from-top-2 duration-300">
+            <div className="bg-voltech-dark/30 border border-voltech-border rounded-lg p-4">
+              <p className="text-xs text-voltech-muted mb-4 flex items-center gap-2">
+                <Info className="w-4 h-4" />
+                Selecciona los colores que deseas usar en tu tienda. Los cambios se aplicarán después de guardar.
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs text-voltech-muted mb-2">Color Primario (Botones, Acentos)</label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="color" 
+                      value={settings.colores.primario} 
+                      onChange={(e) => updateColor('primario', e.target.value)}
+                      className="w-12 h-12 rounded-lg border border-voltech-border cursor-pointer"
+                    />
+                    <input 
+                      type="text" 
+                      value={settings.colores.primario} 
+                      onChange={(e) => updateColor('primario', e.target.value)}
+                      className="input-voltech flex-1 rounded-lg px-3 py-2 text-sm font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-voltech-muted mb-2">Color Secundario (Gradientes, Fondos)</label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="color" 
+                      value={settings.colores.secundario} 
+                      onChange={(e) => updateColor('secundario', e.target.value)}
+                      className="w-12 h-12 rounded-lg border border-voltech-border cursor-pointer"
+                    />
+                    <input 
+                      type="text" 
+                      value={settings.colores.secundario} 
+                      onChange={(e) => updateColor('secundario', e.target.value)}
+                      className="input-voltech flex-1 rounded-lg px-3 py-2 text-sm font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-voltech-muted mb-2">Color de Acento (Links, Iconos)</label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="color" 
+                      value={settings.colores.acento} 
+                      onChange={(e) => updateColor('acento', e.target.value)}
+                      className="w-12 h-12 rounded-lg border border-voltech-border cursor-pointer"
+                    />
+                    <input 
+                      type="text" 
+                      value={settings.colores.acento} 
+                      onChange={(e) => updateColor('acento', e.target.value)}
+                      className="input-voltech flex-1 rounded-lg px-3 py-2 text-sm font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-voltech-muted mb-2">Color de Fondo</label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="color" 
+                      value={settings.colores.fondo} 
+                      onChange={(e) => updateColor('fondo', e.target.value)}
+                      className="w-12 h-12 rounded-lg border border-voltech-border cursor-pointer"
+                    />
+                    <input 
+                      type="text" 
+                      value={settings.colores.fondo} 
+                      onChange={(e) => updateColor('fondo', e.target.value)}
+                      className="input-voltech flex-1 rounded-lg px-3 py-2 text-sm font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-voltech-muted mb-2">Color de Texto</label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="color" 
+                      value={settings.colores.texto} 
+                      onChange={(e) => updateColor('texto', e.target.value)}
+                      className="w-12 h-12 rounded-lg border border-voltech-border cursor-pointer"
+                    />
+                    <input 
+                      type="text" 
+                      value={settings.colores.texto} 
+                      onChange={(e) => updateColor('texto', e.target.value)}
+                      className="input-voltech flex-1 rounded-lg px-3 py-2 text-sm font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* ✅ NUEVO: Campo Difuminado/Gradiente */}
+                <div>
+                  <label className="block text-xs text-voltech-muted mb-2">Tipo de Difuminado</label>
+                  <select 
+                    value={settings.colores.difuminado}
+                    onChange={(e) => updateColor('difuminado', e.target.value)}
+                    className="input-voltech w-full rounded-lg px-3 py-2 text-sm"
+                  >
+                    <option value="horizontal">️ Horizontal (Izq a Der)</option>
+                    <option value="vertical">️ Vertical (Arr a Abj)</option>
+                    <option value="diagonal">↗️ Diagonal (135°)</option>
+                    <option value="radial">⭕ Radial (Círculo)</option>
+                    <option value="none"> Sin Difuminado (Sólido)</option>
+                  </select>
+                  <p className="text-[10px] text-voltech-muted mt-1">Define cómo se mezclan los colores primario y secundario</p>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-voltech-border">
+                <p className="text-xs text-voltech-muted mb-3 flex items-center gap-2">
+                  <Sparkles className="w-3 h-3" />
+                  Vista Previa del Gradiente:
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <div 
+                    className="px-4 py-3 rounded-lg text-white font-medium shadow-lg"
+                    style={getGradientStyle()}
+                  >
+                    Botón con Gradiente
+                  </div>
+                  <div 
+                    className="px-4 py-2 rounded-lg text-white text-sm"
+                    style={{ backgroundColor: settings.colores.primario }}
+                  >
+                    Color Sólido
+                  </div>
+                </div>
+                <p className="text-[10px] text-voltech-muted mt-2">
+                  Tipo actual: {settings.colores.difuminado === 'horizontal' && '↔️ Horizontal'}
+                  {settings.colores.difuminado === 'vertical' && '↕️ Vertical'}
+                  {settings.colores.difuminado === 'diagonal' && '↗️ Diagonal'}
+                  {settings.colores.difuminado === 'radial' && '⭕ Radial'}
+                  {settings.colores.difuminado === 'none' && '❌ Sólido'}
+                </p>
+              </div>
+
+              <button 
+                onClick={aplicarColoresGlobales}
+                className="mt-4 px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"
+              >
+                <Eye className="w-4 h-4" /> Aplicar Vista Previa
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Envíos y Entregas */}
       <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
         <button 
           onClick={() => toggleSection('envios')}
@@ -472,23 +805,13 @@ export default function AjustesPage() {
               </div>
             </div>
 
-            {/* Envío Nacional */}
+            {/* Envío Nacional - SIMPLIFICADO */}
             <div className="p-4 bg-voltech-purple/5 border border-voltech-purple/20 rounded-lg">
               <h4 className="text-sm font-semibold text-voltech-purple mb-3 flex items-center gap-2">
                 <Truck className="w-4 h-4" /> Envío Nacional (Resto de Venezuela)
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-xs text-voltech-muted mb-2">Costo de envío nacional ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={settings.envios.costoEnvioNacional}
-                    onChange={(e) => updateSetting('envios', 'costoEnvioNacional', parseFloat(e.target.value) || 0)}
-                    className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
-                  />
-                  <p className="text-xs text-voltech-muted mt-1">Costo fijo a cualquier destino en Venezuela.</p>
-                </div>
+              
+              <div className="space-y-4">
                 <div>
                   <label className="block text-xs text-voltech-muted mb-2">Envío nacional GRATIS si supera ($)</label>
                   <input
@@ -500,19 +823,18 @@ export default function AjustesPage() {
                   />
                   <p className="text-xs text-voltech-muted mt-1">Si la compra nacional supera este monto, el envío será GRATIS.</p>
                 </div>
-              </div>
-              
-              {/* ✅ NUEVO: Descripción editable del envío nacional */}
-              <div>
-                <label className="block text-xs text-voltech-muted mb-2">Descripción del envío nacional</label>
-                <input
-                  type="text"
-                  value={settings.envios.descripcionEnvioNacional || 'Envíos menores a $50: cobro a destino'}
-                  onChange={(e) => updateSetting('envios', 'descripcionEnvioNacional', e.target.value)}
-                  className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
-                  placeholder="Ej: Envíos menores a $50: cobro a destino"
-                />
-                <p className="text-xs text-voltech-muted mt-1">Este texto aparecerá en el comprobante de venta y en la tienda pública.</p>
+                
+                <div>
+                  <label className="block text-xs text-voltech-muted mb-2">Descripción del envío nacional</label>
+                  <input
+                    type="text"
+                    value={settings.envios.descripcionEnvioNacional || 'Envíos menores a $50: cobro a destino'}
+                    onChange={(e) => updateSetting('envios', 'descripcionEnvioNacional', e.target.value)}
+                    className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
+                    placeholder="Ej: Envíos menores a $50: cobro a destino"
+                  />
+                  <p className="text-xs text-voltech-muted mt-1">Este texto aparecerá en el comprobante de venta y en la tienda pública.</p>
+                </div>
               </div>
             </div>
 
@@ -530,7 +852,7 @@ export default function AjustesPage() {
         )}
       </div>
 
-      {/* Métodos de Pago - COLAPSABLE */}
+      {/* Métodos de Pago */}
       <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
         <button 
           onClick={() => toggleSection('metodosPago')}
@@ -607,7 +929,7 @@ export default function AjustesPage() {
         )}
       </div>
 
-      {/* Gestión de Carteras - COLAPSABLE */}
+      {/* Gestión de Carteras */}
       <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
         <button 
           onClick={() => toggleSection('carteras')}
@@ -683,7 +1005,7 @@ export default function AjustesPage() {
         )}
       </div>
 
-      {/* Términos y Condiciones - COLAPSABLE */}
+      {/* Términos y Condiciones */}
       <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
         <button 
           onClick={() => toggleSection('terminos')}
@@ -777,7 +1099,6 @@ export default function AjustesPage() {
         </div>
       </div>
 
-      {/* Botón Volver Arriba */}
       {showScrollTop && (
         <button
           onClick={scrollToTop}
