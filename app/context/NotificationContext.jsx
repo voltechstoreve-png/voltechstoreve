@@ -22,13 +22,9 @@ export function NotificationProvider({ children }) {
       const user = getCurrentUser();
       
       if (supabase && user) {
-        // ✅ MEJORA: Normalizar el rol a minúsculas para evitar fallos de coincidencia (ej. "Admin" vs "admin")
         const userRol = (user.rol || 'vendedor').toLowerCase();
-        
-        // ✅ MEJORA: Construir la condición OR de forma segura y optimizada
         let orCondition = `rol_destino.eq.${userRol},rol_destino.eq.todas,rol_destino.eq.todos`;
         
-        // Solo agregar usuario_id si es un UUID válido
         if (user.id && user.id !== 'undefined' && user.id !== 'local-1' && user.id.length > 10) {
           orCondition = `usuario_id.eq.${user.id},${orCondition}`;
         }
@@ -46,7 +42,6 @@ export function NotificationProvider({ children }) {
           const guardadas = localStorage.getItem('voltech_notificaciones');
           if (guardadas) {
             try {
-              // ✅ MEJORA: Filtrar también en el fallback local por rol
               const notificacionesLocales = JSON.parse(guardadas);
               const filtradas = notificacionesLocales.filter(n => 
                 n.usuario_id === user.id || 
@@ -70,7 +65,6 @@ export function NotificationProvider({ children }) {
 
     cargarNotificaciones();
 
-    // ✅ MEJORA: Escuchar notificaciones en tiempo real (Optimizado para PWA/Móvil)
     if (supabase) {
       const user = getCurrentUser();
       if (user && user.id && user.id !== 'undefined' && user.id.length > 10) {
@@ -82,7 +76,6 @@ export function NotificationProvider({ children }) {
             const nueva = payload.new;
             const currentUser = getCurrentUser();
             
-            // ✅ MEJORA: Validación estricta de rol en minúsculas
             const rolDestino = (nueva.rol_destino || 'todos').toLowerCase();
             const esParaMi = nueva.usuario_id === currentUser?.id || 
                              rolDestino === userRol || 
@@ -90,8 +83,8 @@ export function NotificationProvider({ children }) {
                              rolDestino === 'todas';
 
             if (currentUser && esParaMi) {
-              setNotifications(prev => {
-                // Evitar duplicados si la notificación ya llegó por otro medio
+              // ✅ CORREGIDO: setNotificaciones en lugar de setNotifications
+              setNotificaciones(prev => {
                 if (prev.some(n => n.id === nueva.id)) return prev;
                 return [nueva, ...prev];
               });
@@ -115,15 +108,13 @@ export function NotificationProvider({ children }) {
     const nueva = {
       ...notificacion,
       leida: false,
-      // ✅ MEJORA: Asegurar que rol_destino esté en minúsculas si se proporciona
       rol_destino: notificacion.rol_destino ? notificacion.rol_destino.toLowerCase() : 'todos',
       created_at: new Date().toISOString(),
       hora: new Date().toISOString(),
     };
 
     if (supabase && user && user.id && user.id !== 'undefined' && user.id.length > 10) {
-      // Si no se especifica usuario_id, intentar asignarlo si es una notificación personal
-      if (!nueva.usuario_id && nueva.rol_destino === user.rol?.toLowerCase()) {
+      if (!nueva.usuario_id && nueva.rol_destino === (user.rol || 'vendedor').toLowerCase()) {
         nueva.usuario_id = user.id;
       }
 
@@ -147,7 +138,6 @@ export function NotificationProvider({ children }) {
     }
   };
 
-  // ✅ MEJORA: Función auxiliar para no repetir código de fallback
   const fallbackLocal = (nueva) => {
     const guardadas = localStorage.getItem('voltech_notificaciones');
     const actuales = guardadas ? JSON.parse(guardadas) : [];
