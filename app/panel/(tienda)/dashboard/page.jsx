@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
-import { usePermissions } from '@/app/context/PermissionsContext'; // ✅ NUEVO: Sistema de permisos
+import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
   DollarSign, 
   ShoppingCart, 
@@ -30,8 +29,6 @@ import {
 import { motion } from 'framer-motion';
 
 export default function DashboardPage() {
-  const { esAdmin, esSocio, esVendedor, usuarioActual } = usePermissions(); // ✅ NUEVO
-  
   const [productos, setProductos] = useState([]);
   const [equipo, setEquipo] = useState([]);
   const [ventas, setVentas] = useState([]);
@@ -45,9 +42,9 @@ export default function DashboardPage() {
     stockBajo: 0,
     agotados: 0,
     ingresosHoy: 0,
-    misVentasTotales: 0, // ✅ NUEVO: Para vendedores
   });
 
+  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
     const cargarDatos = async () => {
       let prods = [], eq = [], vts = [];
@@ -56,7 +53,7 @@ export default function DashboardPage() {
       if (supabase) {
         const [{ data: pData }, { data: eData }, { data: vData }] = await Promise.all([
           supabase.from('productos').select('*'),
-          supabase.from('usuarios').select('*'),
+          supabase.from('usuarios').select('*'), // Equipo
           supabase.from('ventas').select('*')
         ]);
         if (pData) prods = pData;
@@ -78,19 +75,12 @@ export default function DashboardPage() {
         if (ventasGuardadas) vts = JSON.parse(ventasGuardadas);
       }
 
-      // ✅ 3. FILTRAR VENTAS SI ES VENDEDOR (Privacidad de datos)
-      let ventasFiltradas = vts;
-      if (esVendedor && usuarioActual?.nombre) {
-        ventasFiltradas = vts.filter(v => 
-          v.vendedor?.toLowerCase() === usuarioActual.nombre.toLowerCase()
-        );
-      }
-
+      // 3. Actualizar estados
       setProductos(prods);
       setEquipo(eq);
-      setVentas(ventasFiltradas); // Guardamos las ventas filtradas
+      setVentas(vts);
 
-      // 4. Calcular estadísticas (Ahora basadas en ventasFiltradas para vendedores)
+      // 4. Calcular estadísticas (Lógica original intacta)
       const valorInv = prods.reduce((acc, p) => acc + ((p.precioMayor || 0) * (p.cantidad || 0)), 0);
       const publicados = prods.filter(p => p.publicado).length;
       const stockBajo = prods.filter(p => (p.cantidad || 0) > 0 && (p.cantidad || 0) <= 2).length;
@@ -98,27 +88,25 @@ export default function DashboardPage() {
       const miembrosActivos = eq.filter(m => m.activo).length;
 
       const hoy = new Date().toISOString().split('T')[0];
-      const ventasHoyArr = ventasFiltradas.filter(v => v.fecha === hoy);
+      const ventasHoyArr = vts.filter(v => v.fecha === hoy);
       const ingresosHoy = ventasHoyArr.reduce((acc, v) => acc + (v.montoAbonado || v.total || 0), 0);
 
       setStats({
         ventasHoy: ventasHoyArr.length,
-        ventasMes: 0,
-        pedidos: ventasFiltradas.length,
+        ventasMes: 0, // Se puede expandir luego
+        pedidos: vts.length,
         clientesActivos: miembrosActivos,
         productosPublicados: publicados,
         valorInventario: valorInv,
         stockBajo: stockBajo,
         agotados: agotados,
         ingresosHoy: ingresosHoy,
-        misVentasTotales: ventasFiltradas.length,
       });
     };
 
     cargarDatos();
-  }, [esVendedor, usuarioActual]); // ✅ Se recalcula si cambia el usuario
+  }, []);
 
-  // Datos de ejemplo para el gráfico (se pueden hacer dinámicos después)
   const ventasSemanales = [
     { dia: 'Lun', ventas: 120 },
     { dia: 'Mar', ventas: 180 },
@@ -133,7 +121,7 @@ export default function DashboardPage() {
     .filter(p => p.publicado)
     .map(p => ({
       nombre: (p.plataforma || p.producto || '').length > 10 ? (p.plataforma || p.producto || '').substring(0, 10) + '...' : (p.plataforma || p.producto || ''),
-      ventas: p.cantidad // Nota: Esto muestra stock, idealmente sería ventas reales, pero mantenemos tu lógica original
+      ventas: p.cantidad
     }))
     .sort((a, b) => b.ventas - a.ventas)
     .slice(0, 5);
@@ -154,9 +142,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="text-sm text-voltech-muted mt-1">
-            {esVendedor ? 'Resumen de tu rendimiento e inventario disponible' : 'Resumen general de tu tienda'}
-          </p>
+          <p className="text-sm text-voltech-muted mt-1">Resumen general de tu tienda</p>
         </div>
         <div className="text-right">
           <p className="text-xs text-voltech-muted">Última actualización</p>
@@ -165,64 +151,52 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* CARD 1: Valor Inventario (Todos lo ven) */}
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-5">
           <div className="flex items-start justify-between mb-3">
             <div className="p-2 rounded-lg bg-gradient-to-br from-voltech-cyan to-blue-500">
               <DollarSign className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex items-center gap-1 text-xs text-voltech-success">
+              <ArrowUpRight className="w-3 h-3" />
+              +12.5%
             </div>
           </div>
           <p className="text-xs text-voltech-muted mb-1">Valor Inventario</p>
           <p className="text-2xl font-bold text-white">${stats.valorInventario.toFixed(2)}</p>
         </div>
 
-        {/* CARD 2: Productos Publicados (Todos lo ven) */}
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-5">
           <div className="flex items-start justify-between mb-3">
             <div className="p-2 rounded-lg bg-gradient-to-br from-voltech-purple to-pink-500">
               <Package className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex items-center gap-1 text-xs text-voltech-success">
+              <ArrowUpRight className="w-3 h-3" />
+              {stats.productosPublicados}
             </div>
           </div>
           <p className="text-xs text-voltech-muted mb-1">Productos Publicados</p>
           <p className="text-2xl font-bold text-white">{stats.productosPublicados}</p>
         </div>
 
-        {/* CARD 3: Dinámica según el rol */}
-        {esVendedor ? (
-          <div className="bg-voltech-surface border border-voltech-border rounded-xl p-5">
-            <div className="flex items-start justify-between mb-3">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500">
-                <ShoppingCart className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex items-center gap-1 text-xs text-voltech-success">
-                <ArrowUpRight className="w-3 h-3" />
-                Hoy: {stats.ventasHoy}
-              </div>
+        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-5">
+          <div className="flex items-start justify-between mb-3">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500">
+              <Users className="w-5 h-5 text-white" />
             </div>
-            <p className="text-xs text-voltech-muted mb-1">Mis Ventas Totales</p>
-            <p className="text-2xl font-bold text-white">{stats.misVentasTotales}</p>
-          </div>
-        ) : (
-          <div className="bg-voltech-surface border border-voltech-border rounded-xl p-5">
-            <div className="flex items-start justify-between mb-3">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500">
-                <Users className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex items-center gap-1 text-xs text-voltech-success">
-                <ArrowUpRight className="w-3 h-3" />
-                Activos
-              </div>
+            <div className="flex items-center gap-1 text-xs text-voltech-success">
+              <ArrowUpRight className="w-3 h-3" />
+              Activos
             </div>
-            <p className="text-xs text-voltech-muted mb-1">Miembros Equipo</p>
-            <p className="text-2xl font-bold text-white">{stats.clientesActivos}</p>
           </div>
-        )}
+          <p className="text-xs text-voltech-muted mb-1">Miembros Equipo</p>
+          <p className="text-2xl font-bold text-white">{stats.clientesActivos}</p>
+        </div>
 
-        {/* CARD 4: Productos Agotados (Todos lo ven para saber qué no vender) */}
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-5">
           <div className="flex items-start justify-between mb-3">
             <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-red-500">
-              <AlertTriangle className="w-5 h-5 text-white" />
+              <ShoppingCart className="w-5 h-5 text-white" />
             </div>
             <div className="flex items-center gap-1 text-xs text-voltech-error">
               <ArrowDownRight className="w-3 h-3" />
