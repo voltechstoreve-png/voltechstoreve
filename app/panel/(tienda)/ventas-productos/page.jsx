@@ -24,6 +24,8 @@ export default function VentasProductosPage() {
   const [equipo, setEquipo] = useState([]);
   const [carteras, setCarteras] = useState([]);
   const [settings, setSettings] = useState({});
+  const [cupones, setCupones] = useState([]); // ✅ NUEVO: Estado para cupones
+  
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState(null);
@@ -34,6 +36,11 @@ export default function VentasProductosPage() {
   const [productoModalIndex, setProductoModalIndex] = useState(null);
   const [clienteSearch, setClienteSearch] = useState('');
   const [showClientesDropdown, setShowClientesDropdown] = useState(false);
+
+  // ✅ NUEVO: Estados para el cupón
+  const [cuponInput, setCuponInput] = useState('');
+  const [cuponAplicado, setCuponAplicado] = useState(null);
+  const [errorCupon, setErrorCupon] = useState('');
 
   const [nuevoProducto, setNuevoProducto] = useState({
     plataforma: '', categoria: '', marca: '', precioMayor: 0, precioDetal: 0,
@@ -65,15 +72,16 @@ export default function VentasProductosPage() {
 
   useEffect(() => {
     const cargarDatos = async () => {
-      let vts = [], prods = [], clts = [], eqp = [], crt = [], sttngs = {};
+      let vts = [], prods = [], clts = [], eqp = [], crt = [], sttngs = {}, cpons = [];
       
       if (supabase) {
-        const [{ data: d1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }] = await Promise.all([
+        const [{ data: d1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }, { data: d6 }] = await Promise.all([
           supabase.from('ventas').select('*').order('fechaRegistro', { ascending: false }),
           supabase.from('productos').select('*'),
           supabase.from('clientes').select('*'),
           supabase.from('usuarios').select('*'),
-          supabase.from('settings').select('clave, valor')
+          supabase.from('settings').select('clave, valor'),
+          supabase.from('cupones').select('*') // ✅ Cargar cupones
         ]);
         if (d1) vts = d1;
         if (d2) prods = d2;
@@ -90,6 +98,7 @@ export default function VentasProductosPage() {
             tasaBCV: 36.5 
           };
         }
+        if (d6) cpons = d6;
       }
 
       if (vts.length === 0) vts = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
@@ -97,6 +106,7 @@ export default function VentasProductosPage() {
       if (clts.length === 0) clts = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
       if (eqp.length === 0) eqp = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
       if (crt.length === 0) crt = JSON.parse(localStorage.getItem('voltech_carteras') || '[]');
+      if (cpons.length === 0) cpons = JSON.parse(localStorage.getItem('voltech_cupones') || '[]'); // ✅ Fallback cupones
       
       const settingsLocales = JSON.parse(localStorage.getItem('voltech_settings') || '{}');
       const tasaLocales = JSON.parse(localStorage.getItem('voltech_tasa_bcv') || '{"tasa": 36.5}');
@@ -124,6 +134,7 @@ export default function VentasProductosPage() {
       setEquipo(eqp);
       setCarteras(sttngs.carteras || []);
       setSettings(sttngs);
+      setCupones(cpons); // ✅ Guardar cupones
     };
     cargarDatos();
   }, [esVendedor, usuarioActual]);
@@ -264,8 +275,70 @@ export default function VentasProductosPage() {
     setTimeout(() => router.push('/panel/productos'), 1000);
   };
 
+  // ✅ NUEVO: Función para validar y aplicar cupón
+  const validarYAplicarCupon = () => {
+    setErrorCupon('');
+    setCuponAplicado(null);
+    
+    if (!cuponInput.trim()) return;
+
+    const cupon = cupones.find(c => c.codigo.toUpperCase() === cuponInput.trim().toUpperCase() && c.estado === 'activo');
+    
+    if (!cupon) {
+      setErrorCupon('Cupón no encontrado o inactivo');
+      return;
+    }
+
+    const ahora = new Date();
+    if (cupon.fecha_inicio && new Date(cupon.fecha_inicio) > ahora) {
+      setErrorCupon('Este cupón aún no está activo');
+      return;
+    }
+    if (cupon.fecha_vencimiento && new Date(cupon.fecha_vencimiento) < ahora) {
+      setErrorCupon('Este cupón ha expirado');
+      return;
+    }
+
+    if (cupon.limite_usos === 'limitado' && (cupon.usos || 0) >= (cupon.max_usos || 0)) {
+      setErrorCupon('Este cupón ha alcanzado su límite de usos');
+      return;
+    }
+
+    const productosEnVenta = formData.productos.map(p => p.productoId);
+    let productosAplicables = [];
+
+    if (cupon.tipo_aplicacion === 'todos') {
+      productosAplicables = productosEnVenta;
+    } else if (cupon.tipo_aplicacion === 'producto_especifico' || cupon.tipo_aplicacion === 'varios_productos' || cupon.tipo_aplicacion === 'producto_gratis') {
+      const idsCupon = cupon.producto_ids || cupon.productos_especificos || [];
+      productosAplicables = productosEnVenta.filter(id => idsCupon.includes(id));
+    }
+
+    if (productosAplicables.length === 0) {
+      setErrorCupon('Este cupón no aplica a los productos en esta venta');
+      return;
+    }
+
+    // Calcular descuento
+    let descuento = 0;
+    const subtotalAplicable = formData.productos
+      .filter(p => productosAplicables.includes(p.productoId))
+      .reduce((acc, p) => acc + (p.cantidad * p.precioUnitario), 0);
+
+    if (cupon.tipo_descuento === 'gratis' || cupon.es_gratis) {
+      descuento = subtotalAplicable;
+    } else if (cupon.tipo_descuento === 'porcentaje') {
+      descuento = subtotalAplicable * ((cupon.valor_descuento || cupon.valor || 0) / 100);
+    } else if (cupon.tipo_descuento === 'monto_fijo') {
+      descuento = Math.min(cupon.valor_descuento || cupon.valor || 0, subtotalAplicable);
+    }
+
+    setCuponAplicado({ ...cupon, descuentoCalculado: descuento });
+  };
+
   const subtotal = formData.productos.reduce((acc, p) => acc + (p.cantidad * p.precioUnitario), 0);
-  const totalVenta = subtotal + (formData.delivery ? formData.montoDelivery : 0);
+  const descuentoAplicado = cuponAplicado ? cuponAplicado.descuentoCalculado : 0;
+  const totalVenta = subtotal + (formData.delivery ? formData.montoDelivery : 0) - descuentoAplicado;
   const montoPendiente = formData.enCuotas ? totalVenta - formData.montoAbonado : 0;
 
   const registrarVenta = async () => {
@@ -306,10 +379,23 @@ export default function VentasProductosPage() {
           total: p.cantidad * p.precioUnitario, tipo: producto?.tipo || 'fisico',
         };
       }),
-      subtotal, delivery: formData.delivery, montoDelivery: formData.delivery ? formData.montoDelivery : 0,
-      total: totalVenta, enCuotas: formData.enCuotas, montoAbonado: formData.enCuotas ? formData.montoAbonado : totalVenta,
-      montoPendiente: montoPendiente, fechaPago: formData.fechaPago, metodoPago: formData.metodoPago,
-      carteraId: formData.carteraId, referencia: formData.referencia,
+      subtotal, 
+      delivery: formData.delivery, 
+      montoDelivery: formData.delivery ? formData.montoDelivery : 0,
+      
+      // ✅ NUEVO: Campos de cupón
+      cupon_aplicado: cuponAplicado ? cuponAplicado.codigo : null,
+      descuento_aplicado: descuentoAplicado,
+      total_con_descuento: totalVenta,
+      
+      total: totalVenta, 
+      enCuotas: formData.enCuotas, 
+      montoAbonado: formData.enCuotas ? formData.montoAbonado : totalVenta,
+      montoPendiente: montoPendiente, 
+      fechaPago: formData.fechaPago, 
+      metodoPago: formData.metodoPago,
+      carteraId: formData.carteraId, 
+      referencia: formData.referencia,
       estado: formData.enCuotas && montoPendiente > 0 ? 'pendiente' : 'pagado',
       fechaRegistro: new Date().toISOString(),
     };
@@ -324,7 +410,9 @@ export default function VentasProductosPage() {
       ? ventas.map(v => String(v.id) === String(editingId) ? nuevaVenta : v)
       : [nuevaVenta, ...ventas];
 
-    if (supabase) {
+    // ✅ NUEVO: Actualizar usos del cupón si se aplicó
+    let cuponesActualizados = [...cupones];
+    if (supabase && cuponAplicado) {
       await supabase.from('ventas').upsert(nuevaVenta, { onConflict: 'id' });
       await supabase.from('clientes').upsert(nuevoCliente, { onConflict: 'id' });
       for (const prod of formData.productos) {
@@ -333,9 +421,26 @@ export default function VentasProductosPage() {
           await supabase.from('productos').update({ cantidad: pActual.cantidad }).eq('id', pActual.id);
         }
       }
+      // Actualizar cupón en BD
+      await supabase.from('cupones').update({ 
+        usos: (cuponAplicado.usos || 0) + 1,
+        descuento_total: (cuponAplicado.descuento_total || 0) + descuentoAplicado
+      }).eq('id', cuponAplicado.id);
     }
 
-    setVentas(ventasActualizadas); setProductos(productosActualizados); setClientes(clientesActualizados);
+    if (cuponAplicado) {
+      cuponesActualizados = cupones.map(c => 
+        c.id === cuponAplicado.id 
+          ? { ...c, usos: (c.usos || 0) + 1, descuento_total: (c.descuento_total || 0) + descuentoAplicado }
+          : c
+      );
+      setCupones(cuponesActualizados);
+      localStorage.setItem('voltech_cupones', JSON.stringify(cuponesActualizados));
+    }
+
+    setVentas(ventasActualizadas); 
+    setProductos(productosActualizados); 
+    setClientes(clientesActualizados);
     localStorage.setItem('voltech_ventas', JSON.stringify(ventasActualizadas));
     localStorage.setItem('voltech_productos', JSON.stringify(productosActualizados));
     localStorage.setItem('voltech_clientes', JSON.stringify(clientesActualizados));
@@ -356,7 +461,12 @@ export default function VentasProductosPage() {
       delivery: false, montoDelivery: 0, enCuotas: false, montoAbonado: 0, fechaPago: '',
       metodoPago: 'efectivo', carteraId: '', referencia: '',
     });
-    setClienteSearch(''); setShowForm(false); setEditingId(null);
+    setClienteSearch(''); 
+    setCuponInput('');
+    setCuponAplicado(null);
+    setErrorCupon('');
+    setShowForm(false); 
+    setEditingId(null);
   };
 
   const marcarPagado = async (venta) => {
@@ -400,7 +510,10 @@ export default function VentasProductosPage() {
       delivery: venta.delivery, montoDelivery: venta.montoDelivery, enCuotas: venta.enCuotas, montoAbonado: venta.montoAbonado,
       fechaPago: venta.fechaPago || '', metodoPago: venta.metodoPago, carteraId: venta.carteraId, referencia: venta.referencia,
     });
-    setClienteSearch(venta.cliente); setShowForm(true);
+    setClienteSearch(venta.cliente); 
+    setCuponInput(venta.cupon_aplicado || '');
+    // Nota: Para simplificar, al editar no se recalcula el cupón automáticamente, pero se muestra el código.
+    setShowForm(true);
   };
 
   const generarPDF = (venta) => {
@@ -465,7 +578,19 @@ export default function VentasProductosPage() {
     
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text(`TOTAL GENERAL: $${venta.total.toFixed(2)}`, 195, finalY, { align: 'right' });
+    
+    if (venta.descuento_aplicado > 0) {
+      doc.text(`SUBTOTAL: $${venta.subtotal.toFixed(2)}`, 195, finalY, { align: 'right' });
+      doc.setFontSize(10);
+      doc.setTextColor(34, 197, 94); // Verde
+      doc.text(`DESCUENTO: -$${venta.descuento_aplicado.toFixed(2)}`, 195, finalY + 6, { align: 'right' });
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`TOTAL: $${venta.total.toFixed(2)}`, 195, finalY + 12, { align: 'right' });
+      finalY += 12;
+    } else {
+      doc.text(`TOTAL GENERAL: $${venta.total.toFixed(2)}`, 195, finalY, { align: 'right' });
+    }
     
     if (venta.montoPendiente > 0) {
       doc.setFontSize(10);
@@ -689,6 +814,44 @@ export default function VentasProductosPage() {
                 <button onClick={agregarProductoAVenta} className="mt-3 px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2"><Plus className="w-4 h-4" /> Agregar otro producto</button>
               </div>
 
+              {/* ✅ NUEVO: Sección de Cupón */}
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-voltech-cyan mb-3 flex items-center gap-2"><Tag className="w-4 h-4" /> Cupón de Descuento</h4>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={cuponInput} 
+                    onChange={(e) => { setCuponInput(e.target.value.toUpperCase()); setErrorCupon(''); setCuponAplicado(null); }}
+                    placeholder="Ingresa el código del cupón"
+                    className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm uppercase"
+                    disabled={!!cuponAplicado}
+                  />
+                  <button 
+                    onClick={validarYAplicarCupon}
+                    disabled={!!cuponAplicado}
+                    className="px-4 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg hover:bg-voltech-purple/30 transition-colors text-sm font-medium disabled:opacity-50"
+                  >
+                    Aplicar
+                  </button>
+                  {cuponAplicado && (
+                    <button 
+                      onClick={() => { setCuponInput(''); setCuponAplicado(null); setErrorCupon(''); }}
+                      className="px-4 py-2 bg-voltech-error/20 text-voltech-error rounded-lg hover:bg-voltech-error/30 transition-colors text-sm"
+                      title="Quitar cupón"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                {errorCupon && <p className="text-xs text-voltech-error mt-2 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {errorCupon}</p>}
+                {cuponAplicado && (
+                  <p className="text-xs text-voltech-success mt-2 flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" /> 
+                    Cupón "{cuponAplicado.codigo}" aplicado: -$ {cuponAplicado.descuentoCalculado.toFixed(2)}
+                  </p>
+                )}
+              </div>
+
               <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4">
                   <label className="flex items-center gap-2 cursor-pointer mb-3"><input type="checkbox" checked={formData.delivery} onChange={(e) => setFormData({ ...formData, delivery: e.target.checked })} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" /><Truck className="w-4 h-4 text-voltech-warning" /><span className="text-sm text-white">Incluir Delivery</span></label>
@@ -703,7 +866,7 @@ export default function VentasProductosPage() {
               <div className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 mb-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                   <div><p className="text-xs text-voltech-muted">Subtotal</p><p className="text-xl font-bold text-white">${subtotal.toFixed(2)}</p></div>
-                  <div><p className="text-xs text-voltech-muted">Delivery</p><p className="text-xl font-bold text-voltech-warning">${formData.delivery ? formData.montoDelivery.toFixed(2) : '0.00'}</p></div>
+                  <div><p className="text-xs text-voltech-muted">Descuento</p><p className="text-xl font-bold text-voltech-success">-${descuentoAplicado.toFixed(2)}</p></div>
                   <div><p className="text-xs text-voltech-muted">Total Venta</p><p className="text-2xl font-bold text-voltech-success">${totalVenta.toFixed(2)}</p></div>
                   <div><p className="text-xs text-voltech-muted">Pendiente</p><p className="text-xl font-bold text-voltech-error">${montoPendiente.toFixed(2)}</p></div>
                 </div>
@@ -836,7 +999,7 @@ export default function VentasProductosPage() {
                       </td>
                     </tr>
                     
-                    {/* ✅ NUEVO: Fila expandida con detalle de productos */}
+                    {/* Fila expandida con detalle de productos */}
                     {expandedId === venta.id && (
                       <tr className="bg-voltech-dark/30">
                         <td colSpan="11" className="px-4 py-4">
@@ -876,6 +1039,12 @@ export default function VentasProductosPage() {
                                     <td colSpan="6" className="px-3 py-2 text-right font-bold text-white">SUBTOTAL:</td>
                                     <td className="px-3 py-2 text-right font-bold text-voltech-cyan">${venta.subtotal?.toFixed(2)}</td>
                                   </tr>
+                                  {venta.descuento_aplicado > 0 && (
+                                    <tr>
+                                      <td colSpan="6" className="px-3 py-2 text-right text-voltech-muted">Descuento:</td>
+                                      <td className="px-3 py-2 text-right text-voltech-success">-${venta.descuento_aplicado?.toFixed(2)}</td>
+                                    </tr>
+                                  )}
                                   {venta.delivery && venta.montoDelivery > 0 && (
                                     <tr>
                                       <td colSpan="6" className="px-3 py-2 text-right text-voltech-muted">Delivery:</td>
@@ -922,6 +1091,14 @@ export default function VentasProductosPage() {
                                     </div>
                                   )}
                                 </>
+                              )}
+                              {venta.cupon_aplicado && (
+                                <div className="md:col-span-2">
+                                  <p className="text-xs text-voltech-muted mb-1">Cupón Aplicado:</p>
+                                  <p className="text-sm text-voltech-purple font-medium flex items-center gap-1">
+                                    <Tag className="w-3 h-3" /> {venta.cupon_aplicado} (-${venta.descuento_aplicado?.toFixed(2)})
+                                  </p>
+                                </div>
                               )}
                             </div>
                           </div>

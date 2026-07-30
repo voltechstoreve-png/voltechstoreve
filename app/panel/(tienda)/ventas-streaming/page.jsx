@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
+import { supabase } from '@/lib/supabase';
 import { 
   MonitorPlay, Database, AlertTriangle, DollarSign, Package, Search, 
   Edit3, Trash2, X, Save, Calendar, MessageCircle, Mail, RefreshCw,
@@ -19,6 +19,8 @@ export default function VentasStreamingPage() {
   const [clientes, setClientes] = useState([]);
   const [equipo, setEquipo] = useState([]);
   const [plataformas, setPlataformas] = useState([]);
+  const [cupones, setCupones] = useState([]); // ✅ NUEVO: Estado para cupones
+  
   const [currentUser, setCurrentUser] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -62,6 +64,11 @@ export default function VentasStreamingPage() {
   const [showFormCuenta, setShowFormCuenta] = useState(false);
   const [showFormInventario, setShowFormInventario] = useState(false);
 
+  // ✅ NUEVO: Estados para el cupón en streaming
+  const [cuponInput, setCuponInput] = useState('');
+  const [cuponAplicado, setCuponAplicado] = useState(null);
+  const [errorCupon, setErrorCupon] = useState('');
+
   const [formDataNueva, setFormDataNueva] = useState({
     fecha: new Date().toISOString().split('T')[0],
     vendedor: '', cliente: '', telefono: '',
@@ -90,28 +97,28 @@ export default function VentasStreamingPage() {
 
   const [historialReemplazos, setHistorialReemplazos] = useState({});
 
-  // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
     const cargarDatos = async () => {
       const userLogged = localStorage.getItem('voltech_user');
       if (userLogged) setCurrentUser(JSON.parse(userLogged));
 
-      let vData = [], cData = [], iData = [], pData = null;
+      let vData = [], cData = [], iData = [], pData = null, cponsData = [];
 
       if (supabase) {
-        const [{ data: v }, { data: c }, { data: i }, { data: p }] = await Promise.all([
+        const [{ data: v }, { data: c }, { data: i }, { data: p }, { data: cp }] = await Promise.all([
           supabase.from('ventas_streaming').select('*'),
           supabase.from('cuentas_streaming').select('*'),
           supabase.from('inventario_streaming').select('*'),
-          supabase.from('settings').select('valor').eq('clave', 'plataformas_streaming').single()
+          supabase.from('settings').select('valor').eq('clave', 'plataformas_streaming').single(),
+          supabase.from('cupones').select('*') // ✅ Cargar cupones
         ]);
         if (v) vData = v;
         if (c) cData = c;
         if (i) iData = i;
         if (p?.valor) pData = p.valor;
+        if (cp) cponsData = cp;
       }
 
-      // Fallback y migración de datos
       if (vData.length === 0) {
         const ventasGuardadas = localStorage.getItem('voltech_ventas_streaming');
         if (ventasGuardadas) {
@@ -160,6 +167,11 @@ export default function VentasStreamingPage() {
         if (equipoGuardado) setEquipo(JSON.parse(equipoGuardado));
       }
 
+      if (cponsData.length === 0) {
+        const cuponesGuardados = localStorage.getItem('voltech_cupones');
+        if (cuponesGuardados) cponsData = JSON.parse(cuponesGuardados);
+      }
+
       const historialGuardado = localStorage.getItem('voltech_historial_reemplazos');
       if (historialGuardado) setHistorialReemplazos(JSON.parse(historialGuardado));
       
@@ -179,6 +191,7 @@ export default function VentasStreamingPage() {
       setVentas(vData);
       setCuentas(cData);
       setInventario(iData);
+      setCupones(cponsData); // ✅ Guardar cupones
     };
 
     cargarDatos();
@@ -261,7 +274,75 @@ export default function VentasStreamingPage() {
     setFormDataNueva(prev => ({ ...prev, plataformas: nuevasPlataformas }));
   };
 
-  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
+  // ✅ NUEVO: Función para validar y aplicar cupón en Streaming
+  const validarYAplicarCupon = () => {
+    setErrorCupon('');
+    setCuponAplicado(null);
+    
+    if (!cuponInput.trim()) return;
+
+    const cupon = cupones.find(c => c.codigo.toUpperCase() === cuponInput.trim().toUpperCase() && c.estado === 'activo');
+    
+    if (!cupon) {
+      setErrorCupon('Cupón no encontrado o inactivo');
+      return;
+    }
+
+    const ahora = new Date();
+    if (cupon.fecha_inicio && new Date(cupon.fecha_inicio) > ahora) {
+      setErrorCupon('Este cupón aún no está activo');
+      return;
+    }
+    if (cupon.fecha_vencimiento && new Date(cupon.fecha_vencimiento) < ahora) {
+      setErrorCupon('Este cupón ha expirado');
+      return;
+    }
+
+    if (cupon.limite_usos === 'limitado' && (cupon.usos || 0) >= (cupon.max_usos || 0)) {
+      setErrorCupon('Este cupón ha alcanzado su límite de usos');
+      return;
+    }
+
+    // Lógica específica para Streaming: verificar si las plataformas coinciden
+    let descuento = 0;
+    const subtotal = formDataNueva.plataformas.reduce((acc, p) => acc + (p.precioDetal || 0), 0);
+
+    if (cupon.tipo_aplicacion === 'todos') {
+      if (cupon.tipo_descuento === 'gratis' || cupon.es_gratis) {
+        descuento = subtotal;
+      } else if (cupon.tipo_descuento === 'porcentaje') {
+        descuento = subtotal * ((cupon.valor_descuento || cupon.valor || 0) / 100);
+      } else if (cupon.tipo_descuento === 'monto_fijo') {
+        descuento = Math.min(cupon.valor_descuento || cupon.valor || 0, subtotal);
+      }
+    } else {
+      // Verificar si alguna plataforma en la venta coincide con los productos objetivo del cupón
+      const targetedProductIds = cupon.producto_ids || cupon.productos_especificos || [];
+      const plataformasAplicables = formDataNueva.plataformas.filter(p => {
+        // Buscar si el nombre de la plataforma coincide con algún producto en la base de datos que esté en la lista del cupón
+        const prod = productos.find(prod => prod.plataforma === p.plataforma || prod.nombre === p.plataforma);
+        return prod && targetedProductIds.includes(prod.id);
+      });
+
+      if (plataformasAplicables.length === 0) {
+        setErrorCupon('Este cupón no aplica a las plataformas seleccionadas');
+        return;
+      }
+
+      const subtotalAplicable = plataformasAplicables.reduce((acc, p) => acc + (p.precioDetal || 0), 0);
+      
+      if (cupon.tipo_descuento === 'gratis' || cupon.es_gratis) {
+        descuento = subtotalAplicable;
+      } else if (cupon.tipo_descuento === 'porcentaje') {
+        descuento = subtotalAplicable * ((cupon.valor_descuento || cupon.valor || 0) / 100);
+      } else if (cupon.tipo_descuento === 'monto_fijo') {
+        descuento = Math.min(cupon.valor_descuento || cupon.valor || 0, subtotalAplicable);
+      }
+    }
+
+    setCuponAplicado({ ...cupon, descuentoCalculado: descuento });
+  };
+
   const aplicarRegaloFalla = async () => {
     const { ventaId, plataformaIndex, dias, tipo, nota } = regaloData;
     if (!ventaId || dias === 0) {
@@ -300,17 +381,26 @@ export default function VentasStreamingPage() {
     setRegaloData({ ventaId: null, plataformaIndex: 0, dias: 0, tipo: 'regalo', nota: '' });
   };
 
-  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
   const guardarNuevaPlataforma = async () => {
     if (!formDataNueva.cliente || !formDataNueva.vendedor || formDataNueva.plataformas.some(p => !p.plataforma)) {
       toast.error('Completa los campos obligatorios');
       return;
     }
 
-    const total = formDataNueva.plataformas.reduce((sum, p) => sum + (p.precioDetal || 0), 0);
+    const subtotal = formDataNueva.plataformas.reduce((sum, p) => sum + (p.precioDetal || 0), 0);
+    const descuentoAplicado = cuponAplicado ? cuponAplicado.descuentoCalculado : 0;
+    const total = subtotal - descuentoAplicado;
+
     const nuevaVenta = {
-      id: editingId || Date.now().toString(), ...formDataNueva, total,
-      estado: 'activa', fechaRegistro: new Date().toISOString(),
+      id: editingId || Date.now().toString(), 
+      ...formDataNueva, 
+      subtotal,
+      cupon_aplicado: cuponAplicado ? cuponAplicado.codigo : null, // ✅ NUEVO
+      descuento_aplicado: descuentoAplicado, // ✅ NUEVO
+      total_con_descuento: total, // ✅ NUEVO
+      total,
+      estado: 'activa', 
+      fechaRegistro: new Date().toISOString(),
       registradoPor: currentUser?.nombre || 'Admin',
     };
 
@@ -330,8 +420,27 @@ export default function VentasStreamingPage() {
       ? ventas.map(v => v.id === editingId ? nuevaVenta : v)
       : [nuevaVenta, ...ventas];
 
+    // ✅ NUEVO: Actualizar usos del cupón si se aplicó
+    let cuponesActualizados = [...cupones];
     if (supabase) {
       await supabase.from('ventas_streaming').upsert(nuevaVenta, { onConflict: 'id' });
+      
+      if (cuponAplicado) {
+        await supabase.from('cupones').update({ 
+          usos: (cuponAplicado.usos || 0) + 1,
+          descuento_total: (cuponAplicado.descuento_total || 0) + descuentoAplicado
+        }).eq('id', cuponAplicado.id);
+      }
+    }
+
+    if (cuponAplicado) {
+      cuponesActualizados = cupones.map(c => 
+        c.id === cuponAplicado.id 
+          ? { ...c, usos: (c.usos || 0) + 1, descuento_total: (c.descuento_total || 0) + descuentoAplicado }
+          : c
+      );
+      setCupones(cuponesActualizados);
+      localStorage.setItem('voltech_cupones', JSON.stringify(cuponesActualizados));
     }
 
     setVentas(ventasActualizadas);
@@ -381,7 +490,6 @@ export default function VentasStreamingPage() {
     setFormDataCuenta(prev => ({ ...prev, pins: nuevosPins }));
   };
 
-  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
   const guardarCuenta = async () => {
     if (!formDataCuenta.plataforma || !formDataCuenta.correo || !formDataCuenta.contraseña) {
       toast.error('Completa los campos obligatorios');
@@ -419,7 +527,6 @@ export default function VentasStreamingPage() {
     setFormDataInventario(prev => ({ ...prev, pins: nuevosPins }));
   };
 
-  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
   const guardarInventario = async () => {
     if (!formDataInventario.plataforma || !formDataInventario.correo) {
       toast.error('Completa los campos obligatorios');
@@ -443,7 +550,6 @@ export default function VentasStreamingPage() {
     setShowFormInventario(false);
   };
 
-  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
   const reemplazarCuenta = async () => {
     if (!reemplazoData.cuentaId || !reemplazoData.nuevoCorreo || !reemplazoData.nuevaContraseña) {
       toast.error('Completa los datos de la nueva cuenta');
@@ -507,7 +613,6 @@ export default function VentasStreamingPage() {
     setReemplazoData({ cuentaId: null, nuevaPlataforma: '', nuevoCorreo: '', nuevaContraseña: '', nuevosPins: [''], observacion: '' });
   };
 
-  // ✅ ACTUALIZADO: Guarda en Supabase y localStorage
   const asignarCuentaAVenta = async (venta, cuenta) => {
     const ventasActualizadas = ventas.map(v => v.id === venta.id ? { ...v, cuentaAsignada: cuenta } : v);
     
@@ -679,7 +784,6 @@ El equipo de Voltechstore.ve`;
     setShowFormNueva(true);
   };
 
-  // ✅ ACTUALIZADO: Elimina de Supabase y localStorage
   const eliminarVenta = async (id) => {
     if (!confirm('¿Estás seguro de eliminar esta venta?')) return;
     if (supabase) {
@@ -691,7 +795,6 @@ El equipo de Voltechstore.ve`;
     toast.success('Venta eliminada');
   };
 
-  // ✅ ACTUALIZADO: Guarda en Supabase (settings) y localStorage
   const agregarPlataforma = async () => {
     if (!nuevaPlataforma.trim()) { toast.error('Ingresa un nombre para la plataforma'); return; }
     if (plataformas.includes(nuevaPlataforma)) { toast.error('Esta plataforma ya existe'); return; }
@@ -706,7 +809,6 @@ El equipo de Voltechstore.ve`;
     setNuevaPlataforma('');
   };
 
-  // ✅ ACTUALIZADO: Elimina de Supabase (settings) y localStorage
   const eliminarPlataforma = async (nombre) => {
     if (!confirm(`¿Estás seguro de eliminar "${nombre}"?`)) return;
     const plataformasActualizadas = plataformas.filter(p => p !== nombre);
@@ -727,6 +829,9 @@ El equipo de Voltechstore.ve`;
         cuentaAsignada: null,
       });
       setEditingId(null);
+      setCuponInput('');
+      setCuponAplicado(null);
+      setErrorCupon('');
     } else if (tipo === 'inventario') {
       setFormDataInventario({
         fecha: new Date().toISOString().split('T')[0], fechaVencimiento: '', diasDisponibles: 30,
@@ -876,7 +981,6 @@ El equipo de Voltechstore.ve`;
                       <input type="tel" value={formDataNueva.telefono} onChange={(e) => setFormDataNueva({ ...formDataNueva, telefono: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="0412-1234567" />
                     </div>
                     
-                    {/* ✅ NUEVO: Método de Pago */}
                     <div>
                       <label className="block text-xs text-voltech-muted mb-1 ml-1">Método de Pago *</label>
                       <select value={formDataNueva.metodoPago} onChange={(e) => setFormDataNueva({ ...formDataNueva, metodoPago: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
@@ -888,7 +992,6 @@ El equipo de Voltechstore.ve`;
                       </select>
                     </div>
 
-                    {/* ✅ NUEVO: Cartera */}
                     <div>
                       <label className="block text-xs text-voltech-muted mb-1 ml-1">Cartera *</label>
                       <select value={formDataNueva.cartera} onChange={(e) => setFormDataNueva({ ...formDataNueva, cartera: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
@@ -954,10 +1057,57 @@ El equipo de Voltechstore.ve`;
                     </div>
                   ))}
 
+                  {/* ✅ NUEVO: Sección de Cupón */}
+                  <div className="mb-6 pb-6 border-b border-voltech-border">
+                    <h4 className="text-sm font-semibold text-voltech-cyan mb-3 flex items-center gap-2"><Tag className="w-4 h-4" /> Cupón de Descuento</h4>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={cuponInput} 
+                        onChange={(e) => { setCuponInput(e.target.value.toUpperCase()); setErrorCupon(''); setCuponAplicado(null); }}
+                        placeholder="Ingresa el código del cupón"
+                        className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm uppercase"
+                        disabled={!!cuponAplicado}
+                      />
+                      <button 
+                        onClick={validarYAplicarCupon}
+                        disabled={!!cuponAplicado}
+                        className="px-4 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg hover:bg-voltech-purple/30 transition-colors text-sm font-medium disabled:opacity-50"
+                      >
+                        Aplicar
+                      </button>
+                      {cuponAplicado && (
+                        <button 
+                          onClick={() => { setCuponInput(''); setCuponAplicado(null); setErrorCupon(''); }}
+                          className="px-4 py-2 bg-voltech-error/20 text-voltech-error rounded-lg hover:bg-voltech-error/30 transition-colors text-sm"
+                          title="Quitar cupón"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    {errorCupon && <p className="text-xs text-voltech-error mt-2 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {errorCupon}</p>}
+                    {cuponAplicado && (
+                      <p className="text-xs text-voltech-success mt-2 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" /> 
+                        Cupón "{cuponAplicado.codigo}" aplicado: -$ {cuponAplicado.descuentoCalculado.toFixed(2)}
+                      </p>
+                    )}
+                  </div>
+
                   <div className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 mb-6">
                     <div className="flex items-center justify-between">
                       <div><p className="text-xs text-voltech-muted">Total de Plataformas</p><p className="text-lg font-bold text-white">{formDataNueva.plataformas.length}</p></div>
-                      <div><p className="text-xs text-voltech-muted">Total Venta</p><p className="text-2xl font-bold text-voltech-success">${formDataNueva.plataformas.reduce((sum, p) => sum + (p.precioDetal || 0), 0).toFixed(2)}</p></div>
+                      <div className="text-right">
+                        <p className="text-xs text-voltech-muted">Subtotal</p>
+                        <p className="text-sm font-bold text-white">${formDataNueva.plataformas.reduce((sum, p) => sum + (p.precioDetal || 0), 0).toFixed(2)}</p>
+                        {cuponAplicado && (
+                          <p className="text-xs text-voltech-success">Descuento: -${cuponAplicado.descuentoCalculado.toFixed(2)}</p>
+                        )}
+                        <p className="text-2xl font-bold text-voltech-success mt-1">
+                          Total: ${(formDataNueva.plataformas.reduce((sum, p) => sum + (p.precioDetal || 0), 0) - (cuponAplicado ? cuponAplicado.descuentoCalculado : 0)).toFixed(2)}
+                        </p>
+                      </div>
                     </div>
                   </div>
 

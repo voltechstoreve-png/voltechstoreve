@@ -10,7 +10,7 @@ import {
   Sun, Moon, Play, Clock, Zap, Truck,
   Sparkles, Trophy, AlertCircle, Ticket, Copy, Users,
   MessageSquare, ThumbsUp, Upload, Percent, Share2,
-  Image as ImageIcon
+  Image as ImageIcon, FileText // ✅ AGREGADO: FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -67,7 +67,10 @@ export default function CatalogoPage() {
   const [showBannerSorteo, setShowBannerSorteo] = useState(true);
 
   const [publicidad, setPublicidad] = useState([]);
-  const [ventas, setVentas] = useState([]); // ✅ NUEVO: Para calcular más vendidos
+  const [ventas, setVentas] = useState([]);
+  
+  // ✅ NUEVO: Estado para el modal de Términos y Condiciones
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -86,7 +89,6 @@ export default function CatalogoPage() {
     if (opinionesGuardadas) setOpiniones(JSON.parse(opinionesGuardadas));
   }, []);
 
-  // ✅ NUEVO: Cargar publicidad y ventas para calcular más vendidos
   useEffect(() => {
     const cargarDatosExtras = async () => {
       let pubs = [], vts = [];
@@ -180,7 +182,6 @@ export default function CatalogoPage() {
     return () => clearInterval(interval);
   }, [sorteoActivo]);
 
-  // ✅ NUEVO: Calcular productos más vendidos basado en el historial de ventas
   const productosMasVendidos = useMemo(() => {
     if (!productos.length) return [];
     const conteo = {};
@@ -228,31 +229,72 @@ export default function CatalogoPage() {
     else setCart(cart.map(item => item.id === productoId ? { ...item, cantidad } : item));
   };
 
+  // ✅ ACTUALIZADO: Validación inteligente de cupones
   const applyCoupon = () => {
     if (!couponCode.trim()) { toast.error('Ingresa un código'); return; }
+    
     const cupones = JSON.parse(localStorage.getItem('voltech_cupones') || '[]');
     const cupon = cupones.find(c => c.codigo === couponCode.toUpperCase() && c.estado === 'activo' && new Date(c.fecha_vencimiento) > new Date());
 
     if (!cupon) { toast.error('Cupón inválido o expirado'); return; }
 
     const subtotal = cart.reduce((sum, item) => sum + (getPrecioMostrar(item).precioPrincipal * item.cantidad), 0);
+    
     if (cupon.monto_minimo && subtotal < cupon.monto_minimo) {
       toast.error(`Monto mínimo de compra: $${cupon.monto_minimo.toFixed(2)}`);
       return;
     }
-    if (cupon.aplica_a === 'especificos' && cupon.productos_especificos && cupon.productos_especificos.length > 0) {
-      if (!cart.some(item => cupon.productos_especificos.includes(item.id))) {
-        toast.error('Este cupón solo aplica a productos específicos');
+
+    if (cupon.excluir_ofertas) {
+      const tieneOfertas = cart.some(item => item.precio_oferta || item.precioOferta);
+      if (tieneOfertas) {
+        toast.error('Este cupón no aplica a productos que ya tienen oferta');
         return;
       }
     }
-    if (cupon.excluir_ofertas && cart.some(item => item.precio_oferta || item.precioOferta)) {
-      toast.error('Este cupón no aplica a productos en oferta');
-      return;
+
+    let descuentoCalculado = 0;
+    let mensajeExito = '';
+
+    const tipoAplicacion = cupon.tipo_aplicacion || (cupon.aplica_a === 'especificos' ? 'varios_productos' : 'todos');
+    const targetIds = cupon.producto_ids || cupon.productos_especificos || [];
+
+    if (tipoAplicacion === 'todos') {
+      if (cupon.tipo_descuento === 'gratis' || cupon.es_gratis) {
+        descuentoCalculado = subtotal;
+        mensajeExito = '¡Compra 100% GRATIS con este cupón!';
+      } else if (cupon.tipo_descuento === 'porcentaje') {
+        descuentoCalculado = subtotal * ((cupon.valor_descuento || cupon.valor || 0) / 100);
+        mensajeExito = `Cupón ${cupon.codigo} aplicado: -$${descuentoCalculado.toFixed(2)}`;
+      } else {
+        descuentoCalculado = Math.min(cupon.valor_descuento || cupon.valor || 0, subtotal);
+        mensajeExito = `Cupón ${cupon.codigo} aplicado: -$${descuentoCalculado.toFixed(2)}`;
+      }
+    } else {
+      const productosAplicables = cart.filter(item => targetIds.includes(item.id));
+      
+      if (productosAplicables.length === 0) {
+        toast.error('Este cupón no es válido para los productos en tu carrito');
+        return;
+      }
+
+      const subtotalAplicable = productosAplicables.reduce((sum, item) => sum + (getPrecioMostrar(item).precioPrincipal * item.cantidad), 0);
+
+      if (cupon.tipo_descuento === 'gratis' || cupon.es_gratis || tipoAplicacion === 'producto_gratis') {
+        descuentoCalculado = subtotalAplicable;
+        const nombres = productosAplicables.map(p => p.producto || p.plataforma).join(', ');
+        mensajeExito = `Producto(s) GRATIS: ${nombres}`;
+      } else if (cupon.tipo_descuento === 'porcentaje') {
+        descuentoCalculado = subtotalAplicable * ((cupon.valor_descuento || cupon.valor || 0) / 100);
+        mensajeExito = `Cupón ${cupon.codigo} aplicado: -$${descuentoCalculado.toFixed(2)}`;
+      } else {
+        descuentoCalculado = Math.min(cupon.valor_descuento || cupon.valor || 0, subtotalAplicable);
+        mensajeExito = `Cupón ${cupon.codigo} aplicado: -$${descuentoCalculado.toFixed(2)}`;
+      }
     }
 
-    setAppliedCoupon(cupon);
-    toast.success(`✓ Cupón "${cupon.codigo}" aplicado`);
+    setAppliedCoupon({ ...cupon, descuentoCalculado, mensajeExito });
+    toast.success(mensajeExito);
   };
 
   const removeCoupon = () => {
@@ -281,16 +323,11 @@ export default function CatalogoPage() {
     return 0;
   };
 
+  // ✅ ACTUALIZADO: Cálculo del total con descuento inteligente
   const calculateTotal = () => {
     let subtotal = cart.reduce((sum, item) => sum + (getPrecioMostrar(item).precioPrincipal * item.cantidad), 0);
-    if (appliedCoupon) {
-      if (appliedCoupon.tipo_descuento === 'porcentaje') {
-        subtotal = subtotal * (1 - appliedCoupon.valor / 100);
-      } else {
-        subtotal = subtotal - appliedCoupon.valor;
-      }
-    }
-    return Math.max(0, subtotal + calcularEnvio());
+    const descuento = appliedCoupon ? appliedCoupon.descuentoCalculado : 0;
+    return Math.max(0, subtotal - descuento + calcularEnvio());
   };
 
   const finalizarPedido = () => {
@@ -310,21 +347,19 @@ export default function CatalogoPage() {
       const subtotal = precioInfo.precioPrincipal * item.cantidad;
       mensaje += `• ${item.plataforma || item.producto} x${item.cantidad} - $${subtotal.toFixed(2)}\n`;
     });
-    mensaje += `\n Subtotal: $${(total - envio).toFixed(2)}`;
+    
+    const subtotalSinEnvio = cart.reduce((sum, item) => sum + (getPrecioMostrar(item).precioPrincipal * item.cantidad), 0);
+    mensaje += `\n Subtotal: $${subtotalSinEnvio.toFixed(2)}`;
+    
     if (appliedCoupon) {
-      const descuento = appliedCoupon.tipo_descuento === 'porcentaje' 
-        ? `${appliedCoupon.valor}%` 
-        : `$${appliedCoupon.valor}`;
-      const montoDescuento = appliedCoupon.tipo_descuento === 'porcentaje'
-        ? ((total - envio) * appliedCoupon.valor / 100).toFixed(2)
-        : appliedCoupon.valor.toFixed(2);
-      mensaje += `\n Cupón: ${appliedCoupon.codigo} (-${descuento} = -$${montoDescuento})`;
+      mensaje += `\n 🎟️ Cupón: ${appliedCoupon.codigo} (-$${appliedCoupon.descuentoCalculado.toFixed(2)})`;
     }
     if (autoReferrer) {
       mensaje += `\n Referido por: ${autoReferrer}`;
     }
     mensaje += `\n Envío: ${envio === 0 ? 'GRATIS' : '$' + envio.toFixed(2)}`;
     mensaje += `\n💵 TOTAL: $${total.toFixed(2)} (Bs ${calcularPrecioBs(total)})\n`;
+    
     if (!tieneSoloProductosDigitales) {
       if (deliveryMethod === 'retiro') mensaje += `\n Entrega: Retiro en ${selectedAddress}`;
       else if (deliveryMethod === 'delivery') mensaje += `\n Entrega: Delivery a ${customerLocation}`;
@@ -535,7 +570,6 @@ export default function CatalogoPage() {
   const headerBg = darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-slate-200';
   const totalVotos = productosVotacion.reduce((sum, p) => sum + (p.votos || 0), 0);
 
-  // ✅ NUEVO: Componente reutilizable para tarjetas de publicidad con descripción y botón
   const renderPubCard = (pub) => (
     <a 
       key={pub.id} 
@@ -566,7 +600,6 @@ export default function CatalogoPage() {
     </a>
   );
 
-  // ✅ NUEVO: Filtrar publicidad por lado
   const pubsIzquierda = publicidad.filter(p => p.lado === 'izquierdo' || p.lado === 'ambos');
   const pubsDerecha = publicidad.filter(p => p.lado === 'derecho' || p.lado === 'ambos');
 
@@ -673,7 +706,6 @@ export default function CatalogoPage() {
       <main className="max-w-[1800px] xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
           
-          {/* ✅ LEFT SIDEBAR: Condicional a que haya productos */}
           {productos.length > 0 && (
             <aside className="col-span-1 lg:col-span-2 space-y-4 order-2 lg:order-1">
               {pubsIzquierda.length > 0 ? (
@@ -700,7 +732,6 @@ export default function CatalogoPage() {
             </aside>
           )}
 
-          {/* ✅ MAIN CONTENT */}
           <div className={`${productos.length === 0 ? 'col-span-full' : 'col-span-1 lg:col-span-8 xl:col-span-8'} order-1 lg:order-2`}>
             {activeSection === 'productos' && (
               <div>
@@ -1130,7 +1161,6 @@ export default function CatalogoPage() {
             )}
           </div>
 
-          {/* ✅ RIGHT SIDEBAR: Condicional a que haya productos */}
           {productos.length > 0 && (
             <aside className="col-span-1 lg:col-span-2 space-y-4 order-3 lg:order-3">
               {pubsDerecha.length > 0 ? (
@@ -1178,6 +1208,14 @@ export default function CatalogoPage() {
               <h3 className="text-xl font-bold mb-4">{settings.tienda?.nombre || 'VOLTECHSTOREVE'}</h3>
               <p className="text-slate-400 text-sm">{settings.tienda?.direccion || 'Caracas, Venezuela'}</p>
               <p className="text-slate-400 text-sm mt-2">{settings.tienda?.email}</p>
+              
+              {/* ✅ NUEVO: Link a Términos y Condiciones */}
+              <button 
+                onClick={() => setShowTermsModal(true)} 
+                className="mt-4 flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm"
+              >
+                <FileText className="w-4 h-4" /> Términos y Condiciones
+              </button>
             </div>
             <div>
               <h4 className="font-bold mb-4"> Redes Sociales</h4>
@@ -1207,6 +1245,58 @@ export default function CatalogoPage() {
           <div className="border-t border-slate-800 mt-8 pt-6 text-center text-sm text-slate-500">© {new Date().getFullYear()} {settings.tienda?.nombre || 'VOLTECHSTOREVE'}. Todos los derechos reservados.</div>
         </div>
       </footer>
+
+      {/* ✅ NUEVO: Modal de Términos y Condiciones */}
+      <AnimatePresence>
+        {showTermsModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-[90] flex items-center justify-center p-4" onClick={() => setShowTermsModal(false)}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className={`${cardBg} border ${cardBorder} rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto`} onClick={(e) => e.stopPropagation()}>
+              <div className={`sticky top-0 ${cardBg} border-b ${cardBorder} p-6 flex justify-between items-center z-10`}>
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-purple-600" />
+                  Términos y Condiciones
+                </h3>
+                <button onClick={() => setShowTermsModal(false)} className="p-2 hover:bg-voltech-border rounded-full transition-colors"><X className="w-6 h-6" /></button>
+              </div>
+              <div className="p-6 space-y-4 text-sm leading-relaxed">
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-bold text-purple-600 mb-1">1. Política de Pago Anticipado</h4>
+                    <p className={mutedText}>Para garantizar la disponibilidad de inventario y el procesamiento logístico con nuestros proveedores, todo despacho se gestionará exclusivamente previa recepción y conciliación del pago total.</p>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-purple-600 mb-1">2. Presentación</h4>
+                    <p className={mutedText}>Es obligatorio presentar este comprobante para cualquier reclamo.</p>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-purple-600 mb-1">3. Tiempo de Garantía</h4>
+                    <p className={mutedText}>El producto tiene una garantía de 3 días continuos.</p>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-purple-600 mb-1">4. Exclusiones</h4>
+                    <p className={mutedText}>No cubre daños físicos, humedad, sobrecargas o sellos removidos.</p>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-purple-600 mb-1">5. Empaque</h4>
+                    <p className={mutedText}>Es obligatorio conservar la caja y accesorios originales en buen estado.</p>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-purple-600 mb-1">6. Gestión de Cambios</h4>
+                    <p className={mutedText}>Sujeto a revisión técnica (24-48h). Es condición indispensable la entrega del producto defectuoso en su empaque original; no se entregará un reemplazo sin la verificación previa del equipo anterior.</p>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-purple-600 mb-1">7. Reembolsos y Conformidad</h4>
+                    <p className={mutedText}>Al recibir, el cliente acepta el estado del producto. Bajo ninguna circunstancia se realizará la devolución de dinero; se procederá exclusivamente al cambio por un producto igual o de similares características.</p>
+                  </div>
+                </div>
+                <div className="mt-6 pt-4 border-t border-voltech-border text-center">
+                  <button onClick={() => setShowTermsModal(false)} className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium">Entendido</button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {selectedProduct && (
@@ -1444,6 +1534,7 @@ export default function CatalogoPage() {
                       </select>
                     </div>
 
+                    {/* ✅ ACTUALIZADO: Sección de Cupón con resumen claro */}
                     <div className="mb-4">
                       <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}> Cupón de Descuento</label>
                       {appliedCoupon ? (
@@ -1451,7 +1542,7 @@ export default function CatalogoPage() {
                           <div className={`flex-1 px-3 py-2 border-2 border-green-500 rounded-lg text-sm ${darkMode ? 'bg-green-900/20' : 'bg-green-50'}`}>
                             <span className="font-mono font-bold text-green-600">{appliedCoupon.codigo}</span>
                             <span className="text-xs text-green-600 ml-2">
-                              (-{appliedCoupon.tipo_descuento === 'porcentaje' ? `${appliedCoupon.valor}%` : `$${appliedCoupon.valor}`})
+                              (-${appliedCoupon.descuentoCalculado.toFixed(2)})
                             </span>
                           </div>
                           <button 
@@ -1494,7 +1585,12 @@ export default function CatalogoPage() {
 
                     <div className={`border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'} pt-4 mb-4 space-y-1 text-sm`}>
                       <div className="flex justify-between"><span className={mutedText}>Subtotal:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>${cart.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0).toFixed(2)}</span></div>
-                      {appliedCoupon && <div className="flex justify-between text-green-600"><span>Descuento:</span><span>-${(appliedCoupon.tipo_descuento === 'porcentaje' ? (cart.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0) * appliedCoupon.valor / 100) : appliedCoupon.valor).toFixed(2)}</span></div>}
+                      {appliedCoupon && (
+                        <div className="flex justify-between text-green-600">
+                          <span>Descuento ({appliedCoupon.codigo}):</span>
+                          <span>-${appliedCoupon.descuentoCalculado.toFixed(2)}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between"><span className={mutedText}>Envío:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>{calcularEnvio() === 0 ? 'GRATIS' : '$' + calcularEnvio().toFixed(2)}</span></div>
                       <div className={`flex justify-between font-bold text-lg border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'} pt-2 mt-2`}><span className={darkMode ? 'text-white' : 'text-slate-900'}>Total:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>${calculateTotal().toFixed(2)}</span></div>
                       <div className="flex justify-between"><span className={mutedText}>Bs:</span><span className={mutedText}>Bs {calcularPrecioBs(calculateTotal())}</span></div>

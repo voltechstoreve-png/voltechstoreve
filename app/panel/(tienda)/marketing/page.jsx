@@ -49,9 +49,14 @@ export default function MarketingPage() {
   const [cuponEditando, setCuponEditando] = useState(null);
   const [busquedaProductoCupon, setBusquedaProductoCupon] = useState('');
   
+  // ✅ ACTUALIZADO: Nuevos campos para el sistema de cupones
   const [formDataCupon, setFormDataCupon] = useState({
-    titulo: '', descripcion: '', codigo: '', tipo_descuento: 'porcentaje', valor: 20, aplica_a: 'todos',
-    productos_especificos: [], excluir_ofertas: false, monto_minimo: 0, fecha_inicio: '', fecha_vencimiento: '',
+    titulo: '', descripcion: '', codigo: '', 
+    tipo_descuento: 'porcentaje', // 'porcentaje', 'monto_fijo', 'gratis'
+    valor_descuento: 20, 
+    tipo_aplicacion: 'todos', // 'todos', 'producto_especifico', 'varios_productos', 'producto_gratis'
+    producto_ids: [], 
+    excluir_ofertas: false, monto_minimo: 0, fecha_inicio: '', fecha_vencimiento: '',
     limite_usos: 'ilimitado', max_usos: 100, uso_por_cliente: 'una_vez', estado: 'activo'
   });
 
@@ -62,7 +67,6 @@ export default function MarketingPage() {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef(null);
   
-  // ✅ AGREGADO: campo 'descripcion'
   const [formDataPublicidad, setFormDataPublicidad] = useState({
     titulo: '', descripcion: '', url_destino: '', url_imagen: '', lado: 'izquierdo', posicion: 'sidebar',
     fecha_inicio: '', hora_inicio: '00:00', fecha_fin: '', hora_fin: '23:59', prioridad: 'normal',
@@ -172,7 +176,7 @@ export default function MarketingPage() {
     setPublicidadEditando(pub);
     setFormDataPublicidad({
       titulo: pub.titulo, 
-      descripcion: pub.descripcion || '', // ✅ AGREGADO
+      descripcion: pub.descripcion || '', 
       url_destino: pub.url_destino || '', 
       url_imagen: pub.url_imagen,
       lado: pub.lado || 'izquierdo', 
@@ -213,7 +217,7 @@ export default function MarketingPage() {
 
   const resetPublicidadForm = () => {
     setFormDataPublicidad({
-      titulo: '', descripcion: '', url_destino: '', url_imagen: '', lado: 'izquierdo', posicion: 'sidebar', // ✅ AGREGADO
+      titulo: '', descripcion: '', url_destino: '', url_imagen: '', lado: 'izquierdo', posicion: 'sidebar',
       fecha_inicio: '', hora_inicio: '00:00', fecha_fin: '', hora_fin: '23:59', prioridad: 'normal',
       mostrar_en: { inicio: true, catalogo: true, streaming: false, ofertas: false },
       dispositivos: { desktop: true, movil: true, tablet: true }, rotacion: 5, estado: 'activo'
@@ -235,18 +239,66 @@ export default function MarketingPage() {
     return `${codigoBase}-${random}`;
   };
 
+  const handleTipoAplicacionChange = (value) => {
+    if (value === 'producto_gratis') {
+      setFormDataCupon(prev => ({
+        ...prev,
+        tipo_aplicacion: value,
+        tipo_descuento: 'gratis',
+        valor_descuento: 100
+      }));
+    } else {
+      setFormDataCupon(prev => ({
+        ...prev,
+        tipo_aplicacion: value,
+        tipo_descuento: prev.tipo_descuento === 'gratis' ? 'porcentaje' : prev.tipo_descuento
+      }));
+    }
+  };
+
+  const toggleProductoCupon = (productoId, isSingle) => {
+    if (isSingle) {
+      setFormDataCupon({ ...formDataCupon, producto_ids: [productoId] });
+    } else {
+      const actuales = formDataCupon.producto_ids;
+      if (actuales.includes(productoId)) {
+        setFormDataCupon({ ...formDataCupon, producto_ids: actuales.filter(id => id !== productoId) });
+      } else {
+        setFormDataCupon({ ...formDataCupon, producto_ids: [...actuales, productoId] });
+      }
+    }
+  };
+
   const guardarCupon = async () => {
     if (!esAdmin) return toast.error('Solo el administrador puede crear cupones');
     if (!formDataCupon.titulo || !formDataCupon.descripcion || !formDataCupon.fecha_inicio || !formDataCupon.fecha_vencimiento) {
       toast.error('Completa los campos obligatorios (Título, Descripción, Fechas)');
       return;
     }
+    if (formDataCupon.tipo_aplicacion !== 'todos' && formDataCupon.producto_ids.length === 0) {
+      toast.error('Debes seleccionar al menos un producto para este tipo de cupón');
+      return;
+    }
 
     const codigo = formDataCupon.codigo || generarCodigo(formDataCupon.titulo);
     const nuevoCupon = {
       id: cuponEditando ? cuponEditando.id : `cupon-${Date.now()}`,
-      ...formDataCupon,
-      codigo,
+      titulo: formDataCupon.titulo,
+      descripcion: formDataCupon.descripcion,
+      codigo: codigo,
+      tipo_descuento: formDataCupon.tipo_descuento,
+      valor_descuento: formDataCupon.valor_descuento,
+      tipo_aplicacion: formDataCupon.tipo_aplicacion,
+      producto_ids: formDataCupon.producto_ids,
+      es_gratis: formDataCupon.tipo_aplicacion === 'producto_gratis' || formDataCupon.tipo_descuento === 'gratis',
+      excluir_ofertas: formDataCupon.excluir_ofertas,
+      monto_minimo: formDataCupon.monto_minimo,
+      fecha_inicio: formDataCupon.fecha_inicio,
+      fecha_vencimiento: formDataCupon.fecha_vencimiento,
+      limite_usos: formDataCupon.limite_usos,
+      max_usos: formDataCupon.max_usos,
+      uso_por_cliente: formDataCupon.uso_por_cliente,
+      estado: formDataCupon.estado,
       usos: cuponEditando?.usos || 0,
       descuento_total: cuponEditando?.descuento_total || 0,
       fecha_creacion: cuponEditando?.fecha_creacion || new Date().toISOString()
@@ -257,8 +309,8 @@ export default function MarketingPage() {
 
     setShowCuponForm(false); setCuponEditando(null); setBusquedaProductoCupon('');
     setFormDataCupon({
-      titulo: '', descripcion: '', codigo: '', tipo_descuento: 'porcentaje', valor: 20, aplica_a: 'todos',
-      productos_especificos: [], excluir_ofertas: false, monto_minimo: 0, fecha_inicio: '', fecha_vencimiento: '',
+      titulo: '', descripcion: '', codigo: '', tipo_descuento: 'porcentaje', valor_descuento: 20, tipo_aplicacion: 'todos',
+      producto_ids: [], excluir_ofertas: false, monto_minimo: 0, fecha_inicio: '', fecha_vencimiento: '',
       limite_usos: 'ilimitado', max_usos: 100, uso_por_cliente: 'una_vez', estado: 'activo'
     });
   };
@@ -266,11 +318,21 @@ export default function MarketingPage() {
   const editarCupon = (cupon) => {
     setCuponEditando(cupon);
     setFormDataCupon({
-      titulo: cupon.titulo, descripcion: cupon.descripcion, codigo: cupon.codigo, tipo_descuento: cupon.tipo_descuento,
-      valor: cupon.valor, aplica_a: cupon.aplica_a, productos_especificos: cupon.productos_especificos || [],
-      excluir_ofertas: cupon.excluir_ofertas || false, monto_minimo: cupon.monto_minimo || 0, fecha_inicio: cupon.fecha_inicio,
-      fecha_vencimiento: cupon.fecha_vencimiento, limite_usos: cupon.limite_usos, max_usos: cupon.max_usos || 100,
-      uso_por_cliente: cupon.uso_por_cliente, estado: cupon.estado
+      titulo: cupon.titulo, 
+      descripcion: cupon.descripcion, 
+      codigo: cupon.codigo, 
+      tipo_descuento: cupon.tipo_descuento || 'porcentaje',
+      valor_descuento: cupon.valor_descuento || cupon.valor || 0,
+      tipo_aplicacion: cupon.tipo_aplicacion || (cupon.aplica_a === 'especificos' ? 'varios_productos' : 'todos'),
+      producto_ids: cupon.producto_ids || cupon.productos_especificos || [],
+      excluir_ofertas: cupon.excluir_ofertas || false, 
+      monto_minimo: cupon.monto_minimo || 0, 
+      fecha_inicio: cupon.fecha_inicio,
+      fecha_vencimiento: cupon.fecha_vencimiento, 
+      limite_usos: cupon.limite_usos, 
+      max_usos: cupon.max_usos || 100,
+      uso_por_cliente: cupon.uso_por_cliente, 
+      estado: cupon.estado
     });
     setShowCuponForm(true);
   };
@@ -296,15 +358,6 @@ export default function MarketingPage() {
   };
 
   const copiarCodigo = (codigo) => { navigator.clipboard.writeText(codigo); toast.success('Código copiado'); };
-
-  const toggleProductoCupon = (productoId) => {
-    const actuales = formDataCupon.productos_especificos;
-    if (actuales.includes(productoId)) {
-      setFormDataCupon({ ...formDataCupon, productos_especificos: actuales.filter(id => id !== productoId) });
-    } else {
-      setFormDataCupon({ ...formDataCupon, productos_especificos: [...actuales, productoId] });
-    }
-  };
 
   const estadisticasCupones = {
     total: cupones.length,
@@ -441,7 +494,7 @@ export default function MarketingPage() {
   const mostrarTextoMarketplace = productoMarketplace && plantillaMarketplaceSeleccionada && textoMarketplace !== '';
 
   const productosParaCupon = productos.filter(p => 
-    (p.producto || '').toLowerCase().includes(busquedaProductoCupon.toLowerCase()) ||
+    (p.producto || p.plataforma || p.nombre || '').toLowerCase().includes(busquedaProductoCupon.toLowerCase()) ||
     (p.marca || '').toLowerCase().includes(busquedaProductoCupon.toLowerCase())
   );
 
@@ -561,7 +614,7 @@ export default function MarketingPage() {
                       <div>
                         <h4 className="text-sm font-semibold text-white">{plantilla.nombre}</h4>
                         <div className="flex gap-1 mt-1">
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-voltech-cyan/20 text-voltech-cyan">{plantilla.tipo === 'whatsapp' ? '📱 WhatsApp' : ' Marketplace'}</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-voltech-cyan/20 text-voltech-cyan">{plantilla.tipo === 'whatsapp' ? '📱 WhatsApp' : '📄 Marketplace'}</span>
                           <span className="text-xs text-voltech-muted capitalize">{plantilla.categoria}</span>
                         </div>
                         <p className="text-[10px] text-voltech-muted mt-1">Creado por: {plantilla.creadoPor || 'Desconocido'}</p>
@@ -819,66 +872,113 @@ export default function MarketingPage() {
 
                       <div>
                         <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2"><Percent className="w-4 h-4 text-voltech-success" /> Configuración del Descuento</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        
+                        <div className="mb-4">
+                          <label className="block text-xs text-voltech-muted mb-2">Tipo de Cupón (Aplicación)</label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formDataCupon.tipo_aplicacion === 'todos' ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'}`}>
+                              <input type="radio" name="tipo_aplicacion" checked={formDataCupon.tipo_aplicacion === 'todos'} onChange={() => handleTipoAplicacionChange('todos')} className="w-4 h-4 text-voltech-cyan" />
+                              <div>
+                                <span className="text-sm text-white font-medium">Todos los productos</span>
+                                <p className="text-[10px] text-voltech-muted">Válido para cualquier artículo del carrito</p>
+                              </div>
+                            </label>
+                            <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formDataCupon.tipo_aplicacion === 'producto_especifico' ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'}`}>
+                              <input type="radio" name="tipo_aplicacion" checked={formDataCupon.tipo_aplicacion === 'producto_especifico'} onChange={() => handleTipoAplicacionChange('producto_especifico')} className="w-4 h-4 text-voltech-cyan" />
+                              <div>
+                                <span className="text-sm text-white font-medium">1 Producto específico</span>
+                                <p className="text-[10px] text-voltech-muted">Válido solo para un producto seleccionado</p>
+                              </div>
+                            </label>
+                            <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formDataCupon.tipo_aplicacion === 'varios_productos' ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'}`}>
+                              <input type="radio" name="tipo_aplicacion" checked={formDataCupon.tipo_aplicacion === 'varios_productos'} onChange={() => handleTipoAplicacionChange('varios_productos')} className="w-4 h-4 text-voltech-cyan" />
+                              <div>
+                                <span className="text-sm text-white font-medium">Varios productos</span>
+                                <p className="text-[10px] text-voltech-muted">Válido para una lista de productos seleccionados</p>
+                              </div>
+                            </label>
+                            <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formDataCupon.tipo_aplicacion === 'producto_gratis' ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'}`}>
+                              <input type="radio" name="tipo_aplicacion" checked={formDataCupon.tipo_aplicacion === 'producto_gratis'} onChange={() => handleTipoAplicacionChange('producto_gratis')} className="w-4 h-4 text-voltech-cyan" />
+                              <div>
+                                <span className="text-sm text-white font-medium">Producto 100% Gratis</span>
+                                <p className="text-[10px] text-voltech-muted">Hace que el producto seleccionado sea gratis</p>
+                              </div>
+                            </label>
+                          </div>
+                        </div>
+
+                        {formDataCupon.tipo_aplicacion !== 'todos' && (
+                          <div className="border-t border-voltech-border pt-4 mb-4">
+                            <label className="block text-xs text-voltech-muted mb-2">
+                              {formDataCupon.tipo_aplicacion === 'producto_especifico' ? 'Buscar y seleccionar el producto:' : 'Buscar y seleccionar los productos:'}
+                            </label>
+                            <div className="relative mb-3">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
+                              <input 
+                                type="text" 
+                                value={busquedaProductoCupon} 
+                                onChange={(e) => setBusquedaProductoCupon(e.target.value)} 
+                                placeholder="Escribir nombre, plataforma o marca..." 
+                                className="input-voltech w-full rounded-lg pl-10 pr-4 py-2 text-sm" 
+                              />
+                            </div>
+                            <div className="max-h-40 overflow-y-auto space-y-2 border border-voltech-border rounded-lg p-2 bg-voltech-surface">
+                              {productosParaCupon.map(prod => {
+                                const isSelected = formDataCupon.producto_ids.includes(prod.id);
+                                const isSingle = formDataCupon.tipo_aplicacion === 'producto_especifico' || formDataCupon.tipo_aplicacion === 'producto_gratis';
+                                
+                                return (
+                                  <label key={prod.id} className={`flex items-center gap-3 p-2 rounded cursor-pointer transition-colors ${isSelected ? 'bg-voltech-cyan/10 border border-voltech-cyan/30' : 'hover:bg-voltech-dark/50'}`}>
+                                    <input 
+                                      type={isSingle ? 'radio' : 'checkbox'} 
+                                      name="producto_seleccionado"
+                                      checked={isSelected} 
+                                      onChange={() => toggleProductoCupon(prod.id, isSingle)} 
+                                      className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" 
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm text-white truncate">{prod.producto || prod.plataforma || prod.nombre || 'Sin nombre'}</p>
+                                      <p className="text-xs text-voltech-muted">${(prod.precioDetal || prod.precioMayor || 0).toFixed(2)} • {prod.marca || 'Sin marca'}</p>
+                                    </div>
+                                  </label>
+                                );
+                              })}
+                              {productosParaCupon.length === 0 && <p className="text-xs text-voltech-muted text-center py-2">No se encontraron productos</p>}
+                            </div>
+                            <p className="text-xs text-voltech-cyan mt-2">{formDataCupon.producto_ids.length} producto(s) seleccionado(s)</p>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                           <div>
-                            <label className="block text-xs text-voltech-muted mb-1">Tipo</label>
-                            <select value={formDataCupon.tipo_descuento} onChange={(e) => setFormDataCupon({...formDataCupon, tipo_descuento: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                            <label className="block text-xs text-voltech-muted mb-1">Tipo de Descuento</label>
+                            <select 
+                              value={formDataCupon.tipo_descuento} 
+                              disabled={formDataCupon.tipo_aplicacion === 'producto_gratis'}
+                              onChange={(e) => setFormDataCupon({...formDataCupon, tipo_descuento: e.target.value})} 
+                              className="input-voltech w-full rounded-lg px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
                               <option value="porcentaje">Porcentaje (%)</option>
-                              <option value="monto">Monto Fijo ($)</option>
+                              <option value="monto_fijo">Monto Fijo ($)</option>
+                              {formDataCupon.tipo_aplicacion === 'producto_gratis' && <option value="gratis">Gratis (100% off)</option>}
                             </select>
                           </div>
                           <div>
-                            <label className="block text-xs text-voltech-muted mb-1">Valor *</label>
-                            <input type="number" value={formDataCupon.valor} onChange={(e) => setFormDataCupon({...formDataCupon, valor: parseFloat(e.target.value) || 0})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder={formDataCupon.tipo_descuento === 'porcentaje' ? '20' : '10.00'} />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-voltech-muted mb-1">Monto Mínimo de Compra ($)</label>
-                            <input type="number" step="0.01" value={formDataCupon.monto_minimo} onChange={(e) => setFormDataCupon({...formDataCupon, monto_minimo: parseFloat(e.target.value) || 0})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="0.00" />
+                            <label className="block text-xs text-voltech-muted mb-1">
+                              {formDataCupon.tipo_descuento === 'porcentaje' ? 'Valor (%)' : formDataCupon.tipo_descuento === 'monto_fijo' ? 'Valor ($)' : 'Valor'} *
+                            </label>
+                            <input 
+                              type="number" 
+                              disabled={formDataCupon.tipo_aplicacion === 'producto_gratis'}
+                              value={formDataCupon.valor_descuento} 
+                              onChange={(e) => setFormDataCupon({...formDataCupon, valor_descuento: parseFloat(e.target.value) || 0})} 
+                              className="input-voltech w-full rounded-lg px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed" 
+                              placeholder={formDataCupon.tipo_descuento === 'porcentaje' ? '20' : '10.00'} 
+                            />
                           </div>
                         </div>
 
                         <div className="bg-voltech-dark/30 border border-voltech-border rounded-lg p-4 space-y-4">
-                          <div>
-                            <label className="block text-xs text-voltech-muted mb-2">Aplicar descuento a:</label>
-                            <div className="flex gap-4">
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" name="aplica_a" checked={formDataCupon.aplica_a === 'todos'} onChange={() => setFormDataCupon({...formDataCupon, aplica_a: 'todos'})} className="w-4 h-4 text-voltech-cyan" />
-                                <span className="text-sm text-white">Todos los productos</span>
-                              </label>
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" name="aplica_a" checked={formDataCupon.aplica_a === 'especificos'} onChange={() => setFormDataCupon({...formDataCupon, aplica_a: 'especificos'})} className="w-4 h-4 text-voltech-cyan" />
-                                <span className="text-sm text-white">Productos específicos</span>
-                              </label>
-                            </div>
-                          </div>
-
-                          {formDataCupon.aplica_a === 'especificos' && (
-                            <div className="border-t border-voltech-border pt-4">
-                              <label className="block text-xs text-voltech-muted mb-2">Buscar y seleccionar productos:</label>
-                              <div className="relative mb-3">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
-                                <input type="text" value={busquedaProductoCupon} onChange={(e) => setBusquedaProductoCupon(e.target.value)} placeholder="Escribir nombre o marca..." className="input-voltech w-full rounded-lg pl-10 pr-4 py-2 text-sm" />
-                              </div>
-                              <div className="max-h-40 overflow-y-auto space-y-2 border border-voltech-border rounded-lg p-2 bg-voltech-surface">
-                                {productosParaCupon.map(prod => {
-                                  const isSelected = formDataCupon.productos_especificos.includes(prod.id);
-                                  return (
-                                    <label key={prod.id} className={`flex items-center gap-3 p-2 rounded cursor-pointer transition-colors ${isSelected ? 'bg-voltech-cyan/10 border border-voltech-cyan/30' : 'hover:bg-voltech-dark/50'}`}>
-                                      <input type="checkbox" checked={isSelected} onChange={() => toggleProductoCupon(prod.id)} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" />
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-sm text-white truncate">{prod.producto || prod.plataforma}</p>
-                                        <p className="text-xs text-voltech-muted">${prod.precioDetal?.toFixed(2)} • {prod.marca || 'Sin marca'}</p>
-                                      </div>
-                                      {prod.precio_oferta && <span className="text-[10px] px-2 py-0.5 bg-red-500/20 text-red-400 rounded-full">En Oferta</span>}
-                                    </label>
-                                  );
-                                })}
-                                {productosParaCupon.length === 0 && <p className="text-xs text-voltech-muted text-center py-2">No se encontraron productos</p>}
-                              </div>
-                              <p className="text-xs text-voltech-cyan mt-2">{formDataCupon.productos_especificos.length} producto(s) seleccionado(s)</p>
-                            </div>
-                          )}
-
                           <div className="border-t border-voltech-border pt-4">
                             <label className="flex items-center gap-3 cursor-pointer">
                               <input type="checkbox" checked={formDataCupon.excluir_ofertas} onChange={(e) => setFormDataCupon({...formDataCupon, excluir_ofertas: e.target.checked})} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" />
@@ -946,9 +1046,18 @@ export default function MarketingPage() {
                   </div>
                 ) : (
                   cupones.map(cupon => {
-                    const aplicaTexto = cupon.aplica_a === 'especificos' 
-                      ? `${cupon.productos_especificos.length} productos específicos` 
-                      : 'Todos los productos';
+                    const aplicaTexto = () => {
+                      if (cupon.tipo_aplicacion === 'todos') return 'Todos los productos';
+                      if (cupon.tipo_aplicacion === 'producto_gratis') return 'Producto 100% Gratis';
+                      const count = (cupon.producto_ids || cupon.productos_especificos || []).length;
+                      return cupon.tipo_aplicacion === 'producto_especifico' ? '1 producto específico' : `${count} productos específicos`;
+                    };
+
+                    const descuentoTexto = cupon.es_gratis || cupon.tipo_descuento === 'gratis' 
+                      ? '100% GRATIS' 
+                      : cupon.tipo_descuento === 'porcentaje' 
+                        ? `${cupon.valor_descuento || cupon.valor}%` 
+                        : `$${(cupon.valor_descuento || cupon.valor || 0).toFixed(2)}`;
                     
                     return (
                       <div key={cupon.id} className="p-6 hover:bg-voltech-dark/30 transition-colors">
@@ -975,11 +1084,11 @@ export default function MarketingPage() {
                               </div>
                               <div className="flex items-center gap-2">
                                 <Percent className="w-4 h-4 text-voltech-success" />
-                                <span className="text-voltech-success font-bold">{cupon.tipo_descuento === 'porcentaje' ? `${cupon.valor}%` : `$${cupon.valor.toFixed(2)}`}</span>
+                                <span className="text-voltech-success font-bold">{descuentoTexto}</span>
                               </div>
                               <div className="flex items-center gap-2">
                                 <Package className="w-4 h-4 text-voltech-purple" />
-                                <span className="text-voltech-muted">{aplicaTexto}</span>
+                                <span className="text-voltech-muted">{aplicaTexto()}</span>
                               </div>
                               <div className="flex items-center gap-2">
                                 <Calendar className="w-4 h-4 text-voltech-warning" />
@@ -1080,7 +1189,6 @@ export default function MarketingPage() {
                           />
                         </div>
 
-                        {/* ✅ AGREGADO: Campo de Descripción */}
                         <div>
                           <label className="block text-sm font-medium text-voltech-muted mb-2">Descripción</label>
                           <textarea
@@ -1139,9 +1247,6 @@ export default function MarketingPage() {
                               </div>
                             )}
                           </div>
-                          <p className="text-[10px] text-voltech-muted flex items-center gap-1 mt-2">
-                            <AlertCircle className="w-3 h-3" /> 💡 Tip: Para mejores resultados en WhatsApp y Facebook, usa imágenes cuadradas (800x800px) u horizontales (1200x630px). El sistema las adaptará automáticamente.
-                          </p>
                         </div>
 
                         <div>
@@ -1436,7 +1541,6 @@ export default function MarketingPage() {
                             </span>
                           </div>
                           
-                          {/* ✅ AGREGADO: Mostrar descripción en la lista */}
                           {pub.descripcion && (
                             <p className="text-xs text-voltech-muted line-clamp-2 w-full mb-2 italic">"{pub.descripcion}"</p>
                           )}

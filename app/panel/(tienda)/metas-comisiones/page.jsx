@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { usePermissions } from '@/app/context/PermissionsContext'; // ✅ NUEVO: Sistema de permisos
+import { usePermissions } from '@/app/context/PermissionsContext';
+import { useNotificaciones } from '@/app/context/NotificationContext'; // ✅ Para notificaciones
 import { 
   DollarSign, BarChart, Target, MessageCircle, CheckCircle, 
   User, Save, Trash2, Plus, Calendar, Bell, X, TrendingUp, 
-  Award, Download
+  Award, Download, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -14,29 +15,23 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
 export default function MetasYComisionesPage() {
-  // ✅ NUEVO: Usamos el contexto de permisos en lugar de leer localStorage manualmente
   const { esAdmin, esSocio, esVendedor, usuarioActual } = usePermissions();
-  const puedeGestionar = esAdmin || esSocio; // Helper para saber si puede editar
+  const { agregarNotificacion } = useNotificaciones(); // ✅ Hook de notificaciones
+  const puedeGestionar = esAdmin || esSocio;
 
   const [mostrarFormMetas, setMostrarFormMetas] = useState(false);
-  
-  const [comisiones, setComisiones] = useState({
-    metas: [
-      { id: 1, ventas: 0, porcentaje: 3, activo: true, fechaInicio: '', fechaFin: '' },
-      { id: 2, ventas: 10, porcentaje: 5, activo: true, fechaInicio: '', fechaFin: '' },
-      { id: 3, ventas: 20, porcentaje: 7, activo: true, fechaInicio: '', fechaFin: '' },
-    ],
-    comentarios: [],
-    comisionesPagadas: []
-  });
-  
-  const [nuevoComentario, setNuevoComentario] = useState('');
+  const [metas, setMetas] = useState([]);
   const [metasTemp, setMetasTemp] = useState([]);
-  const [showModalAprobar, setShowModalAprobar] = useState(false);
-  const [comentarioSeleccionado, setComentarioSeleccionado] = useState(null);
   
-  const [ranking, setRanking] = useState([]);
   const [statsReales, setStatsReales] = useState({ ventasMes: 0, metaActual: 0 });
+  const [ranking, setRanking] = useState([]);
+  
+  // ✅ NUEVO: Bonos generados por metas (se integran con Pagos al Equipo)
+  const [bonosPendientes, setBonosPendientes] = useState([]);
+  const [loadingBonos, setLoadingBonos] = useState(false);
+
+  const [nuevoComentario, setNuevoComentario] = useState('');
+  const [comentarios, setComentarios] = useState([]);
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -52,27 +47,44 @@ export default function MetasYComisionesPage() {
       }
 
       if (savedData) {
-        setComisiones(savedData);
+        setMetas(savedData.metas || []);
         setMetasTemp(savedData.metas || []);
-      } else {
-        setMetasTemp(comisiones.metas);
+        setComentarios(savedData.comentarios || []);
       }
 
-      calcularRankingYStats();
+      await cargarDatosReales();
+      await verificarBonosAutomaticamente(); // ✅ Verifica al cargar la página
     };
 
     cargarDatos();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Se recalcula cuando cambian las metas o el usuario
+  }, []);
 
-  const calcularRankingYStats = () => {
-    const ventasProd = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
-    const ventasStream = JSON.parse(localStorage.getItem('voltech_ventas_streaming') || '[]');
+  const cargarDatosReales = async () => {
+    let ventasProd = [], ventasStream = [], equipo = [];
+    
+    if (supabase) {
+      const [{ data: vp }, { data: vs }, { data: eq }] = await Promise.all([
+        supabase.from('ventas').select('*'),
+        supabase.from('ventas_streaming').select('*'),
+        supabase.from('usuarios').select('*')
+      ]);
+      if (vp) ventasProd = vp;
+      if (vs) ventasStream = vs;
+      if (eq) equipo = eq;
+    } else {
+      ventasProd = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
+      ventasStream = JSON.parse(localStorage.getItem('voltech_ventas_streaming') || '[]');
+      equipo = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
+    }
+
     const todasLasVentas = [...ventasProd, ...ventasStream];
-    const equipo = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
+    const mesActual = new Date().toISOString().slice(0, 7); // Formato: YYYY-MM
 
-    const mesActual = new Date().getMonth();
-    const ventasDelMes = todasLasVentas.filter(v => new Date(v.fecha || v.fechaRegistro).getMonth() === mesActual);
+    const ventasDelMes = todasLasVentas.filter(v => {
+      const fecha = v.fechaRegistro || v.fecha;
+      return fecha && fecha.startsWith(mesActual);
+    });
 
     const ventasPorVendedor = {};
     ventasDelMes.forEach(v => {
@@ -83,7 +95,7 @@ export default function MetasYComisionesPage() {
 
     let rankingCalculado = equipo.map(miembro => {
       const ventasCount = ventasPorVendedor[miembro.nombre] || 0;
-      const metasOrdenadas = [...(comisiones.metas || [])].sort((a, b) => a.ventas - b.ventas);
+      const metasOrdenadas = [...metas].sort((a, b) => a.ventas - b.ventas);
       const proximaMeta = metasOrdenadas.find(m => m.ventas > ventasCount) || metasOrdenadas[metasOrdenadas.length - 1];
       const progreso = proximaMeta ? Math.min((ventasCount / proximaMeta.ventas) * 100, 100) : 100;
 
@@ -97,19 +109,17 @@ export default function MetasYComisionesPage() {
       };
     }).sort((a, b) => b.ventas - a.ventas);
 
-    // ✅ FILTRAR RANKING: Si es vendedor, solo ve su propio progreso
     if (esVendedor && usuarioActual?.nombre) {
       rankingCalculado = rankingCalculado.filter(r => r.nombre === usuarioActual.nombre);
     }
 
     setRanking(rankingCalculado);
     
-    // ✅ ESTADÍSTICAS: Vendedor ve solo sus ventas, Admin ve el total global
     const totalVentasMes = (esVendedor && usuarioActual?.nombre) 
       ? (ventasPorVendedor[usuarioActual.nombre] || 0) 
       : ventasDelMes.length;
       
-    const metaObj = comisiones.metas?.find(m => m.activo) || comisiones.metas?.[comisiones.metas.length - 1];
+    const metaObj = metas?.find(m => m.activo) || metas?.[metas.length - 1];
     
     setStatsReales({
       ventasMes: totalVentasMes,
@@ -117,17 +127,145 @@ export default function MetasYComisionesPage() {
     });
   };
 
+  // ✅ NUEVO: Función para verificar metas y generar bonos en comisiones_pendientes
+  const verificarBonosAutomaticamente = async () => {
+    setLoadingBonos(true);
+    try {
+      let ventasProd = [], ventasStream = [], equipo = [], bonosExistentes = [];
+      const periodoActual = new Date().toISOString().slice(0, 7); // Ej: '2026-07'
+
+      if (supabase) {
+        const [{ data: vp }, { data: vs }, { data: eq }, { data: be }] = await Promise.all([
+          supabase.from('ventas').select('*'),
+          supabase.from('ventas_streaming').select('*'),
+          supabase.from('usuarios').select('*'),
+          supabase.from('comisiones_pendientes').select('*').eq('tipo', 'bono_meta').eq('periodo', periodoActual)
+        ]);
+        ventasProd = vp || [];
+        ventasStream = vs || [];
+        equipo = eq || [];
+        bonosExistentes = be || [];
+      } else {
+        ventasProd = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
+        ventasStream = JSON.parse(localStorage.getItem('voltech_ventas_streaming') || '[]');
+        equipo = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
+        bonosExistentes = JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]').filter(b => b.tipo === 'bono_meta' && b.periodo === periodoActual);
+      }
+
+      const todasLasVentas = [...ventasProd, ...ventasStream];
+      const ventasDelMes = todasLasVentas.filter(v => {
+        const fecha = v.fechaRegistro || v.fecha;
+        return fecha && fecha.startsWith(periodoActual);
+      });
+
+      const ventasPorVendedor = {};
+      ventasDelMes.forEach(v => {
+        const vendedor = v.vendedor;
+        if (vendedor) {
+          if (!ventasPorVendedor[vendedor]) ventasPorVendedor[vendedor] = 0;
+          ventasPorVendedor[vendedor] += 1;
+        }
+      });
+
+      const nuevosBonos = [];
+
+      // Revisar cada vendedor contra las metas
+      for (const miembro of equipo) {
+        const ventasCount = ventasPorVendedor[miembro.nombre] || 0;
+        
+        // Buscar la meta más alta que haya alcanzado
+        const metasAlcanzadas = metas.filter(m => m.activo && ventasCount >= m.ventas).sort((a, b) => b.ventas - a.ventas);
+        const mejorMeta = metasAlcanzadas[0];
+
+        if (mejorMeta) {
+          // Verificar si ya se le pagó o generó este bono este período
+          const yaBonificado = bonosExistentes.some(b => b.miembro_id === miembro.id && b.meta_id === mejorMeta.id);
+
+          if (!yaBonificado) {
+            // Calcular monto del bono (puede ser fijo o % sobre un monto base, aquí usamos un valor fijo de ejemplo o calculado)
+            // Para este ejemplo, asumimos que la meta tiene un campo 'bono_monto' o usamos un cálculo estándar.
+            // Si no existe, usamos $20 como ejemplo del prompt.
+            const montoBono = mejorMeta.bono_monto || 20.00; 
+
+            const nuevoBono = {
+              id: `bono-${Date.now()}-${miembro.id}`,
+              venta_id: null,
+              venta_numero_orden: 'META',
+              miembro_id: miembro.id,
+              miembro_nombre: miembro.nombre,
+              producto_id: null,
+              producto_nombre: `Bono Meta: ${mejorMeta.ventas} ventas`,
+              monto_venta: 0,
+              porcentaje_comision: mejorMeta.porcentaje,
+              monto_comision: montoBono,
+              fecha_venta: new Date().toISOString().split('T')[0],
+              estado: 'pendiente',
+              tipo: 'bono_meta', // ✅ Clave para que aparezca en Pagos al Equipo
+              periodo: periodoActual,
+              meta_id: mejorMeta.id,
+              fecha_registro: new Date().toISOString()
+            };
+
+            nuevosBonos.push(nuevoBono);
+
+            // ✅ Enviar notificación
+            if (agregarNotificacion) {
+              agregarNotificacion({
+                tipo: 'meta_alcanzada',
+                titulo: '¡Meta Alcanzada! 🎉',
+                mensaje: `Felicidades ${miembro.nombre}, alcanzaste la meta de ${mejorMeta.ventas} ventas. Bono: $${montoBono}`,
+                detalle: `Revisa tus comisiones pendientes.`,
+                usuario_id: miembro.id
+              });
+            }
+          }
+        }
+      }
+
+      if (nuevosBonos.length > 0) {
+        if (supabase) {
+          await supabase.from('comisiones_pendientes').insert(nuevosBonos);
+        }
+        const bonosGuardados = JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]');
+        localStorage.setItem('voltech_comisiones_pendientes', JSON.stringify([...bonosGuardados, ...nuevosBonos]));
+        
+        toast.success(`Se generaron ${nuevosBonos.length} bonos por metas alcanzadas. Revisa "Pagos al Equipo".`);
+      }
+
+      // Cargar bonos para mostrar en esta página
+      let todosLosBonos = [];
+      if (supabase) {
+        const { data } = await supabase.from('comisiones_pendientes').select('*').eq('tipo', 'bono_meta').order('fecha_registro', { ascending: false });
+        todosLosBonos = data || [];
+      } else {
+        todosLosBonos = JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]').filter(b => b.tipo === 'bono_meta');
+      }
+      
+      // Filtrar si es vendedor
+      const bonosVisibles = (esVendedor && usuarioActual?.nombre) 
+        ? todosLosBonos.filter(b => b.miembro_nombre === usuarioActual.nombre)
+        : todosLosBonos;
+
+      setBonosPendientes(bonosVisibles);
+
+    } catch (error) {
+      console.error('Error verificando bonos:', error);
+    } finally {
+      setLoadingBonos(false);
+    }
+  };
+
   const guardarEnSupabaseYLocal = async (nuevosDatos) => {
     if (supabase) {
       await supabase.from('settings').upsert({ clave: 'metas_comisiones', valor: nuevosDatos }, { onConflict: 'clave' });
     }
     localStorage.setItem('voltech_comisiones', JSON.stringify(nuevosDatos));
-    setComisiones(nuevosDatos);
   };
 
   const handleSave = async () => {
-    await guardarEnSupabaseYLocal(comisiones);
-    toast.success('Configuración guardada correctamente');
+    await guardarEnSupabaseYLocal({ metas: metas, comentarios: comentarios });
+    setMetas(metas);
+    toast.success('Configuración de metas guardada correctamente');
   };
 
   const agregarComentario = async () => {
@@ -146,69 +284,40 @@ export default function MetasYComisionesPage() {
       rechazado: false
     };
 
-    const nuevasComisiones = {
-      ...comisiones,
-      comentarios: [comentario, ...comisiones.comentarios]
-    };
-    
-    await guardarEnSupabaseYLocal(nuevasComisiones);
+    const nuevosDatos = { metas, comentarios: [comentario, ...comentarios] };
+    await guardarEnSupabaseYLocal(nuevosDatos);
+    setComentarios(nuevosDatos.comentarios);
     setNuevoComentario('');
     toast.success('Sugerencia enviada. El admin la revisará.');
   };
 
-  const aprobarComentario = (comentario) => {
-    setComentarioSeleccionado(comentario);
-    setShowModalAprobar(true);
-  };
-
-  const confirmarAprobacion = async () => {
-    if (!comentarioSeleccionado) return;
-
-    const nuevasComisiones = {
-      ...comisiones,
-      comentarios: comisiones.comentarios.map(c => 
-        c.id === comentarioSeleccionado.id ? { ...c, aprobado: true, leido: true } : c
-      )
+  const aprobarComentario = async (comentario) => {
+    const nuevosDatos = {
+      metas,
+      comentarios: comentarios.map(c => c.id === comentario.id ? { ...c, aprobado: true, leido: true } : c)
     };
+    await guardarEnSupabaseYLocal(nuevosDatos);
+    setComentarios(nuevosDatos.comentarios);
+    toast.success(`Sugerencia de ${comentario.usuario} aprobada.`);
     
-    await guardarEnSupabaseYLocal(nuevasComisiones);
-    toast.success(`Sugerencia de ${comentarioSeleccionado.usuario} aprobada.`);
-    
-    const notificacion = {
-      id: Date.now(),
-      tipo: 'sugerencia_aprobada',
-      usuario: comentarioSeleccionado.usuario,
-      mensaje: `Tu sugerencia ha sido aprobada: "${comentarioSeleccionado.texto}"`,
-      hora: new Date().toISOString()
-    };
-    
-    // Guardar notificación (usando el formato correcto del contexto)
-    const notificacionesGuardadas = localStorage.getItem('voltech_notificaciones');
-    const notificaciones = notificacionesGuardadas ? JSON.parse(notificacionesGuardadas) : [];
-    localStorage.setItem('voltech_notificaciones', JSON.stringify([notificacion, ...notificaciones]));
-
-    setShowModalAprobar(false);
-    setComentarioSeleccionado(null);
+    if (agregarNotificacion) {
+      agregarNotificacion({
+        tipo: 'sugerencia_aprobada',
+        titulo: 'Sugerencia Aprobada',
+        mensaje: `Tu sugerencia ha sido aprobada: "${comentario.texto.substring(0, 30)}..."`,
+        usuario_id: comentario.usuario // Asumiendo que el nombre coincide, idealmente usar ID
+      });
+    }
   };
 
   const rechazarComentario = async (id) => {
-    const nuevasComisiones = {
-      ...comisiones,
-      comentarios: comisiones.comentarios.map(c => 
-        c.id === id ? { ...c, rechazado: true, leido: true } : c
-      )
+    const nuevosDatos = {
+      metas,
+      comentarios: comentarios.map(c => c.id === id ? { ...c, rechazado: true, leido: true } : c)
     };
-    await guardarEnSupabaseYLocal(nuevasComisiones);
+    await guardarEnSupabaseYLocal(nuevosDatos);
+    setComentarios(nuevosDatos.comentarios);
     toast.success('Sugerencia rechazada');
-  };
-
-  const eliminarComentario = async (id) => {
-    const nuevasComisiones = {
-      ...comisiones,
-      comentarios: comisiones.comentarios.filter(c => c.id !== id)
-    };
-    await guardarEnSupabaseYLocal(nuevasComisiones);
-    toast.success('Comentario eliminado');
   };
 
   const agregarMeta = () => {
@@ -217,6 +326,7 @@ export default function MetasYComisionesPage() {
       id: Date.now(),
       ventas: (ultimaMeta?.ventas || 0) + 10,
       porcentaje: ultimaMeta?.porcentaje ? Math.min(ultimaMeta.porcentaje + 2, 15) : 7,
+      bono_monto: 20.00, // ✅ Valor por defecto del bono
       activo: true,
       fechaInicio: '',
       fechaFin: ''
@@ -226,9 +336,8 @@ export default function MetasYComisionesPage() {
   };
 
   const eliminarMeta = (id) => {
-    const nuevasMetas = metasTemp.filter(m => m.id !== id);
-    setMetasTemp(nuevasMetas);
-    toast.success('Meta eliminada de la vista previa. Recuerda guardar.');
+    setMetasTemp(prev => prev.filter(m => m.id !== id));
+    toast.success('Meta eliminada de la vista previa.');
   };
 
   const actualizarMeta = (id, campo, valor) => {
@@ -238,27 +347,12 @@ export default function MetasYComisionesPage() {
   };
 
   const guardarMetas = async () => {
-    const nuevasComisiones = {
-      ...comisiones,
-      metas: [...metasTemp]
-    };
-    
-    await guardarEnSupabaseYLocal(nuevasComisiones);
-    calcularRankingYStats();
-    
-    toast.success('Metas actualizadas y guardadas correctamente en el sistema');
+    const nuevosDatos = { metas: [...metasTemp], comentarios };
+    await guardarEnSupabaseYLocal(nuevosDatos);
+    setMetas(metasTemp);
+    await cargarDatosReales();
+    toast.success('Metas actualizadas y guardadas correctamente');
     setMostrarFormMetas(false);
-  };
-
-  const marcarComisionPagada = async (comisionId) => {
-    const nuevasComisiones = {
-      ...comisiones,
-      comisionesPagadas: comisiones.comisionesPagadas.map(c => 
-        c.id === comisionId ? { ...c, estado: 'pagada', fechaPago: new Date().toISOString() } : c
-      )
-    };
-    await guardarEnSupabaseYLocal(nuevasComisiones);
-    toast.success('Comisión marcada como pagada');
   };
 
   const generarReporteSocio = () => {
@@ -293,16 +387,11 @@ export default function MetasYComisionesPage() {
     });
 
     doc.save(`Reporte_Avance_${new Date().toISOString().split('T')[0]}.pdf`);
-    toast.success('Reporte generado. ¡Envíalo por WhatsApp a tu socio!');
+    toast.success('Reporte generado.');
   };
 
-  const comentariosNoLeidos = comisiones.comentarios?.filter(c => !c.leido).length || 0;
-  const comisionActual = comisiones.metas?.[comisiones.metas.length - 1]?.porcentaje || 0;
-
-  // ✅ Filtrar comisiones pagadas si es vendedor
-  const comisionesVisibles = (esVendedor && usuarioActual?.nombre)
-    ? comisiones.comisionesPagadas.filter(c => c.vendedor === usuarioActual.nombre)
-    : comisiones.comisionesPagadas;
+  const comentariosNoLeidos = comentarios?.filter(c => !c.leido).length || 0;
+  const comisionActual = metas?.[metas.length - 1]?.porcentaje || 0;
 
   return (
     <div className="space-y-6">
@@ -317,16 +406,25 @@ export default function MetasYComisionesPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Metas y Comisiones</h1>
           <p className="text-sm text-voltech-muted mt-1">
-            {esVendedor ? 'Monitorea tu progreso y rendimiento' : 'Configura porcentajes y monitorea el rendimiento del equipo'}
+            {esVendedor ? 'Monitorea tu progreso y rendimiento' : 'Configura porcentajes, bonos y monitorea el equipo'}
           </p>
         </div>
         <div className="flex gap-3">
           {puedeGestionar && (
             <button
+              onClick={verificarBonosAutomaticamente}
+              disabled={loadingBonos}
+              className="px-4 py-2 bg-voltech-success/20 text-voltech-success border border-voltech-success/30 rounded-lg text-sm font-medium hover:bg-voltech-success/30 transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              {loadingBonos ? 'Verificando...' : <><CheckCircle className="w-4 h-4" /> Verificar y Generar Bonos</>}
+            </button>
+          )}
+          {puedeGestionar && (
+            <button
               onClick={generarReporteSocio}
               className="px-4 py-2 bg-voltech-surface border border-voltech-border text-voltech-cyan rounded-lg text-sm font-medium hover:bg-voltech-cyan/10 transition-all flex items-center gap-2"
             >
-              <Download className="w-4 h-4" /> Reporte para Socio
+              <Download className="w-4 h-4" /> Reporte PDF
             </button>
           )}
           <button
@@ -376,6 +474,58 @@ export default function MetasYComisionesPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ✅ NUEVO: Bonos Pendientes de Pago (Integración con Pagos al Equipo) */}
+      <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-voltech-warning/20"><Award className="w-5 h-5 text-voltech-warning" /></div>
+            <div>
+              <h3 className="text-lg font-bold text-white">Bonos por Metas Alcanzadas</h3>
+              <p className="text-xs text-voltech-muted">Estos bonos aparecerán automáticamente en "Pagos al Equipo" listos para aprobar.</p>
+            </div>
+          </div>
+        </div>
+        
+        {bonosPendientes.length === 0 ? (
+          <div className="text-center py-8 bg-voltech-dark/30 rounded-lg border border-dashed border-voltech-border">
+            <Award className="w-12 h-12 mx-auto mb-3 opacity-50 text-voltech-muted" />
+            <p className="text-sm text-voltech-muted">No hay bonos por metas pendientes de pago este período.</p>
+            {puedeGestionar && <p className="text-xs text-voltech-muted mt-1">Haz clic en "Verificar y Generar Bonos" para revisar el progreso del equipo.</p>}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-voltech-dark border-b border-voltech-border">
+                <tr>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Fecha</th>
+                  {!esVendedor && <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Vendedor</th>}
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Concepto</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Período</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Monto Bono</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bonosPendientes.map((bono) => (
+                  <tr key={bono.id} className="border-b border-voltech-border hover:bg-voltech-border/30">
+                    <td className="px-4 py-3 text-sm text-white">{new Date(bono.fecha_registro).toLocaleDateString('es-VE')}</td>
+                    {!esVendedor && <td className="px-4 py-3 text-sm text-white">{bono.miembro_nombre}</td>}
+                    <td className="px-4 py-3 text-sm text-voltech-cyan">{bono.producto_nombre}</td>
+                    <td className="px-4 py-3 text-sm text-voltech-muted">{bono.periodo}</td>
+                    <td className="px-4 py-3 text-sm font-bold text-voltech-success text-right">${Number(bono.monto_comision).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`text-xs px-2 py-1 rounded-full ${bono.estado === 'pagada' ? 'bg-voltech-success/20 text-voltech-success' : 'bg-voltech-warning/20 text-voltech-warning'}`}>
+                        {bono.estado === 'pagada' ? 'Pagado' : 'Pendiente'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* 🏆 RANKING DE VENTAS DEL MES */}
@@ -442,9 +592,9 @@ export default function MetasYComisionesPage() {
                 <Target className="w-5 h-5 text-voltech-purple" />
               </div>
               <div className="text-left">
-                <h3 className="text-lg font-bold text-white">Metas Escalonadas</h3>
+                <h3 className="text-lg font-bold text-white">Configurar Metas Escalonadas</h3>
                 <p className="text-xs text-voltech-muted">
-                  {mostrarFormMetas ? 'Ocultar configuración' : 'Clic para gestionar porcentajes y fechas'}
+                  {mostrarFormMetas ? 'Ocultar configuración' : 'Clic para gestionar porcentajes, fechas y montos de bonos'}
                 </p>
               </div>
             </div>
@@ -486,7 +636,7 @@ export default function MetasYComisionesPage() {
                           </div>
                           <div>
                             <p className="text-sm font-medium text-white">Meta {index + 1}</p>
-                            <p className="text-xs text-voltech-muted">Comisión del {meta.porcentaje}% al alcanzar {meta.ventas} ventas</p>
+                            <p className="text-xs text-voltech-muted">Comisión del {meta.porcentaje}% + Bono de ${meta.bono_monto || 20} al alcanzar {meta.ventas} ventas</p>
                           </div>
                         </div>
                         <button 
@@ -497,7 +647,7 @@ export default function MetasYComisionesPage() {
                         </button>
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                         <div>
                           <label className="block text-xs text-voltech-muted mb-2">Ventas requeridas</label>
                           <input
@@ -511,6 +661,14 @@ export default function MetasYComisionesPage() {
                           <input
                             type="number" min="0" max="100" step="0.1" value={meta.porcentaje}
                             onChange={(e) => actualizarMeta(meta.id, 'porcentaje', parseFloat(e.target.value) || 0)}
+                            className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-voltech-muted mb-2">Monto Bono ($)</label>
+                          <input
+                            type="number" min="0" step="0.01" value={meta.bono_monto || 20}
+                            onChange={(e) => actualizarMeta(meta.id, 'bono_monto', parseFloat(e.target.value) || 0)}
                             className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
                           />
                         </div>
@@ -580,7 +738,7 @@ export default function MetasYComisionesPage() {
           </div>
         )}
 
-        {(!comisiones.comentarios || comisiones.comentarios.length === 0) ? (
+        {(!comentarios || comentarios.length === 0) ? (
           <div className="text-center py-8">
             <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-50 text-voltech-muted" />
             <p className="text-sm text-voltech-muted">
@@ -589,7 +747,7 @@ export default function MetasYComisionesPage() {
           </div>
         ) : (
           <div className="space-y-4 max-h-96 overflow-y-auto">
-            {comisiones.comentarios.map((comentario) => (
+            {comentarios.map((comentario) => (
               <motion.div 
                 key={comentario.id}
                 initial={{ opacity: 0, height: 0 }}
@@ -618,9 +776,6 @@ export default function MetasYComisionesPage() {
                       <button onClick={() => rechazarComentario(comentario.id)} className="text-xs px-3 py-1 bg-voltech-error/20 text-voltech-error rounded hover:bg-voltech-error/30 transition-colors flex items-center gap-1">
                         <X className="w-3 h-3" /> Rechazar
                       </button>
-                      <button onClick={() => eliminarComentario(comentario.id)} className="text-voltech-error hover:text-voltech-error/70 p-1">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </div>
                   )}
                   {comentario.aprobado && <span className="text-xs px-2 py-1 bg-voltech-success/20 text-voltech-success rounded-full">Aprobado</span>}
@@ -632,97 +787,6 @@ export default function MetasYComisionesPage() {
           </div>
         )}
       </div>
-
-      {/* Historial de Comisiones Pagadas (Filtrado para vendedores) */}
-      {comisionesVisibles.length > 0 && (
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-voltech-success/20"><BarChart className="w-5 h-5 text-voltech-success" /></div>
-              <div>
-                <h3 className="text-lg font-bold text-white">Historial de Comisiones</h3>
-                <p className="text-xs text-voltech-muted">
-                  {esVendedor ? 'Tus comisiones registradas' : 'Registro de pagos realizados'}
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-voltech-dark border-b border-voltech-border">
-                <tr>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Fecha</th>
-                  {!esVendedor && <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Vendedor</th>}
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Ventas</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Monto</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Comisión</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Estado</th>
-                  {puedeGestionar && <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Acciones</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {comisionesVisibles.map((comision) => (
-                  <tr key={comision.id} className="border-b border-voltech-border hover:bg-voltech-border/30">
-                    <td className="px-4 py-3 text-sm text-white">{new Date(comision.fecha).toLocaleDateString('es-VE')}</td>
-                    {!esVendedor && <td className="px-4 py-3 text-sm text-white">{comision.vendedor}</td>}
-                    <td className="px-4 py-3 text-sm text-white">{comision.ventas}</td>
-                    <td className="px-4 py-3 text-sm text-voltech-success">${comision.monto.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-sm text-voltech-cyan">${comision.comision.toFixed(2)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-1 rounded-full ${comision.estado === 'pagada' ? 'bg-voltech-success/20 text-voltech-success' : 'bg-voltech-warning/20 text-voltech-warning'}`}>
-                        {comision.estado === 'pagada' ? 'Pagada' : 'Pendiente'}
-                      </span>
-                    </td>
-                    {puedeGestionar && (
-                      <td className="px-4 py-3 text-right">
-                        {comision.estado !== 'pagada' && (
-                          <button onClick={() => marcarComisionPagada(comision.id)} className="text-voltech-success hover:text-voltech-success/70 flex items-center gap-1">
-                            <CheckCircle className="w-4 h-4" /> Marcar pagada
-                          </button>
-                        )}
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Aprobación */}
-      <AnimatePresence>
-        {showModalAprobar && comentarioSeleccionado && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
-            onClick={() => setShowModalAprobar(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-voltech-surface border border-voltech-border rounded-xl w-full max-w-md p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-lg font-bold text-white mb-4">Aprobar Sugerencia</h3>
-              <p className="text-sm text-voltech-muted mb-4">
-                ¿Estás seguro de aprobar esta sugerencia de <span className="text-white font-semibold">{comentarioSeleccionado.usuario}</span>?
-              </p>
-              <div className="p-3 bg-voltech-dark/50 border border-voltech-border rounded-lg mb-6">
-                <p className="text-sm text-white">{comentarioSeleccionado.texto}</p>
-              </div>
-              <div className="flex gap-3">
-                <button onClick={confirmarAprobacion} className="flex-1 px-4 py-2 bg-voltech-success/20 text-voltech-success rounded-lg hover:bg-voltech-success/30 transition-colors flex items-center justify-center gap-2">
-                  <CheckCircle className="w-4 h-4" /> Sí, Aprobar
-                </button>
-                <button onClick={() => setShowModalAprobar(false)} className="flex-1 px-4 py-2 bg-voltech-dark border border-voltech-border rounded-lg text-voltech-muted hover:text-white transition-colors">
-                  Cancelar
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from '@/app/context/ThemeContext';
-import { usePermissions } from '@/app/context/PermissionsContext'; // ✅ NUEVO: Sistema de permisos
+import { usePermissions } from '@/app/context/PermissionsContext';
 import { 
   LayoutDashboard, 
   Package, 
@@ -25,7 +25,7 @@ import {
   Target,        
   DollarSign,
   Truck,
-  Wallet // ✅ ÚNICO CAMBIO 1: Agregado para el ícono de Pagos
+  CreditCard // ✅ CAMBIADO: Wallet por CreditCard
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -33,13 +33,11 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }
   const pathname = usePathname();
   const { darkMode, setDarkMode } = useTheme();
   
-  // ✅ NUEVO: Obtenemos el usuario y sus permisos directamente del contexto
   const { usuarioActual, tienePermiso, esAdmin, esSocio } = usePermissions();
 
   const finalIsOpen = sidebarOpen !== undefined ? sidebarOpen : isOpen;
   const finalOnClose = setSidebarOpen ? () => setSidebarOpen(false) : onClose;
 
-  // ✅ MENÚ DINÁMICO: Cada ítem tiene reglas de visibilidad
   const menuItems = [
     {
       section: 'PANEL TIENDA',
@@ -64,7 +62,7 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }
       section: 'PANEL FINANZAS',
       items: [
         { name: 'Dashboard Finanzas', icon: DollarSign, path: '/panel/finanzas', requierePermiso: 'puedeVerFinanzas' },
-        { name: 'Pagos al Equipo', icon: Wallet, path: '/panel/finanzas/pagos-equipos', requierePermiso: 'puedeVerFinanzas' }, // ✅ ÚNICO CAMBIO 2: Agregado aquí
+        { name: 'Pagos al Equipo', icon: CreditCard, path: '/panel/finanzas/pagos-equipos', requierePermiso: 'puedeVerFinanzas' }, // ✅ CAMBIADO: Wallet por CreditCard
         { name: 'Metas y Comisiones', icon: Target, path: '/panel/metas-comisiones', siempreVisible: true },
       ]
     },
@@ -83,7 +81,6 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }
     }
   ];
 
-  // ✅ FILTRAR MENÚ SEGÚN PERMISOS DEL USUARIO
   const menuItemsFiltrados = menuItems.map(section => ({
     ...section,
     items: section.items.filter(item => {
@@ -91,7 +88,7 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }
       if (item.requierePermiso && tienePermiso(item.requierePermiso)) return true;
       return false;
     })
-  })).filter(section => section.items.length > 0); // Ocultar secciones vacías
+  })).filter(section => section.items.length > 0);
 
   const handleLogout = () => {
     localStorage.removeItem('voltech_user');
@@ -180,7 +177,6 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }
         </nav>
 
         <div className="p-4 border-t border-voltech-border space-y-2">
-          {/* ✅ INFO DEL USUARIO CON ROLES DINÁMICOS */}
           {finalIsOpen && usuarioActual && (
             <div className="px-3 py-2 mb-2">
               <p className="text-xs text-voltech-muted">Conectado como:</p>
