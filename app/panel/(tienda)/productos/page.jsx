@@ -14,6 +14,12 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
+// ✅ NUEVO: Función para normalizar texto (ignorar mayúsculas y acentos)
+const normalizarTexto = (texto) => {
+  if (!texto) return '';
+  return texto.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+};
+
 export default function ProductosPage() {
   const { tienePermiso } = usePermissions();
   
@@ -37,6 +43,10 @@ export default function ProductosPage() {
   const [showBulkCommissionModal, setShowBulkCommissionModal] = useState(false);
   const [bulkCommissionPercent, setBulkCommissionPercent] = useState(5);
   
+  // ✅ NUEVO: Estado para gestionar categorías y marcas
+  const [showGestionModal, setShowGestionModal] = useState(false);
+  const [editCatMarca, setEditCatMarca] = useState({ tipo: '', valorOriginal: '', valorNuevo: '' });
+
   const [items, setItems] = useState([{
     id: Date.now(),
     tipo: 'fisico',
@@ -169,9 +179,8 @@ export default function ProductosPage() {
 
   const calcularTotal = (index) => {
     const item = items[index];
-    const total = item.precioMayor * item.cantidad;
     const nuevosItems = [...items];
-    nuevosItems[index].total = total;
+    nuevosItems[index].total = item.precioMayor * item.cantidad;
     setItems(nuevosItems);
   };
 
@@ -234,7 +243,7 @@ export default function ProductosPage() {
   };
 
   const agregarItem = () => {
-    const nuevoItem = {
+    setItems([...items, {
       id: Date.now(),
       tipo: 'fisico',
       imagen: '',
@@ -253,14 +262,12 @@ export default function ProductosPage() {
       esCombo: false,
       plataformasCombo: [],
       porcentaje_comision: 5,
-    };
-    setItems([...items, nuevoItem]);
+    }]);
   };
 
   const eliminarItem = (index) => {
     if (items.length > 1) {
-      const nuevosItems = items.filter((_, i) => i !== index);
-      setItems(nuevosItems);
+      setItems(items.filter((_, i) => i !== index));
     } else {
       toast.error('Debe haber al menos un producto');
     }
@@ -303,11 +310,45 @@ export default function ProductosPage() {
     setNuevoCampo({ tipo: '', valor: '' });
   };
 
+  // ✅ NUEVO: Funciones para editar y eliminar categorías/marcas
+  const eliminarCatMarca = (tipo, valor) => {
+    if (tipo === 'categoria') {
+      const nuevas = categorias.filter(c => c !== valor);
+      setCategorias(nuevas);
+      if (supabase) supabase.from('settings').upsert({ clave: 'categorias', valor: nuevas }, { onConflict: 'clave' });
+      localStorage.setItem('voltech_categorias', JSON.stringify(nuevas));
+    } else {
+      const nuevas = marcas.filter(m => m !== valor);
+      setMarcas(nuevas);
+      if (supabase) supabase.from('settings').upsert({ clave: 'marcas', valor: nuevas }, { onConflict: 'clave' });
+      localStorage.setItem('voltech_marcas', JSON.stringify(nuevas));
+    }
+    toast.success(`${tipo === 'categoria' ? 'Categoría' : 'Marca'} eliminada`);
+  };
+
+  const guardarEdicionCatMarca = () => {
+    if (!editCatMarca.valorNuevo.trim() || editCatMarca.valorNuevo === editCatMarca.valorOriginal) {
+      setEditCatMarca({ tipo: '', valorOriginal: '', valorNuevo: '' });
+      return;
+    }
+    
+    if (editCatMarca.tipo === 'categoria') {
+      const nuevas = categorias.map(c => c === editCatMarca.valorOriginal ? editCatMarca.valorNuevo : c);
+      setCategorias(nuevas);
+      if (supabase) supabase.from('settings').upsert({ clave: 'categorias', valor: nuevas }, { onConflict: 'clave' });
+      localStorage.setItem('voltech_categorias', JSON.stringify(nuevas));
+    } else {
+      const nuevas = marcas.map(m => m === editCatMarca.valorOriginal ? editCatMarca.valorNuevo : m);
+      setMarcas(nuevas);
+      if (supabase) supabase.from('settings').upsert({ clave: 'marcas', valor: nuevas }, { onConflict: 'clave' });
+      localStorage.setItem('voltech_marcas', JSON.stringify(nuevas));
+    }
+    setEditCatMarca({ tipo: '', valorOriginal: '', valorNuevo: '' });
+    toast.success('Actualizado correctamente');
+  };
+
   const abrirComboModal = () => {
-    const plataformasDisponibles = productos
-      .filter(p => p.tipo === 'streaming' && !p.esCombo)
-      .map(p => p.plataforma);
-    setComboPlataformas(plataformasDisponibles);
+    setComboPlataformas(productos.filter(p => p.tipo === 'streaming' && !p.esCombo).map(p => p.plataforma));
     setShowComboModal(true);
   };
 
@@ -377,19 +418,11 @@ export default function ProductosPage() {
   };
 
   const toggleProductSelection = (id) => {
-    if (selectedProducts.includes(id)) {
-      setSelectedProducts(selectedProducts.filter(pid => pid !== id));
-    } else {
-      setSelectedProducts([...selectedProducts, id]);
-    }
+    setSelectedProducts(selectedProducts.includes(id) ? selectedProducts.filter(pid => pid !== id) : [...selectedProducts, id]);
   };
 
   const selectAll = () => {
-    if (selectedProducts.length === productosFiltrados.length) {
-      setSelectedProducts([]);
-    } else {
-      setSelectedProducts(productosFiltrados.map(p => p.id));
-    }
+    setSelectedProducts(selectedProducts.length === productosFiltrados.length ? [] : productosFiltrados.map(p => p.id));
   };
 
   const guardarProductos = async () => {
@@ -403,9 +436,11 @@ export default function ProductosPage() {
         return;
       }
 
+      // ✅ CORRECCIÓN: Búsqueda de duplicados ignorando mayúsculas y acentos
       const productoExistente = productos.find(p => 
-        p.plataforma?.toLowerCase() === item.plataforma.toLowerCase() &&
-        p.categoria?.toLowerCase() === item.categoria.toLowerCase() &&
+        normalizarTexto(p.plataforma) === normalizarTexto(item.plataforma) &&
+        normalizarTexto(p.categoria) === normalizarTexto(item.categoria) &&
+        (item.tipo === 'fisico' ? normalizarTexto(p.marca) === normalizarTexto(item.marca) : true) &&
         p.id !== item.id
       );
 
@@ -450,8 +485,8 @@ export default function ProductosPage() {
       let productosFinales = [...productos];
       nuevosProductos.forEach(p => {
         const index = productosFinales.findIndex(existing => 
-          existing.plataforma === p.plataforma && 
-          existing.categoria === p.categoria
+          normalizarTexto(existing.plataforma) === normalizarTexto(p.plataforma) && 
+          normalizarTexto(existing.categoria) === normalizarTexto(p.categoria)
         );
         
         if (index !== -1) {
@@ -684,6 +719,9 @@ export default function ProductosPage() {
           <button onClick={generarPDFCatalogo} className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2">
             <Download className="w-4 h-4" /> Catálogo
           </button>
+          <button onClick={() => setShowGestionModal(true)} className={`px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}>
+            <Filter className="w-4 h-4" /> Gestionar Cats/Marcas
+          </button>
           <button onClick={() => setShowCarterasModal(!showCarterasModal)} className={`px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}>
             <DollarSign className="w-4 h-4" /> Carteras
           </button>
@@ -697,6 +735,82 @@ export default function ProductosPage() {
           )}
         </div>
       </div>
+
+      {/* ✅ NUEVO: Modal de Gestión de Categorías y Marcas */}
+      <AnimatePresence>
+        {showGestionModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-voltech-surface border border-voltech-border rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-bold text-white">Gestionar Categorías y Marcas</h3>
+                  <button onClick={() => { setShowGestionModal(false); setEditCatMarca({ tipo: '', valorOriginal: '', valorNuevo: '' }); }} className="p-2 rounded-lg hover:bg-voltech-border"><X className="w-5 h-5" /></button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Categorías */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-voltech-cyan mb-3">Categorías</h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                      {categorias.map((cat, idx) => (
+                        <div key={idx} className="flex items-center gap-2 bg-voltech-dark/50 p-2 rounded-lg border border-voltech-border">
+                          {editCatMarca.tipo === 'categoria' && editCatMarca.valorOriginal === cat ? (
+                            <input 
+                              type="text" 
+                              value={editCatMarca.valorNuevo} 
+                              onChange={(e) => setEditCatMarca({...editCatMarca, valorNuevo: e.target.value})}
+                              className="input-voltech flex-1 rounded px-2 py-1 text-sm"
+                              autoFocus
+                            />
+                          ) : (
+                            <span className="flex-1 text-sm text-white truncate">{cat}</span>
+                          )}
+                          {editCatMarca.tipo === 'categoria' && editCatMarca.valorOriginal === cat ? (
+                            <button onClick={guardarEdicionCatMarca} className="p-1 text-voltech-success hover:bg-voltech-success/10 rounded"><CheckCircle className="w-4 h-4" /></button>
+                          ) : (
+                            <button onClick={() => setEditCatMarca({ tipo: 'categoria', valorOriginal: cat, valorNuevo: cat })} className="p-1 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit className="w-4 h-4" /></button>
+                          )}
+                          <button onClick={() => eliminarCatMarca('categoria', cat)} className="p-1 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      ))}
+                      {categorias.length === 0 && <p className="text-xs text-voltech-muted text-center py-4">No hay categorías registradas</p>}
+                    </div>
+                  </div>
+
+                  {/* Marcas */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-voltech-purple mb-3">Marcas</h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                      {marcas.map((mar, idx) => (
+                        <div key={idx} className="flex items-center gap-2 bg-voltech-dark/50 p-2 rounded-lg border border-voltech-border">
+                          {editCatMarca.tipo === 'marca' && editCatMarca.valorOriginal === mar ? (
+                            <input 
+                              type="text" 
+                              value={editCatMarca.valorNuevo} 
+                              onChange={(e) => setEditCatMarca({...editCatMarca, valorNuevo: e.target.value})}
+                              className="input-voltech flex-1 rounded px-2 py-1 text-sm"
+                              autoFocus
+                            />
+                          ) : (
+                            <span className="flex-1 text-sm text-white truncate">{mar}</span>
+                          )}
+                          {editCatMarca.tipo === 'marca' && editCatMarca.valorOriginal === mar ? (
+                            <button onClick={guardarEdicionCatMarca} className="p-1 text-voltech-success hover:bg-voltech-success/10 rounded"><CheckCircle className="w-4 h-4" /></button>
+                          ) : (
+                            <button onClick={() => setEditCatMarca({ tipo: 'marca', valorOriginal: mar, valorNuevo: mar })} className="p-1 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit className="w-4 h-4" /></button>
+                          )}
+                          <button onClick={() => eliminarCatMarca('marca', mar)} className="p-1 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      ))}
+                      {marcas.length === 0 && <p className="text-xs text-voltech-muted text-center py-4">No hay marcas registradas</p>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showCarterasModal && (
@@ -877,7 +991,7 @@ export default function ProductosPage() {
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Total</label><input type="number" step="0.01" value={item.total} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-success bg-voltech-dark/50" /></div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Método de Pago</label><select value={item.metodoPago} onChange={(e) => handleChange(itemIndex, { target: { name: 'metodoPago', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="efectivo">Efectivo</option><option value="pago_movil">Pago Móvil</option><option value="transferencia">Transferencia</option><option value="zelle">Zelle</option><option value="binance">Binance</option><option value="otro">Otro</option></select></div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cartera</label><select value={item.cartera} onChange={(e) => handleChange(itemIndex, { target: { name: 'cartera', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="">-- Selecciona --</option>{carteras.map(c => (<option key={c.id} value={c.nombre}>{c.nombre}</option>))}</select></div>
-                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">% Comisión</label><input type="number" step="0.01" value={item.porcentaje_comision} onChange={(e) => { const nuevosItems = [...items]; nuevosItems[itemIndex].porcentaje_comision = parseFloat(e.target.value); setItems(nuevosItems); }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
+                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">% Comisión por Venta</label><input type="number" step="0.01" value={item.porcentaje_comision} onChange={(e) => { const nuevosItems = [...items]; nuevosItems[itemIndex].porcentaje_comision = parseFloat(e.target.value); setItems(nuevosItems); }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                     </div>
                   </div>
                 ))}
