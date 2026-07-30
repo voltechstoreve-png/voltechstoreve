@@ -7,7 +7,8 @@ import { usePermissions } from '@/app/context/PermissionsContext';
 import { 
   ShoppingCart, DollarSign, TrendingUp, Users, Plus, X, Save, Search,
   Calendar, CreditCard, Tag, MessageCircle, Edit3, Trash2, CheckCircle,
-  Truck, ChevronDown, Package, ExternalLink, FileText, Bell, AlertTriangle, ArrowUpRight
+  Truck, ChevronDown, Package, ExternalLink, FileText, Bell, AlertTriangle, ArrowUpRight,
+  Box, Layers // ✅ NUEVOS ICONOS PARA KITS
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -20,11 +21,12 @@ export default function VentasProductosPage() {
   
   const [ventas, setVentas] = useState([]);
   const [productos, setProductos] = useState([]);
+  const [kits, setKits] = useState([]); // ✅ NUEVO: Estado para kits
   const [clientes, setClientes] = useState([]);
   const [equipo, setEquipo] = useState([]);
   const [carteras, setCarteras] = useState([]);
   const [settings, setSettings] = useState({});
-  const [cupones, setCupones] = useState([]); // ✅ NUEVO: Estado para cupones
+  const [cupones, setCupones] = useState([]);
   
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,8 +38,8 @@ export default function VentasProductosPage() {
   const [productoModalIndex, setProductoModalIndex] = useState(null);
   const [clienteSearch, setClienteSearch] = useState('');
   const [showClientesDropdown, setShowClientesDropdown] = useState(false);
+  const [showKitSelector, setShowKitSelector] = useState(false); // ✅ NUEVO: Selector de kits
 
-  // ✅ NUEVO: Estados para el cupón
   const [cuponInput, setCuponInput] = useState('');
   const [cuponAplicado, setCuponAplicado] = useState(null);
   const [errorCupon, setErrorCupon] = useState('');
@@ -72,16 +74,17 @@ export default function VentasProductosPage() {
 
   useEffect(() => {
     const cargarDatos = async () => {
-      let vts = [], prods = [], clts = [], eqp = [], crt = [], sttngs = {}, cpons = [];
+      let vts = [], prods = [], clts = [], eqp = [], crt = [], sttngs = {}, cpons = [], kts = [];
       
       if (supabase) {
-        const [{ data: d1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }, { data: d6 }] = await Promise.all([
+        const [{ data: d1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }, { data: d6 }, { data: d7 }] = await Promise.all([
           supabase.from('ventas').select('*').order('fechaRegistro', { ascending: false }),
           supabase.from('productos').select('*'),
           supabase.from('clientes').select('*'),
           supabase.from('usuarios').select('*'),
           supabase.from('settings').select('clave, valor'),
-          supabase.from('cupones').select('*') // ✅ Cargar cupones
+          supabase.from('cupones').select('*'),
+          supabase.from('kits').select('*').eq('activo', true) // ✅ Cargar kits
         ]);
         if (d1) vts = d1;
         if (d2) prods = d2;
@@ -99,6 +102,7 @@ export default function VentasProductosPage() {
           };
         }
         if (d6) cpons = d6;
+        if (d7) kts = d7;
       }
 
       if (vts.length === 0) vts = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
@@ -106,7 +110,8 @@ export default function VentasProductosPage() {
       if (clts.length === 0) clts = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
       if (eqp.length === 0) eqp = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
       if (crt.length === 0) crt = JSON.parse(localStorage.getItem('voltech_carteras') || '[]');
-      if (cpons.length === 0) cpons = JSON.parse(localStorage.getItem('voltech_cupones') || '[]'); // ✅ Fallback cupones
+      if (cpons.length === 0) cpons = JSON.parse(localStorage.getItem('voltech_cupones') || '[]');
+      if (kts.length === 0) kts = JSON.parse(localStorage.getItem('voltech_kits') || '[]');
       
       const settingsLocales = JSON.parse(localStorage.getItem('voltech_settings') || '{}');
       const tasaLocales = JSON.parse(localStorage.getItem('voltech_tasa_bcv') || '{"tasa": 36.5}');
@@ -134,7 +139,8 @@ export default function VentasProductosPage() {
       setEquipo(eqp);
       setCarteras(sttngs.carteras || []);
       setSettings(sttngs);
-      setCupones(cpons); // ✅ Guardar cupones
+      setCupones(cpons);
+      setKits(kts); // ✅ Guardar kits
     };
     cargarDatos();
   }, [esVendedor, usuarioActual]);
@@ -142,6 +148,7 @@ export default function VentasProductosPage() {
   const tasaBCV = settings.tasaBCV || 36.5;
   const vendedores = equipo.filter(m => m.activo && (m.rol === 'vendedor' || m.rol === 'admin' || m.rol === 'Admin'));
   const productosDisponibles = productos.filter(p => p.cantidad > 0);
+  const kitsDisponibles = kits.filter(k => k.activo !== false); // ✅ Kits activos
 
   const metodosPagoActivos = Object.entries(settings.pagos || {}).filter(([_, val]) => val && (val.activo === true || val === true));
   const carterasActivas = (settings.carteras || []).filter(c => c && c.activo === true);
@@ -189,6 +196,50 @@ export default function VentasProductosPage() {
     }
     
     setFormData({ ...formData, productos: nuevosProductos });
+  };
+
+  // ✅ NUEVO: Agregar kit completo a la venta
+  const agregarKitAVenta = (kit) => {
+    // Verificar si hay productos vacíos para reemplazar
+    const primerProductoVacio = formData.productos.findIndex(p => !p.productoId);
+    
+    if (primerProductoVacio !== -1) {
+      // Reemplazar el primer producto vacío con el kit
+      const nuevosProductos = [...formData.productos];
+      nuevosProductos[primerProductoVacio] = {
+        productoId: kit.id,
+        sku: kit.sku || `KIT-${kit.nombre?.substring(0, 3).toUpperCase()}`,
+        categoria: 'KIT',
+        marca: kit.marca || 'Voltech',
+        cantidad: 1,
+        precioUnitario: kit.precio_kit || kit.precioCombo || 0,
+        esKit: true,
+        productosIncluidos: kit.productos_incluidos || [],
+        filtroCategoria: '',
+        filtroMarca: ''
+      };
+      setFormData({ ...formData, productos: nuevosProductos });
+    } else {
+      // Agregar como nuevo producto
+      setFormData({
+        ...formData,
+        productos: [...formData.productos, { 
+          productoId: kit.id,
+          sku: kit.sku || `KIT-${kit.nombre?.substring(0, 3).toUpperCase()}`,
+          categoria: 'KIT',
+          marca: kit.marca || 'Voltech',
+          cantidad: 1,
+          precioUnitario: kit.precio_kit || kit.precioCombo || 0,
+          esKit: true,
+          productosIncluidos: kit.productos_incluidos || [],
+          filtroCategoria: '',
+          filtroMarca: ''
+        }]
+      });
+    }
+    
+    setShowKitSelector(false);
+    toast.success(`Kit "${kit.nombre}" agregado`);
   };
 
   const agregarProductoAVenta = () => {
@@ -275,7 +326,6 @@ export default function VentasProductosPage() {
     setTimeout(() => router.push('/panel/productos'), 1000);
   };
 
-  // ✅ NUEVO: Función para validar y aplicar cupón
   const validarYAplicarCupon = () => {
     setErrorCupon('');
     setCuponAplicado(null);
@@ -319,7 +369,6 @@ export default function VentasProductosPage() {
       return;
     }
 
-    // Calcular descuento
     let descuento = 0;
     const subtotalAplicable = formData.productos
       .filter(p => productosAplicables.includes(p.productoId))
@@ -377,17 +426,16 @@ export default function VentasProductosPage() {
           productoId: p.productoId, sku: p.sku, nombre: producto?.plataforma || producto?.producto || 'Producto',
           categoria: p.categoria, marca: p.marca, cantidad: p.cantidad, precioUnitario: p.precioUnitario,
           total: p.cantidad * p.precioUnitario, tipo: producto?.tipo || 'fisico',
+          esKit: p.esKit || false,
+          productosIncluidos: p.productosIncluidos || []
         };
       }),
       subtotal, 
       delivery: formData.delivery, 
       montoDelivery: formData.delivery ? formData.montoDelivery : 0,
-      
-      // ✅ NUEVO: Campos de cupón
       cupon_aplicado: cuponAplicado ? cuponAplicado.codigo : null,
       descuento_aplicado: descuentoAplicado,
       total_con_descuento: totalVenta,
-      
       total: totalVenta, 
       enCuotas: formData.enCuotas, 
       montoAbonado: formData.enCuotas ? formData.montoAbonado : totalVenta,
@@ -410,7 +458,6 @@ export default function VentasProductosPage() {
       ? ventas.map(v => String(v.id) === String(editingId) ? nuevaVenta : v)
       : [nuevaVenta, ...ventas];
 
-    // ✅ NUEVO: Actualizar usos del cupón si se aplicó
     let cuponesActualizados = [...cupones];
     if (supabase && cuponAplicado) {
       await supabase.from('ventas').upsert(nuevaVenta, { onConflict: 'id' });
@@ -421,7 +468,6 @@ export default function VentasProductosPage() {
           await supabase.from('productos').update({ cantidad: pActual.cantidad }).eq('id', pActual.id);
         }
       }
-      // Actualizar cupón en BD
       await supabase.from('cupones').update({ 
         usos: (cuponAplicado.usos || 0) + 1,
         descuento_total: (cuponAplicado.descuento_total || 0) + descuentoAplicado
@@ -467,6 +513,7 @@ export default function VentasProductosPage() {
     setErrorCupon('');
     setShowForm(false); 
     setEditingId(null);
+    setShowKitSelector(false);
   };
 
   const marcarPagado = async (venta) => {
@@ -505,14 +552,15 @@ export default function VentasProductosPage() {
       cliente: venta.cliente, telefono: venta.telefono,
       productos: venta.productos.map(p => ({ 
         productoId: p.productoId, sku: p.sku || '', categoria: p.categoria || '', marca: p.marca || '', 
-        cantidad: p.cantidad, precioUnitario: p.precioUnitario, filtroCategoria: '', filtroMarca: '' 
+        cantidad: p.cantidad, precioUnitario: p.precioUnitario, filtroCategoria: '', filtroMarca: '',
+        esKit: p.esKit || false,
+        productosIncluidos: p.productosIncluidos || []
       })),
       delivery: venta.delivery, montoDelivery: venta.montoDelivery, enCuotas: venta.enCuotas, montoAbonado: venta.montoAbonado,
       fechaPago: venta.fechaPago || '', metodoPago: venta.metodoPago, carteraId: venta.carteraId, referencia: venta.referencia,
     });
     setClienteSearch(venta.cliente); 
     setCuponInput(venta.cupon_aplicado || '');
-    // Nota: Para simplificar, al editar no se recalcula el cupón automáticamente, pero se muestra el código.
     setShowForm(true);
   };
 
@@ -553,7 +601,7 @@ export default function VentasProductosPage() {
     y += 20;
 
     const tableData = venta.productos.map(p => [
-      p.nombre,
+      `${p.nombre}${p.esKit ? ' (KIT)' : ''}`,
       p.cantidad.toString(),
       `$${p.precioUnitario.toFixed(2)}`,
       `$${p.total.toFixed(2)}`
@@ -582,7 +630,7 @@ export default function VentasProductosPage() {
     if (venta.descuento_aplicado > 0) {
       doc.text(`SUBTOTAL: $${venta.subtotal.toFixed(2)}`, 195, finalY, { align: 'right' });
       doc.setFontSize(10);
-      doc.setTextColor(34, 197, 94); // Verde
+      doc.setTextColor(34, 197, 94);
       doc.text(`DESCUENTO: -$${venta.descuento_aplicado.toFixed(2)}`, 195, finalY + 6, { align: 'right' });
       doc.setFontSize(12);
       doc.setTextColor(0, 0, 0);
@@ -634,7 +682,7 @@ export default function VentasProductosPage() {
 
   const enviarWhatsapp = (venta) => {
     const totalBs = (venta.total * tasaBCV).toFixed(2);
-    const productosTexto = venta.productos.map(p => `• ${p.nombre} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n');
+    const productosTexto = venta.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n');
     const mensaje = whatsappMode === 'gracias' 
       ? `Gracias por su compra 🛍️\n\nRecuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos \n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos\n\n${productosTexto}\n\n Total: $${venta.total.toFixed(2)} (Bs ${totalBs})\n\n¡Gracias por tu compra!\n${settings.tienda?.nombre || 'VOLTECH STORE'}`
       : `¡Buen día, ${venta.cliente}!\n\nTe escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto \n\n${productosTexto}\nMonto: $${venta.montoPendiente.toFixed(2)}\n\nSi ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!\n\nQue tengas un excelente día,\nEl equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}\n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos`;
@@ -712,7 +760,62 @@ export default function VentasProductosPage() {
               </div>
 
               <div className="mb-6">
-                <h4 className="text-sm font-semibold text-voltech-cyan mb-3 flex items-center gap-2"><Package className="w-4 h-4" /> Productos</h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-voltech-cyan flex items-center gap-2"><Package className="w-4 h-4" /> Productos</h4>
+                  {/* ✅ NUEVO: Botón para agregar KIT */}
+                  {kitsDisponibles.length > 0 && (
+                    <button 
+                      onClick={() => setShowKitSelector(!showKitSelector)}
+                      className="px-3 py-1.5 bg-voltech-purple/20 text-voltech-purple rounded-lg text-xs hover:bg-voltech-purple/30 transition-colors flex items-center gap-1"
+                    >
+                      <Layers className="w-3 h-3" /> Agregar Kit
+                    </button>
+                  )}
+                </div>
+
+                {/* ✅ NUEVO: Selector de Kits */}
+                <AnimatePresence>
+                  {showKitSelector && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="mb-4 bg-voltech-dark/50 border border-voltech-border rounded-lg p-4"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <h5 className="text-sm font-bold text-white flex items-center gap-2">
+                          <Layers className="w-4 h-4 text-voltech-purple" />
+                          Seleccionar Kit/Combo
+                        </h5>
+                        <button onClick={() => setShowKitSelector(false)} className="p-1 hover:bg-voltech-border rounded">
+                          <X className="w-4 h-4 text-voltech-muted" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto">
+                        {kitsDisponibles.map(kit => (
+                          <button
+                            key={kit.id}
+                            onClick={() => agregarKitAVenta(kit)}
+                            className="p-3 bg-voltech-surface border border-voltech-border rounded-lg text-left hover:border-voltech-purple/50 transition-colors"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-bold text-white">{kit.nombre}</p>
+                                <p className="text-xs text-voltech-muted">
+                                  {kit.productos_incluidos?.length || 0} productos
+                                </p>
+                              </div>
+                              <p className="text-sm font-bold text-voltech-success">
+                                ${kit.precio_kit?.toFixed(2) || kit.precioCombo?.toFixed(2) || '0.00'}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <div className="space-y-3">
                   {formData.productos.map((prod, index) => {
                     const marcasDisponibles = [...new Set(
@@ -729,10 +832,21 @@ export default function VentasProductosPage() {
                     });
 
                     return (
-                      <div key={index} className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4">
+                      <div key={index} className={`bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 ${prod.esKit ? 'border-voltech-purple/50 bg-voltech-purple/5' : ''}`}>
+                        {prod.esKit && (
+                          <div className="flex items-center gap-2 mb-3 pb-3 border-b border-voltech-border">
+                            <Layers className="w-4 h-4 text-voltech-purple" />
+                            <span className="text-xs font-bold text-voltech-purple">KIT/COMBO</span>
+                            {prod.productosIncluidos && prod.productosIncluidos.length > 0 && (
+                              <span className="text-xs text-voltech-muted">
+                                ({prod.productosIncluidos.length} productos incluidos)
+                              </span>
+                            )}
+                          </div>
+                        )}
                         <div className="grid grid-cols-12 gap-3 items-end">
                           <div className="col-span-12 md:col-span-2">
-                            <label className="block text-xs text-voltech-muted mb-1 ml-1">SKU (Auto)</label>
+                            <label className="block text-xs text-voltech-muted mb-1 ml-1">SKU</label>
                             <input type="text" value={prod.sku} readOnly className="input-voltech w-full rounded-lg px-3 py-2 text-sm font-mono text-voltech-cyan bg-voltech-dark/50" placeholder="Auto" />
                           </div>
 
@@ -742,6 +856,7 @@ export default function VentasProductosPage() {
                               value={prod.filtroCategoria}
                               onChange={(e) => actualizarCampoProducto(index, 'filtroCategoria', e.target.value)}
                               className="input-voltech w-full rounded-lg px-3 py-2 text-sm"
+                              disabled={prod.esKit}
                             >
                               <option value="">Todas</option>
                               {[...new Set(productosDisponibles.map(p => p.categoria).filter(Boolean))].map(cat => (
@@ -756,6 +871,7 @@ export default function VentasProductosPage() {
                               value={prod.filtroMarca}
                               onChange={(e) => actualizarCampoProducto(index, 'filtroMarca', e.target.value)}
                               className="input-voltech w-full rounded-lg px-3 py-2 text-sm"
+                              disabled={prod.esKit}
                             >
                               <option value="">Todas</option>
                               {marcasDisponibles.map(marca => (
@@ -771,6 +887,7 @@ export default function VentasProductosPage() {
                                 value={prod.productoId}
                                 onChange={(e) => actualizarCampoProducto(index, 'productoId', e.target.value)}
                                 className="input-voltech flex-1 rounded-lg px-3 py-2 text-sm"
+                                disabled={prod.esKit}
                               >
                                 <option value="">-- Selecciona --</option>
                                 {productosParaSelect.map(p => (
@@ -779,16 +896,18 @@ export default function VentasProductosPage() {
                                   </option>
                                 ))}
                               </select>
-                              <button onClick={() => abrirModalProductoNuevo(index)} className="px-3 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg hover:bg-voltech-purple/30 transition-colors flex items-center gap-1" title="Crear nuevo"><Plus className="w-4 h-4" /></button>
+                              {!prod.esKit && (
+                                <button onClick={() => abrirModalProductoNuevo(index)} className="px-3 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg hover:bg-voltech-purple/30 transition-colors flex items-center gap-1" title="Crear nuevo"><Plus className="w-4 h-4" /></button>
+                              )}
                             </div>
                           </div>
 
                           <div className="col-span-6 md:col-span-2">
-                            <label className="block text-xs text-voltech-muted mb-1 ml-1">Categoría (Auto)</label>
+                            <label className="block text-xs text-voltech-muted mb-1 ml-1">Categoría</label>
                             <input type="text" value={prod.categoria} readOnly className="input-voltech w-full rounded-lg px-3 py-2 text-sm bg-voltech-dark/50" placeholder="Auto" />
                           </div>
                           <div className="col-span-6 md:col-span-2">
-                            <label className="block text-xs text-voltech-muted mb-1 ml-1">Marca (Auto)</label>
+                            <label className="block text-xs text-voltech-muted mb-1 ml-1">Marca</label>
                             <input type="text" value={prod.marca} readOnly className="input-voltech w-full rounded-lg px-3 py-2 text-sm bg-voltech-dark/50" placeholder="Auto" />
                           </div>
                           <div className="col-span-4 md:col-span-1">
@@ -814,7 +933,6 @@ export default function VentasProductosPage() {
                 <button onClick={agregarProductoAVenta} className="mt-3 px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2"><Plus className="w-4 h-4" /> Agregar otro producto</button>
               </div>
 
-              {/* ✅ NUEVO: Sección de Cupón */}
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-voltech-cyan mb-3 flex items-center gap-2"><Tag className="w-4 h-4" /> Cupón de Descuento</h4>
                 <div className="flex gap-2">
@@ -980,7 +1098,7 @@ export default function VentasProductosPage() {
                       <td className="px-4 py-3 text-sm font-mono text-voltech-cyan">{venta.numeroOrden || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-voltech-muted flex items-center gap-2"><Calendar className="w-3 h-3" /> {venta.fecha}</td>
                       <td className="px-4 py-3"><p className="text-sm font-medium text-white">{venta.cliente}</p><p className="text-xs text-voltech-muted">{venta.telefono}</p></td>
-                      <td className="px-4 py-3"><p className="text-sm text-white">{venta.productos[0]?.nombre}{venta.productos.length > 1 && (<span className="text-xs text-voltech-muted ml-1">(+{venta.productos.length - 1} más)</span>)}</p><button onClick={() => setExpandedId(expandedId === venta.id ? null : venta.id)} className="text-xs text-voltech-cyan hover:underline flex items-center gap-1 mt-1"><ChevronDown className={`w-3 h-3 transition-transform ${expandedId === venta.id ? 'rotate-180' : ''}`} /> Ver detalle</button></td>
+                      <td className="px-4 py-3"><p className="text-sm text-white">{venta.productos[0]?.nombre}{venta.productos[0]?.esKit && <span className="text-xs text-voltech-purple ml-1">(KIT)</span>}{venta.productos.length > 1 && (<span className="text-xs text-voltech-muted ml-1">(+{venta.productos.length - 1} más)</span>)}</p><button onClick={() => setExpandedId(expandedId === venta.id ? null : venta.id)} className="text-xs text-voltech-cyan hover:underline flex items-center gap-1 mt-1"><ChevronDown className={`w-3 h-3 transition-transform ${expandedId === venta.id ? 'rotate-180' : ''}`} /> Ver detalle</button></td>
                       <td className="px-4 py-3 text-sm font-bold text-voltech-success">${venta.total.toFixed(2)}</td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{venta.fechaPago || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-voltech-warning">{calcularDiasAtraso(venta) > 0 ? `+${calcularDiasAtraso(venta)}` : '0'}</td>
@@ -999,7 +1117,6 @@ export default function VentasProductosPage() {
                       </td>
                     </tr>
                     
-                    {/* Fila expandida con detalle de productos */}
                     {expandedId === venta.id && (
                       <tr className="bg-voltech-dark/30">
                         <td colSpan="11" className="px-4 py-4">
@@ -1023,9 +1140,12 @@ export default function VentasProductosPage() {
                                 </thead>
                                 <tbody>
                                   {venta.productos.map((prod, idx) => (
-                                    <tr key={idx} className="border-b border-voltech-border last:border-0">
+                                    <tr key={idx} className={`border-b border-voltech-border last:border-0 ${prod.esKit ? 'bg-voltech-purple/5' : ''}`}>
                                       <td className="px-3 py-2 text-xs font-mono text-voltech-cyan">{prod.sku || 'N/A'}</td>
-                                      <td className="px-3 py-2 text-white">{prod.nombre}</td>
+                                      <td className="px-3 py-2 text-white">
+                                        {prod.nombre}
+                                        {prod.esKit && <span className="ml-2 text-xs text-voltech-purple">(KIT)</span>}
+                                      </td>
                                       <td className="px-3 py-2 text-voltech-muted">{prod.categoria || 'N/A'}</td>
                                       <td className="px-3 py-2 text-voltech-muted">{prod.marca || 'N/A'}</td>
                                       <td className="px-3 py-2 text-center text-white">{prod.cantidad}</td>
@@ -1125,7 +1245,7 @@ export default function VentasProductosPage() {
                 <p className="text-sm text-voltech-muted mb-4">Se enviará un mensaje a <strong className="text-white">{showWhatsappModal.telefono}</strong> con el detalle de la venta.</p>
                 <div className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-3 mb-4 max-h-48 overflow-y-auto">
                   <p className="text-xs text-white whitespace-pre-wrap">
-                    {whatsappMode === 'gracias' ? `Gracias por su compra 🛍️\n\nRecuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos \n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇🏽\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos\n\n${showWhatsappModal.productos.map(p => `• ${p.nombre} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n')}\n\n💰 Total: $${showWhatsappModal.total.toFixed(2)} (Bs ${(showWhatsappModal.total * tasaBCV).toFixed(2)})\n\n¡Gracias por tu compra!\n${settings.tienda?.nombre || 'VOLTECH STORE'}` : `¡Buen día, ${showWhatsappModal.cliente}!\n\nTe escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto \n\n${showWhatsappModal.productos.map(p => `• ${p.nombre} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n')}\nMonto: $${showWhatsappModal.montoPendiente.toFixed(2)}\n\nSi ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!\n\nQue tengas un excelente día,\nEl equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}\n\n📸 Instagram @Voltechstore.ve\n Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos`}
+                    {whatsappMode === 'gracias' ? `Gracias por su compra 🛍️\n\nRecuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos \n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇🏽\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos\n\n${showWhatsappModal.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n')}\n\n💰 Total: $${showWhatsappModal.total.toFixed(2)} (Bs ${(showWhatsappModal.total * tasaBCV).toFixed(2)})\n\n¡Gracias por tu compra!\n${settings.tienda?.nombre || 'VOLTECH STORE'}` : `¡Buen día, ${showWhatsappModal.cliente}!\n\nTe escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto \n\n${showWhatsappModal.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n')}\nMonto: $${showWhatsappModal.montoPendiente.toFixed(2)}\n\nSi ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!\n\nQue tengas un excelente día,\nEl equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}\n\n📸 Instagram @Voltechstore.ve\n Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos`}
                   </p>
                 </div>
                 <div className="flex items-center justify-between gap-3">
