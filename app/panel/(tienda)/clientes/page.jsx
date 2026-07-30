@@ -1,23 +1,30 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { usePermissions } from '@/app/context/PermissionsContext'; // ✅ NUEVO
+import { usePermissions } from '@/app/context/PermissionsContext';
 import { 
   Users, UserPlus, Search, Edit3, Trash2, X, Save, Mail, Phone, MapPin, 
   Tag, AlertTriangle, CheckCircle, Filter, Palette, Plus, Gift, 
-  Link as LinkIcon, Trophy, UserCheck, Copy, Share2, Bell, ChevronDown
+  Link as LinkIcon, Trophy, UserCheck, Copy, Share2, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
-import { useNotificaciones } from '@/app/context/NotificationContext';
 
-export default function ClientesPage() {
+const generarUUID = () => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+// ✅ Componente interno que usa useSearchParams
+function ClientesContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { agregarNotificacion, notificaciones, marcarLeida, limpiarTodas } = useNotificaciones();
-  const { esAdmin, esSocio, esVendedor, usuarioActual, tienePermiso } = usePermissions(); // ✅ NUEVO
+  const { esVendedor, usuarioActual, tienePermiso } = usePermissions();
   
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'clientes');
   const [clientes, setClientes] = useState([]);
@@ -58,7 +65,6 @@ export default function ClientesPage() {
     const cargarDatos = async () => {
       let clientesData = [], etiquetasData = [], nivelesData = [];
 
-      // 1. Intentar cargar desde Supabase
       if (supabase) {
         const [{ data: cData }, { data: eData }, { data: nData }] = await Promise.all([
           supabase.from('clientes').select('*'),
@@ -70,7 +76,6 @@ export default function ClientesPage() {
         if (nData?.valor) nivelesData = nData.valor;
       }
 
-      // 2. Fallback a localStorage
       if (clientesData.length === 0) {
         const clientesGuardados = localStorage.getItem('voltech_clientes');
         if (clientesGuardados) clientesData = JSON.parse(clientesGuardados);
@@ -90,7 +95,6 @@ export default function ClientesPage() {
       let vts = ventasGuardadas ? JSON.parse(ventasGuardadas) : [];
       const eqp = equipoGuardado ? JSON.parse(equipoGuardado) : [];
 
-      // ✅ FILTRAR VENTAS SI ES VENDEDOR (Privacidad de datos)
       if (esVendedor && usuarioActual?.nombre) {
         vts = vts.filter(v => v.vendedor?.toLowerCase() === usuarioActual.nombre.toLowerCase());
       }
@@ -100,23 +104,20 @@ export default function ClientesPage() {
       setEtiquetas(etiquetasData);
       setNivelesReferidos(nivelesData);
 
-      // ✅ FILTRAR CLIENTES SI ES VENDEDOR (Solo ve los suyos)
       if (esVendedor && usuarioActual?.nombre) {
         clientesData = clientesData.filter(c => c.registradoPor === usuarioActual.nombre);
       }
 
-      // 4. Sincronizar clientes desde ventas y actualizar estado
       const clientesSincronizados = sincronizarClientesDesdeVentas(clientesData, vts);
       setClientes(clientesSincronizados);
       localStorage.setItem('voltech_clientes', JSON.stringify(clientesSincronizados));
     };
     
     cargarDatos();
-  }, [esVendedor, usuarioActual]); // ✅ Se recalcula si cambia el rol o usuario
+  }, [esVendedor, usuarioActual]);
 
   const sincronizarClientesDesdeVentas = (listaClientes, listaVentas) => {
     const clientesActuales = [...listaClientes];
-    let cambios = false;
     
     listaVentas.forEach(venta => {
       const clienteExistente = clientesActuales.find(c => c.telefono === venta.telefono || c.nombre.toLowerCase() === venta.cliente.toLowerCase());
@@ -124,10 +125,9 @@ export default function ClientesPage() {
         clienteExistente.totalCompras = (clienteExistente.totalCompras || 0) + 1;
         clienteExistente.ultimaCompra = venta.fecha;
         clienteExistente.totalGastado = (clienteExistente.totalGastado || 0) + (venta.total || 0);
-        cambios = true;
       } else {
         clientesActuales.push({
-          id: (Date.now() + Math.random()).toString(), 
+          id: generarUUID(), 
           nombre: venta.cliente, 
           apellido: '', 
           telefono: venta.telefono,
@@ -143,7 +143,6 @@ export default function ClientesPage() {
           totalGastado: venta.total || 0, 
           fechaRegistro: venta.fecha,
         });
-        cambios = true;
       }
     });
     return clientesActuales;
@@ -216,11 +215,10 @@ export default function ClientesPage() {
     if (!formData.nombre || !formData.telefono) { toast.error('Nombre y Teléfono son obligatorios'); return; }
     if (clientes.find(c => c.telefono === formData.telefono && c.id !== editingId)) { toast.error('Ya existe un cliente con ese teléfono'); return; }
     
-    // ✅ Forzar registradoPor al vendedor actual si es vendedor
     const clienteAGuardar = editingId 
       ? { ...formData, ultimaActualizacion: new Date().toISOString() } 
       : { 
-          id: Date.now().toString(), 
+          id: generarUUID(), 
           ...formData, 
           registradoPor: esVendedor ? usuarioActual?.nombre : formData.registradoPor,
           totalCompras: 0, 
@@ -246,14 +244,6 @@ export default function ClientesPage() {
       const actualizados = [clienteAGuardar, ...clientes];
       setClientes(actualizados); 
       localStorage.setItem('voltech_clientes', JSON.stringify(actualizados));
-      
-      agregarNotificacion({
-        tipo: 'cliente',
-        titulo: 'NUEVO CLIENTE REGISTRADO',
-        mensaje: `${formData.nombre} ${formData.apellido} se registró en el sistema`,
-        detalle: `Teléfono: ${formData.telefono}`,
-      });
-      
       toast.success('Cliente registrado');
     }
     resetForm();
@@ -374,16 +364,10 @@ export default function ClientesPage() {
 
   const tieneDuplicados = clientes.length > new Set(clientes.map(c => c.telefono)).size;
 
-  const notificacionesClientes = notificaciones.filter(n => 
-    ['referido', 'nivel', 'sorteo', 'cliente'].includes(n.tipo)
-  );
-  const noLeidas = notificacionesClientes.filter(n => !n.leida).length;
-
   return (
     <div className="space-y-6">
       <Toaster position="top-right" toastOptions={{ style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' }, success: { iconTheme: { primary: '#00ff88', secondary: '#fff' } }, error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } } }} />
 
-      {/* HEADER */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Clientes</h1>
@@ -400,86 +384,48 @@ export default function ClientesPage() {
         </div>
       </div>
 
-      {/* TARJETAS DE MÉTRICAS */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-cyan/20">
-              <Users className="w-5 h-5 text-voltech-cyan" />
-            </div>
-            <div>
-              <p className="text-xs text-voltech-muted">Total Clientes</p>
-              <p className="text-xl font-bold text-white">{clientes.length}</p>
-            </div>
+            <div className="p-2 rounded-lg bg-voltech-cyan/20"><Users className="w-5 h-5 text-voltech-cyan" /></div>
+            <div><p className="text-xs text-voltech-muted">Total Clientes</p><p className="text-xl font-bold text-white">{clientes.length}</p></div>
           </div>
         </div>
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-success/20">
-              <CheckCircle className="w-5 h-5 text-voltech-success" />
-            </div>
-            <div>
-              <p className="text-xs text-voltech-muted">Nuevos</p>
-              <p className="text-xl font-bold text-white">{clientes.filter(c => c.etiquetas?.includes('Nuevo')).length}</p>
-            </div>
+            <div className="p-2 rounded-lg bg-voltech-success/20"><CheckCircle className="w-5 h-5 text-voltech-success" /></div>
+            <div><p className="text-xs text-voltech-muted">Nuevos</p><p className="text-xl font-bold text-white">{clientes.filter(c => c.etiquetas?.includes('Nuevo')).length}</p></div>
           </div>
         </div>
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-purple/20">
-              <Tag className="w-5 h-5 text-voltech-purple" />
-            </div>
-            <div>
-              <p className="text-xs text-voltech-muted">Frecuentes</p>
-              <p className="text-xl font-bold text-white">{clientes.filter(c => c.etiquetas?.includes('Frecuente')).length}</p>
-            </div>
+            <div className="p-2 rounded-lg bg-voltech-purple/20"><Tag className="w-5 h-5 text-voltech-purple" /></div>
+            <div><p className="text-xs text-voltech-muted">Frecuentes</p><p className="text-xl font-bold text-white">{clientes.filter(c => c.etiquetas?.includes('Frecuente')).length}</p></div>
           </div>
         </div>
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-warning/20">
-              <Trophy className="w-5 h-5 text-voltech-warning" />
-            </div>
-            <div>
-              <p className="text-xs text-voltech-muted">Embajadores (2+ referidos)</p>
-              <p className="text-xl font-bold text-white">{clientes.filter(c => (c.referidos?.length || 0) >= 2).length}</p>
-            </div>
+            <div className="p-2 rounded-lg bg-voltech-warning/20"><Trophy className="w-5 h-5 text-voltech-warning" /></div>
+            <div><p className="text-xs text-voltech-muted">Embajadores (2+ referidos)</p><p className="text-xl font-bold text-white">{clientes.filter(c => (c.referidos?.length || 0) >= 2).length}</p></div>
           </div>
         </div>
       </div>
 
-      {/* PESTAÑAS DE NAVEGACIÓN */}
       <div className="border-b border-voltech-border">
         <div className="flex gap-6">
-          <button 
-            className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'clientes' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}
-            onClick={() => setActiveTab('clientes')}
-          >
+          <button className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'clientes' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`} onClick={() => setActiveTab('clientes')}>
             <Users className="w-4 h-4" /> Base de Clientes
           </button>
-          <button 
-            className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'referidos' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}
-            onClick={() => setActiveTab('referidos')}
-          >
+          <button className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'referidos' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`} onClick={() => setActiveTab('referidos')}>
             <Gift className="w-4 h-4" /> Programa de Referidos
           </button>
-          <button 
-            className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'notificaciones' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}
-            onClick={() => setActiveTab('notificaciones')}
-          >
-            <Bell className="w-4 h-4" /> Notificaciones
-            {noLeidas > 0 && (
-              <span className="bg-voltech-error text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                {noLeidas}
-              </span>
-            )}
+          <button className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'notificaciones' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`} onClick={() => setActiveTab('notificaciones')}>
+            <Users className="w-4 h-4" /> Notificaciones
           </button>
         </div>
       </div>
 
-      {/* CONTENIDO DE PESTAÑAS */}
       <div>
-        {/* PESTAÑA 1: BASE DE CLIENTES */}
         {activeTab === 'clientes' && (
           <div>
             <AnimatePresence>
@@ -500,12 +446,7 @@ export default function ClientesPage() {
                       <div>
                         <label className="block text-xs text-voltech-muted mb-1 ml-1">Registrado por (Equipo) *</label>
                         {esVendedor ? (
-                          <input 
-                            type="text" 
-                            value={usuarioActual?.nombre || ''} 
-                            readOnly 
-                            className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed" 
-                          />
+                          <input type="text" value={usuarioActual?.nombre || ''} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed" />
                         ) : (
                           <select name="registradoPor" value={formData.registradoPor} onChange={handleInputChange} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
                             <option value="">-- Selecciona --</option>
@@ -542,7 +483,6 @@ export default function ClientesPage() {
               )}
             </AnimatePresence>
 
-            {/* FILTROS Y BÚSQUEDA */}
             <div className="flex items-center justify-between gap-4 mb-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
@@ -578,7 +518,6 @@ export default function ClientesPage() {
               </div>
             </div>
 
-            {/* TABLA DE CLIENTES */}
             <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -690,10 +629,8 @@ export default function ClientesPage() {
           </div>
         )}
 
-        {/* PESTAÑA 2: PROGRAMA DE REFERIDOS */}
         {activeTab === 'referidos' && (
           <div>
-            {/* Niveles de Referidos (Gestión solo para Admin/Socio) */}
             <div className="bg-voltech-dark/50 border border-voltech-border rounded-xl p-6 mb-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-white">Niveles de Referidos</h3>
@@ -745,7 +682,6 @@ export default function ClientesPage() {
               </div>
             </div>
 
-            {/* Lista de Códigos */}
             <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
               <h3 className="text-lg font-bold text-white mb-4">Códigos de Referidos Generados</h3>
               <div className="overflow-x-auto">
@@ -787,7 +723,6 @@ export default function ClientesPage() {
           </div>
         )}
 
-        {/* PESTAÑA 3: NOTIFICACIONES */}
         {activeTab === 'notificaciones' && (
           <div>
             <div className="flex items-center justify-between mb-4">
@@ -795,66 +730,14 @@ export default function ClientesPage() {
                 <h3 className="text-lg font-bold text-white">Notificaciones</h3>
                 <p className="text-sm text-voltech-muted">Recibe alertas de actividad importante</p>
               </div>
-              <div className="flex gap-2">
-                <button onClick={limpiarTodas} className="px-3 py-1.5 bg-voltech-dark text-voltech-muted rounded-lg text-sm hover:bg-voltech-border transition-colors">Limpiar todas</button>
-              </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-                <div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-voltech-cyan/20"><Bell className="w-5 h-5 text-voltech-cyan" /></div><div><p className="text-xs text-voltech-muted">No leídas</p><p className="text-xl font-bold text-white">{noLeidas}</p></div></div>
-              </div>
-              <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-                <div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-voltech-purple/20"><Trophy className="w-5 h-5 text-voltech-purple" /></div><div><p className="text-xs text-voltech-muted">Nuevos registros</p><p className="text-xl font-bold text-white">{notificacionesClientes.filter(n => n.tipo === 'sorteo').length}</p></div></div>
-              </div>
-              <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-                <div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-voltech-success/20"><Users className="w-5 h-5 text-voltech-success" /></div><div><p className="text-xs text-voltech-muted">Referidos</p><p className="text-xl font-bold text-white">{notificacionesClientes.filter(n => n.tipo === 'referido').length}</p></div></div>
-              </div>
-              <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-                <div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-voltech-warning/20"><Trophy className="w-5 h-5 text-voltech-warning" /></div><div><p className="text-xs text-voltech-muted">Niveles</p><p className="text-xl font-bold text-white">{notificacionesClientes.filter(n => n.tipo === 'nivel').length}</p></div></div>
-              </div>
-            </div>
-
             <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
-              <div className="space-y-4">
-                {notificacionesClientes.length === 0 ? (
-                  <p className="text-center text-voltech-muted py-8">No hay notificaciones</p>
-                ) : (
-                  notificacionesClientes.map(notificacion => (
-                    <div key={notificacion.id} className={`bg-voltech-dark/50 border border-voltech-border rounded-xl p-4 transition-all ${!notificacion.leida ? 'ring-2 ring-voltech-cyan' : ''}`}>
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-start gap-3">
-                          {notificacion.tipo === 'referido' && <div className="bg-voltech-cyan/20 text-voltech-cyan p-2 rounded-lg"><Gift className="w-4 h-4" /></div>}
-                          {notificacion.tipo === 'sorteo' && <div className="bg-voltech-purple/20 text-voltech-purple p-2 rounded-lg"><Users className="w-4 h-4" /></div>}
-                          {notificacion.tipo === 'nivel' && <div className="bg-voltech-warning/20 text-voltech-warning p-2 rounded-lg"><Trophy className="w-4 h-4" /></div>}
-                          {notificacion.tipo === 'cliente' && <div className="bg-voltech-success/20 text-voltech-success p-2 rounded-lg"><UserPlus className="w-4 h-4" /></div>}
-                          
-                          <div>
-                            <h4 className="text-sm font-bold text-white">{notificacion.titulo}</h4>
-                            <p className="text-sm text-voltech-muted">{notificacion.mensaje}</p>
-                            <p className="text-xs text-voltech-muted mt-1">{notificacion.detalle}</p>
-                          </div>
-                        </div>
-                        <div className="text-xs text-voltech-muted flex flex-col items-end">
-                          <span>{new Date(notificacion.hora).toLocaleString('es-VE')}</span>
-                          {!notificacion.leida && (
-                            <span className="bg-voltech-cyan text-white text-[10px] px-1.5 py-0.5 rounded mt-1">Nueva</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => marcarLeida(notificacion.id)} className="text-xs text-voltech-cyan hover:text-voltech-cyan/70 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Marcar leída</button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+              <p className="text-center text-voltech-muted py-8">Sistema de notificaciones activo. (Integrado con el contexto global)</p>
             </div>
           </div>
         )}
       </div>
 
-      {/* MODAL DE ETIQUETAS */}
       <AnimatePresence>
         {showEtiquetasModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
@@ -893,7 +776,6 @@ export default function ClientesPage() {
         )}
       </AnimatePresence>
 
-      {/* MODAL SELECCIONAR REFERIDO */}
       <AnimatePresence>
         {showSeleccionarReferidoModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
@@ -920,7 +802,6 @@ export default function ClientesPage() {
         )}
       </AnimatePresence>
 
-      {/* MODAL VER REFERIDOS */}
       <AnimatePresence>
         {showReferidosModal && clienteSeleccionado && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
@@ -967,5 +848,18 @@ export default function ClientesPage() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+// ✅ Componente principal que envuelve en Suspense
+export default function ClientesPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-voltech-muted animate-pulse">Cargando clientes...</div>
+      </div>
+    }>
+      <ClientesContent />
+    </Suspense>
   );
 }
