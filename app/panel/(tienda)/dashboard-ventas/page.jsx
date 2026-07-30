@@ -33,43 +33,45 @@ export default function DashboardVentasPage() {
   const [ventasRecientes, setVentasRecientes] = useState([]);
   const [ranking, setRanking] = useState([]);
   const [equipo, setEquipo] = useState([]);
+  const [comisiones, setComisiones] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const cargarDatos = async () => {
       setLoading(true);
-      let ventas = [], clientes = [], usuarios = [], comisiones = [], metas = [];
+      let ventas = [], clientes = [], usuarios = [], coms = [];
 
       try {
+        // Cargar desde Supabase
         if (supabase) {
-          const [{ data: vData }, { data: cData }, { data: uData }, { data: comData }, { data: mData }] = await Promise.all([
-            supabase.from('ventas').select('*').order('fechaRegistro', { ascending: false }).limit(50),
+          const [{ data: vData }, { data: cData }, { data: uData }, { data: comData }] = await Promise.all([
+            supabase.from('ventas').select('*').order('fechaRegistro', { ascending: false }),
             supabase.from('clientes').select('*'),
             supabase.from('usuarios').select('*'),
-            supabase.from('comisiones_pendientes').select('*'),
-            supabase.from('metas_ventas').select('*').eq('mes', new Date().toISOString().slice(0, 7))
+            supabase.from('comisiones_pendientes').select('*')
           ]);
           
-          if (vData) ventas = vData;
-          if (cData) clientes = cData;
-          if (uData) usuarios = uData;
-          if (comData) comisiones = comData;
-          if (mData) metas = mData;
+          ventas = vData || [];
+          clientes = cData || [];
+          usuarios = uData || [];
+          coms = comData || [];
         } else {
-          // Fallback a localStorage
+          // Fallback localStorage
           ventas = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
           clientes = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
           usuarios = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
-          comisiones = JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]');
-          metas = JSON.parse(localStorage.getItem('voltech_metas_ventas') || '[]');
+          coms = JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]');
         }
 
-        // Fechas para filtros
+        setComisiones(coms);
+        setEquipo(usuarios);
+
+        // Fechas
         const hoy = new Date().toISOString().split('T')[0];
         const hace7Dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const mesActual = new Date().toISOString().slice(0, 7);
+        const mesActual = new Date().toISOString().slice(0, 7); // YYYY-MM
 
-        // Filtrar ventas por período
+        // Filtrar ventas CORRECTAMENTE
         const ventasHoy = ventas.filter(v => {
           const fechaVenta = v.fecha || (v.fechaRegistro ? v.fechaRegistro.split('T')[0] : '');
           return fechaVenta === hoy;
@@ -77,7 +79,7 @@ export default function DashboardVentasPage() {
 
         const ventasSemana = ventas.filter(v => {
           const fechaVenta = v.fecha || (v.fechaRegistro ? v.fechaRegistro.split('T')[0] : '');
-          return fechaVenta >= hace7Dias;
+          return fechaVenta >= hace7Dias && fechaVenta <= hoy;
         });
 
         const ventasMes = ventas.filter(v => {
@@ -90,21 +92,21 @@ export default function DashboardVentasPage() {
         const totalIngresosSemana = ventasSemana.reduce((sum, v) => sum + Number(v.total || 0), 0);
         const totalIngresosMes = ventasMes.reduce((sum, v) => sum + Number(v.total || 0), 0);
 
-        // Calcular comisiones
-        const comPagadas = comisiones.filter(c => c.estado === 'pagada').reduce((sum, c) => sum + Number(c.monto_comision || 0), 0);
-        const comPendientes = comisiones.filter(c => c.estado === 'pendiente').reduce((sum, c) => sum + Number(c.monto_comision || 0), 0);
+        // Comisiones
+        const comPagadas = coms.filter(c => c.estado === 'pagada').reduce((sum, c) => sum + Number(c.monto_comision || 0), 0);
+        const comPendientes = coms.filter(c => c.estado === 'pendiente').reduce((sum, c) => sum + Number(c.monto_comision || 0), 0);
 
-        // Calcular meta
-        const metaGlobal = metas.find(m => m.vendedor_nombre === 'GLOBAL') || { meta_ventas: 100, meta_monto: 5000 };
-        const porcentajeMeta = metaGlobal.meta_monto > 0 ? (totalIngresosMes / metaGlobal.meta_monto) * 100 : 0;
-
-        // Calcular productos vendidos
+        // Productos vendidos
         const totalProductosVendidos = ventas.reduce((sum, v) => {
           if (v.productos && Array.isArray(v.productos)) {
             return sum + v.productos.reduce((pSum, p) => pSum + (Number(p.cantidad) || 1), 0);
           }
           return sum + 1;
         }, 0);
+
+        // Meta (por defecto 100 ventas o $5000)
+        const metaMonto = 5000;
+        const porcentajeMeta = metaMonto > 0 ? (totalIngresosMes / metaMonto) * 100 : 0;
 
         setStats({
           ventasHoy: ventasHoy.length,
@@ -117,15 +119,15 @@ export default function DashboardVentasPage() {
           productosVendidos: totalProductosVendidos,
           comisionesPagadas: comPagadas,
           comisionesPendientes: comPendientes,
-          metaVentas: metaGlobal.meta_ventas || 100,
-          metaMonto: metaGlobal.meta_monto || 5000,
+          metaVentas: 100,
+          metaMonto: metaMonto,
           porcentajeMeta
         });
 
+        // Últimas 10 ventas
         setVentasRecientes(ventas.slice(0, 10));
-        setEquipo(usuarios);
 
-        // ✅ CALCULAR RANKING DE VENDEDORES
+        // Ranking de vendedores
         const rankingCalculado = usuarios.map(member => {
           const memberSales = ventas.filter(v => 
             v.vendedor?.toLowerCase() === member.nombre.toLowerCase() || 
@@ -135,8 +137,7 @@ export default function DashboardVentasPage() {
           const totalVentas = memberSales.length;
           const montoTotal = memberSales.reduce((sum, v) => sum + Number(v.total || 0), 0);
           
-          // Calcular comisión acumulada
-          const memberCommissions = comisiones.filter(c => 
+          const memberCommissions = coms.filter(c => 
             c.miembroId === member.id && c.estado === 'pendiente'
           );
           const comisionAcumulada = memberCommissions.reduce((sum, c) => sum + Number(c.monto_comision || 0), 0);
@@ -187,9 +188,8 @@ export default function DashboardVentasPage() {
         <p className="text-sm text-voltech-muted mt-1">Análisis de rendimiento y ranking de vendedores</p>
       </div>
 
-      {/* TARJETAS DE MÉTRICAS PRINCIPALES - 2 FILAS */}
+      {/* TARJETAS DE MÉTRICAS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Fila 1 */}
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -238,7 +238,6 @@ export default function DashboardVentasPage() {
           </div>
         </div>
 
-        {/* Fila 2 */}
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -288,7 +287,7 @@ export default function DashboardVentasPage() {
         </div>
       </div>
 
-      {/*  SECCIÓN: RANKING DE VENDEDORES */}
+      {/* RANKING DE VENDEDORES */}
       <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
@@ -330,12 +329,10 @@ export default function DashboardVentasPage() {
                   }`}
                 >
                   <div className="flex items-center gap-4">
-                    {/* Icono de Ranking */}
                     <div className="flex-shrink-0 w-10">
                       {getRankIcon(index)}
                     </div>
 
-                    {/* Info del Vendedor */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
@@ -351,14 +348,12 @@ export default function DashboardVentasPage() {
                           </div>
                         </div>
                         
-                        {/* Métricas principales */}
                         <div className="text-right hidden sm:block">
                           <p className="text-lg font-bold text-voltech-cyan">{member.totalVentas}</p>
                           <p className="text-[10px] text-voltech-muted uppercase tracking-wider">Ventas</p>
                         </div>
                       </div>
 
-                      {/* Barra de Progreso */}
                       <div className="w-full bg-voltech-border/50 rounded-full h-2 mb-3">
                         <div 
                           className={`h-2 rounded-full transition-all duration-1000 ${
@@ -371,7 +366,6 @@ export default function DashboardVentasPage() {
                         ></div>
                       </div>
 
-                      {/* Detalles en fila inferior */}
                       <div className="flex items-center justify-between text-xs flex-wrap gap-2">
                         <span className="text-voltech-muted">
                           Monto: <span className="text-voltech-success font-semibold">${member.montoTotal.toFixed(2)}</span>
@@ -389,126 +383,56 @@ export default function DashboardVentasPage() {
         )}
       </div>
 
-      {/* ÚLTIMAS VENTAS Y RESUMEN SEMANAL */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Últimas Ventas */}
-        <div className="lg:col-span-2 bg-voltech-surface border border-voltech-border rounded-xl p-6">
-          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <Activity className="w-5 h-5 text-voltech-cyan" /> Últimas Ventas
-          </h3>
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {ventasRecientes.length === 0 ? (
-              <div className="text-center py-12 text-voltech-muted">
-                <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>No hay ventas registradas aún.</p>
-              </div>
-            ) : (
-              ventasRecientes.map((venta, idx) => (
-                <motion.div 
-                  key={venta.id || idx}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                  className="flex items-center justify-between p-3 bg-voltech-dark/50 rounded-lg border border-voltech-border hover:border-voltech-cyan/30 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${
-                      venta.tipo === 'streaming' 
-                        ? 'bg-voltech-purple/20 text-voltech-purple' 
-                        : 'bg-voltech-success/20 text-voltech-success'
-                    }`}>
-                      {venta.tipo === 'streaming' ? <TrendingUp className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-white">{venta.cliente || 'Cliente General'}</p>
-                      <p className="text-xs text-voltech-muted">
-                        {venta.fecha || (venta.fechaRegistro ? venta.fechaRegistro.split('T')[0] : 'Reciente')} 
-                        {venta.vendedor && <span className="ml-2 text-voltech-cyan">• {venta.vendedor}</span>}
-                      </p>
-                      {venta.productos && Array.isArray(venta.productos) && (
-                        <p className="text-xs text-voltech-muted mt-1">
-                          {venta.productos.map(p => p.nombre || p.producto).join(', ')}
-                        </p>
-                      )}
-                    </div>
+      {/* ÚLTIMAS VENTAS */}
+      <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
+        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          <Activity className="w-5 h-5 text-voltech-cyan" /> Últimas Ventas
+        </h3>
+        <div className="space-y-3 max-h-96 overflow-y-auto">
+          {ventasRecientes.length === 0 ? (
+            <div className="text-center py-12 text-voltech-muted">
+              <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>No hay ventas registradas aún.</p>
+            </div>
+          ) : (
+            ventasRecientes.map((venta, idx) => (
+              <motion.div 
+                key={venta.id || idx}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                className="flex items-center justify-between p-3 bg-voltech-dark/50 rounded-lg border border-voltech-border hover:border-voltech-cyan/30 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${
+                    venta.tipo === 'streaming' 
+                      ? 'bg-voltech-purple/20 text-voltech-purple' 
+                      : 'bg-voltech-success/20 text-voltech-success'
+                  }`}>
+                    {venta.tipo === 'streaming' ? <TrendingUp className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-voltech-success">${Number(venta.total || 0).toFixed(2)}</p>
+                  <div>
+                    <p className="text-sm font-medium text-white">{venta.cliente || 'Cliente General'}</p>
                     <p className="text-xs text-voltech-muted">
-                      {venta.productos?.length || 1} prod.
+                      {venta.fecha || (venta.fechaRegistro ? venta.fechaRegistro.split('T')[0] : 'Reciente')} 
+                      {venta.vendedor && <span className="ml-2 text-voltech-cyan">• {venta.vendedor}</span>}
                     </p>
+                    {venta.productos && Array.isArray(venta.productos) && (
+                      <p className="text-xs text-voltech-muted mt-1">
+                        {venta.productos.map(p => p.nombre || p.producto).join(', ')}
+                      </p>
+                    )}
                   </div>
-                </motion.div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Resumen Semanal */}
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
-          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-voltech-purple" /> Resumen Semanal
-          </h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-voltech-dark/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <BarChart className="w-5 h-5 text-voltech-cyan" />
-                <span className="text-sm text-voltech-muted">Ventas esta semana</span>
-              </div>
-              <span className="text-sm font-bold text-white">{stats.ventasSemana}</span>
-            </div>
-            
-            <div className="flex items-center justify-between p-3 bg-voltech-dark/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <DollarSign className="w-5 h-5 text-voltech-success" />
-                <span className="text-sm text-voltech-muted">Ingresos semana</span>
-              </div>
-              <span className="text-sm font-bold text-voltech-success">${stats.ingresosSemana.toFixed(2)}</span>
-            </div>
-            
-            <div className="flex items-center justify-between p-3 bg-voltech-dark/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <Package className="w-5 h-5 text-voltech-purple" />
-                <span className="text-sm text-voltech-muted">Productos vendidos</span>
-              </div>
-              <span className="text-sm font-bold text-white">{stats.productosVendidos}</span>
-            </div>
-
-            <div className="border-t border-voltech-border pt-4 mt-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-voltech-muted">Meta del mes:</span>
-                <span className="text-sm font-bold text-white">${stats.metaMonto.toFixed(2)}</span>
-              </div>
-              <div className="w-full bg-voltech-border/50 rounded-full h-3 mb-2">
-                <div 
-                  className={`h-3 rounded-full transition-all duration-1000 ${
-                    stats.porcentajeMeta >= 100 
-                      ? 'bg-gradient-to-r from-voltech-success to-green-400' 
-                      : stats.porcentajeMeta >= 50
-                      ? 'bg-gradient-to-r from-voltech-cyan to-blue-500'
-                      : 'bg-gradient-to-r from-voltech-warning to-orange-500'
-                  }`}
-                  style={{ width: `${Math.min(stats.porcentajeMeta, 100)}%` }}
-                ></div>
-              </div>
-              <p className="text-xs text-voltech-muted text-center">
-                {stats.porcentajeMeta.toFixed(1)}% completado
-              </p>
-            </div>
-
-            {ranking.length > 0 && ranking[0].totalVentas > 0 && (
-              <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-lg p-4 mt-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Trophy className="w-5 h-5 text-yellow-400" />
-                  <span className="text-sm font-bold text-yellow-400">Líder del mes</span>
                 </div>
-                <p className="text-sm text-white font-bold">{ranking[0].nombre}</p>
-                <p className="text-xs text-voltech-muted">
-                  {ranking[0].totalVentas} ventas • ${ranking[0].montoTotal.toFixed(2)}
-                </p>
-              </div>
-            )}
-          </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-voltech-success">${Number(venta.total || 0).toFixed(2)}</p>
+                  <p className="text-xs text-voltech-muted">
+                    {venta.productos?.length || 1} prod.
+                  </p>
+                </div>
+              </motion.div>
+            ))
+          )}
         </div>
       </div>
     </div>
