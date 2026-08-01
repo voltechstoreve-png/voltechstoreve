@@ -10,10 +10,11 @@ import {
   Sun, Moon, Play, Clock, Zap, Truck,
   Sparkles, Trophy, AlertCircle, Ticket, Copy, Users,
   MessageSquare, ThumbsUp, Upload, Percent, Share2,
-  Image as ImageIcon, FileText
+  Image as ImageIcon, FileText, Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
+import ChatbotWidget from '@/components/ChatbotWidget';
 
 export default function CatalogoPage() {
   const [activeSection, setActiveSection] = useState('productos');
@@ -60,7 +61,8 @@ export default function CatalogoPage() {
   const [opiniones, setOpiniones] = useState([]);
   const [showOpinionForm, setShowOpinionForm] = useState(false);
   const [formDataOpinion, setFormDataOpinion] = useState({
-    nombre: '', telefono: '', rating: 5, comentario: '', producto: '', foto: null
+    nombre: '', telefono: '', rating: 5, comentario: '', producto: '', foto: null,
+    donde_nos_conocio: ''
   });
   const fileInputRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -68,6 +70,8 @@ export default function CatalogoPage() {
 
   const [publicidad, setPublicidad] = useState([]);
   const [ventas, setVentas] = useState([]);
+  const [masVendidosConfig, setMasVendidosConfig] = useState(null);
+  const [whatsappNumero, setWhatsappNumero] = useState('5841253785815'); // Número por defecto
   
   const [showTermsModal, setShowTermsModal] = useState(false);
 
@@ -90,15 +94,30 @@ export default function CatalogoPage() {
 
   useEffect(() => {
     const cargarDatosExtras = async () => {
-      let pubs = [], vts = [];
+      let pubs = [], vts = [], mvConfig = null;
       
       if (supabase) {
-        const [{ data: pData }, { data: vData }] = await Promise.all([
+        const [{ data: pData }, { data: vData }, { data: mvData }, { data: settingsData }] = await Promise.all([
           supabase.from('publicidad').select('*').eq('estado', 'activo'),
-          supabase.from('ventas').select('*')
+          supabase.from('ventas').select('*'),
+          supabase.from('marketing_config').select('valor').eq('clave', 'mas_vendidos').single(),
+          supabase.from('settings').select('clave, valor').in('clave', ['telefono_tienda', 'whatsapp_numero'])
         ]);
         if (pData) pubs = pData;
         if (vData) vts = vData;
+        if (mvData?.valor) mvConfig = mvData.valor;
+        
+        // ✅ PRIORIDAD 1: Buscar número en configuración de la tienda
+        const telefonoSetting = settingsData?.find(s => s.clave === 'telefono_tienda' || s.clave === 'whatsapp_numero');
+        if (telefonoSetting?.valor) {
+          setWhatsappNumero(telefonoSetting.valor.replace(/\D/g, ''));
+        } else {
+          // ✅ PRIORIDAD 2: Buscar en la tabla de equipo (Admin)
+          const { data: equipoData } = await supabase.from('equipo').select('*').eq('rol', 'Admin').limit(1);
+          if (equipoData && equipoData.length > 0 && equipoData[0].telefono) {
+            setWhatsappNumero(equipoData[0].telefono.replace(/\D/g, ''));
+          }
+        }
       }
       
       if (pubs.length === 0) {
@@ -108,6 +127,10 @@ export default function CatalogoPage() {
       if (vts.length === 0) {
         const localVts = localStorage.getItem('voltech_ventas');
         if (localVts) vts = JSON.parse(localVts);
+      }
+      if (!mvConfig) {
+        const localMv = localStorage.getItem('voltech_mas_vendidos_config');
+        if (localMv) mvConfig = JSON.parse(localMv);
       }
       
       const now = new Date();
@@ -123,6 +146,7 @@ export default function CatalogoPage() {
 
       setPublicidad(filtradas);
       setVentas(vts);
+      setMasVendidosConfig(mvConfig);
     };
     cargarDatosExtras();
   }, []);
@@ -198,13 +222,11 @@ export default function CatalogoPage() {
 
   const tieneSoloProductosDigitales = cart.length > 0 && cart.every(item => item.tipo === 'streaming' || item.categoria?.toUpperCase() === 'STREAMING');
   
-  // ✅ CORREGIDO: Asegurar que sea número antes de usar toFixed
   const calcularPrecioBs = (precioUsd) => {
     const precio = Number(precioUsd) || 0;
     return (precio * tasaBCV).toFixed(2);
   };
 
-  // ✅ CORREGIDO: Asegurar que los precios sean números
   const getPrecioMostrar = (producto) => {
     const precioOferta = Number(producto.precio_oferta || producto.precioOferta) || 0;
     const precioDetal = Number(producto.precioDetal || producto.precio_detal) || 0;
@@ -367,14 +389,13 @@ export default function CatalogoPage() {
     if (!tieneSoloProductosDigitales) {
       if (deliveryMethod === 'retiro') mensaje += `\n Entrega: Retiro en ${selectedAddress}`;
       else if (deliveryMethod === 'delivery') mensaje += `\n Entrega: Delivery a ${customerLocation}`;
-      else if (deliveryMethod === 'nacional') mensaje += `\n📦 Envío Nacional: ${agenciaEnvio} - ${oficinaDestino}`;
+      else if (deliveryMethod === 'nacional') mensaje += `\n Envío Nacional: ${agenciaEnvio} - ${oficinaDestino}`;
     } else {
       mensaje += `\n Entrega: Digital / WhatsApp`;
     }
     mensaje += `\n💳 Pago: ${paymentMethod}`;
 
-    const telefono = settings.tienda?.telefono || '04121234567';
-    window.open(`https://wa.me/58${telefono.replace(/\D/g, '')}?text=${encodeURIComponent(mensaje)}`, '_blank');
+    window.open(`https://wa.me/${whatsappNumero}?text=${encodeURIComponent(mensaje)}`, '_blank');
     toast.success('Pedido enviado');
   };
 
@@ -387,8 +408,7 @@ export default function CatalogoPage() {
       mensaje += `Precio: $${precioInfo.precioPrincipal.toFixed(2)}\n`;
     }
     mensaje += `Bs ${calcularPrecioBs(precioInfo.precioPrincipal)}\n\n¿Cómo procedo?`;
-    const telefono = settings.tienda?.telefono || '04121234567';
-    window.open(`https://wa.me/58${telefono.replace(/\D/g, '')}?text=${encodeURIComponent(mensaje)}`, '_blank');
+    window.open(`https://wa.me/${whatsappNumero}?text=${encodeURIComponent(mensaje)}`, '_blank');
   };
 
   const categorias = [...new Set((productos || []).filter(p => p.categoria && p.categoria.toUpperCase() !== 'STREAMING').map(p => p.categoria).filter(Boolean))].sort();
@@ -532,7 +552,7 @@ export default function CatalogoPage() {
     opinionesExistentes.push(nuevaOpinion);
     localStorage.setItem('voltech_opiniones', JSON.stringify(opinionesExistentes));
     setOpiniones(opinionesExistentes);
-    setFormDataOpinion({ nombre: '', telefono: '', rating: 5, comentario: '', producto: '', foto: null });
+    setFormDataOpinion({ nombre: '', telefono: '', rating: 5, comentario: '', producto: '', foto: null, donde_nos_conocio: '' });
     setShowOpinionForm(false);
     toast.success('Opinión enviada. Será publicada tras aprobación.');
   };
@@ -553,13 +573,20 @@ export default function CatalogoPage() {
     handleFileChange(e.dataTransfer.files[0]);
   };
 
+  // ✅ ACTUALIZADO: Incluir 'kit' en el filtro para que aparezcan en el catálogo
   const productosFiltrados = (productos || []).filter(p => {
-    const match = (p.producto || '').toLowerCase().includes(searchTerm.toLowerCase()) || (p.marca || '').toLowerCase().includes(searchTerm.toLowerCase()) || (p.categoria || '').toLowerCase().includes(searchTerm.toLowerCase());
-    return match && (!filterCategory || p.categoria === filterCategory) && (!filterBrand || p.marca === filterBrand) && p.tipo === 'fisico' && !p.esCombo;
+    const searchTermLower = searchTerm.toLowerCase();
+    const match = (p.producto || '').toLowerCase().includes(searchTermLower) || 
+                  (p.marca || '').toLowerCase().includes(searchTermLower) || 
+                  (p.categoria || '').toLowerCase().includes(searchTermLower) ||
+                  (p.descripcion_detallada || '').toLowerCase().includes(searchTermLower);
+    return match && (!filterCategory || p.categoria === filterCategory) && (!filterBrand || p.marca === filterBrand) && (p.tipo === 'fisico' || p.tipo === 'kit') && !p.esCombo;
   });
 
   const streamingFiltrados = (productos || []).filter(p => {
-    const match = (p.plataforma || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const searchTermLower = searchTerm.toLowerCase();
+    const match = (p.plataforma || '').toLowerCase().includes(searchTermLower) ||
+                  (p.descripcion_detallada || '').toLowerCase().includes(searchTermLower);
     return match && (!filterPlatform || p.plataforma === filterPlatform) && p.tipo === 'streaming' && !p.esCombo;
   });
 
@@ -709,33 +736,14 @@ export default function CatalogoPage() {
       <main className="max-w-[1800px] xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
           
-          {productos.length > 0 && (
+          {/* ✅ SIDEBAR IZQUIERDO: SOLO si hay publicidad activa */}
+          {productos.length > 0 && pubsIzquierda.length > 0 && (
             <aside className="col-span-1 lg:col-span-2 space-y-4 order-2 lg:order-1">
-              {pubsIzquierda.length > 0 ? (
-                pubsIzquierda.map(renderPubCard)
-              ) : (
-                <div className={`${cardBg} border ${cardBorder} rounded-xl p-4`}>
-                  <h4 className="font-bold text-sm mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-500" /> Super Combos</h4>
-                  <div className="space-y-3">
-                    <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg p-3 text-white text-center cursor-pointer hover:opacity-90 transition-opacity">
-                      <p className="text-xs font-bold uppercase">Oferta Especial</p>
-                      <p className="text-sm font-bold mt-1">iPhone + AirPods</p>
-                      <p className="text-lg font-extrabold mt-1">$899</p>
-                      <button className="mt-2 w-full bg-white/20 hover:bg-white/30 text-xs py-1.5 rounded transition-colors">Ver Oferta</button>
-                    </div>
-                    <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-100'} rounded-lg p-3 text-center cursor-pointer hover:opacity-90 transition-opacity`}>
-                      <p className="text-xs font-bold text-voltech-muted uppercase">Tienda Hermana</p>
-                      <p className="text-sm font-bold mt-1 text-voltech-cyan">Ropa Deportiva</p>
-                      <p className="text-xs text-voltech-muted mt-1">30% OFF en todo</p>
-                      <button className="mt-2 w-full border border-voltech-cyan text-voltech-cyan hover:bg-voltech-cyan/10 text-xs py-1.5 rounded transition-colors">Visitar</button>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {pubsIzquierda.map(renderPubCard)}
             </aside>
           )}
 
-          <div className={`${productos.length === 0 ? 'col-span-full' : 'col-span-1 lg:col-span-8 xl:col-span-8'} order-1 lg:order-2`}>
+          <div className={`${(productos.length === 0 || pubsIzquierda.length === 0) ? 'col-span-full' : 'col-span-1 lg:col-span-8 xl:col-span-8'} order-1 lg:order-2`}>
             {activeSection === 'productos' && (
               <div>
                 <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Productos</h2>
@@ -752,6 +760,7 @@ export default function CatalogoPage() {
                               <Package className="w-12 h-12 text-slate-300" />
                             )}
                             {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">OFERTA</div>}
+                            {p.tipo === 'kit' && <div className="absolute top-2 left-2 bg-voltech-cyan text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">KIT</div>}
                           </div>
                           <div className="p-3 flex flex-col flex-1">
                             <div className="mb-1"><p className={`text-[10px] font-medium uppercase tracking-wide ${mutedText} truncate`}>{p.marca} • {p.categoria}</p></div>
@@ -889,6 +898,26 @@ export default function CatalogoPage() {
                           <input type="tel" value={formDataOpinion.telefono} onChange={(e) => setFormDataOpinion({...formDataOpinion, telefono: e.target.value})} className={`w-full px-4 py-2 border rounded-lg ${inputBg}`} />
                         </div>
                       </div>
+                      
+                      {/* ✅ NUEVO CAMPO: ¿Dónde nos conoció? */}
+                      <div>
+                        <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>¿Dónde nos conoció?</label>
+                        <select 
+                          value={formDataOpinion.donde_nos_conocio} 
+                          onChange={(e) => setFormDataOpinion({...formDataOpinion, donde_nos_conocio: e.target.value})} 
+                          className={`w-full px-4 py-2 border rounded-lg ${inputBg}`}
+                        >
+                          <option value="">Selecciona una opción</option>
+                          <option value="Instagram">Instagram</option>
+                          <option value="TikTok">TikTok</option>
+                          <option value="Facebook">Facebook</option>
+                          <option value="WhatsApp">WhatsApp</option>
+                          <option value="Google">Google</option>
+                          <option value="Recomendación">Recomendación de amigo/familiar</option>
+                          <option value="Otro">Otro</option>
+                        </select>
+                      </div>
+                      
                       <div>
                         <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>Producto (opcional)</label>
                         <input type="text" value={formDataOpinion.producto} onChange={(e) => setFormDataOpinion({...formDataOpinion, producto: e.target.value})} className={`w-full px-4 py-2 border rounded-lg ${inputBg}`} placeholder="Nombre del producto" />
@@ -946,6 +975,7 @@ export default function CatalogoPage() {
                               <div className="flex gap-0.5">{[1, 2, 3, 4, 5].map(star => (<Star key={star} className={`w-4 h-4 ${star <= opinion.rating ? 'text-yellow-400 fill-yellow-400' : 'text-slate-300'}`} />))}</div>
                             </div>
                             {opinion.producto && <p className={`text-xs ${mutedText} mb-2`}>Producto: {opinion.producto}</p>}
+                            {opinion.donde_nos_conocio && <p className={`text-xs ${mutedText} mb-2`}>Nos conoció por: {opinion.donde_nos_conocio}</p>}
                             {opinion.foto && (
                               <div className="mb-3">
                                 <img src={opinion.foto} alt={opinion.producto || 'Foto del producto'} className="w-full max-w-xs h-48 object-contain p-2 bg-voltech-dark rounded-lg border border-voltech-border cursor-pointer hover:opacity-90 transition-opacity" onClick={() => { const imgWindow = window.open('', '_blank'); imgWindow.document.write(`<html><head><title>${opinion.producto || 'Foto'}</title><style>body { margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #000; } img { max-width: 100%; max-height: 100vh; object-fit: contain; }</style></head><body><img src="${opinion.foto}" /></body></html>`); }} />
@@ -1032,7 +1062,7 @@ export default function CatalogoPage() {
                                       <div className="flex items-center gap-4">
                                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-purple-600 bg-purple-600' : 'border-slate-400'}`}>{isSelected && <div className="w-2 h-2 bg-white rounded-full"></div>}</div>
                                         <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">{prod.imagen ? <img src={prod.imagen} alt={prod.producto} className="w-full h-full object-contain p-2 rounded-lg" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-8 h-8 text-slate-300" />}</div>
-                                        <div className="flex-1"><h4 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{prod.producto}</h4><p className={`text-sm ${mutedText}`}>{prod.marca} • ${prod.categoria}</p></div>
+                                        <div className="flex-1"><h4 className={`font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{prod.producto}</h4><p className={`text-sm ${mutedText}`}>{prod.marca} • {prod.categoria}</p></div>
                                         <div className="text-right">
                                           <div className="flex items-center gap-2"><span className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{porcentaje}%</span></div>
                                           <p className={`text-xs ${mutedText}`}>{votos} {votos === 1 ? 'voto' : 'votos'}</p>
@@ -1171,7 +1201,7 @@ export default function CatalogoPage() {
             )}
           </div>
 
-          {/* ✅ ACTUALIZADO: Sidebar derecho SOLO se muestra si hay publicidad */}
+          {/* ✅ SIDEBAR DERECHO: SOLO si hay publicidad */}
           {productos.length > 0 && pubsDerecha.length > 0 && (
             <aside className="col-span-1 lg:col-span-2 space-y-4 order-3 lg:order-3">
               {pubsDerecha.map(renderPubCard)}
@@ -1277,7 +1307,7 @@ export default function CatalogoPage() {
         )}
       </AnimatePresence>
 
-      {/* Modal de Producto */}
+      {/* Modal de Producto - ACTUALIZADO */}
       <AnimatePresence>
         {selectedProduct && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-[80] flex items-center justify-center p-4" onClick={() => setSelectedProduct(null)}>
@@ -1337,6 +1367,31 @@ export default function CatalogoPage() {
                     )}
                   </div>
 
+                  {/* ✅ NUEVO: Mostrar contenido del Kit o descripción detallada */}
+                  {selectedProduct.tipo === 'kit' && selectedProduct.productos_kit && selectedProduct.productos_kit.length > 0 ? (
+                    <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-4`}>
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <Package className="w-4 h-4 text-voltech-cyan" />
+                        Contenido del Kit
+                      </h4>
+                      <ul className="list-disc list-inside text-sm text-voltech-muted space-y-1">
+                        {selectedProduct.productos_kit.map((item, idx) => (
+                          <li key={idx}>{item.nombre || item.producto} (x{item.cantidad})</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : selectedProduct.descripcion_detallada ? (
+                    <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-4`}>
+                      <h4 className="font-semibold mb-2 flex items-center gap-2">
+                        <Info className="w-4 h-4 text-voltech-cyan" />
+                        Especificaciones Técnicas
+                      </h4>
+                      <p className="text-sm text-voltech-muted whitespace-pre-line">
+                        {selectedProduct.descripcion_detallada}
+                      </p>
+                    </div>
+                  ) : null}
+
                   {selectedProduct.caracteristicas && Array.isArray(selectedProduct.caracteristicas) && (
                     <div>
                       <h4 className="font-semibold mb-2">Características:</h4>
@@ -1353,14 +1408,14 @@ export default function CatalogoPage() {
                       onClick={() => { comprarRapido(selectedProduct); setSelectedProduct(null); }} 
                       className="flex-1 bg-green-500 text-white py-3 rounded-xl font-semibold hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
                     >
-                      <MessageCircle className="w-5 h-5 flex-shrink-0" /> 
+                      <MessageCircle className="w-5 h-5" /> 
                       <span>Comprar por WhatsApp</span>
                     </button>
                     <button 
                       onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }} 
                       className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
                     >
-                      <ShoppingCart className="w-5 h-5 flex-shrink-0" /> 
+                      <ShoppingCart className="w-5 h-5" /> 
                       <span>Agregar al Carrito</span>
                     </button>
                   </div>
@@ -1586,6 +1641,12 @@ export default function CatalogoPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ✅ CHATBOT WIDGET */}
+      <ChatbotWidget 
+        productos={productos} 
+        whatsappNumber={whatsappNumero}
+      />
     </div>
   );
 }

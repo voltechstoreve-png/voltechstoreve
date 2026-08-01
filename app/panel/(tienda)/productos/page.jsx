@@ -75,7 +75,8 @@ export default function ProductosPage() {
     porcentaje_comision: 5,
     productos_kit: [],
     precio_costo_total: 0,
-    precio_individual_total: 0
+    precio_individual_total: 0,
+    descripcion_detallada: ''
   }]);
 
   const [editData, setEditData] = useState({
@@ -84,6 +85,7 @@ export default function ProductosPage() {
     precioOferta: 0,
     estado: 'nuevo',
     descripcion: '',
+    descripcion_detallada: '',
     publicado: false,
     imagen: '',
     duracion: '',
@@ -332,7 +334,8 @@ export default function ProductosPage() {
       porcentaje_comision: 5,
       productos_kit: [],
       precio_costo_total: 0,
-      precio_individual_total: 0
+      precio_individual_total: 0,
+      descripcion_detallada: ''
     }]);
   };
 
@@ -533,7 +536,8 @@ export default function ProductosPage() {
           porcentaje_comision: item.porcentaje_comision || 5,
           productos_kit: item.productos_kit || [],
           precio_costo_total: item.precio_costo_total || 0,
-          precio_individual_total: item.precio_individual_total || 0
+          precio_individual_total: item.precio_individual_total || 0,
+          descripcion_detallada: item.descripcion_detallada || productoExistente.descripcion_detallada || ''
         };
         nuevosProductos.push(productoActualizado);
         productosActualizados++;
@@ -545,6 +549,7 @@ export default function ProductosPage() {
           precioOferta: item.precioOferta || 0,
           estado: item.estado || 'nuevo',
           descripcion: '',
+          descripcion_detallada: item.descripcion_detallada || '',
           publicado: false,
           fechaCreacion: new Date().toISOString(),
           porcentaje_comision: item.porcentaje_comision || 5,
@@ -613,6 +618,7 @@ export default function ProductosPage() {
         fecha: new Date().toISOString().split('T')[0],
         comprador: '',
         plataforma: '',
+        plataformas: [],
         categoria: '',
         marca: '',
         cantidad: 1,
@@ -632,7 +638,8 @@ export default function ProductosPage() {
         porcentaje_comision: 5,
         productos_kit: [],
         precio_costo_total: 0,
-        precio_individual_total: 0
+        precio_individual_total: 0,
+        descripcion_detallada: ''
       }]);
       setShowForm(false);
     }
@@ -646,6 +653,7 @@ export default function ProductosPage() {
       precioOferta: producto.precioOferta || 0,
       estado: producto.estado || 'nuevo',
       descripcion: producto.descripcion || '',
+      descripcion_detallada: producto.descripcion_detallada || '',
       publicado: producto.publicado || false,
       imagen: producto.imagen || '',
       duracion: producto.duracion || '',
@@ -1022,7 +1030,7 @@ export default function ProductosPage() {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2"><Package className="w-5 h-5 text-voltech-cyan" />Nuevo Producto{items.length > 1 && `s (${items.length} items)`}</h2>
-                <button onClick={() => { setShowForm(false); setItems([{ id: Date.now(), tipo: 'fisico', imagen: '', imagenFile: null, sku: '', fecha: new Date().toISOString().split('T')[0], comprador: '', plataforma: '', plataformas: [], categoria: '', marca: '', cantidad: 1, metodoPago: 'efectivo', cartera: '', precioMayor: 0, precioDetal: 0, precioOferta: 0, estado: 'nuevo', precioBs: 0, total: 0, monedaCompra: 'usd', duracion: '', tipoOferta: '', esCombo: false, plataformasCombo: [], porcentaje_comision: 5, productos_kit: [], precio_costo_total: 0, precio_individual_total: 0 }]); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"><X className="w-5 h-5" /></button>
+                <button onClick={() => { setShowForm(false); setItems([{ id: Date.now(), tipo: 'fisico', imagen: '', imagenFile: null, sku: '', fecha: new Date().toISOString().split('T')[0], comprador: '', plataforma: '', plataformas: [], categoria: '', marca: '', cantidad: 1, metodoPago: 'efectivo', cartera: '', precioMayor: 0, precioDetal: 0, precioOferta: 0, estado: 'nuevo', precioBs: 0, total: 0, monedaCompra: 'usd', duracion: '', tipoOferta: '', esCombo: false, plataformasCombo: [], porcentaje_comision: 5, productos_kit: [], precio_costo_total: 0, precio_individual_total: 0, descripcion_detallada: '' }]); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"><X className="w-5 h-5" /></button>
               </div>
               <div className="space-y-6">
                 {items.map((item, itemIndex) => (
@@ -1148,6 +1156,22 @@ export default function ProductosPage() {
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Método de Pago</label><select value={item.metodoPago} onChange={(e) => handleChange(itemIndex, { target: { name: 'metodoPago', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="efectivo">Efectivo</option><option value="pago_movil">Pago Móvil</option><option value="transferencia">Transferencia</option><option value="zelle">Zelle</option><option value="binance">Binance</option><option value="otro">Otro</option></select></div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cartera</label><select value={item.cartera} onChange={(e) => handleChange(itemIndex, { target: { name: 'cartera', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="">-- Selecciona --</option>{carteras.map(c => (<option key={c.id} value={c.nombre}>{c.nombre}</option>))}</select></div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">% Comisión por Venta</label><input type="number" step="0.01" value={item.porcentaje_comision} onChange={(e) => { const nuevosItems = [...items]; nuevosItems[itemIndex].porcentaje_comision = parseFloat(e.target.value); setItems(nuevosItems); }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
+                      
+                      {/* NUEVO CAMPO: DESCRIPCIÓN DETALLADA */}
+                      <div className="lg:col-span-3">
+                        <label className="block text-xs text-voltech-muted mb-1 ml-1">Descripción Detallada (para Chatbot)</label>
+                        <textarea 
+                          value={item.descripcion_detallada || ''} 
+                          onChange={(e) => {
+                            const nuevosItems = [...items];
+                            nuevosItems[itemIndex].descripcion_detallada = e.target.value;
+                            setItems(nuevosItems);
+                          }} 
+                          className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-24 resize-none" 
+                          placeholder="Ej: Batería de 5000mAh, carga rápida 25W, resistencia al agua IP68, incluye cargador y cable USB-C..."
+                        />
+                        <p className="text-xs text-voltech-muted mt-1">Esta información será usada por el chatbot para responder preguntas de los clientes</p>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1338,7 +1362,19 @@ export default function ProductosPage() {
               <label className="block text-xs text-voltech-muted mb-1 ml-1">Estado</label>
               <div className="flex gap-2">{['nuevo', 'oferta', 'kit', 'agotado'].map((estado) => (<button key={estado} onClick={() => setEditData({ ...editData, estado })} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${editData.estado === estado ? estado === 'nuevo' ? 'bg-voltech-success text-white' : estado === 'oferta' ? 'bg-voltech-warning text-white' : estado === 'kit' ? 'bg-voltech-cyan text-white' : 'bg-voltech-error text-white' : 'bg-voltech-dark border border-voltech-border text-voltech-muted hover:border-voltech-muted'}`}>{estado.charAt(0).toUpperCase() + estado.slice(1)}</button>))}</div>
             </div>
-            <div className="lg:col-span-3"><label className="block text-xs text-voltech-muted mb-1 ml-1">Descripción</label><textarea value={editData.descripcion} onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-20 resize-none" placeholder="Descripción del producto..." /></div>
+            <div className="lg:col-span-3"><label className="block text-xs text-voltech-muted mb-1 ml-1">Descripción</label><textarea value={editData.descripcion} onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-20 resize-none" placeholder="Descripción corta del producto..." /></div>
+            
+            {/* NUEVO CAMPO: DESCRIPCIÓN DETALLADA EN EDICIÓN */}
+            <div className="lg:col-span-3">
+              <label className="block text-xs text-voltech-muted mb-1 ml-1">Descripción Detallada (para Chatbot)</label>
+              <textarea 
+                value={editData.descripcion_detallada || ''} 
+                onChange={(e) => setEditData({ ...editData, descripcion_detallada: e.target.value })} 
+                className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-24 resize-none" 
+                placeholder="Ej: Batería de 5000mAh, carga rápida 25W, resistencia al agua IP68, incluye cargador y cable USB-C..."
+              />
+              <p className="text-xs text-voltech-muted mt-1">Información técnica detallada para que el chatbot responda preguntas</p>
+            </div>
           </div>
           <div className="flex gap-3 mt-4">
             <button onClick={() => guardarEdicion(editandoId)} className="flex-1 btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"><Save className="w-5 h-5" />Guardar Cambios</button>
