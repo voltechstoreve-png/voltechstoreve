@@ -8,7 +8,7 @@ import {
   ShoppingCart, DollarSign, TrendingUp, Users, Plus, X, Save, Search,
   Calendar, CreditCard, Tag, MessageCircle, Edit3, Trash2, CheckCircle,
   Truck, ChevronDown, Package, ExternalLink, FileText, Bell, AlertTriangle, ArrowUpRight,
-  Box, Layers // ✅ NUEVOS ICONOS PARA KITS
+  Box, Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -21,7 +21,7 @@ export default function VentasProductosPage() {
   
   const [ventas, setVentas] = useState([]);
   const [productos, setProductos] = useState([]);
-  const [kits, setKits] = useState([]); // ✅ NUEVO: Estado para kits
+  const [kits, setKits] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [equipo, setEquipo] = useState([]);
   const [carteras, setCarteras] = useState([]);
@@ -38,7 +38,7 @@ export default function VentasProductosPage() {
   const [productoModalIndex, setProductoModalIndex] = useState(null);
   const [clienteSearch, setClienteSearch] = useState('');
   const [showClientesDropdown, setShowClientesDropdown] = useState(false);
-  const [showKitSelector, setShowKitSelector] = useState(false); // ✅ NUEVO: Selector de kits
+  const [showKitSelector, setShowKitSelector] = useState(false);
 
   const [cuponInput, setCuponInput] = useState('');
   const [cuponAplicado, setCuponAplicado] = useState(null);
@@ -66,7 +66,7 @@ export default function VentasProductosPage() {
     telefono: '',
     productos: [{ 
       productoId: '', sku: '', categoria: '', marca: '', cantidad: 1, precioUnitario: 0,
-      filtroCategoria: '', filtroMarca: ''
+      filtroCategoria: '', filtroMarca: '', esKit: false, productosIncluidos: []
     }],
     delivery: false, montoDelivery: 0, enCuotas: false, montoAbonado: 0, fechaPago: '',
     metodoPago: 'efectivo', carteraId: '', referencia: '',
@@ -84,7 +84,7 @@ export default function VentasProductosPage() {
           supabase.from('usuarios').select('*'),
           supabase.from('settings').select('clave, valor'),
           supabase.from('cupones').select('*'),
-          supabase.from('kits').select('*').eq('activo', true) // ✅ Cargar kits
+          supabase.from('kits').select('*').eq('activo', true)
         ]);
         if (d1) vts = d1;
         if (d2) prods = d2;
@@ -140,7 +140,7 @@ export default function VentasProductosPage() {
       setCarteras(sttngs.carteras || []);
       setSettings(sttngs);
       setCupones(cpons);
-      setKits(kts); // ✅ Guardar kits
+      setKits(kts);
     };
     cargarDatos();
   }, [esVendedor, usuarioActual]);
@@ -148,7 +148,7 @@ export default function VentasProductosPage() {
   const tasaBCV = settings.tasaBCV || 36.5;
   const vendedores = equipo.filter(m => m.activo && (m.rol === 'vendedor' || m.rol === 'admin' || m.rol === 'Admin'));
   const productosDisponibles = productos.filter(p => p.cantidad > 0);
-  const kitsDisponibles = kits.filter(k => k.activo !== false); // ✅ Kits activos
+  const kitsDisponibles = kits.filter(k => k.activo !== false);
 
   const metodosPagoActivos = Object.entries(settings.pagos || {}).filter(([_, val]) => val && (val.activo === true || val === true));
   const carterasActivas = (settings.carteras || []).filter(c => c && c.activo === true);
@@ -166,6 +166,7 @@ export default function VentasProductosPage() {
     }
   };
 
+  // ✅ FILTRADO RELACIONAL: Producto, Marca, Categoría
   const actualizarCampoProducto = (index, field, value) => {
     const nuevosProductos = [...formData.productos];
     nuevosProductos[index][field] = value;
@@ -181,30 +182,79 @@ export default function VentasProductosPage() {
         nuevosProductos[index].filtroMarca = producto.marca || '';
       }
     } else if (field === 'filtroCategoria') {
+      // Si selecciona Categoría: mostrar productos de esa categoría y marcas disponibles
       nuevosProductos[index].filtroMarca = '';
       nuevosProductos[index].productoId = '';
       nuevosProductos[index].sku = '';
-      nuevosProductos[index].categoria = '';
+      nuevosProductos[index].categoria = value;
       nuevosProductos[index].marca = '';
       nuevosProductos[index].precioUnitario = 0;
     } else if (field === 'filtroMarca') {
+      // Si selecciona Marca: mostrar productos de esa marca y categorías disponibles
       nuevosProductos[index].productoId = '';
       nuevosProductos[index].sku = '';
       nuevosProductos[index].categoria = '';
-      nuevosProductos[index].marca = '';
+      nuevosProductos[index].marca = value;
       nuevosProductos[index].precioUnitario = 0;
     }
     
     setFormData({ ...formData, productos: nuevosProductos });
   };
 
-  // ✅ NUEVO: Agregar kit completo a la venta
+  // ✅ Obtener marcas disponibles según filtro
+  const getMarcasDisponibles = (producto) => {
+    if (producto.filtroCategoria) {
+      // Si hay categoría filtrada, mostrar marcas de esa categoría
+      return [...new Set(
+        productosDisponibles
+          .filter(p => p.categoria === producto.filtroCategoria)
+          .map(p => p.marca)
+          .filter(Boolean)
+      )];
+    }
+    // Si no, mostrar todas las marcas
+    return [...new Set(productosDisponibles.map(p => p.marca).filter(Boolean))];
+  };
+
+  // ✅ Obtener categorías disponibles según filtro
+  const getCategoriasDisponibles = (producto) => {
+    if (producto.filtroMarca) {
+      // Si hay marca filtrada, mostrar categorías de esa marca
+      return [...new Set(
+        productosDisponibles
+          .filter(p => p.marca === producto.filtroMarca)
+          .map(p => p.categoria)
+          .filter(Boolean)
+      )];
+    }
+    // Si no, mostrar todas las categorías
+    return [...new Set(productosDisponibles.map(p => p.categoria).filter(Boolean))];
+  };
+
+  // ✅ Obtener productos disponibles según filtros (intersección estricta)
+  const getProductosDisponibles = (producto) => {
+    return productosDisponibles.filter(p => {
+      // Si hay filtro de categoría Y marca, aplicar intersección estricta
+      if (producto.filtroCategoria && producto.filtroMarca) {
+        return p.categoria === producto.filtroCategoria && p.marca === producto.filtroMarca;
+      }
+      // Si solo hay filtro de categoría
+      if (producto.filtroCategoria) {
+        return p.categoria === producto.filtroCategoria;
+      }
+      // Si solo hay filtro de marca
+      if (producto.filtroMarca) {
+        return p.marca === producto.filtroMarca;
+      }
+      // Si no hay filtros, mostrar todos
+      return true;
+    });
+  };
+
   const agregarKitAVenta = (kit) => {
-    // Verificar si hay productos vacíos para reemplazar
     const primerProductoVacio = formData.productos.findIndex(p => !p.productoId);
     
     if (primerProductoVacio !== -1) {
-      // Reemplazar el primer producto vacío con el kit
       const nuevosProductos = [...formData.productos];
       nuevosProductos[primerProductoVacio] = {
         productoId: kit.id,
@@ -220,7 +270,6 @@ export default function VentasProductosPage() {
       };
       setFormData({ ...formData, productos: nuevosProductos });
     } else {
-      // Agregar como nuevo producto
       setFormData({
         ...formData,
         productos: [...formData.productos, { 
@@ -247,7 +296,7 @@ export default function VentasProductosPage() {
       ...formData,
       productos: [...formData.productos, { 
         productoId: '', sku: '', categoria: '', marca: '', cantidad: 1, precioUnitario: 0,
-        filtroCategoria: '', filtroMarca: ''
+        filtroCategoria: '', filtroMarca: '', esKit: false, productosIncluidos: []
       }]
     });
   };
@@ -396,11 +445,24 @@ export default function VentasProductosPage() {
       return;
     }
 
+    // ✅ VALIDAR STOCK - Including kits
     for (const prod of formData.productos) {
-      const producto = productos.find(p => String(p.id) === String(prod.productoId));
-      if (!producto || producto.cantidad < prod.cantidad) {
-        toast.error(`Stock insuficiente para ${producto?.plataforma || 'producto'}`);
-        return;
+      if (prod.esKit) {
+        // Validar stock de cada producto en el kit
+        for (const prodKit of prod.productosIncluidos || []) {
+          const productoBase = productos.find(p => String(p.id) === String(prodKit.producto_id));
+          const cantidadNecesaria = productoBase ? productoBase.cantidad * prod.cantidad : 0;
+          if (!productoBase || productoBase.cantidad < prodKit.cantidad * prod.cantidad) {
+            toast.error(`Stock insuficiente para ${productoBase?.plataforma || 'producto'} en el kit`);
+            return;
+          }
+        }
+      } else {
+        const producto = productos.find(p => String(p.id) === String(prod.productoId));
+        if (!producto || producto.cantidad < prod.cantidad) {
+          toast.error(`Stock insuficiente para ${producto?.plataforma || 'producto'}`);
+          return;
+        }
       }
     }
 
@@ -448,11 +510,32 @@ export default function VentasProductosPage() {
       fechaRegistro: new Date().toISOString(),
     };
 
-    const productosActualizados = productos.map(p => {
-      const prodEnVenta = formData.productos.find(vp => String(vp.productoId) === String(p.id));
-      if (prodEnVenta) return { ...p, cantidad: p.cantidad - prodEnVenta.cantidad };
-      return p;
-    });
+    // ✅ ACTUALIZAR INVENTARIO - Including kits
+    let productosActualizados = [...productos];
+    
+    for (const prod of formData.productos) {
+      if (prod.esKit && prod.productosIncluidos && prod.productosIncluidos.length > 0) {
+        // Descontar cada producto individual del kit
+        for (const prodKit of prod.productosIncluidos) {
+          const index = productosActualizados.findIndex(p => String(p.id) === String(prodKit.producto_id));
+          if (index !== -1) {
+            productosActualizados[index] = {
+              ...productosActualizados[index],
+              cantidad: productosActualizados[index].cantidad - (prodKit.cantidad * prod.cantidad)
+            };
+          }
+        }
+      } else {
+        // Producto normal
+        const index = productosActualizados.findIndex(p => String(p.id) === String(prod.productoId));
+        if (index !== -1) {
+          productosActualizados[index] = {
+            ...productosActualizados[index],
+            cantidad: productosActualizados[index].cantidad - prod.cantidad
+          };
+        }
+      }
+    }
 
     const ventasActualizadas = editingId 
       ? ventas.map(v => String(v.id) === String(editingId) ? nuevaVenta : v)
@@ -462,12 +545,12 @@ export default function VentasProductosPage() {
     if (supabase && cuponAplicado) {
       await supabase.from('ventas').upsert(nuevaVenta, { onConflict: 'id' });
       await supabase.from('clientes').upsert(nuevoCliente, { onConflict: 'id' });
-      for (const prod of formData.productos) {
-        const pActual = productosActualizados.find(p => String(p.id) === String(prod.productoId));
-        if (pActual) {
-          await supabase.from('productos').update({ cantidad: pActual.cantidad }).eq('id', pActual.id);
-        }
+      
+      // Actualizar inventario en Supabase
+      for (const prodActualizado of productosActualizados) {
+        await supabase.from('productos').update({ cantidad: prodActualizado.cantidad }).eq('id', prodActualizado.id);
       }
+      
       await supabase.from('cupones').update({ 
         usos: (cuponAplicado.usos || 0) + 1,
         descuento_total: (cuponAplicado.descuento_total || 0) + descuentoAplicado
@@ -502,7 +585,7 @@ export default function VentasProductosPage() {
       cliente: '', telefono: '',
       productos: [{ 
         productoId: '', sku: '', categoria: '', marca: '', cantidad: 1, precioUnitario: 0,
-        filtroCategoria: '', filtroMarca: ''
+        filtroCategoria: '', filtroMarca: '', esKit: false, productosIncluidos: []
       }],
       delivery: false, montoDelivery: 0, enCuotas: false, montoAbonado: 0, fechaPago: '',
       metodoPago: 'efectivo', carteraId: '', referencia: '',
@@ -529,11 +612,34 @@ export default function VentasProductosPage() {
 
   const eliminarVenta = async (venta) => {
     if (!confirm('¿Estás seguro de eliminar esta venta? El stock será devuelto.')) return;
-    const productosActualizados = productos.map(p => {
-      const prodEnVenta = venta.productos.find(vp => String(vp.productoId) === String(p.id));
-      if (prodEnVenta) return { ...p, cantidad: p.cantidad + prodEnVenta.cantidad };
-      return p;
-    });
+    
+    let productosActualizados = [...productos];
+    
+    // Devolver stock de kits y productos normales
+    for (const prod of venta.productos) {
+      if (prod.esKit && prod.productosIncluidos && prod.productosIncluidos.length > 0) {
+        // Devolver cada producto del kit
+        for (const prodKit of prod.productosIncluidos) {
+          const index = productosActualizados.findIndex(p => String(p.id) === String(prodKit.producto_id));
+          if (index !== -1) {
+            productosActualizados[index] = {
+              ...productosActualizados[index],
+              cantidad: productosActualizados[index].cantidad + (prodKit.cantidad * prod.cantidad)
+            };
+          }
+        }
+      } else {
+        // Producto normal
+        const index = productosActualizados.findIndex(p => String(p.id) === String(prod.productoId));
+        if (index !== -1) {
+          productosActualizados[index] = {
+            ...productosActualizados[index],
+            cantidad: productosActualizados[index].cantidad + prod.cantidad
+          };
+        }
+      }
+    }
+    
     const ventasActualizadas = ventas.filter(v => String(v.id) !== String(venta.id));
     if (supabase) {
       await supabase.from('ventas').delete().eq('id', venta.id);
@@ -684,7 +790,7 @@ export default function VentasProductosPage() {
     const totalBs = (venta.total * tasaBCV).toFixed(2);
     const productosTexto = venta.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n');
     const mensaje = whatsappMode === 'gracias' 
-      ? `Gracias por su compra 🛍️\n\nRecuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos \n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos\n\n${productosTexto}\n\n Total: $${venta.total.toFixed(2)} (Bs ${totalBs})\n\n¡Gracias por tu compra!\n${settings.tienda?.nombre || 'VOLTECH STORE'}`
+      ? `Gracias por su compra ️\n\nRecuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos \n\n Instagram @Voltechstore.ve\n Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos\n\n${productosTexto}\n\n Total: $${venta.total.toFixed(2)} (Bs ${totalBs})\n\n¡Gracias por tu compra!\n${settings.tienda?.nombre || 'VOLTECH STORE'}`
       : `¡Buen día, ${venta.cliente}!\n\nTe escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto \n\n${productosTexto}\nMonto: $${venta.montoPendiente.toFixed(2)}\n\nSi ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!\n\nQue tengas un excelente día,\nEl equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}\n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos`;
     const telefonoLimpio = venta.telefono.replace(/\D/g, '');
     window.open(`https://wa.me/58${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`, '_blank');
@@ -762,7 +868,6 @@ export default function VentasProductosPage() {
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-semibold text-voltech-cyan flex items-center gap-2"><Package className="w-4 h-4" /> Productos</h4>
-                  {/* ✅ NUEVO: Botón para agregar KIT */}
                   {kitsDisponibles.length > 0 && (
                     <button 
                       onClick={() => setShowKitSelector(!showKitSelector)}
@@ -773,7 +878,6 @@ export default function VentasProductosPage() {
                   )}
                 </div>
 
-                {/* ✅ NUEVO: Selector de Kits */}
                 <AnimatePresence>
                   {showKitSelector && (
                     <motion.div
@@ -818,18 +922,9 @@ export default function VentasProductosPage() {
 
                 <div className="space-y-3">
                   {formData.productos.map((prod, index) => {
-                    const marcasDisponibles = [...new Set(
-                      productosDisponibles
-                        .filter(p => !prod.filtroCategoria || p.categoria === prod.filtroCategoria)
-                        .map(p => p.marca)
-                        .filter(Boolean)
-                    )];
-
-                    const productosParaSelect = productosDisponibles.filter(p => {
-                      if (prod.filtroCategoria && p.categoria !== prod.filtroCategoria) return false;
-                      if (prod.filtroMarca && p.marca !== prod.filtroMarca) return false;
-                      return true;
-                    });
+                    const marcasDisponibles = getMarcasDisponibles(prod);
+                    const categoriasDisponibles = getCategoriasDisponibles(prod);
+                    const productosParaSelect = getProductosDisponibles(prod);
 
                     return (
                       <div key={index} className={`bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 ${prod.esKit ? 'border-voltech-purple/50 bg-voltech-purple/5' : ''}`}>
@@ -859,7 +954,7 @@ export default function VentasProductosPage() {
                               disabled={prod.esKit}
                             >
                               <option value="">Todas</option>
-                              {[...new Set(productosDisponibles.map(p => p.categoria).filter(Boolean))].map(cat => (
+                              {categoriasDisponibles.map(cat => (
                                 <option key={cat} value={cat}>{cat}</option>
                               ))}
                             </select>
@@ -1245,7 +1340,7 @@ export default function VentasProductosPage() {
                 <p className="text-sm text-voltech-muted mb-4">Se enviará un mensaje a <strong className="text-white">{showWhatsappModal.telefono}</strong> con el detalle de la venta.</p>
                 <div className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-3 mb-4 max-h-48 overflow-y-auto">
                   <p className="text-xs text-white whitespace-pre-wrap">
-                    {whatsappMode === 'gracias' ? `Gracias por su compra 🛍️\n\nRecuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos \n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇🏽\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos\n\n${showWhatsappModal.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n')}\n\n💰 Total: $${showWhatsappModal.total.toFixed(2)} (Bs ${(showWhatsappModal.total * tasaBCV).toFixed(2)})\n\n¡Gracias por tu compra!\n${settings.tienda?.nombre || 'VOLTECH STORE'}` : `¡Buen día, ${showWhatsappModal.cliente}!\n\nTe escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto \n\n${showWhatsappModal.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n')}\nMonto: $${showWhatsappModal.montoPendiente.toFixed(2)}\n\nSi ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!\n\nQue tengas un excelente día,\nEl equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}\n\n📸 Instagram @Voltechstore.ve\n Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos`}
+                    {whatsappMode === 'gracias' ? `Gracias por su compra ️\n\nRecuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos \n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos\n\n${showWhatsappModal.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n')}\n\n Total: $${showWhatsappModal.total.toFixed(2)} (Bs ${(showWhatsappModal.total * tasaBCV).toFixed(2)})\n\n¡Gracias por tu compra!\n${settings.tienda?.nombre || 'VOLTECH STORE'}` : `¡Buen día, ${showWhatsappModal.cliente}!\n\nTe escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto \n\n${showWhatsappModal.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n')}\nMonto: $${showWhatsappModal.montoPendiente.toFixed(2)}\n\nSi ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!\n\nQue tengas un excelente día,\nEl equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}\n\n📸 Instagram @Voltechstore.ve\n Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos`}
                   </p>
                 </div>
                 <div className="flex items-center justify-between gap-3">

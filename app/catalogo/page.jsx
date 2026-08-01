@@ -10,7 +10,7 @@ import {
   Sun, Moon, Play, Clock, Zap, Truck,
   Sparkles, Trophy, AlertCircle, Ticket, Copy, Users,
   MessageSquare, ThumbsUp, Upload, Percent, Share2,
-  Image as ImageIcon, FileText // ✅ AGREGADO: FileText
+  Image as ImageIcon, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -69,7 +69,6 @@ export default function CatalogoPage() {
   const [publicidad, setPublicidad] = useState([]);
   const [ventas, setVentas] = useState([]);
   
-  // ✅ NUEVO: Estado para el modal de Términos y Condiciones
   const [showTermsModal, setShowTermsModal] = useState(false);
 
   useEffect(() => {
@@ -198,12 +197,19 @@ export default function CatalogoPage() {
   }, [productos, ventas]);
 
   const tieneSoloProductosDigitales = cart.length > 0 && cart.every(item => item.tipo === 'streaming' || item.categoria?.toUpperCase() === 'STREAMING');
-  const calcularPrecioBs = (precioUsd) => (precioUsd * tasaBCV).toFixed(2);
+  
+  // ✅ CORREGIDO: Asegurar que sea número antes de usar toFixed
+  const calcularPrecioBs = (precioUsd) => {
+    const precio = Number(precioUsd) || 0;
+    return (precio * tasaBCV).toFixed(2);
+  };
 
+  // ✅ CORREGIDO: Asegurar que los precios sean números
   const getPrecioMostrar = (producto) => {
-    const precioOferta = producto.precio_oferta || producto.precioOferta;
-    const precioDetal = producto.precioDetal || producto.precio_detal;
-    if (precioOferta && precioOferta > 0 && precioOferta < precioDetal) {
+    const precioOferta = Number(producto.precio_oferta || producto.precioOferta) || 0;
+    const precioDetal = Number(producto.precioDetal || producto.precio_detal) || 0;
+    
+    if (precioOferta > 0 && precioOferta < precioDetal) {
       return { precioPrincipal: precioOferta, precioTachado: precioDetal, tieneOferta: true };
     }
     return { precioPrincipal: precioDetal, precioTachado: null, tieneOferta: false };
@@ -229,7 +235,6 @@ export default function CatalogoPage() {
     else setCart(cart.map(item => item.id === productoId ? { ...item, cantidad } : item));
   };
 
-  // ✅ ACTUALIZADO: Validación inteligente de cupones
   const applyCoupon = () => {
     if (!couponCode.trim()) { toast.error('Ingresa un código'); return; }
     
@@ -323,7 +328,6 @@ export default function CatalogoPage() {
     return 0;
   };
 
-  // ✅ ACTUALIZADO: Cálculo del total con descuento inteligente
   const calculateTotal = () => {
     let subtotal = cart.reduce((sum, item) => sum + (getPrecioMostrar(item).precioPrincipal * item.cantidad), 0);
     const descuento = appliedCoupon ? appliedCoupon.descuentoCalculado : 0;
@@ -398,14 +402,14 @@ export default function CatalogoPage() {
 
   const validarCodigoCompra = async (codigo) => {
     if (!codigo.trim()) return null;
-    const ventas = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
-    return ventas.find(v => (v.numero_orden === codigo || v.id === codigo) && v.estado === 'Pagado') || null;
+    const ventasData = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
+    return ventasData.find(v => (v.numero_orden === codigo || v.id === codigo) && v.estado === 'Pagado') || null;
   };
 
   const validarCodigoReferido = async (codigo) => {
     if (!codigo.trim()) return null;
-    const clientes = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
-    return clientes.find(c => {
+    const clientesData = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
+    return clientesData.find(c => {
       const codigoCliente = `VOLTECHSTORE-${c.nombre.substring(0, 5).toUpperCase()}-${c.id.toString().slice(-4)}`;
       return codigoCliente === codigo.toUpperCase();
     }) || null;
@@ -479,11 +483,11 @@ export default function CatalogoPage() {
       if (formDataSorteo.codigoReferido) {
         const referidor = await validarCodigoReferido(formDataSorteo.codigoReferido);
         if (referidor) {
-          const clientes = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
-          const clienteIndex = clientes.findIndex(c => c.id === referidor.id);
+          const clientesData = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
+          const clienteIndex = clientesData.findIndex(c => c.id === referidor.id);
           if (clienteIndex !== -1) {
-            clientes[clienteIndex].referidos_contador = (clientes[clienteIndex].referidos_contador || 0) + 1;
-            localStorage.setItem('voltech_clientes', JSON.stringify(clientes));
+            clientesData[clienteIndex].referidos_contador = (clientesData[clienteIndex].referidos_contador || 0) + 1;
+            localStorage.setItem('voltech_clientes', JSON.stringify(clientesData));
             toast.success(`¡${referidor.nombre} ganó un bonus por referido!`);
           }
         }
@@ -508,8 +512,8 @@ export default function CatalogoPage() {
     if (!formDataOpinion.nombre || !formDataOpinion.comentario) { toast.error('Nombre y comentario son obligatorios'); return; }
     
     if (formDataOpinion.telefono) {
-      const clientes = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
-      const clienteExistente = clientes.find(c => c.telefono === formDataOpinion.telefono);
+      const clientesData = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
+      const clienteExistente = clientesData.find(c => c.telefono === formDataOpinion.telefono);
       
       if (!clienteExistente) {
         const nuevoCliente = {
@@ -518,8 +522,8 @@ export default function CatalogoPage() {
           telefono: formDataOpinion.telefono,
           referidos_contador: 0
         };
-        clientes.push(nuevoCliente);
-        localStorage.setItem('voltech_clientes', JSON.stringify(clientes));
+        clientesData.push(nuevoCliente);
+        localStorage.setItem('voltech_clientes', JSON.stringify(clientesData));
       }
     }
     
@@ -559,7 +563,7 @@ export default function CatalogoPage() {
     return match && (!filterPlatform || p.plataforma === filterPlatform) && p.tipo === 'streaming' && !p.esCombo;
   });
 
-  const ofertas = (productos || []).filter(p => p.publicado && (p.estado === 'oferta' || p.precio_oferta || p.precioOferta));
+  const ofertas = (productos || []).filter(p => p.publicado && (p.estado === 'oferta' || Number(p.precio_oferta || p.precioOferta) > 0));
 
   const bg = darkMode ? 'bg-slate-950' : 'bg-slate-50';
   const text = darkMode ? 'text-slate-100' : 'text-slate-900';
@@ -603,8 +607,7 @@ export default function CatalogoPage() {
   const pubsIzquierda = publicidad.filter(p => p.lado === 'izquierdo' || p.lado === 'ambos');
   const pubsDerecha = publicidad.filter(p => p.lado === 'derecho' || p.lado === 'ambos');
 
-  return (
-    <div className={`min-h-screen ${bg} ${text} flex flex-col transition-colors duration-300`}>
+  return (    <div className={`min-h-screen ${bg} ${text} flex flex-col transition-colors duration-300`}>
       <Toaster position="top-right" toastOptions={{ style: { background: darkMode ? '#1e293b' : '#fff', color: darkMode ? '#fff' : '#000', border: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}` } }} />
 
       {sorteoActivo && activeSection !== 'sorteos' && showBannerSorteo && (
@@ -826,35 +829,42 @@ export default function CatalogoPage() {
               <div>
                 <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}> Ofertas Especiales</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
-                  {ofertas.map(p => {
-                    const precioInfo = getPrecioMostrar(p);
-                    return (
-                      <div key={p.id} onClick={() => setSelectedProduct(p)} className={`${darkMode ? 'bg-gradient-to-br from-orange-900/30 to-red-900/30 border-red-800' : 'bg-gradient-to-br from-orange-50 to-red-50 border-red-200'} rounded-xl shadow-md border-2 overflow-hidden flex flex-col relative hover:shadow-lg transition-all cursor-pointer group`}>
-                        <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md z-10">OFERTA</div>
-                        <div className="aspect-square bg-slate-100 flex items-center justify-center overflow-hidden">
-                          {p.imagen ? <img src={p.imagen} alt={p.producto || p.plataforma} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-12 h-12 text-slate-300" />}
-                        </div>
-                        <div className="p-3 flex flex-col flex-1">
-                          <h3 className={`font-semibold text-sm mb-2 line-clamp-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto || p.plataforma}</h3>
-                          <div className="mb-3">
-                            <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)}</p>
-                            <p className={`text-xl font-bold ${darkMode ? 'text-red-400' : 'text-red-600'}`}>${precioInfo.precioPrincipal}</p>
-                            <p className={`text-xs ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
+                  {ofertas.length > 0 ? (
+                    ofertas.map(p => {
+                      const precioInfo = getPrecioMostrar(p);
+                      return (
+                        <div key={p.id} onClick={() => setSelectedProduct(p)} className={`${darkMode ? 'bg-gradient-to-br from-orange-900/30 to-red-900/30 border-red-800' : 'bg-gradient-to-br from-orange-50 to-red-50 border-red-200'} rounded-xl shadow-md border-2 overflow-hidden flex flex-col relative hover:shadow-lg transition-all cursor-pointer group`}>
+                          <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md z-10">OFERTA</div>
+                          <div className="aspect-square bg-slate-100 flex items-center justify-center overflow-hidden">
+                            {p.imagen ? <img src={p.imagen} alt={p.producto || p.plataforma} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-12 h-12 text-slate-300" />}
                           </div>
-                          <div className="flex gap-1.5 mt-auto">
-                            <button onClick={(e) => { e.stopPropagation(); comprarRapido(p); }} className="flex-1 bg-green-500 text-white py-2 rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors flex items-center justify-center gap-1">
-                              <MessageCircle className="w-3 h-3 flex-shrink-0" /> WhatsApp
-                            </button>
-                            <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="flex-1 bg-purple-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-1">
-                              <ShoppingCart className="w-3 h-3 flex-shrink-0" /> Carrito
-                            </button>
+                          <div className="p-3 flex flex-col flex-1">
+                            <h3 className={`font-semibold text-sm mb-2 line-clamp-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto || p.plataforma}</h3>
+                            <div className="mb-3">
+                              <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)}</p>
+                              <p className={`text-xl font-bold ${darkMode ? 'text-red-400' : 'text-red-600'}`}>${precioInfo.precioPrincipal}</p>
+                              <p className={`text-xs ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
+                            </div>
+                            <div className="flex gap-1.5 mt-auto">
+                              <button onClick={(e) => { e.stopPropagation(); comprarRapido(p); }} className="flex-1 bg-green-500 text-white py-2 rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors flex items-center justify-center gap-1">
+                                <MessageCircle className="w-3 h-3 flex-shrink-0" /> WhatsApp
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="flex-1 bg-purple-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-1">
+                                <ShoppingCart className="w-3 h-3 flex-shrink-0" /> Carrito
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  ) : (
+                    <div className="col-span-full text-center py-20">
+                      <Zap className={`w-16 h-16 mx-auto mb-3 opacity-30 ${mutedText}`} />
+                      <p className={`text-lg ${mutedText}`}>No hay ofertas disponibles</p>
+                      <p className={`text-sm ${mutedText} mt-2`}>Las ofertas aparecerán aquí cuando haya productos con estado "oferta"</p>
+                    </div>
+                  )}
                 </div>
-                {ofertas.length === 0 && <div className={`text-center py-20 ${mutedText}`}><Zap className="w-16 h-16 mx-auto mb-3 opacity-30" /><p className="text-lg">No hay ofertas disponibles</p></div>}
               </div>
             )}
 
@@ -1161,40 +1171,10 @@ export default function CatalogoPage() {
             )}
           </div>
 
-          {productos.length > 0 && (
+          {/* ✅ ACTUALIZADO: Sidebar derecho SOLO se muestra si hay publicidad */}
+          {productos.length > 0 && pubsDerecha.length > 0 && (
             <aside className="col-span-1 lg:col-span-2 space-y-4 order-3 lg:order-3">
-              {pubsDerecha.length > 0 ? (
-                pubsDerecha.map(renderPubCard)
-              ) : (
-                <div className={`${cardBg} border ${cardBorder} rounded-xl p-4`}>
-                  <h4 className="font-bold text-sm mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-voltech-warning" /> Más Vendidos</h4>
-                  <div className="space-y-3">
-                    {productosMasVendidos.length > 0 ? productosMasVendidos.map((p, idx) => (
-                      <div key={p.id} className="flex items-center gap-3 cursor-pointer hover:bg-voltech-border/50 p-2 rounded-lg transition-colors" onClick={() => setSelectedProduct(p)}>
-                        <div className="w-10 h-10 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                          {p.imagen ? <img src={p.imagen} className="w-full h-full object-contain p-1 rounded-lg" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-5 h-5 text-slate-400" />}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold truncate">{p.producto || p.plataforma}</p>
-                          <p className="text-[10px] text-voltech-muted">${getPrecioMostrar(p).precioPrincipal?.toFixed(2)}</p>
-                        </div>
-                      </div>
-                    )) : (
-                      <p className="text-xs text-voltech-muted text-center py-4">Aún no hay suficientes ventas</p>
-                    )}
-                  </div>
-                  <div className={`mt-4 pt-4 border-t ${cardBorder}`}>
-                    <div className="flex items-center gap-2 text-xs text-voltech-muted mb-2">
-                      <Truck className="w-4 h-4 text-voltech-success" />
-                      <span>Envío GRATIS en compras +$50</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-voltech-muted">
-                      <Clock className="w-4 h-4 text-voltech-cyan" />
-                      <span>Entrega en 24-48h</span>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {pubsDerecha.map(renderPubCard)}
             </aside>
           )}
 
@@ -1209,7 +1189,6 @@ export default function CatalogoPage() {
               <p className="text-slate-400 text-sm">{settings.tienda?.direccion || 'Caracas, Venezuela'}</p>
               <p className="text-slate-400 text-sm mt-2">{settings.tienda?.email}</p>
               
-              {/* ✅ NUEVO: Link a Términos y Condiciones */}
               <button 
                 onClick={() => setShowTermsModal(true)} 
                 className="mt-4 flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm"
@@ -1246,7 +1225,7 @@ export default function CatalogoPage() {
         </div>
       </footer>
 
-      {/* ✅ NUEVO: Modal de Términos y Condiciones */}
+      {/* Modal de Términos y Condiciones */}
       <AnimatePresence>
         {showTermsModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-[90] flex items-center justify-center p-4" onClick={() => setShowTermsModal(false)}>
@@ -1298,6 +1277,7 @@ export default function CatalogoPage() {
         )}
       </AnimatePresence>
 
+      {/* Modal de Producto */}
       <AnimatePresence>
         {selectedProduct && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-[80] flex items-center justify-center p-4" onClick={() => setSelectedProduct(null)}>
@@ -1391,6 +1371,7 @@ export default function CatalogoPage() {
         )}
       </AnimatePresence>
 
+      {/* Modal de Ticket */}
       <AnimatePresence>
         {showTicketModal && ticketGenerado && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4" onClick={() => setShowTicketModal(false)}>
@@ -1437,6 +1418,7 @@ export default function CatalogoPage() {
         )}
       </AnimatePresence>
 
+      {/* Modal de Carrito */}
       <AnimatePresence>
         {showCart && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 z-50 flex justify-end" onClick={() => setShowCart(false)}>
@@ -1534,7 +1516,6 @@ export default function CatalogoPage() {
                       </select>
                     </div>
 
-                    {/* ✅ ACTUALIZADO: Sección de Cupón con resumen claro */}
                     <div className="mb-4">
                       <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}> Cupón de Descuento</label>
                       {appliedCoupon ? (

@@ -8,7 +8,7 @@ import {
   Plus, Search, Edit, Trash2, X, Package, DollarSign, TrendingUp,
   AlertTriangle, CheckCircle, Image as ImageIcon, Save, Minus,
   Upload, Eye, EyeOff, Globe, LayoutGrid, Table, Download,
-  Database, MonitorPlay, Tag, Layers, Calendar, Percent,
+  Database, MonitorPlay, Tag, Layers, Calendar, Percent, Gift,
   ChevronDown, MoreVertical, Filter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -44,6 +44,7 @@ export default function ProductosPage() {
   
   const [showGestionModal, setShowGestionModal] = useState(false);
   const [editCatMarca, setEditCatMarca] = useState({ tipo: '', valorOriginal: '', valorNuevo: '' });
+  const [busquedaKit, setBusquedaKit] = useState('');
 
   const [items, setItems] = useState([{
     id: Date.now(),
@@ -62,8 +63,8 @@ export default function ProductosPage() {
     cartera: '',
     precioMayor: 0,
     precioDetal: 0,
-    precioOferta: 0, // ✅ NUEVO
-    estado: 'nuevo', // ✅ NUEVO
+    precioOferta: 0,
+    estado: 'nuevo',
     precioBs: 0,
     total: 0,
     monedaCompra: 'usd',
@@ -72,6 +73,9 @@ export default function ProductosPage() {
     esCombo: false,
     plataformasCombo: [],
     porcentaje_comision: 5,
+    productos_kit: [],
+    precio_costo_total: 0,
+    precio_individual_total: 0
   }]);
 
   const [editData, setEditData] = useState({
@@ -87,6 +91,9 @@ export default function ProductosPage() {
     plataforma: '',
     plataformasCombo: [],
     porcentaje_comision: 5,
+    productos_kit: [],
+    precio_costo_total: 0,
+    precio_individual_total: 0
   });
 
   const [nuevaCartera, setNuevaCartera] = useState({ nombre: '', tipo: 'pago_movil', datos: '' });
@@ -152,6 +159,7 @@ export default function ProductosPage() {
   }, []);
 
   const generarSKU = (plataforma, categoria, marca, existente = 0) => {
+    if (categoria === 'KIT') return `KIT-${(plataforma || 'KIT').substring(0, 3).toUpperCase()}-${String(existente).padStart(3, '0')}`;
     const plat = (plataforma || '').substring(0, 3).toUpperCase();
     const cat = (categoria || '').substring(0, 3).toUpperCase();
     const mar = marca ? marca.substring(0, 3).toUpperCase() : 'STR';
@@ -161,14 +169,14 @@ export default function ProductosPage() {
 
   const obtenerSiguienteNumero = (plataforma, categoria, marca) => {
     if (!plataforma || !categoria) return 0;
-    const base = `${plataforma.substring(0, 3).toUpperCase()}-${categoria.substring(0, 3).toUpperCase()}-${marca ? marca.substring(0, 3).toUpperCase() : 'STR'}`;
+    const base = categoria === 'KIT' ? `KIT-${(plataforma || 'KIT').substring(0, 3).toUpperCase()}` : `${plataforma.substring(0, 3).toUpperCase()}-${categoria.substring(0, 3).toUpperCase()}-${marca ? marca.substring(0, 3).toUpperCase() : 'STR'}`;
     const existentes = productos.filter(p => p.sku && p.sku.startsWith(base));
     return existentes.length;
   };
 
   const actualizarSKU = (index) => {
     const item = items[index];
-    if (item.plataforma && item.categoria && (item.tipo === 'streaming' || item.marca)) {
+    if (item.plataforma && item.categoria) {
       const siguienteNum = obtenerSiguienteNumero(item.plataforma, item.categoria, item.marca);
       const nuevoSKU = generarSKU(item.plataforma, item.categoria, item.marca, siguienteNum);
       const nuevosItems = [...items];
@@ -208,10 +216,65 @@ export default function ProductosPage() {
     const { name, value } = e.target;
     const nuevosItems = [...items];
     nuevosItems[index][name] = value;
-    setItems(nuevosItems);
     
-    if (['plataforma', 'categoria', 'marca'].includes(name)) {
+    if (name === 'tipo' && value === 'kit') {
+      nuevosItems[index].categoria = 'KIT';
+      nuevosItems[index].marca = 'Voltech';
+    }
+    
+    setItems(nuevosItems);
+    if (['plataforma', 'categoria', 'marca', 'tipo'].includes(name)) {
       setTimeout(() => actualizarSKU(index), 100);
+    }
+  };
+
+  const toggleProductoKit = (index, producto) => {
+    const nuevosItems = [...items];
+    const kitActual = nuevosItems[index].productos_kit || [];
+    const existe = kitActual.find(p => p.producto_id === producto.id);
+    
+    if (existe) {
+      nuevosItems[index].productos_kit = kitActual.filter(p => p.producto_id !== producto.id);
+    } else {
+      nuevosItems[index].productos_kit = [...kitActual, {
+        producto_id: producto.id,
+        sku: producto.sku,
+        nombre: producto.plataforma || producto.producto,
+        cantidad: 1,
+        precio_costo: producto.precioMayor || 0,
+        precio_venta: producto.precioDetal || 0,
+        imagen: producto.imagen
+      }];
+    }
+    
+    const kitActualizado = nuevosItems[index].productos_kit;
+    const costoTotal = kitActualizado.reduce((sum, p) => sum + (p.precio_costo * p.cantidad), 0);
+    const ventaTotal = kitActualizado.reduce((sum, p) => sum + (p.precio_venta * p.cantidad), 0);
+    
+    nuevosItems[index].precio_costo_total = costoTotal;
+    nuevosItems[index].precio_individual_total = ventaTotal;
+    if (nuevosItems[index].precioDetal === 0) {
+      nuevosItems[index].precioDetal = parseFloat((ventaTotal * 0.9).toFixed(2));
+    }
+    
+    setItems(nuevosItems);
+  };
+
+  const actualizarCantidadKit = (index, productoId, nuevaCantidad) => {
+    if (nuevaCantidad < 1) return;
+    const nuevosItems = [...items];
+    const kitActual = nuevosItems[index].productos_kit || [];
+    const producto = kitActual.find(p => p.producto_id === productoId);
+    if (producto) {
+      producto.cantidad = nuevaCantidad;
+      
+      const costoTotal = kitActual.reduce((sum, p) => sum + (p.precio_costo * p.cantidad), 0);
+      const ventaTotal = kitActual.reduce((sum, p) => sum + (p.precio_venta * p.cantidad), 0);
+      
+      nuevosItems[index].productos_kit = kitActual;
+      nuevosItems[index].precio_costo_total = costoTotal;
+      nuevosItems[index].precio_individual_total = ventaTotal;
+      setItems(nuevosItems);
     }
   };
 
@@ -252,18 +315,24 @@ export default function ProductosPage() {
       cantidad: 1,
       precioMayor: 0,
       precioDetal: 0,
-      precioOferta: 0, // ✅ NUEVO
-      estado: 'nuevo', // ✅ NUEVO
+      precioOferta: 0,
+      estado: 'nuevo',
       precioBs: 0,
       total: 0,
       plataforma: '',
-      plataformas: [],
-      fecha: new Date().toISOString().split('T')[0],
+      categoria: '',
+      marca: '',
+      metodoPago: 'efectivo',
+      cartera: '',
+      monedaCompra: 'usd',
       duracion: '',
       tipoOferta: '',
       esCombo: false,
       plataformasCombo: [],
       porcentaje_comision: 5,
+      productos_kit: [],
+      precio_costo_total: 0,
+      precio_individual_total: 0
     }]);
   };
 
@@ -432,26 +501,29 @@ export default function ProductosPage() {
     const nuevosProductos = [];
 
     items.forEach((item, index) => {
-      if (!item.plataforma || !item.categoria || (item.tipo === 'fisico' && !item.marca)) {
+      if (item.tipo !== 'kit' && (!item.plataforma || !item.categoria || (item.tipo === 'fisico' && !item.marca))) {
         toast.error(`El item ${index + 1} tiene campos obligatorios vacíos`);
+        return;
+      }
+      if (item.tipo === 'kit' && (!item.plataforma || (item.productos_kit || []).length === 0)) {
+        toast.error(`El Kit ${index + 1} debe tener un nombre y al menos 1 producto`);
         return;
       }
 
       const productoExistente = productos.find(p => 
         normalizarTexto(p.plataforma) === normalizarTexto(item.plataforma) &&
         normalizarTexto(p.categoria) === normalizarTexto(item.categoria) &&
-        (item.tipo === 'fisico' ? normalizarTexto(p.marca) === normalizarTexto(item.marca) : true) &&
         p.id !== item.id
       );
 
       if (productoExistente) {
         const productoActualizado = {
           ...productoExistente,
-          cantidad: productoExistente.cantidad + item.cantidad,
+          cantidad: item.tipo !== 'kit' ? productoExistente.cantidad + item.cantidad : item.cantidad,
           precioMayor: item.precioMayor,
           precioDetal: item.precioDetal || item.precioMayor,
-          precioOferta: item.precioOferta || 0, // ✅ NUEVO
-          estado: item.estado || 'nuevo', // ✅ NUEVO
+          precioOferta: item.precioOferta || 0,
+          estado: item.estado || 'nuevo',
           precioBs: item.precioBs,
           fecha: item.fecha,
           tipo: item.tipo,
@@ -459,6 +531,9 @@ export default function ProductosPage() {
           tipoOferta: item.tipoOferta,
           imagen: item.imagen || productoExistente.imagen,
           porcentaje_comision: item.porcentaje_comision || 5,
+          productos_kit: item.productos_kit || [],
+          precio_costo_total: item.precio_costo_total || 0,
+          precio_individual_total: item.precio_individual_total || 0
         };
         nuevosProductos.push(productoActualizado);
         productosActualizados++;
@@ -467,12 +542,15 @@ export default function ProductosPage() {
           ...item,
           id: (Date.now() + index).toString(),
           precioDetal: item.precioDetal || item.precioMayor,
-          precioOferta: item.precioOferta || 0, // ✅ NUEVO
-          estado: item.estado || 'nuevo', // ✅ NUEVO
+          precioOferta: item.precioOferta || 0,
+          estado: item.estado || 'nuevo',
           descripcion: '',
           publicado: false,
           fechaCreacion: new Date().toISOString(),
           porcentaje_comision: item.porcentaje_comision || 5,
+          productos_kit: item.productos_kit || [],
+          precio_costo_total: item.precio_costo_total || 0,
+          precio_individual_total: item.precio_individual_total || 0
         };
         nuevosProductos.push(nuevoProducto);
         productosGuardados++;
@@ -535,7 +613,6 @@ export default function ProductosPage() {
         fecha: new Date().toISOString().split('T')[0],
         comprador: '',
         plataforma: '',
-        plataformas: [],
         categoria: '',
         marca: '',
         cantidad: 1,
@@ -543,8 +620,8 @@ export default function ProductosPage() {
         cartera: '',
         precioMayor: 0,
         precioDetal: 0,
-        precioOferta: 0, // ✅ NUEVO
-        estado: 'nuevo', // ✅ NUEVO
+        precioOferta: 0,
+        estado: 'nuevo',
         precioBs: 0,
         total: 0,
         monedaCompra: 'usd',
@@ -553,6 +630,9 @@ export default function ProductosPage() {
         esCombo: false,
         plataformasCombo: [],
         porcentaje_comision: 5,
+        productos_kit: [],
+        precio_costo_total: 0,
+        precio_individual_total: 0
       }]);
       setShowForm(false);
     }
@@ -573,6 +653,9 @@ export default function ProductosPage() {
       plataforma: producto.plataforma || '',
       plataformasCombo: producto.plataformasCombo || [],
       porcentaje_comision: producto.porcentaje_comision || 5,
+      productos_kit: producto.productos_kit || [],
+      precio_costo_total: producto.precio_costo_total || 0,
+      precio_individual_total: producto.precio_individual_total || 0
     });
   };
 
@@ -706,9 +789,10 @@ export default function ProductosPage() {
   const totalProductos = productos.length;
   const stockBajo = productos.filter(p => p.cantidad <= 2).length;
   const agotados = productos.filter(p => p.cantidad === 0).length;
-  const valorInventario = productos.reduce((acc, p) => acc + (p.precioMayor * p.cantidad), 0);
+  const valorInventario = productos.reduce((acc, p) => 
+  acc + (parseFloat(p.precioMayor || 0) * (p.cantidad || 0)), 0
+);
 
-  // ✅ FUNCIÓN AUXILIAR PARA BADGES DE ESTADO
   const getEstadoBadge = (estado) => {
     const estilos = {
       nuevo: 'bg-voltech-success/20 text-voltech-success',
@@ -719,6 +803,11 @@ export default function ProductosPage() {
     };
     return estilos[estado] || estilos.nuevo;
   };
+
+  const productosParaKit = productos.filter(p => 
+    p.tipo === 'fisico' && p.cantidad > 0 &&
+    (p.plataforma?.toLowerCase().includes(busquedaKit.toLowerCase()) || p.sku?.toLowerCase().includes(busquedaKit.toLowerCase()))
+  );
 
   return (
     <div className="space-y-6">
@@ -933,7 +1022,7 @@ export default function ProductosPage() {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2"><Package className="w-5 h-5 text-voltech-cyan" />Nuevo Producto{items.length > 1 && `s (${items.length} items)`}</h2>
-                <button onClick={() => { setShowForm(false); setItems([{ id: Date.now(), tipo: 'fisico', imagen: '', imagenFile: null, sku: '', fecha: new Date().toISOString().split('T')[0], comprador: '', plataforma: '', plataformas: [], categoria: '', marca: '', cantidad: 1, metodoPago: 'efectivo', cartera: '', precioMayor: 0, precioDetal: 0, precioOferta: 0, estado: 'nuevo', precioBs: 0, total: 0, monedaCompra: 'usd', duracion: '', tipoOferta: '', esCombo: false, plataformasCombo: [], porcentaje_comision: 5 }]); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"><X className="w-5 h-5" /></button>
+                <button onClick={() => { setShowForm(false); setItems([{ id: Date.now(), tipo: 'fisico', imagen: '', imagenFile: null, sku: '', fecha: new Date().toISOString().split('T')[0], comprador: '', plataforma: '', plataformas: [], categoria: '', marca: '', cantidad: 1, metodoPago: 'efectivo', cartera: '', precioMayor: 0, precioDetal: 0, precioOferta: 0, estado: 'nuevo', precioBs: 0, total: 0, monedaCompra: 'usd', duracion: '', tipoOferta: '', esCombo: false, plataformasCombo: [], porcentaje_comision: 5, productos_kit: [], precio_costo_total: 0, precio_individual_total: 0 }]); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"><X className="w-5 h-5" /></button>
               </div>
               <div className="space-y-6">
                 {items.map((item, itemIndex) => (
@@ -945,6 +1034,7 @@ export default function ProductosPage() {
                       <div className="flex gap-3">
                         <button type="button" onClick={() => { const nuevosItems = [...items]; nuevosItems[itemIndex].tipo = 'fisico'; setItems(nuevosItems); }} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'fisico' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Package className="w-4 h-4" />Físico</button>
                         <button type="button" onClick={() => { const nuevosItems = [...items]; nuevosItems[itemIndex].tipo = 'streaming'; setItems(nuevosItems); }} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'streaming' ? 'bg-voltech-purple/20 border-voltech-purple text-voltech-purple' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-purple'}`}><MonitorPlay className="w-4 h-4" />Streaming</button>
+                        <button type="button" onClick={() => { const nuevosItems = [...items]; nuevosItems[itemIndex].tipo = 'kit'; nuevosItems[itemIndex].categoria = 'KIT'; nuevosItems[itemIndex].marca = 'Voltech'; setItems(nuevosItems); }} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'kit' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Gift className="w-4 h-4" />Kit</button>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -962,34 +1052,83 @@ export default function ProductosPage() {
                       </div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">SKU (automático)</label><input type="text" value={item.sku} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-mono text-voltech-cyan bg-voltech-dark/50" /></div>
                       <div className="lg:col-span-2">
-                        <label className="block text-xs text-voltech-muted mb-1 ml-1">Plataforma Streaming *</label>
-                        <div className="flex gap-2">
-                          <input type="text" value={item.plataforma} onChange={(e) => handleChange(itemIndex, { target: { name: 'plataforma', value: e.target.value } })} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" placeholder={item.tipo === 'streaming' ? 'Ej: Netflix Premium' : 'Ej: Audífonos JBL'} list={`plataformas-list-${item.id}`} />
-                          <datalist id={`plataformas-list-${item.id}`}>{productos.filter(p => p.tipo === 'streaming').map(p => (<option key={p.id} value={p.plataforma} />))}</datalist>
-                          {item.tipo === 'streaming' && (<button type="button" onClick={() => { if (item.plataforma.trim()) { const nuevosItems = [...items]; const nuevaPlataforma = item.plataforma.trim(); if (!nuevosItems[itemIndex].plataformas.includes(nuevaPlataforma)) { nuevosItems[itemIndex].plataformas.push(nuevaPlataforma); } nuevosItems[itemIndex].plataforma = ''; setItems(nuevosItems); toast.success('Plataforma agregada'); } }} className="px-3 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg hover:bg-voltech-purple/30 transition-colors"><Plus className="w-4 h-4" /></button>)}
-                        </div>
-                        {item.plataformas && item.plataformas.length > 0 && (<div className="flex flex-wrap gap-2 mt-2">{item.plataformas.map((plat, idx) => (<span key={idx} className="text-xs bg-voltech-purple/20 text-voltech-purple px-2 py-1 rounded-full flex items-center gap-1">{plat}<button type="button" onClick={() => { const nuevosItems = [...items]; nuevosItems[itemIndex].plataformas = nuevosItems[itemIndex].plataformas.filter((_, i) => i !== idx); setItems(nuevosItems); }} className="text-voltech-error hover:text-voltech-error/70"><X className="w-3 h-3" /></button></span>))}</div>)}
+                        <label className="block text-xs text-voltech-muted mb-1 ml-1">Nombre del {item.tipo === 'kit' ? 'Kit' : 'Producto'} *</label>
+                        <input type="text" value={item.plataforma} onChange={(e) => handleChange(itemIndex, { target: { name: 'plataforma', value: e.target.value } })} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" placeholder={item.tipo === 'kit' ? 'Ej: Kit iPhone Completo' : 'Ej: Audífonos JBL'} />
                       </div>
-                      <div>
-                        <label className="block text-xs text-voltech-muted mb-1 ml-1">Categoría *</label>
-                        <div className="flex gap-2">
-                          <input type="text" value={item.categoria} onChange={(e) => handleChange(itemIndex, { target: { name: 'categoria', value: e.target.value } })} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" placeholder="Ej: STREAMING" list={`categorias-list-${item.id}`} />
-                          <datalist id={`categorias-list-${item.id}`}>{categorias.map(c => (<option key={c} value={c} />))}</datalist>
-                          <button onClick={() => abrirNuevoCampo('categoria')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors"><Plus className="w-4 h-4" /></button>
-                        </div>
-                      </div>
-                      {item.tipo === 'fisico' && (<div><label className="block text-xs text-voltech-muted mb-1 ml-1">Marca *</label><div className="flex gap-2"><select value={item.marca} onChange={(e) => handleChange(itemIndex, { target: { name: 'marca', value: e.target.value } })} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm"><option value="">-- Selecciona --</option>{marcas.map(m => (<option key={m} value={m}>{m}</option>))}</select><button onClick={() => abrirNuevoCampo('marca')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors"><Plus className="w-4 h-4" /></button></div></div>)}
-                      {item.tipo === 'streaming' && (<>
-                        <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Duración</label><div className="flex gap-2"><input type="text" value={item.duracion} onChange={(e) => { const nuevosItems = [...items]; nuevosItems[itemIndex].duracion = e.target.value; setItems(nuevosItems); }} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" placeholder="Ej: 1 mes, 15 días, 3 meses..." /><Calendar className="w-5 h-5 text-voltech-muted self-center" /></div></div>
-                        <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Tipo de Oferta</label><div className="flex gap-2"><input type="text" value={item.tipoOferta} onChange={(e) => { const nuevosItems = [...items]; nuevosItems[itemIndex].tipoOferta = e.target.value; setItems(nuevosItems); }} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" placeholder="Ej: Pack 3 plataformas, 2x1, 5% descuento..." /><Percent className="w-5 h-5 text-voltech-muted self-center" /></div></div>
-                        {!item.esCombo && (<div className="lg:col-span-3"><button onClick={abrirComboModal} className="w-full py-3 bg-voltech-purple/20 border border-voltech-purple rounded-lg text-voltech-purple hover:bg-voltech-purple/30 transition-colors flex items-center justify-center gap-2"><Layers className="w-4 h-4" />Crear Combo con Plataformas Existentes</button></div>)}
-                      </>)}
-                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Fecha</label><input type="date" value={item.fecha} onChange={(e) => handleChange(itemIndex, { target: { name: 'fecha', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
-                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Comprador (Equipo)</label><select value={item.comprador} onChange={(e) => handleChange(itemIndex, { target: { name: 'comprador', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="">-- Selecciona --</option>{equipo.map(e => (<option key={e.id} value={e.nombre}>{e.nombre} ({e.rol})</option>))}</select></div>
-                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cantidad</label><input type="number" value={item.cantidad} onChange={(e) => { handleChange(itemIndex, { target: { name: 'cantidad', value: e.target.value } }); calcularTotal(itemIndex); }} min="0" className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
-                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Moneda de compra</label><select value={item.monedaCompra} onChange={(e) => handleChange(itemIndex, { target: { name: 'monedaCompra', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="usd">Dólares ($)</option><option value="bs">Bolívares (Bs)</option></select></div>
                       
-                      {/* ✅ NUEVOS CAMPOS: Estado y Precio Oferta */}
+                      {item.tipo !== 'kit' && (
+                        <>
+                          <div>
+                            <label className="block text-xs text-voltech-muted mb-1 ml-1">Categoría *</label>
+                            <div className="flex gap-2">
+                              <input type="text" value={item.categoria} onChange={(e) => handleChange(itemIndex, { target: { name: 'categoria', value: e.target.value } })} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" placeholder="Ej: STREAMING" list={`categorias-list-${item.id}`} />
+                              <datalist id={`categorias-list-${item.id}`}>{categorias.map(c => (<option key={c} value={c} />))}</datalist>
+                              <button onClick={() => abrirNuevoCampo('categoria')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors"><Plus className="w-4 h-4" /></button>
+                            </div>
+                          </div>
+                          {item.tipo === 'fisico' && (<div><label className="block text-xs text-voltech-muted mb-1 ml-1">Marca *</label><div className="flex gap-2"><select value={item.marca} onChange={(e) => handleChange(itemIndex, { target: { name: 'marca', value: e.target.value } })} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm"><option value="">-- Selecciona --</option>{marcas.map(m => (<option key={m} value={m}>{m}</option>))}</select><button onClick={() => abrirNuevoCampo('marca')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors"><Plus className="w-4 h-4" /></button></div></div>)}
+                        </>
+                      )}
+
+                      {item.tipo === 'kit' && (
+                        <div className="lg:col-span-3 space-y-3">
+                          <label className="block text-xs text-voltech-muted mb-1 ml-1">Seleccionar Productos del Inventario</label>
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
+                            <input type="text" value={busquedaKit} onChange={(e) => setBusquedaKit(e.target.value)} placeholder="Buscar por nombre o SKU..." className="input-voltech w-full rounded-lg pl-10 pr-4 py-2 text-sm" />
+                          </div>
+                          <div className="max-h-60 overflow-y-auto border border-voltech-border rounded-lg bg-voltech-dark/30 p-2 space-y-2">
+                            {productosParaKit.map((prod, idx) => {
+                              const enKit = (item.productos_kit || []).find(p => p.producto_id === prod.id);
+                              return (
+                                <div key={idx} className={`flex items-center justify-between p-3 rounded-lg border transition-all ${enKit ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-surface border-voltech-border hover:border-voltech-cyan/50'}`}>
+                                  <div className="flex items-center gap-3 flex-1">
+                                    <input type="checkbox" checked={!!enKit} onChange={() => toggleProductoKit(itemIndex, prod)} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" />
+                                    {prod.imagen ? <img src={prod.imagen} alt={prod.plataforma} className="w-10 h-10 rounded object-cover" /> : <div className="w-10 h-10 rounded bg-voltech-dark flex items-center justify-center"><ImageIcon className="w-5 h-5 text-voltech-muted" /></div>}
+                                    <div>
+                                      <p className="text-sm font-medium text-white">{prod.plataforma || prod.producto}</p>
+                                      <p className="text-xs text-voltech-muted">SKU: {prod.sku} | Stock: {prod.cantidad}</p>
+                                    </div>
+                                  </div>
+                                  {enKit && (
+                                    <div className="flex items-center gap-2">
+                                      <button onClick={() => actualizarCantidadKit(itemIndex, prod.id, enKit.cantidad - 1)} className="p-1 hover:bg-voltech-border rounded"><Minus className="w-3 h-3" /></button>
+                                      <span className="text-sm font-bold w-6 text-center">{enKit.cantidad}</span>
+                                      <button onClick={() => actualizarCantidadKit(itemIndex, prod.id, enKit.cantidad + 1)} className="p-1 hover:bg-voltech-border rounded"><Plus className="w-3 h-3" /></button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {productosParaKit.length === 0 && <p className="text-center text-xs text-voltech-muted py-4">No se encontraron productos</p>}
+                          </div>
+                        </div>
+                      )}
+
+                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cantidad</label><input type="number" value={item.cantidad} onChange={(e) => { handleChange(itemIndex, { target: { name: 'cantidad', value: e.target.value } }); calcularTotal(itemIndex); }} min="0" className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
+                      
+                      {item.tipo === 'kit' && (item.productos_kit || []).length > 0 && (
+                        <div className="lg:col-span-3 bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 space-y-2">
+                          <h4 className="text-sm font-bold text-voltech-cyan flex items-center gap-2"><DollarSign className="w-4 h-4" /> Resumen Financiero del Kit</h4>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div><p className="text-xs text-voltech-muted">Inversión Total:</p><p className="font-bold text-white">${(item.precio_costo_total || 0).toFixed(2)}</p></div>
+                            <div><p className="text-xs text-voltech-muted">Valor Individual:</p><p className="font-bold text-white">${(item.precio_individual_total || 0).toFixed(2)}</p></div>
+                            <div>
+                              <label className="text-xs text-voltech-muted block">Precio del Kit ($):</label>
+                              <input type="number" step="0.01" value={item.precioDetal} onChange={(e) => handleChange(itemIndex, { target: { name: 'precioDetal', value: e.target.value } })} className="input-voltech w-full rounded px-2 py-1 text-sm font-bold text-voltech-success" />
+                            </div>
+                            <div><p className="text-xs text-voltech-muted">Ganancia Estimada:</p><p className="font-bold text-voltech-success">${(item.precioDetal - (item.precio_costo_total || 0)).toFixed(2)}</p></div>
+                          </div>
+                        </div>
+                      )}
+
+                      {item.tipo !== 'kit' && (
+                        <>
+                          {item.tipo === 'fisico' && (<div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Mayor ($) <span className="text-voltech-warning">(Tu costo)</span></label><input type="number" step="0.01" value={item.precioMayor} onChange={(e) => calcularPrecioCruzado(itemIndex, 'precioMayor', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>)}
+                          <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Detal ($) <span className="text-voltech-success">(Venta al público)</span></label><input type="number" step="0.01" value={item.precioDetal} onChange={(e) => calcularPrecioCruzado(itemIndex, 'precioDetal', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Precio de venta" />{item.tipo === 'fisico' && item.precioMayor > 0 && item.precioDetal > 0 && (<p className="text-xs text-voltech-success mt-1">Ganancia: ${(item.precioDetal - item.precioMayor).toFixed(2)} ({((item.precioDetal - item.precioMayor) / item.precioMayor * 100).toFixed(0)}%)</p>)}</div>
+                        </>
+                      )}
+                      
                       <div>
                         <label className="block text-xs text-voltech-muted mb-1 ml-1">Estado</label>
                         <select value={item.estado} onChange={(e) => handleChange(itemIndex, { target: { name: 'estado', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
@@ -1004,8 +1143,6 @@ export default function ProductosPage() {
                         <input type="number" step="0.01" value={item.precioOferta} onChange={(e) => handleChange(itemIndex, { target: { name: 'precioOferta', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="0.00" />
                       </div>
 
-                      {item.tipo === 'fisico' && (<div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Mayor ($) <span className="text-voltech-warning">(Tu costo)</span></label><input type="number" step="0.01" value={item.precioMayor} onChange={(e) => calcularPrecioCruzado(itemIndex, 'precioMayor', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>)}
-                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Detal ($) <span className="text-voltech-success">(Venta al público)</span></label><input type="number" step="0.01" value={item.precioDetal} onChange={(e) => calcularPrecioCruzado(itemIndex, 'precioDetal', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Precio de venta" />{item.tipo === 'fisico' && item.precioMayor > 0 && item.precioDetal > 0 && (<p className="text-xs text-voltech-success mt-1">Ganancia: ${(item.precioDetal - item.precioMayor).toFixed(2)} ({((item.precioDetal - item.precioMayor) / item.precioMayor * 100).toFixed(0)}%)</p>)}</div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio (Bs)</label><input type="number" step="0.01" value={item.precioBs} onChange={(e) => calcularPrecioCruzado(itemIndex, 'precioBs', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Total</label><input type="number" step="0.01" value={item.total} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-success bg-voltech-dark/50" /></div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Método de Pago</label><select value={item.metodoPago} onChange={(e) => handleChange(itemIndex, { target: { name: 'metodoPago', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="efectivo">Efectivo</option><option value="pago_movil">Pago Móvil</option><option value="transferencia">Transferencia</option><option value="zelle">Zelle</option><option value="binance">Binance</option><option value="otro">Otro</option></select></div>
@@ -1086,9 +1223,8 @@ export default function ProductosPage() {
                           <div><p className="text-sm font-medium text-white">{producto.plataforma}</p>{producto.esCombo && (<p className="text-xs text-voltech-purple">Combo: {producto.plataformasCombo?.join(', ')}</p>)}</div>
                         </div>
                       </td>
-                      <td className="px-4 py-3">{producto.tipo === 'streaming' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-purple/20 text-voltech-purple flex items-center gap-1 w-fit"><MonitorPlay className="w-3 h-3" />Streaming</span>) : (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit"><Package className="w-3 h-3" />Físico</span>)}</td>
+                      <td className="px-4 py-3">{producto.tipo === 'streaming' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-purple/20 text-voltech-purple flex items-center gap-1 w-fit"><MonitorPlay className="w-3 h-3" />Streaming</span>) : producto.tipo === 'kit' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit"><Gift className="w-3 h-3" />Kit</span>) : (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit"><Package className="w-3 h-3" />Físico</span>)}</td>
                       
-                      {/* ✅ NUEVO: Columna Estado */}
                       <td className="px-4 py-3">
                         <span className={`text-xs px-2 py-1 rounded-full font-medium ${getEstadoBadge(producto.estado)}`}>
                           {producto.estado ? producto.estado.charAt(0).toUpperCase() + producto.estado.slice(1) : 'Nuevo'}
@@ -1098,15 +1234,14 @@ export default function ProductosPage() {
                       <td className="px-4 py-3 text-sm text-voltech-muted">{producto.categoria}</td>
                       <td className="px-4 py-3"><span className={`text-sm font-medium ${producto.cantidad === 0 ? 'text-voltech-error' : producto.cantidad <= 2 ? 'text-voltech-warning' : 'text-voltech-success'}`}>{producto.cantidad}</span></td>
                       
-                      {/* ✅ NUEVO: Columna Precio con Oferta */}
                       <td className="px-4 py-3">
                         {producto.precioOferta > 0 && producto.estado === 'oferta' ? (
                           <div className="flex flex-col">
-                            <span className="text-xs text-gray-400 line-through">${(producto.precioDetal || producto.precioMayor).toFixed(2)}</span>
-                            <span className="text-sm font-bold text-voltech-warning">${producto.precioOferta.toFixed(2)}</span>
+                            <span className="text-xs text-gray-400 line-through">$${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</span>
+                            <span className="text-sm font-bold text-voltech-warning">${parseFloat(producto.precioOferta || 0).toFixed(2)}</span>
                           </div>
                         ) : (
-                          <span className="text-sm text-white">${(producto.precioDetal || producto.precioMayor).toFixed(2)}</span>
+                          <span className="text-sm text-white">$${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</span>
                         )}
                       </td>
                       
@@ -1150,7 +1285,7 @@ export default function ProductosPage() {
                   <div className="absolute top-2 right-2 flex gap-2">
                     <button onClick={() => togglePublicado(producto.id)} className={`p-2 rounded-lg backdrop-blur-sm transition-colors ${producto.publicado ? 'bg-voltech-success/80 text-white' : 'bg-voltech-dark/80 text-voltech-muted'}`}>{producto.publicado ? <Globe className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
                   </div>
-                  <div className="absolute top-2 left-2">{producto.tipo === 'streaming' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-purple/80 text-white flex items-center gap-1"><MonitorPlay className="w-3 h-3" />Streaming</span>) : (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/80 text-white flex items-center gap-1"><Package className="w-3 h-3" />Físico</span>)}</div>
+                  <div className="absolute top-2 left-2">{producto.tipo === 'streaming' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-purple/80 text-white flex items-center gap-1"><MonitorPlay className="w-3 h-3" />Streaming</span>) : producto.tipo === 'kit' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/80 text-white flex items-center gap-1"><Gift className="w-3 h-3" />Kit</span>) : (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/80 text-white flex items-center gap-1"><Package className="w-3 h-3" />Físico</span>)}</div>
                   {producto.esCombo && (<div className="absolute top-12 left-2"><span className="text-xs px-2 py-1 rounded-full bg-voltech-warning/80 text-white flex items-center gap-1"><Layers className="w-3 h-3" />Combo</span></div>)}
                   <div className="absolute bottom-2 left-2"><span className={`text-xs px-2 py-1 rounded-full backdrop-blur-sm ${getEstadoBadge(producto.estado)}`}>{producto.estado ? producto.estado.charAt(0).toUpperCase() + producto.estado.slice(1) : 'Nuevo'}</span></div>
                 </div>
@@ -1163,11 +1298,11 @@ export default function ProductosPage() {
                     <div>
                       {producto.precioOferta > 0 && producto.estado === 'oferta' ? (
                         <>
-                          <p className="text-xs text-gray-400 line-through">${(producto.precioDetal || producto.precioMayor).toFixed(2)}</p>
-                          <p className="text-lg font-bold text-voltech-warning">${producto.precioOferta.toFixed(2)}</p>
+                          <p className="text-xs text-gray-400 line-through">${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</p>
+                          <p className="text-lg font-bold text-voltech-warning">${Number(producto.precioOferta || 0).toFixed(2)}</p>
                         </>
                       ) : (
-                        <p className="text-lg font-bold text-white">${(producto.precioDetal || producto.precioMayor).toFixed(2)}</p>
+                        <p className="text-lg font-bold text-white">${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</p>
                       )}
                       <p className="text-xs text-voltech-muted">Bs {producto.precioBs.toFixed(2)}</p>
                     </div>

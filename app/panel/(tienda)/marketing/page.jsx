@@ -8,7 +8,8 @@ import {
   Edit3, Save, X, CheckCircle, ShoppingCart, Tag, FileText, 
   ChevronDown, ChevronUp, Share2, Ticket, Percent, Calendar,
   TrendingUp, DollarSign, Package, Megaphone, Store, Image as ImageIcon,
-  Eye, Monitor, Smartphone, Tablet, Clock, Upload, AlertCircle
+  Eye, Monitor, Smartphone, Tablet, Clock, Upload, AlertCircle, Repeat, Sparkles,
+  Phone, Instagram, Globe, Truck, RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -17,9 +18,17 @@ export default function MarketingPage() {
   const { esAdmin, usuarioActual } = usePermissions();
   const [activeTab, setActiveTab] = useState('plantillas');
   
+  const [masVendidosOpen, setMasVendidosOpen] = useState(false);
+  const [whatsappOpen, setWhatsappOpen] = useState(false);
+  const [marketplaceOpen, setMarketplaceOpen] = useState(false);
+  const [cuponesOpen, setCuponesOpen] = useState(false);
+  const [calendarioMes, setCalendarioMes] = useState(new Date().getMonth());
+  const [calendarioAnio, setCalendarioAnio] = useState(new Date().getFullYear());
+
   const [plantillas, setPlantillas] = useState([]);
   const [showPlantillaForm, setShowPlantillaForm] = useState(false);
   const [plantillaEditando, setPlantillaEditando] = useState(null);
+  const [filtroTipoPlantilla, setFiltroTipoPlantilla] = useState('todas');
   const [formDataPlantilla, setFormDataPlantilla] = useState({
     nombre: '', tipo: 'whatsapp', categoria: 'mensaje', contenido: '',
   });
@@ -27,21 +36,24 @@ export default function MarketingPage() {
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [etiquetas, setEtiquetas] = useState([]);
+  
+  // WhatsApp States
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
   const [precioPromocion, setPrecioPromocion] = useState('');
+  const [plantillaWhatsappSeleccionada, setPlantillaWhatsappSeleccionada] = useState('');
+  const [plantillaContactoWaSeleccionada, setPlantillaContactoWaSeleccionada] = useState('');
   const [clientesSeleccionados, setClientesSeleccionados] = useState([]);
   const [filtroEtiqueta, setFiltroEtiqueta] = useState('');
   const [busquedaClientes, setBusquedaClientes] = useState('');
-  const [plantillaWhatsappSeleccionada, setPlantillaWhatsappSeleccionada] = useState('');
-  const [mensajePersonalizado, setMensajePersonalizado] = useState('');
+  const [mensajePersonalizadoWa, setMensajePersonalizadoWa] = useState('');
+  const [historialEnvios, setHistorialEnvios] = useState({});
+  const [historialDetallado, setHistorialDetallado] = useState([]);
 
-  const [showDiffusionModal, setShowDiffusionModal] = useState(false);
-  const [diffusionIndex, setDiffusionIndex] = useState(0);
-  const [enviados, setEnviados] = useState(new Set());
-
+  // Marketplace States (SIN IA)
   const [productoMarketplace, setProductoMarketplace] = useState(null);
   const [precioPromocionMarketplace, setPrecioPromocionMarketplace] = useState('');
   const [plantillaMarketplaceSeleccionada, setPlantillaMarketplaceSeleccionada] = useState('');
+  const [plantillaContactoMpSeleccionada, setPlantillaContactoMpSeleccionada] = useState('');
   const [textoMarketplace, setTextoMarketplace] = useState('');
 
   const [cupones, setCupones] = useState([]);
@@ -49,15 +61,23 @@ export default function MarketingPage() {
   const [cuponEditando, setCuponEditando] = useState(null);
   const [busquedaProductoCupon, setBusquedaProductoCupon] = useState('');
   
-  // ✅ ACTUALIZADO: Nuevos campos para el sistema de cupones
   const [formDataCupon, setFormDataCupon] = useState({
     titulo: '', descripcion: '', codigo: '', 
-    tipo_descuento: 'porcentaje', // 'porcentaje', 'monto_fijo', 'gratis'
+    tipo_descuento: 'porcentaje',
     valor_descuento: 20, 
-    tipo_aplicacion: 'todos', // 'todos', 'producto_especifico', 'varios_productos', 'producto_gratis'
+    tipo_aplicacion: 'todos',
     producto_ids: [], 
-    excluir_ofertas: false, monto_minimo: 0, fecha_inicio: '', fecha_vencimiento: '',
-    limite_usos: 'ilimitado', max_usos: 100, uso_por_cliente: 'una_vez', estado: 'activo'
+    excluir_ofertas: false, 
+    monto_minimo: 0, 
+    fecha_inicio: '', 
+    duracion_dias: 30, 
+    fecha_vencimiento: '',
+    limite_usos: 'ilimitado', 
+    max_usos: 100, 
+    uso_por_cliente: 'una_vez', 
+    estado: 'activo',
+    usos: 0,
+    descuento_total: 0
   });
 
   const [publicidad, setPublicidad] = useState([]);
@@ -69,38 +89,112 @@ export default function MarketingPage() {
   
   const [formDataPublicidad, setFormDataPublicidad] = useState({
     titulo: '', descripcion: '', url_destino: '', url_imagen: '', lado: 'izquierdo', posicion: 'sidebar',
-    fecha_inicio: '', hora_inicio: '00:00', fecha_fin: '', hora_fin: '23:59', prioridad: 'normal',
+    fecha_inicio: '', duracion_dias: 30, fecha_fin: '', hora_inicio: '00:00', hora_fin: '23:59', prioridad: 'normal',
     mostrar_en: { inicio: true, catalogo: true, streaming: false, ofertas: false },
     dispositivos: { desktop: true, movil: true, tablet: true }, rotacion: 5, estado: 'activo'
   });
 
-  useEffect(() => {
-    const cargarDatos = async () => {
-      let plts = [], cpons = [], pubs = [], prods = [], clts = [], etqs = [];
+  const [masVendidosConfig, setMasVendidosConfig] = useState({
+    activo: false, titulo: '🔥 Los Favoritos de Nuestros Clientes', cantidad_maxima: 3,
+    descripcion_1: '🚚 Envíos rápidos a todo el país en 24-48h',
+    descripcion_2: '️ Garantía de 3 días en todos nuestros productos'
+  });
 
-      if (supabase) {
-        const [{ data: pData }, { data: cData }, { data: puData }, { data: prData }, { data: clData }, { data: etData }] = await Promise.all([
-          supabase.from('plantillas').select('*'),
-          supabase.from('cupones').select('*'),
-          supabase.from('publicidad').select('*'),
-          supabase.from('productos').select('*'),
-          supabase.from('clientes').select('*'),
-          supabase.from('settings').select('valor').eq('clave', 'etiquetas').single()
-        ]);
-        if (pData) plts = pData;
-        if (cData) cpons = cData;
-        if (puData) pubs = puData;
-        if (prData) prods = prData;
-        if (clData) clts = clData;
-        if (etData?.valor) etqs = etData.valor;
+  const [campanasCalendario, setCampanasCalendario] = useState([]);
+  const [alertasVencimiento, setAlertasVencimiento] = useState([]);
+
+  // ✅ CÁLCULO AUTOMÁTICO DE FECHA DE VENCIMIENTO
+  useEffect(() => {
+    if (formDataCupon.fecha_inicio && formDataCupon.duracion_dias) {
+      const fecha = new Date(formDataCupon.fecha_inicio);
+      fecha.setDate(fecha.getDate() + parseInt(formDataCupon.duracion_dias));
+      const year = fecha.getFullYear();
+      const month = String(fecha.getMonth() + 1).padStart(2, '0');
+      const day = String(fecha.getDate()).padStart(2, '0');
+      const hours = String(fecha.getHours()).padStart(2, '0');
+      const minutes = String(fecha.getMinutes()).padStart(2, '0');
+      setFormDataCupon(prev => ({ ...prev, fecha_vencimiento: `${year}-${month}-${day}T${hours}:${minutes}` }));
+    }
+  }, [formDataCupon.fecha_inicio, formDataCupon.duracion_dias]);
+
+  useEffect(() => {
+    const cargarHistorial = async () => {
+      const hoy = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('envios_marketing')
+        .select('cliente_id')
+        .gte('fecha_envio', `${hoy}T00:00:00`);
+      
+      if (!error && data) {
+        const conteo = {};
+        data.forEach(envio => {
+          conteo[envio.cliente_id] = (conteo[envio.cliente_id] || 0) + 1;
+        });
+        setHistorialEnvios(conteo);
       }
 
+      const { data: histDet, error: histErr } = await supabase
+        .from('envios_marketing')
+        .select('cliente_id, producto_id, fecha_envio')
+        .order('fecha_envio', { ascending: false })
+        .limit(10);
+      
+      if (!histErr && histDet) setHistorialDetallado(histDet);
+    };
+    cargarHistorial();
+  }, []);
+
+  useEffect(() => {
+    if (formDataPublicidad.fecha_inicio && formDataPublicidad.duracion_dias) {
+      const fecha = new Date(formDataPublicidad.fecha_inicio);
+      fecha.setDate(fecha.getDate() + parseInt(formDataPublicidad.duracion_dias));
+      setFormDataPublicidad(prev => ({ ...prev, fecha_fin: fecha.toISOString().split('T')[0] }));
+    }
+  }, [formDataPublicidad.fecha_inicio, formDataPublicidad.duracion_dias]);
+
+  useEffect(() => {
+    const alertas = [];
+    const hoy = new Date();
+    publicidad.forEach(pub => {
+      if (pub.estado === 'activo' && pub.fecha_fin) {
+        const fin = new Date(pub.fecha_fin);
+        const dias = Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24));
+        if (dias <= 3 && dias >= 0) alertas.push({ tipo: 'Publicidad', titulo: pub.titulo, dias, fecha: pub.fecha_fin });
+      }
+    });
+    cupones.forEach(cupon => {
+      if (cupon.estado === 'activo' && cupon.fecha_vencimiento) {
+        const fin = new Date(cupon.fecha_vencimiento);
+        const dias = Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24));
+        if (dias <= 3 && dias >= 0) alertas.push({ tipo: 'Cupón', titulo: cupon.titulo, dias, fecha: cupon.fecha_vencimiento });
+      }
+    });
+    setAlertasVencimiento(alertas);
+  }, [publicidad, cupones]);
+
+  useEffect(() => {
+    const cargarDatos = async () => {
+      let plts = [], cpons = [], pubs = [], prods = [], clts = [], etqs = [], mvConfig = {};
+      if (supabase) {
+        const [{ data: pData }, { data: cData }, { data: puData }, { data: prData }, { data: clData }, { data: etData }, { data: mvData }] = await Promise.all([
+          supabase.from('plantillas').select('*'), supabase.from('cupones').select('*'),
+          supabase.from('publicidad').select('*'), supabase.from('productos').select('*'),
+          supabase.from('clientes').select('*'), supabase.from('settings').select('valor').eq('clave', 'etiquetas').single(),
+          supabase.from('marketing_config').select('valor').eq('clave', 'mas_vendidos').single()
+        ]);
+        if (pData) plts = pData; if (cData) cpons = cData; if (puData) pubs = puData;
+        if (prData) prods = prods; if (clData) clts = clData; if (etData?.valor) etqs = etData.valor;
+        if (mvData?.valor) mvConfig = mvData.valor;
+      }
       if (plts.length === 0) { const d = localStorage.getItem('voltech_plantillas'); if (d) plts = JSON.parse(d); }
       if (cpons.length === 0) { const d = localStorage.getItem('voltech_cupones'); if (d) cpons = JSON.parse(d); }
       if (pubs.length === 0) { const d = localStorage.getItem('voltech_publicidad'); if (d) pubs = JSON.parse(d); }
       if (prods.length === 0) { const d = localStorage.getItem('voltech_productos'); if (d) prods = JSON.parse(d); }
       if (clts.length === 0) { const d = localStorage.getItem('voltech_clientes'); if (d) clts = JSON.parse(d); }
       if (etqs.length === 0) { const d = localStorage.getItem('voltech_etiquetas'); if (d) etqs = JSON.parse(d); }
+      if (Object.keys(mvConfig).length === 0) { const d = localStorage.getItem('voltech_mas_vendidos_config'); if (d) mvConfig = JSON.parse(d); }
+
+      if (Object.keys(mvConfig).length > 0) setMasVendidosConfig(mvConfig);
 
       let clientesFiltrados = clts;
       if (!esAdmin && usuarioActual?.nombre) {
@@ -109,178 +203,143 @@ export default function MarketingPage() {
 
       setPlantillas(plts); setCupones(cpons); setPublicidad(pubs);
       setProductos(prods); setClientes(clientesFiltrados); setEtiquetas(etqs);
+
+      const campanas = [];
+      pubs.forEach(pub => campanas.push({ id: pub.id, tipo: 'Publicidad', titulo: pub.titulo, inicio: pub.fecha_inicio, fin: pub.fecha_fin, estado: pub.estado }));
+      cpons.forEach(cupon => campanas.push({ id: cupon.id, tipo: 'Cupón', titulo: cupon.titulo, inicio: cupon.fecha_inicio, fin: cupon.fecha_vencimiento, estado: cupon.estado }));
+      campanas.sort((a, b) => new Date(a.inicio) - new Date(b.inicio));
+      setCampanasCalendario(campanas);
     };
     cargarDatos();
   }, [esAdmin, usuarioActual]);
+
+  // ✅ WHATSAPP: Generar mensaje con orden correcto
+  useEffect(() => {
+    if (!productoSeleccionado || clientesSeleccionados.length === 0) {
+      setMensajePersonalizadoWa('');
+      return;
+    }
+    
+    const primerCliente = clientes.find(c => String(c.id) === String(clientesSeleccionados[0]));
+    const nombreCliente = primerCliente ? primerCliente.nombre : '{{nombre_cliente}}';
+    const nombreProducto = productoSeleccionado.nombre || productoSeleccionado.plataforma || 'Producto';
+    const precioProducto = precioPromocion ? parseFloat(precioPromocion).toFixed(2) : (Number(productoSeleccionado.precioDetal) || 0).toFixed(2);
+    
+    let mensaje = `¡Hola ${nombreCliente}! \n\n`;
+    
+    // 2. Título de la Promoción (si hay plantilla seleccionada)
+    if (plantillaWhatsappSeleccionada) {
+      const plantilla = plantillas.find(p => String(p.id) === String(plantillaWhatsappSeleccionada));
+      if (plantilla && plantilla.nombre) {
+        mensaje += ` *${plantilla.nombre}* 🔥\n\n`;
+      }
+    }
+    
+    // 3. Detalles del Producto
+    mensaje += ` *Producto:* ${nombreProducto}\n`;
+    mensaje += `💰 *Precio Especial:* $${precioProducto}\n\n`;
+    
+    // 4. Texto/Oferta de la Promoción (contenido de la plantilla)
+    if (plantillaWhatsappSeleccionada) {
+      const plantilla = plantillas.find(p => String(p.id) === String(plantillaWhatsappSeleccionada));
+      if (plantilla && plantilla.contenido && plantilla.contenido.trim() !== '' && plantilla.contenido.trim() !== 'Sin plantilla') {
+        mensaje += `${plantilla.contenido}\n\n`;
+      }
+    }
+    
+    // 5. Plantilla de Contacto (Footer)
+    mensaje += `---\n`;
+    if (plantillaContactoWaSeleccionada) {
+      const plantilla = plantillas.find(p => String(p.id) === String(plantillaContactoWaSeleccionada));
+      if (plantilla && plantilla.contenido && plantilla.contenido.trim() !== '' && plantilla.contenido.trim() !== 'Sin plantilla') {
+        mensaje += `${plantilla.contenido}`;
+      }
+    } else {
+      mensaje += `📲 ¡Escríbenos para coordinar tu entrega y aprovechar esta oferta!`;
+    }
+    
+    setMensajePersonalizadoWa(mensaje.trim());
+  }, [productoSeleccionado, precioPromocion, plantillaWhatsappSeleccionada, plantillaContactoWaSeleccionada, clientesSeleccionados, clientes, plantillas]);
+
+  // ✅ MARKETPLACE: Generar texto con orden correcto (SIN IA)
+  useEffect(() => {
+    if (!productoMarketplace) {
+      setTextoMarketplace('');
+      return;
+    }
+    
+    const nombreProducto = productoMarketplace.nombre || productoMarketplace.plataforma || 'Producto';
+    const precioProducto = precioPromocionMarketplace ? parseFloat(precioPromocionMarketplace).toFixed(2) : (Number(productoMarketplace.precioDetal) || 0).toFixed(2);
+    
+    let mensaje = '';
+    
+    // 1. Título de la Promoción
+    if (plantillaMarketplaceSeleccionada) {
+      const plantilla = plantillas.find(p => String(p.id) === String(plantillaMarketplaceSeleccionada));
+      if (plantilla && plantilla.nombre) {
+        mensaje += `${plantilla.nombre.toUpperCase()}\n\n`;
+      }
+    }
+    
+    // 2. Producto y Precio
+    mensaje += ` ${nombreProducto.toUpperCase()} 🔥\n`;
+    mensaje += ` PRECIO: $${precioProducto}\n\n`;
+    
+    // 3. Texto/Oferta de la Promoción (contenido de la plantilla)
+    if (plantillaMarketplaceSeleccionada) {
+      const plantilla = plantillas.find(p => String(p.id) === String(plantillaMarketplaceSeleccionada));
+      if (plantilla && plantilla.contenido && plantilla.contenido.trim() !== '' && plantilla.contenido.trim() !== 'Sin plantilla') {
+        mensaje += `${plantilla.contenido}\n\n`;
+      }
+    }
+    
+    // 4. Plantilla de Contacto
+    mensaje += `📍 ENTREGAS Y CONTACTO:\n`;
+    if (plantillaContactoMpSeleccionada) {
+      const plantilla = plantillas.find(p => String(p.id) === String(plantillaContactoMpSeleccionada));
+      if (plantilla && plantilla.contenido && plantilla.contenido.trim() !== '' && plantilla.contenido.trim() !== 'Sin plantilla') {
+        mensaje += `${plantilla.contenido}`;
+      } else {
+        mensaje += `Entregas personales o envíos a todo el país. ¡Escríbenos al DM!`;
+      }
+    } else {
+      mensaje += `Entregas personales o envíos a todo el país. ¡Escríbenos al DM!`;
+    }
+    
+    setTextoMarketplace(mensaje.trim());
+  }, [productoMarketplace, precioPromocionMarketplace, plantillaMarketplaceSeleccionada, plantillaContactoMpSeleccionada, plantillas]);
 
   const handleImageUpload = (file) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) { toast.error('Solo se permiten imágenes'); return; }
     if (file.size > 5 * 1024 * 1024) { toast.error('La imagen no debe pesar más de 5MB'); return; }
     const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result;
-      setImagenPreview(base64);
-      setFormDataPublicidad({...formDataPublicidad, url_imagen: base64});
-    };
+    reader.onloadend = () => { setImagenPreview(reader.result); setFormDataPublicidad({...formDataPublicidad, url_imagen: reader.result}); };
     reader.readAsDataURL(file);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const file = e.dataTransfer.files[0];
-    handleImageUpload(file);
-  };
-
-  const handleFileInput = (e) => {
-    const file = e.target.files[0];
-    handleImageUpload(file);
   };
 
   const guardarPublicidad = async () => {
     if (!esAdmin) return toast.error('Solo el administrador puede gestionar publicidad');
     if (!formDataPublicidad.titulo || !formDataPublicidad.url_imagen || !formDataPublicidad.fecha_inicio || !formDataPublicidad.fecha_fin) {
-      toast.error('Título, imagen y fechas son obligatorios');
-      return;
+      return toast.error('Título, imagen y fechas son obligatorios');
     }
-
-    const nuevaPublicidad = {
-      id: publicidadEditando ? publicidadEditando.id : `pub-${Date.now()}`,
-      ...formDataPublicidad,
-      fecha_creacion: publicidadEditando?.fecha_creacion || new Date().toISOString(),
-      impresiones: publicidadEditando?.impresiones || 0,
-      clics: publicidadEditando?.clics || 0
-    };
-
-    if (supabase) {
-      const { error } = await supabase.from('publicidad').upsert(nuevaPublicidad, { onConflict: 'id' });
-      if (error) { toast.error('Error al guardar en la nube: ' + error.message); return; }
-    }
-
-    if (publicidadEditando) {
-      const actualizadas = publicidad.map(p => p.id === publicidadEditando.id ? nuevaPublicidad : p);
-      localStorage.setItem('voltech_publicidad', JSON.stringify(actualizadas));
-      setPublicidad(actualizadas);
-      toast.success('Publicidad actualizada');
-    } else {
-      const actualizadas = [...publicidad, nuevaPublicidad];
-      localStorage.setItem('voltech_publicidad', JSON.stringify(actualizadas));
-      setPublicidad(actualizadas);
-      toast.success('Publicidad creada exitosamente');
-    }
-    resetPublicidadForm();
-  };
-
-  const editarPublicidad = (pub) => {
-    setPublicidadEditando(pub);
-    setFormDataPublicidad({
-      titulo: pub.titulo, 
-      descripcion: pub.descripcion || '', 
-      url_destino: pub.url_destino || '', 
-      url_imagen: pub.url_imagen,
-      lado: pub.lado || 'izquierdo', 
-      posicion: pub.posicion || 'sidebar', 
-      fecha_inicio: pub.fecha_inicio,
-      hora_inicio: pub.hora_inicio || '00:00', 
-      fecha_fin: pub.fecha_fin, 
-      hora_fin: pub.hora_fin || '23:59',
-      prioridad: pub.prioridad || 'normal', 
-      mostrar_en: pub.mostrar_en || { inicio: true, catalogo: true, streaming: false, ofertas: false },
-      dispositivos: pub.dispositivos || { desktop: true, movil: true, tablet: true }, 
-      rotacion: pub.rotacion || 5, 
-      estado: pub.estado || 'activo'
-    });
-    setImagenPreview(pub.url_imagen);
-    setShowPublicidadForm(true);
-  };
-
-  const eliminarPublicidad = async (id) => {
-    if (!esAdmin) return toast.error('Solo el administrador puede eliminar publicidad');
-    if (!confirm('¿Estás seguro de eliminar esta publicidad?')) return;
-    if (supabase) await supabase.from('publicidad').delete().eq('id', id);
-    const actualizadas = publicidad.filter(p => p.id !== id);
-    localStorage.setItem('voltech_publicidad', JSON.stringify(actualizadas));
-    setPublicidad(actualizadas);
-    toast.success('Publicidad eliminada');
-  };
-
-  const toggleEstadoPublicidad = async (pub) => {
-    if (!esAdmin) return toast.error('Solo el administrador puede cambiar el estado');
-    const nuevoEstado = pub.estado === 'activo' ? 'inactivo' : 'activo';
-    if (supabase) await supabase.from('publicidad').update({ estado: nuevoEstado }).eq('id', pub.id);
-    const actualizadas = publicidad.map(p => p.id === pub.id ? { ...p, estado: nuevoEstado } : p);
-    localStorage.setItem('voltech_publicidad', JSON.stringify(actualizadas));
-    setPublicidad(actualizadas);
-    toast.success(nuevoEstado === 'activo' ? 'Publicidad activada' : 'Publicidad desactivada');
-  };
-
-  const resetPublicidadForm = () => {
-    setFormDataPublicidad({
-      titulo: '', descripcion: '', url_destino: '', url_imagen: '', lado: 'izquierdo', posicion: 'sidebar',
-      fecha_inicio: '', hora_inicio: '00:00', fecha_fin: '', hora_fin: '23:59', prioridad: 'normal',
-      mostrar_en: { inicio: true, catalogo: true, streaming: false, ofertas: false },
-      dispositivos: { desktop: true, movil: true, tablet: true }, rotacion: 5, estado: 'activo'
-    });
-    setImagenPreview(''); setShowPublicidadForm(false); setPublicidadEditando(null);
-  };
-
-  const guardarCupones = async (nuevosCupones) => {
-    if (supabase) {
-      await supabase.from('cupones').upsert(nuevosCupones, { onConflict: 'id' });
-    }
-    localStorage.setItem('voltech_cupones', JSON.stringify(nuevosCupones));
-    setCupones(nuevosCupones);
-  };
-
-  const generarCodigo = (titulo) => {
-    const codigoBase = titulo.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 12);
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return `${codigoBase}-${random}`;
-  };
-
-  const handleTipoAplicacionChange = (value) => {
-    if (value === 'producto_gratis') {
-      setFormDataCupon(prev => ({
-        ...prev,
-        tipo_aplicacion: value,
-        tipo_descuento: 'gratis',
-        valor_descuento: 100
-      }));
-    } else {
-      setFormDataCupon(prev => ({
-        ...prev,
-        tipo_aplicacion: value,
-        tipo_descuento: prev.tipo_descuento === 'gratis' ? 'porcentaje' : prev.tipo_descuento
-      }));
-    }
-  };
-
-  const toggleProductoCupon = (productoId, isSingle) => {
-    if (isSingle) {
-      setFormDataCupon({ ...formDataCupon, producto_ids: [productoId] });
-    } else {
-      const actuales = formDataCupon.producto_ids;
-      if (actuales.includes(productoId)) {
-        setFormDataCupon({ ...formDataCupon, producto_ids: actuales.filter(id => id !== productoId) });
-      } else {
-        setFormDataCupon({ ...formDataCupon, producto_ids: [...actuales, productoId] });
-      }
-    }
+    const nuevaPublicidad = { id: publicidadEditando ? publicidadEditando.id : `pub-${Date.now()}`, ...formDataPublicidad, fecha_creacion: new Date().toISOString() };
+    if (supabase) { const { error } = await supabase.from('publicidad').upsert(nuevaPublicidad, { onConflict: 'id' }); if (error) toast.error('Error: ' + error.message); }
+    const actualizadas = publicidadEditando ? publicidad.map(p => p.id === publicidadEditando.id ? nuevaPublicidad : p) : [...publicidad, nuevaPublicidad];
+    setPublicidad(actualizadas); localStorage.setItem('voltech_publicidad', JSON.stringify(actualizadas));
+    toast.success('Publicidad guardada'); setShowPublicidadForm(false); setPublicidadEditando(null);
   };
 
   const guardarCupon = async () => {
     if (!esAdmin) return toast.error('Solo el administrador puede crear cupones');
     if (!formDataCupon.titulo || !formDataCupon.descripcion || !formDataCupon.fecha_inicio || !formDataCupon.fecha_vencimiento) {
-      toast.error('Completa los campos obligatorios (Título, Descripción, Fechas)');
-      return;
+      return toast.error('Completa los campos obligatorios (Título, Descripción, Fechas)');
     }
     if (formDataCupon.tipo_aplicacion !== 'todos' && formDataCupon.producto_ids.length === 0) {
-      toast.error('Debes seleccionar al menos un producto para este tipo de cupón');
-      return;
+      return toast.error('Debes seleccionar al menos un producto para este tipo de cupón');
     }
 
-    const codigo = formDataCupon.codigo || generarCodigo(formDataCupon.titulo);
+    const codigo = formDataCupon.codigo || generarCodigoUnico(formDataCupon.titulo);
     const nuevoCupon = {
       id: cuponEditando ? cuponEditando.id : `cupon-${Date.now()}`,
       titulo: formDataCupon.titulo,
@@ -290,10 +349,10 @@ export default function MarketingPage() {
       valor_descuento: formDataCupon.valor_descuento,
       tipo_aplicacion: formDataCupon.tipo_aplicacion,
       producto_ids: formDataCupon.producto_ids,
-      es_gratis: formDataCupon.tipo_aplicacion === 'producto_gratis' || formDataCupon.tipo_descuento === 'gratis',
       excluir_ofertas: formDataCupon.excluir_ofertas,
       monto_minimo: formDataCupon.monto_minimo,
       fecha_inicio: formDataCupon.fecha_inicio,
+      duracion_dias: formDataCupon.duracion_dias,
       fecha_vencimiento: formDataCupon.fecha_vencimiento,
       limite_usos: formDataCupon.limite_usos,
       max_usos: formDataCupon.max_usos,
@@ -301,63 +360,199 @@ export default function MarketingPage() {
       estado: formDataCupon.estado,
       usos: cuponEditando?.usos || 0,
       descuento_total: cuponEditando?.descuento_total || 0,
-      fecha_creacion: cuponEditando?.fecha_creacion || new Date().toISOString()
+      fecha_creacion: cuponEditando?.fecha_creacion || new Date().toISOString(),
+      creado_por: usuarioActual?.nombre || 'Admin'
     };
 
-    await guardarCupones(cuponEditando ? cupones.map(c => c.id === cuponEditando.id ? nuevoCupon : c) : [...cupones, nuevoCupon]);
-    toast.success(cuponEditando ? 'Cupón actualizado' : `Cupón creado: ${codigo}`);
+    if (supabase) {
+      const { error } = await supabase.from('cupones').upsert(nuevoCupon, { onConflict: 'id' });
+      if (error) {
+        toast.error('Error al guardar: ' + error.message);
+        return;
+      }
+    }
 
-    setShowCuponForm(false); setCuponEditando(null); setBusquedaProductoCupon('');
+    const actualizados = cuponEditando 
+      ? cupones.map(c => c.id === cuponEditando.id ? nuevoCupon : c)
+      : [...cupones, nuevoCupon];
+    
+    setCupones(actualizados);
+    localStorage.setItem('voltech_cupones', JSON.stringify(actualizados));
+    toast.success(cuponEditando ? 'Cupón actualizado' : `Cupón creado: ${codigo}`);
+    setShowCuponForm(false);
+    setCuponEditando(null);
+    setBusquedaProductoCupon('');
     setFormDataCupon({
-      titulo: '', descripcion: '', codigo: '', tipo_descuento: 'porcentaje', valor_descuento: 20, tipo_aplicacion: 'todos',
-      producto_ids: [], excluir_ofertas: false, monto_minimo: 0, fecha_inicio: '', fecha_vencimiento: '',
-      limite_usos: 'ilimitado', max_usos: 100, uso_por_cliente: 'una_vez', estado: 'activo'
+      titulo: '', descripcion: '', codigo: '', 
+      tipo_descuento: 'porcentaje', valor_descuento: 20, tipo_aplicacion: 'todos',
+      producto_ids: [], excluir_ofertas: false, monto_minimo: 0, 
+      fecha_inicio: '', duracion_dias: 30, fecha_vencimiento: '',
+      limite_usos: 'ilimitado', max_usos: 100, uso_por_cliente: 'una_vez', estado: 'activo',
+      usos: 0, descuento_total: 0
     });
+  };
+
+  const generarCodigoUnico = (titulo) => {
+    const codigoBase = titulo.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 8);
+    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `${codigoBase}-${random}`;
+  };
+
+  const guardarPlantilla = async () => {
+    if (!formDataPlantilla.nombre || !formDataPlantilla.contenido) return toast.error('Nombre y contenido son obligatorios');
+    const nuevaPlantilla = { id: Date.now().toString(), ...formDataPlantilla, creadoPor: usuarioActual?.nombre || 'Desconocido', fechaCreacion: new Date().toISOString() };
+    if (supabase) await supabase.from('plantillas').upsert(nuevaPlantilla, { onConflict: 'id' });
+    const actualizadas = plantillaEditando ? plantillas.map(p => p.id === plantillaEditando.id ? nuevaPlantilla : p) : [...plantillas, nuevaPlantilla];
+    setPlantillas(actualizadas); localStorage.setItem('voltech_plantillas', JSON.stringify(actualizadas));
+    toast.success('Plantilla guardada'); setFormDataPlantilla({ nombre: '', tipo: 'whatsapp', categoria: 'mensaje', contenido: '' });
+    setShowPlantillaForm(false); setPlantillaEditando(null);
+  };
+
+  const eliminarPlantilla = async (id) => {
+    if (!confirm('¿Eliminar esta plantilla?')) return;
+    if (supabase) await supabase.from('plantillas').delete().eq('id', id);
+    const actualizadas = plantillas.filter(p => p.id !== id);
+    setPlantillas(actualizadas); localStorage.setItem('voltech_plantillas', JSON.stringify(actualizadas));
+    toast.success('Plantilla eliminada');
   };
 
   const editarCupon = (cupon) => {
     setCuponEditando(cupon);
     setFormDataCupon({
-      titulo: cupon.titulo, 
-      descripcion: cupon.descripcion, 
-      codigo: cupon.codigo, 
+      titulo: cupon.titulo,
+      descripcion: cupon.descripcion,
+      codigo: cupon.codigo,
       tipo_descuento: cupon.tipo_descuento || 'porcentaje',
-      valor_descuento: cupon.valor_descuento || cupon.valor || 0,
-      tipo_aplicacion: cupon.tipo_aplicacion || (cupon.aplica_a === 'especificos' ? 'varios_productos' : 'todos'),
-      producto_ids: cupon.producto_ids || cupon.productos_especificos || [],
-      excluir_ofertas: cupon.excluir_ofertas || false, 
-      monto_minimo: cupon.monto_minimo || 0, 
+      valor_descuento: cupon.valor_descuento || 20,
+      tipo_aplicacion: cupon.tipo_aplicacion || 'todos',
+      producto_ids: cupon.producto_ids || [],
+      excluir_ofertas: cupon.excluir_ofertas || false,
+      monto_minimo: cupon.monto_minimo || 0,
       fecha_inicio: cupon.fecha_inicio,
-      fecha_vencimiento: cupon.fecha_vencimiento, 
-      limite_usos: cupon.limite_usos, 
+      duracion_dias: cupon.duracion_dias || 30,
+      fecha_vencimiento: cupon.fecha_vencimiento,
+      limite_usos: cupon.limite_usos || 'ilimitado',
       max_usos: cupon.max_usos || 100,
-      uso_por_cliente: cupon.uso_por_cliente, 
-      estado: cupon.estado
+      uso_por_cliente: cupon.uso_por_cliente || 'una_vez',
+      estado: cupon.estado || 'activo'
     });
     setShowCuponForm(true);
+    setCuponesOpen(true);
   };
 
   const eliminarCupon = async (id) => {
-    if (!esAdmin) return toast.error('Solo el administrador puede eliminar cupones');
     if (!confirm('¿Estás seguro de eliminar este cupón?')) return;
     if (supabase) await supabase.from('cupones').delete().eq('id', id);
     const actualizados = cupones.filter(c => c.id !== id);
-    localStorage.setItem('voltech_cupones', JSON.stringify(actualizados));
     setCupones(actualizados);
+    localStorage.setItem('voltech_cupones', JSON.stringify(actualizados));
     toast.success('Cupón eliminado');
   };
 
   const toggleEstadoCupon = async (cupon) => {
-    if (!esAdmin) return toast.error('Solo el administrador puede cambiar el estado');
     const nuevoEstado = cupon.estado === 'activo' ? 'inactivo' : 'activo';
-    if (supabase) await supabase.from('cupones').update({ estado: nuevoEstado }).eq('id', cupon.id);
+    if (supabase) {
+      await supabase.from('cupones').update({ estado: nuevoEstado }).eq('id', cupon.id);
+    }
     const actualizados = cupones.map(c => c.id === cupon.id ? { ...c, estado: nuevoEstado } : c);
-    localStorage.setItem('voltech_cupones', JSON.stringify(actualizados));
     setCupones(actualizados);
+    localStorage.setItem('voltech_cupones', JSON.stringify(actualizados));
     toast.success(nuevoEstado === 'activo' ? 'Cupón activado' : 'Cupón desactivado');
   };
 
-  const copiarCodigo = (codigo) => { navigator.clipboard.writeText(codigo); toast.success('Código copiado'); };
+  const copiarCodigo = (codigo) => {
+    navigator.clipboard.writeText(codigo);
+    toast.success('Código copiado');
+  };
+
+  const toggleProductoCupon = (productoId, isSingle) => {
+    if (isSingle) {
+      setFormDataCupon({ ...formDataCupon, producto_ids: [productoId] });
+    } else {
+      const actuales = formDataCupon.producto_ids;
+      setFormDataCupon({ 
+        ...formDataCupon, 
+        producto_ids: actuales.includes(productoId) 
+          ? actuales.filter(id => id !== productoId) 
+          : [...actuales, productoId] 
+      });
+    }
+  };
+
+  const handleTipoAplicacionChange = (value) => {
+    if (value === 'producto_gratis') {
+      setFormDataCupon(prev => ({ 
+        ...prev, 
+        tipo_aplicacion: value, 
+        tipo_descuento: 'gratis', 
+        valor_descuento: 100 
+      }));
+    } else {
+      setFormDataCupon(prev => ({ 
+        ...prev, 
+        tipo_aplicacion: value,
+        tipo_descuento: prev.tipo_descuento === 'gratis' ? 'porcentaje' : prev.tipo_descuento 
+      }));
+    }
+  };
+
+  const registrarEnvio = async (clienteId, tipo, productoId, plantillaId) => {
+    const envio = { cliente_id: String(clienteId), vendedor_id: usuarioActual?.nombre || 'Admin', tipo, producto_id: String(productoId), plantilla_id: String(plantillaId), fecha_envio: new Date().toISOString() };
+    if (supabase) await supabase.from('envios_marketing').insert(envio);
+    setHistorialEnvios(prev => ({ ...prev, [clienteId]: (prev[clienteId] || 0) + 1 }));
+  };
+
+  const filtrarClientes = () => {
+    let resultado = clientes;
+    if (filtroEtiqueta) resultado = resultado.filter(c => c.etiquetas?.includes(filtroEtiqueta));
+    if (busquedaClientes) {
+      const busqueda = busquedaClientes.toLowerCase();
+      resultado = resultado.filter(c => c.nombre.toLowerCase().includes(busqueda) || (c.telefono && c.telefono.includes(busqueda)));
+    }
+    return resultado;
+  };
+
+  const toggleClienteSeleccion = (clienteId) => {
+    const enviosHoy = historialEnvios[clienteId] || 0;
+    if (enviosHoy >= 2) {
+      toast.error('Este cliente ya alcanzó el límite de 2 envíos hoy');
+      return;
+    }
+    setClientesSeleccionados(prev => prev.includes(clienteId) ? prev.filter(id => id !== clienteId) : [...prev, clienteId]);
+  };
+
+  const lanzarDifusion = async () => {
+    if (clientesSeleccionados.length === 0) return toast.error('Selecciona al menos un cliente');
+    if (!mensajePersonalizadoWa) return toast.error('Genera el mensaje primero');
+    
+    const primerCliente = clientes.find(c => String(c.id) === String(clientesSeleccionados[0]));
+    if (primerCliente) {
+      const telefonoLimpio = primerCliente.telefono?.replace(/\D/g, '') || '';
+      const url = `https://wa.me/58${telefonoLimpio}?text=${encodeURIComponent(mensajePersonalizadoWa)}`;
+      window.open(url, '_blank');
+      
+      for (const clienteId of clientesSeleccionados) {
+        await registrarEnvio(clienteId, 'whatsapp', productoSeleccionado?.id, plantillaWhatsappSeleccionada);
+      }
+      toast.success(`¡Difusión iniciada para ${clientesSeleccionados.length} clientes!`);
+      setClientesSeleccionados([]);
+    }
+  };
+
+  const plantillasFiltradas = filtroTipoPlantilla === 'todas' ? plantillas : plantillas.filter(p => p.tipo === filtroTipoPlantilla);
+  const plantillasInfoContacto = plantillas.filter(p => p.tipo === 'info_contacto');
+
+  const diasDelMes = new Date(calendarioAnio, calendarioMes + 1, 0).getDate();
+  const primerDiaSemana = new Date(calendarioAnio, calendarioMes, 1).getDay();
+  const diasArray = Array.from({ length: diasDelMes }, (_, i) => i + 1);
+  const diasVacios = Array.from({ length: primerDiaSemana }, (_, i) => i);
+
+  const urlDestinoType = formDataPublicidad.url_destino.startsWith('/producto/') ? 'producto' : 'manual';
+
+  const productosParaCupon = productos.filter(p => 
+    (p.plataforma || p.nombre || '').toLowerCase().includes(busquedaProductoCupon.toLowerCase()) ||
+    (p.marca || '').toLowerCase().includes(busquedaProductoCupon.toLowerCase())
+  );
 
   const estadisticasCupones = {
     total: cupones.length,
@@ -366,185 +561,32 @@ export default function MarketingPage() {
     descuentoTotal: cupones.reduce((acc, c) => acc + (c.descuento_total || 0), 0)
   };
 
-  useEffect(() => {
-    if (productoSeleccionado && plantillaWhatsappSeleccionada && clientesSeleccionados.length > 0) {
-      const plantilla = plantillas.find(p => p.id === parseInt(plantillaWhatsappSeleccionada));
-      if (plantilla) {
-        const primerCliente = clientes.find(c => c.id === clientesSeleccionados[0]);
-        const nombre = productoSeleccionado.nombre || productoSeleccionado.plataforma || 'Producto';
-        const precioFinal = precioPromocion ? parseFloat(precioPromocion).toFixed(2) : (productoSeleccionado.precioDetal || 0).toFixed(2);
-        const descripcion = productoSeleccionado.descripcion || '';
-        const imagen = productoSeleccionado.imagen ? `\n📸 ${productoSeleccionado.imagen}` : '';
-        setMensajePersonalizado(`*${plantilla.nombre}*\n\n👤 ${primerCliente.nombre}\n\n📦 *${nombre}*\n💰 Precio: $${precioFinal}\n ${descripcion}${imagen}\n\n${plantilla.contenido}`);
-      }
-    } else { setMensajePersonalizado(''); }
-  }, [productoSeleccionado, plantillaWhatsappSeleccionada, clientesSeleccionados, precioPromocion, plantillas, clientes]);
-
-  useEffect(() => {
-    if (productoMarketplace && plantillaMarketplaceSeleccionada) {
-      const plantilla = plantillas.find(p => p.id === parseInt(plantillaMarketplaceSeleccionada));
-      if (plantilla) {
-        const nombre = productoMarketplace.nombre || productoMarketplace.plataforma || 'Producto';
-        const precioFinal = precioPromocionMarketplace ? parseFloat(precioPromocionMarketplace).toFixed(2) : (productoMarketplace.precioDetal || 0).toFixed(2);
-        const descripcion = productoMarketplace.descripcion || '';
-        const imagen = productoMarketplace.imagen ? `\n📸 ${productoMarketplace.imagen}` : '';
-        setTextoMarketplace(`*${plantilla.nombre}*\n\n📦 *${nombre}*\n Precio: $${precioFinal}\n ${descripcion}${imagen}\n\n${plantilla.contenido}\n\n🏢 Somos Tienda Online en Caracas\n🛵 Delivery Gratis / Envíos a nivel nacional\n📲 ¡Escríbenos al directo para coordinar tu pedido!`);
-      }
-    } else { setTextoMarketplace(''); }
-  }, [productoMarketplace, plantillaMarketplaceSeleccionada, precioPromocionMarketplace, plantillas]);
-
-  const guardarPlantilla = async () => {
-    if (!formDataPlantilla.nombre || !formDataPlantilla.contenido) { toast.error('Nombre y contenido son obligatorios'); return; }
-    const nuevaPlantilla = { 
-      id: Date.now().toString(), 
-      ...formDataPlantilla, 
-      creadoPor: usuarioActual?.nombre || 'Desconocido', 
-      fechaCreacion: new Date().toISOString() 
-    };
-    
-    if (supabase) {
-      await supabase.from('plantillas').upsert(nuevaPlantilla, { onConflict: 'id' });
-    }
-    
-    const actualizadas = plantillaEditando ? plantillas.map(p => p.id === plantillaEditando.id ? nuevaPlantilla : p) : [...plantillas, nuevaPlantilla];
-    localStorage.setItem('voltech_plantillas', JSON.stringify(actualizadas));
-    setPlantillas(actualizadas);
-    toast.success(plantillaEditando ? 'Plantilla actualizada' : 'Plantilla guardada');
-    resetPlantillaForm();
-  };
-
-  const resetPlantillaForm = () => {
-    setFormDataPlantilla({ nombre: '', tipo: 'whatsapp', categoria: 'mensaje', contenido: '' });
-    setShowPlantillaForm(false); setPlantillaEditando(null);
-  };
-
-  const editarPlantilla = (plantilla) => {
-    setFormDataPlantilla({ nombre: plantilla.nombre, tipo: plantilla.tipo, categoria: plantilla.categoria, contenido: plantilla.contenido });
-    setPlantillaEditando(plantilla); setShowPlantillaForm(true);
-  };
-
-  const eliminarPlantilla = async (id) => {
-    const plantilla = plantillas.find(p => p.id === id);
-    if (!esAdmin && plantilla?.creadoPor !== usuarioActual?.nombre) {
-      return toast.error('Solo puedes eliminar plantillas que tú hayas creado');
-    }
-    if (!confirm('¿Eliminar esta plantilla?')) return;
-    if (supabase) await supabase.from('plantillas').delete().eq('id', id);
-    const actualizadas = plantillas.filter(p => p.id !== id);
-    localStorage.setItem('voltech_plantillas', JSON.stringify(actualizadas));
-    setPlantillas(actualizadas);
-    toast.success('Plantilla eliminada');
-  };
-
-  const copiarTexto = (texto) => { navigator.clipboard.writeText(texto); toast.success('Texto copiado'); };
-
-  const filtrarClientes = () => {
-    let resultado = clientes;
-    if (filtroEtiqueta) resultado = resultado.filter(c => c.etiquetas?.includes(filtroEtiqueta));
-    if (busquedaClientes) {
-      const busqueda = busquedaClientes.toLowerCase();
-      resultado = resultado.filter(c => c.nombre.toLowerCase().includes(busqueda) || c.telefono.includes(busqueda));
-    }
-    return resultado;
-  };
-
-  const toggleClienteSeleccion = (clienteId) => {
-    if (enviados.has(clienteId)) return;
-    if (clientesSeleccionados.includes(clienteId)) setClientesSeleccionados(clientesSeleccionados.filter(id => id !== clienteId));
-    else setClientesSeleccionados([...clientesSeleccionados, clienteId]);
-  };
-
-  const seleccionarTodosClientes = () => {
-    const filtrados = filtrarClientes();
-    setClientesSeleccionados(clientesSeleccionados.length === filtrados.length ? [] : filtrados.map(c => c.id));
-  };
-
-  const iniciarDifusion = () => {
-    if (clientesSeleccionados.length === 0) return toast.error('Selecciona al menos un cliente');
-    if (!mensajePersonalizado) return toast.error('Genera o escribe un mensaje primero');
-    setDiffusionIndex(0);
-    setEnviados(new Set());
-    setShowDiffusionModal(true);
-  };
-
-  const enviarAlSiguiente = () => {
-    const clienteActual = clientes.find(c => c.id === clientesSeleccionados[diffusionIndex]);
-    if (clienteActual) {
-      setEnviados(prev => new Set(prev).add(clienteActual.id));
-    }
-    if (diffusionIndex + 1 < clientesSeleccionados.length) {
-      setDiffusionIndex(prev => prev + 1);
-    } else {
-      setShowDiffusionModal(false);
-      toast.success('¡Difusión completada exitosamente!');
-      setClientesSeleccionados([]);
-    }
-  };
-
-  const generarLinkWhatsApp = (cliente, mensaje) => {
-    const telefonoLimpio = cliente.telefono?.replace(/\D/g, '') || '';
-    return `https://wa.me/58${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
-  };
-
-  const estadisticas = { totalPlantillas: plantillas.length };
-  const plantillasWhatsapp = plantillas.filter(p => p.tipo === 'whatsapp');
-  const plantillasMarketplace = plantillas.filter(p => p.tipo === 'marketplace');
-  const etiquetasOrdenadas = [...etiquetas].sort((a, b) => a.nombre.localeCompare(b.nombre));
-  const mostrarMensajeWhatsApp = productoSeleccionado && plantillaWhatsappSeleccionada && clientesSeleccionados.length > 0;
-  const mostrarTextoMarketplace = productoMarketplace && plantillaMarketplaceSeleccionada && textoMarketplace !== '';
-
-  const productosParaCupon = productos.filter(p => 
-    (p.producto || p.plataforma || p.nombre || '').toLowerCase().includes(busquedaProductoCupon.toLowerCase()) ||
-    (p.marca || '').toLowerCase().includes(busquedaProductoCupon.toLowerCase())
-  );
-
-  const estadisticasPublicidad = {
-    total: publicidad.length,
-    activas: publicidad.filter(p => p.estado === 'activo').length,
-    impresionesTotales: publicidad.reduce((acc, p) => acc + (p.impresiones || 0), 0),
-    clicsTotales: publicidad.reduce((acc, p) => acc + (p.clics || 0), 0)
-  };
-
   return (
     <div className="space-y-6">
-      <Toaster position="top-right" toastOptions={{
-        style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' },
-        success: { iconTheme: { primary: '#00ff88', secondary: '#fff' } },
-        error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } },
-      }} />
+      <Toaster position="top-right" toastOptions={{ style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' } }} />
+
+      {alertasVencimiento.length > 0 && (
+        <div className="bg-gradient-to-r from-voltech-warning/20 to-voltech-error/20 border border-voltech-warning/50 rounded-xl p-4 animate-pulse">
+          <div className="flex items-center gap-2 mb-2"><AlertCircle className="w-5 h-5 text-voltech-warning" /><h3 className="text-sm font-bold text-white">️ Campañas por Vencer</h3></div>
+          <div className="space-y-2">
+            {alertasVencimiento.map((alerta, idx) => (
+              <div key={idx} className="flex items-center justify-between bg-voltech-dark/50 rounded-lg p-3">
+                <div className="flex items-center gap-3">
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${alerta.tipo === 'Publicidad' ? 'bg-voltech-cyan/20 text-voltech-cyan' : 'bg-voltech-purple/20 text-voltech-purple'}`}>{alerta.tipo}</span>
+                  <p className="text-sm text-white font-medium">{alerta.titulo}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-bold ${alerta.dias === 0 ? 'text-voltech-error' : alerta.dias <= 1 ? 'text-voltech-warning' : 'text-voltech-success'}`}>{alerta.dias === 0 ? '¡Vence hoy!' : `${alerta.dias} días`}</span>
+                  <Calendar className="w-4 h-4 text-voltech-muted" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Panel de Marketing</h1>
-          <p className="text-sm text-voltech-muted mt-1">Gestiona tus campañas, mensajes y cupones</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-cyan/20"><MessageSquare className="w-5 h-5 text-voltech-cyan" /></div>
-            <div><p className="text-xs text-voltech-muted">Plantillas</p><p className="text-xl font-bold text-white">{estadisticas.totalPlantillas}</p></div>
-          </div>
-        </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-purple/20"><Ticket className="w-5 h-5 text-voltech-purple" /></div>
-            <div><p className="text-xs text-voltech-muted">Cupones Activos</p><p className="text-xl font-bold text-white">{estadisticasCupones.activos}</p></div>
-          </div>
-        </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-success/20"><Megaphone className="w-5 h-5 text-voltech-success" /></div>
-            <div><p className="text-xs text-voltech-muted">Publicidad Activa</p><p className="text-xl font-bold text-white">{estadisticasPublicidad.activas}</p></div>
-          </div>
-        </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-warning/20"><DollarSign className="w-5 h-5 text-voltech-warning" /></div>
-            <div><p className="text-xs text-voltech-muted">Descuento Total</p><p className="text-xl font-bold text-white">${estadisticasCupones.descuentoTotal.toFixed(2)}</p></div>
-          </div>
-        </div>
+        <div><h1 className="text-2xl font-bold text-white">Panel de Marketing</h1><p className="text-sm text-voltech-muted mt-1">Gestiona tus campañas, mensajes y cupones</p></div>
       </div>
 
       <div className="border-b border-voltech-border">
@@ -553,20 +595,13 @@ export default function MarketingPage() {
             { id: 'plantillas', icon: MessageSquare, label: 'Plantillas' },
             { id: 'whatsapp', icon: Send, label: 'WhatsApp' },
             { id: 'marketplace', icon: FileText, label: 'Marketplace' },
-            { id: 'cupones', icon: Ticket, label: 'Cupones', badge: estadisticasCupones.activos },
-            { id: 'publicidad', icon: Megaphone, label: 'Publicidad' }
+            { id: 'cupones', icon: Ticket, label: 'Cupones' },
+            { id: 'publicidad', icon: Megaphone, label: 'Publicidad' },
+            { id: 'mas-vendidos', icon: TrendingUp, label: 'Más Vendidos' },
+            { id: 'calendario', icon: Calendar, label: 'Calendario' }
           ].map(tab => (
-            <button 
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 whitespace-nowrap ${
-                activeTab === tab.id ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'
-              }`}
-            >
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>
               <tab.icon className="w-4 h-4" /> {tab.label}
-              {tab.badge > 0 && (
-                <span className="bg-voltech-cyan text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{tab.badge}</span>
-              )}
             </button>
           ))}
         </div>
@@ -576,188 +611,185 @@ export default function MarketingPage() {
         {activeTab === 'plantillas' && (
           <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
             <div className="flex items-center justify-between p-6">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-voltech-cyan/20"><MessageSquare className="w-5 h-5 text-voltech-cyan" /></div>
-                <div><h3 className="text-lg font-bold text-white">Plantillas de Mensajes</h3><p className="text-xs text-voltech-muted">Crea y guarda mensajes personalizados</p></div>
-              </div>
-              <button onClick={() => setShowPlantillaForm(true)} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2">
-                <Plus className="w-4 h-4" /> Nueva Plantilla
-              </button>
+              <div className="flex items-center gap-2"><div className="p-2 rounded-lg bg-voltech-cyan/20"><MessageSquare className="w-5 h-5 text-voltech-cyan" /></div><div><h3 className="text-lg font-bold text-white">Plantillas de Mensajes</h3><p className="text-xs text-voltech-muted">Crea y guarda mensajes personalizados</p></div></div>
+              <button onClick={() => setShowPlantillaForm(true)} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"><Plus className="w-4 h-4" /> Nueva Plantilla</button>
             </div>
-
-            <AnimatePresence>
-              {showPlantillaForm && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-t border-voltech-border p-6 bg-voltech-dark/50">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div><label className="block text-xs text-voltech-muted mb-1">Nombre</label><input type="text" value={formDataPlantilla.nombre} onChange={(e) => setFormDataPlantilla({...formDataPlantilla, nombre: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Ej: Oferta Flash" /></div>
-                    <div><label className="block text-xs text-voltech-muted mb-1">Tipo</label><select value={formDataPlantilla.tipo} onChange={(e) => setFormDataPlantilla({...formDataPlantilla, tipo: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="whatsapp">WhatsApp</option><option value="marketplace">Marketplace</option></select></div>
-                    <div><label className="block text-xs text-voltech-muted mb-1">Categoría</label><select value={formDataPlantilla.categoria} onChange={(e) => setFormDataPlantilla({...formDataPlantilla, categoria: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="mensaje">Mensaje</option><option value="oferta">Oferta</option><option value="recordatorio">Recordatorio</option></select></div>
-                  </div>
-                  <div className="mb-4">
-                    <label className="block text-xs text-voltech-muted mb-1">Contenido</label>
-                    <textarea value={formDataPlantilla.contenido} onChange={(e) => setFormDataPlantilla({...formDataPlantilla, contenido: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-32 resize-none" placeholder="🔥 OFERTA FLASH&#10;&#10;Aprovecha esta oportunidad única&#10;Stock limitado" />
-                    <p className="text-xs text-voltech-muted mt-1">Tip: Primera línea será el título. Variables: {'{producto}'}, {'{precio}'}, {'{descripcion}'}, {'{imagen}'}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={guardarPlantilla} className="px-4 py-2 bg-voltech-success/20 text-voltech-success rounded-lg text-sm hover:bg-voltech-success/30 transition-colors flex items-center gap-2"><Save className="w-4 h-4" /> Guardar</button>
-                    <button onClick={resetPlantillaForm} className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white transition-colors flex items-center gap-2"><X className="w-4 h-4" /> Cancelar</button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
+            {showPlantillaForm && (
+              <div className="border-t border-voltech-border p-6 bg-voltech-dark/50 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div><label className="block text-xs text-voltech-muted mb-1">Nombre</label><input type="text" value={formDataPlantilla.nombre} onChange={(e) => setFormDataPlantilla({...formDataPlantilla, nombre: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
+                  <div><label className="block text-xs text-voltech-muted mb-1">Tipo</label><select value={formDataPlantilla.tipo} onChange={(e) => setFormDataPlantilla({...formDataPlantilla, tipo: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="whatsapp">WhatsApp</option><option value="marketplace">Marketplace</option><option value="info_contacto">Info Contacto</option></select></div>
+                  <div><label className="block text-xs text-voltech-muted mb-1">Categoría</label><select value={formDataPlantilla.categoria} onChange={(e) => setFormDataPlantilla({...formDataPlantilla, categoria: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="mensaje">Mensaje</option><option value="oferta">Oferta</option><option value="contacto">Contacto</option></select></div>
+                </div>
+                <div><label className="block text-xs text-voltech-muted mb-1">Contenido</label><textarea value={formDataPlantilla.contenido} onChange={(e) => setFormDataPlantilla({...formDataPlantilla, contenido: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-32 resize-none" /></div>
+                <div className="flex gap-2">
+                  <button onClick={guardarPlantilla} className="px-4 py-2 bg-voltech-success/20 text-voltech-success rounded-lg text-sm hover:bg-voltech-success/30 transition-colors flex items-center gap-2"><Save className="w-4 h-4" /> Guardar</button>
+                  <button onClick={() => { setShowPlantillaForm(false); setPlantillaEditando(null); }} className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white transition-colors flex items-center gap-2"><X className="w-4 h-4" /> Cancelar</button>
+                </div>
+              </div>
+            )}
             <div className="p-6 border-t border-voltech-border">
+              <div className="flex gap-4 mb-6">
+                {['todas', 'whatsapp', 'marketplace', 'info_contacto'].map(tipo => (
+                  <button key={tipo} onClick={() => setFiltroTipoPlantilla(tipo)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filtroTipoPlantilla === tipo ? 'bg-voltech-cyan text-white' : 'bg-voltech-dark/30 text-voltech-muted hover:text-white'}`}>
+                    {tipo === 'todas' ? 'Todas' : tipo === 'info_contacto' ? '📌 Info Contacto' : tipo === 'whatsapp' ? '📱 WhatsApp' : '📄 Marketplace'}
+                  </button>
+                ))}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {plantillas.map((plantilla) => (
+                {plantillasFiltradas.map((plantilla) => (
                   <div key={plantilla.id} className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4">
                     <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h4 className="text-sm font-semibold text-white">{plantilla.nombre}</h4>
-                        <div className="flex gap-1 mt-1">
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-voltech-cyan/20 text-voltech-cyan">{plantilla.tipo === 'whatsapp' ? '📱 WhatsApp' : '📄 Marketplace'}</span>
-                          <span className="text-xs text-voltech-muted capitalize">{plantilla.categoria}</span>
-                        </div>
-                        <p className="text-[10px] text-voltech-muted mt-1">Creado por: {plantilla.creadoPor || 'Desconocido'}</p>
-                      </div>
+                      <div><h4 className="text-sm font-semibold text-white">{plantilla.nombre}</h4><p className="text-[10px] text-voltech-muted mt-1">Creado por: {plantilla.creadoPor || 'Desconocido'}</p></div>
                       <div className="flex gap-1">
-                        <button onClick={() => editarPlantilla(plantilla)} className="p-1 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit3 className="w-3 h-3" /></button>
+                        <button onClick={() => { setFormDataPlantilla(plantilla); setPlantillaEditando(plantilla); setShowPlantillaForm(true); }} className="p-1 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit3 className="w-3 h-3" /></button>
                         <button onClick={() => eliminarPlantilla(plantilla.id)} className="p-1 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-3 h-3" /></button>
                       </div>
                     </div>
                     <p className="text-xs text-voltech-muted mb-3 line-clamp-2">{plantilla.contenido}</p>
+                    {plantilla.tipo === 'info_contacto' && (
+                      <div className="flex gap-2">
+                        <button onClick={() => { setPlantillaContactoWaSeleccionada(plantilla.id); toast.success('Agregada a WhatsApp'); }} className="flex-1 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded text-xs hover:bg-voltech-cyan/30 transition-colors">Usar en WhatsApp</button>
+                        <button onClick={() => { setPlantillaContactoMpSeleccionada(plantilla.id); toast.success('Agregada a Marketplace'); }} className="flex-1 py-2 bg-voltech-purple/20 text-voltech-purple rounded text-xs hover:bg-voltech-purple/30 transition-colors">Usar en MP</button>
+                      </div>
+                    )}
                   </div>
                 ))}
-                {plantillas.length === 0 && (<div className="col-span-3 text-center py-8 text-voltech-muted"><MessageSquare className="w-12 h-12 mx-auto mb-2 opacity-50" /><p className="text-sm">No hay plantillas guardadas</p></div>)}
               </div>
             </div>
           </div>
         )}
 
         {activeTab === 'whatsapp' && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
-              <div className="p-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <div className="p-2 rounded-lg bg-voltech-success/20"><Send className="w-5 h-5 text-voltech-success" /></div>
-                  <div><h3 className="text-lg font-bold text-white">Difusión por WhatsApp</h3><p className="text-xs text-voltech-muted">Envía mensajes personalizados a tus clientes</p></div>
-                </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                  <div className="space-y-6">
-                    <div className="bg-voltech-dark/30 border border-voltech-border rounded-lg p-4">
-                      <h4 className="text-sm font-semibold text-white mb-3">1️⃣ Seleccionar Producto</h4>
-                      <select value={productoSeleccionado?.id || ''} onChange={(e) => { const prod = productos.find(p => p.id === parseInt(e.target.value)); setProductoSeleccionado(prod || null); setPrecioPromocion(''); }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm mb-3">
-                        <option value="">Buscar producto...</option>
-                        {productos.filter(p => p.cantidad > 0).map(p => (<option key={p.id} value={p.id}>{p.nombre || p.plataforma} - ${p.precioDetal?.toFixed(2) || '0.00'} (Stock: {p.cantidad})</option>))}
-                      </select>
-                      {productoSeleccionado && (
-                        <div className="bg-voltech-surface border border-voltech-border rounded-lg p-3">
-                          <div className="flex gap-3">
-                            <div className="w-16 h-16 bg-voltech-dark rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
-                              {productoSeleccionado.imagen ? (<img src={productoSeleccionado.imagen} alt={productoSeleccionado.nombre} className="w-full h-full object-cover rounded-lg" />) : (<ShoppingCart className="w-8 h-8 text-voltech-muted" />)}
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-white">{productoSeleccionado.nombre || productoSeleccionado.plataforma}</p>
-                              <p className="text-xs text-voltech-success font-bold">${productoSeleccionado.precioDetal?.toFixed(2) || '0.00'}</p>
-                              <p className="text-xs text-voltech-muted">{productoSeleccionado.cantidad > 10 ? '✅ Stock disponible' : '⚠️ Pocas unidades'}</p>
+              <button onClick={() => setWhatsappOpen(!whatsappOpen)} className="w-full flex items-center justify-between p-4 bg-voltech-dark/30 hover:bg-voltech-dark/50 transition-colors">
+                <div className="flex items-center gap-3"><Send className="w-5 h-5 text-voltech-cyan" /><h3 className="text-lg font-bold text-white">Nueva Difusión por WhatsApp</h3></div>
+                {whatsappOpen ? <ChevronUp className="w-5 h-5 text-voltech-muted" /> : <ChevronDown className="w-5 h-5 text-voltech-muted" />}
+              </button>
+              <AnimatePresence>
+                {whatsappOpen && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                    <div className="p-6 border-t border-voltech-border">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-voltech-muted mb-2">1. Seleccionar Producto</label>
+                            <select value={productoSeleccionado ? String(productoSeleccionado.id) : ''} onChange={(e) => { const prod = productos.find(p => String(p.id) === String(e.target.value)); setProductoSeleccionado(prod || null); setPrecioPromocion(''); }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                              <option value="">Buscar producto...</option>
+                              {productos.filter(p => p.cantidad > 0).map(p => (<option key={p.id} value={String(p.id)}>{p.plataforma || p.nombre} - ${Number(p.precioDetal || 0).toFixed(2)}</option>))}
+                            </select>
+                            {productoSeleccionado && (
                               <div className="mt-2">
-                                <label className="text-xs text-voltech-muted block mb-1">💰 Precio para esta promoción:</label>
-                                <input type="number" step="0.01" placeholder={productoSeleccionado.precioDetal?.toFixed(2) || '0.00'} value={precioPromocion} onChange={(e) => setPrecioPromocion(e.target.value)} className="input-voltech w-full rounded px-3 py-1.5 text-xs" />
-                                <p className="text-[10px] text-voltech-muted mt-1">Déjalo vacío para usar el precio original</p>
+                                <label className="text-xs text-voltech-muted block mb-1">💰 Precio para esta promoción (opcional):</label>
+                                <input type="number" step="0.01" placeholder={Number(productoSeleccionado.precioDetal || 0).toFixed(2)} value={precioPromocion} onChange={(e) => setPrecioPromocion(e.target.value)} className="input-voltech w-full rounded px-3 py-1.5 text-xs" />
                               </div>
+                            )}
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-voltech-muted mb-2">2. Plantilla WhatsApp (Opcional)</label>
+                            <select value={plantillaWhatsappSeleccionada} onChange={(e) => setPlantillaWhatsappSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                              <option value="">Sin plantilla</option>
+                              {plantillas.filter(p => p.tipo === 'whatsapp').map(p => (<option key={p.id} value={String(p.id)}>{p.nombre}</option>))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-voltech-muted mb-2">3. Plantilla de Contacto (Opcional)</label>
+                            <select value={plantillaContactoWaSeleccionada} onChange={(e) => setPlantillaContactoWaSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                              <option value="">Sin plantilla</option>
+                              {plantillasInfoContacto.map(p => (<option key={p.id} value={String(p.id)}>{p.nombre}</option>))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-voltech-muted mb-2">4. Seleccionar Destinatarios</label>
+                            <div className="relative mb-2">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
+                              <input type="text" placeholder="Buscar por nombre o teléfono..." value={busquedaClientes} onChange={(e) => setBusquedaClientes(e.target.value)} className="input-voltech w-full rounded-lg pl-10 pr-4 py-2 text-sm" />
                             </div>
+                            <div className="max-h-48 overflow-y-auto space-y-2 border border-voltech-border rounded-lg p-2 bg-voltech-dark/30">
+                              {filtrarClientes().map(cliente => {
+                                const enviosHoy = historialEnvios[cliente.id] || 0;
+                                const puedeEnviar = enviosHoy < 2;
+                                return (
+                                  <label key={cliente.id} className={`flex items-start gap-3 p-2 rounded transition-colors ${!puedeEnviar ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-voltech-dark/50'} ${clientesSeleccionados.includes(cliente.id) ? 'bg-voltech-cyan/10' : ''}`}>
+                                    <input type="checkbox" checked={clientesSeleccionados.includes(cliente.id)} disabled={!puedeEnviar} onChange={() => toggleClienteSeleccion(cliente.id)} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan mt-1" />
+                                    <div className="flex-1">
+                                      <div className="flex items-center justify-between">
+                                        <p className="text-sm text-white font-medium">{cliente.nombre}</p>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${puedeEnviar ? 'bg-voltech-success/20 text-voltech-success' : 'bg-voltech-error/20 text-voltech-error'}`}>
+                                          {puedeEnviar ? `${enviosHoy}/2 envíos` : 'Límite alcanzado'}
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-voltech-muted">📱 {cliente.telefono}</p>
+                                    </div>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                            <p className="text-xs text-voltech-muted mt-2 text-right">{clientesSeleccionados.length} cliente(s) seleccionado(s)</p>
                           </div>
                         </div>
-                      )}
-                    </div>
-                    <div className="bg-voltech-dark/30 border border-voltech-border rounded-lg p-4">
-                      <h4 className="text-sm font-semibold text-white mb-3">2️⃣ Seleccionar Destinatarios</h4>
-                      <div className="space-y-3 mb-4">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
-                          <input type="text" placeholder=" Buscar por nombre o teléfono..." value={busquedaClientes} onChange={(e) => setBusquedaClientes(e.target.value)} className="input-voltech w-full rounded-lg pl-10 pr-4 py-2 text-sm" />
-                        </div>
-                        <div className="flex gap-2">
-                          <select value={filtroEtiqueta} onChange={(e) => setFiltroEtiqueta(e.target.value)} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm">
-                            <option value="">️ Todas las etiquetas</option>
-                            {etiquetasOrdenadas.map(et => (<option key={et.id} value={et.nombre}>{et.nombre}</option>))}
-                          </select>
-                          <button onClick={seleccionarTodosClientes} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors whitespace-nowrap">
-                            {clientesSeleccionados.length === filtrarClientes().length ? 'Deseleccionar' : 'Todos'}
-                          </button>
-                        </div>
-                      </div>
-                      <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
-                        {filtrarClientes().map(cliente => (
-                          <label key={cliente.id} className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
-                            enviados.has(cliente.id) ? 'bg-voltech-success/10 border-voltech-success' : 'bg-voltech-surface border-voltech-border hover:border-voltech-cyan'
-                          }`}>
-                            <input 
-                              type="checkbox" 
-                              checked={clientesSeleccionados.includes(cliente.id) || enviados.has(cliente.id)} 
-                              disabled={enviados.has(cliente.id)}
-                              onChange={() => toggleClienteSeleccion(cliente.id)} 
-                              className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan mt-1" 
+
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-voltech-muted mb-2">Vista Previa del Mensaje</label>
+                            <textarea 
+                              value={mensajePersonalizadoWa} 
+                              onChange={(e) => setMensajePersonalizadoWa(e.target.value)} 
+                              className="w-full h-64 bg-voltech-surface border border-voltech-border rounded-lg p-3 text-sm text-white whitespace-pre-wrap focus:outline-none focus:ring-2 focus:ring-voltech-cyan" 
+                              placeholder="Selecciona un producto y clientes para generar el mensaje..."
                             />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between">
-                                <p className="text-sm text-white font-medium truncate">{cliente.nombre}</p>
-                                {enviados.has(cliente.id) && (
-                                  <span className="text-[10px] px-2 py-0.5 bg-voltech-success/20 text-voltech-success rounded-full flex items-center gap-1">
-                                    <CheckCircle className="w-3 h-3" /> Enviado ✓
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-voltech-muted flex items-center gap-1 mb-1"><span className="w-3 h-3"><Send className="w-3 h-3 inline" /></span> {cliente.telefono}</p>
-                              {cliente.etiquetas && cliente.etiquetas.length > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                  {cliente.etiquetas.slice(0, 3).map((et, idx) => {
-                                    const etiquetaObj = etiquetas.find(e => e.nombre === et);
-                                    return <span key={idx} className="text-[10px] px-1.5 py-0.5 rounded-full border" style={{ backgroundColor: `${etiquetaObj?.color || '#8b5cf6'}20`, color: etiquetaObj?.color || '#8b5cf6', borderColor: `${etiquetaObj?.color || '#8b5cf6'}40` }}>{et}</span>;
-                                  })}
-                                  {cliente.etiquetas.length > 3 && <span className="text-[10px] px-1.5 py-0.5 text-voltech-muted">+{cliente.etiquetas.length - 3}</span>}
-                                </div>
-                              )}
-                            </div>
-                          </label>
-                        ))}
-                        {filtrarClientes().length === 0 && <p className="text-center text-xs text-voltech-muted py-4">No se encontraron clientes</p>}
-                      </div>
-                      <p className="text-xs text-voltech-muted mt-3 text-right">{clientesSeleccionados.length} cliente(s) seleccionado(s)</p>
-                    </div>
-                  </div>
-                  <div className="bg-voltech-dark/30 border border-voltech-border rounded-lg p-4">
-                    <h4 className="text-sm font-semibold text-white mb-3">3️⃣ Seleccionar Plantilla</h4>
-                    <select value={plantillaWhatsappSeleccionada} onChange={(e) => setPlantillaWhatsappSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm mb-3">
-                      <option value="">Seleccionar plantilla de WhatsApp...</option>
-                      {plantillasWhatsapp.map(p => (<option key={p.id} value={p.id}>📱 {p.nombre}</option>))}
-                    </select>
-                    {plantillaWhatsappSeleccionada && (
-                      <div className="bg-voltech-surface border border-voltech-border rounded-lg p-3">
-                        <p className="text-xs text-voltech-muted mb-1 font-semibold">Vista previa de la plantilla:</p>
-                        <p className="text-sm text-white whitespace-pre-wrap font-mono text-xs bg-voltech-dark/50 p-2 rounded border border-voltech-border">{plantillas.find(p => p.id === parseInt(plantillaWhatsappSeleccionada))?.contenido || 'Sin contenido'}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {mostrarMensajeWhatsApp && (
-                  <div className="bg-voltech-dark/30 border border-voltech-border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-semibold text-white flex items-center gap-2"><CheckCircle className="w-4 h-4 text-voltech-success" /> 4️⃣ Mensaje Generado (Vista Previa)</h4>
-                      <div className="flex gap-2">
-                        <button onClick={() => copiarTexto(mensajePersonalizado)} className="px-3 py-1.5 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors flex items-center gap-1 font-medium"><Copy className="w-3.5 h-3.5" /> Copiar</button>
-                        <button 
-                          onClick={iniciarDifusion} 
-                          disabled={clientesSeleccionados.length === 0}
-                          className="px-4 py-1.5 bg-green-500 text-white rounded-lg text-xs hover:bg-green-600 transition-colors flex items-center gap-1 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Send className="w-3.5 h-3.5" /> Lanzar Difusión (1 a 1) ({clientesSeleccionados.length})
-                        </button>
+                          </div>
+                          <div className="flex gap-3 pt-4">
+                            <button 
+                              onClick={() => { navigator.clipboard.writeText(mensajePersonalizadoWa); toast.success('Mensaje copiado'); }} 
+                              disabled={!mensajePersonalizadoWa}
+                              className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-voltech-muted hover:text-white disabled:opacity-50"
+                            >
+                               Copiar
+                            </button>
+                            <button 
+                              onClick={lanzarDifusion} 
+                              disabled={clientesSeleccionados.length === 0 || !mensajePersonalizadoWa} 
+                              className="flex-1 py-2 bg-green-500 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                              <Send className="w-4 h-4" /> Lanzar Difusión ({clientesSeleccionados.length})
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="bg-voltech-surface border border-voltech-border rounded-lg p-4">
-                      <pre className="text-sm text-white whitespace-pre-wrap font-sans leading-relaxed">{mensajePersonalizado}</pre>
-                    </div>
-                  </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <div className="bg-voltech-surface border border-voltech-border rounded-xl">
+              <div className="p-6 border-b border-voltech-border"><h3 className="text-lg font-bold text-white">Historial de Envíos Recientes</h3></div>
+              <div className="divide-y divide-voltech-border">
+                {historialDetallado.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-voltech-muted">No hay envíos registrados aún.</div>
+                ) : (
+                  historialDetallado.map((envio, idx) => {
+                    const cliente = clientes.find(c => String(c.id) === String(envio.cliente_id));
+                    const prod = productos.find(p => String(p.id) === String(envio.producto_id));
+                    return (
+                      <div key={idx} className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-voltech-cyan/20 flex items-center justify-center text-voltech-cyan text-xs font-bold">
+                            {cliente?.nombre?.charAt(0) || '?'}
+                          </div>
+                          <div>
+                            <p className="text-sm text-white font-medium">{cliente?.nombre || 'Cliente Desconocido'}</p>
+                            <p className="text-xs text-voltech-muted">{new Date(envio.fecha_envio).toLocaleString('es-VE')} • {prod?.plataforma || 'Producto'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -765,64 +797,68 @@ export default function MarketingPage() {
         )}
 
         {activeTab === 'marketplace' && (
-          <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
-            <div className="p-6">
-              <div className="flex items-center gap-2 mb-6">
-                <div className="p-2 rounded-lg bg-voltech-purple/20"><FileText className="w-5 h-5 text-voltech-purple" /></div>
-                <div><h3 className="text-lg font-bold text-white">Textos para Marketplace</h3><p className="text-xs text-voltech-muted">Genera descripciones optimizadas</p></div>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <div className="bg-voltech-dark/30 border border-voltech-border rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-white mb-3">1️⃣ Seleccionar Producto</h4>
-                  <select value={productoMarketplace?.id || ''} onChange={(e) => { const prod = productos.find(p => p.id === parseInt(e.target.value)); setProductoMarketplace(prod || null); setPrecioPromocionMarketplace(''); }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm mb-3">
-                    <option value="">Buscar producto...</option>
-                    {productos.map(p => (<option key={p.id} value={p.id}>{p.nombre || p.plataforma} - ${p.precioDetal?.toFixed(2) || '0.00'}</option>))}
-                  </select>
-                  {productoMarketplace && (
-                    <div className="bg-voltech-surface border border-voltech-border rounded-lg p-3">
-                      <div className="flex gap-3">
-                        <div className="w-16 h-16 bg-voltech-dark rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
-                          {productoMarketplace.imagen ? (<img src={productoMarketplace.imagen} alt={productoMarketplace.nombre} className="w-full h-full object-cover rounded-lg" />) : (<ShoppingCart className="w-8 h-8 text-voltech-muted" />)}
+          <div className="space-y-4">
+            <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
+              <button onClick={() => setMarketplaceOpen(!marketplaceOpen)} className="w-full flex items-center justify-between p-4 bg-voltech-dark/30 hover:bg-voltech-dark/50 transition-colors">
+                <div className="flex items-center gap-3"><FileText className="w-5 h-5 text-voltech-purple" /><h3 className="text-lg font-bold text-white">Generador de Textos para Marketplace</h3></div>
+                {marketplaceOpen ? <ChevronUp className="w-5 h-5 text-voltech-muted" /> : <ChevronDown className="w-5 h-5 text-voltech-muted" />}
+              </button>
+              <AnimatePresence>
+                {marketplaceOpen && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                    <div className="p-6 border-t border-voltech-border">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-voltech-muted mb-2">1. Seleccionar Producto</label>
+                            <select value={productoMarketplace ? String(productoMarketplace.id) : ''} onChange={(e) => { const prod = productos.find(p => String(p.id) === String(e.target.value)); setProductoMarketplace(prod || null); setPrecioPromocionMarketplace(''); }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                              <option value="">Buscar producto...</option>
+                              {productos.map(p => (<option key={p.id} value={String(p.id)}>{p.plataforma || p.nombre} - ${Number(p.precioDetal || 0).toFixed(2)}</option>))}
+                            </select>
+                            {productoMarketplace && (
+                              <div className="mt-2">
+                                <label className="text-xs text-voltech-muted block mb-1"> Precio para esta promoción (opcional):</label>
+                                <input type="number" step="0.01" placeholder={Number(productoMarketplace.precioDetal || 0).toFixed(2)} value={precioPromocionMarketplace} onChange={(e) => setPrecioPromocionMarketplace(e.target.value)} className="input-voltech w-full rounded px-3 py-1.5 text-xs" />
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-voltech-muted mb-2">2. Plantilla Marketplace (Opcional)</label>
+                            <select value={plantillaMarketplaceSeleccionada} onChange={(e) => setPlantillaMarketplaceSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                              <option value="">Sin plantilla</option>
+                              {plantillas.filter(p => p.tipo === 'marketplace').map(p => (<option key={p.id} value={String(p.id)}>{p.nombre}</option>))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-voltech-muted mb-2">3. Plantilla de Contacto (Opcional)</label>
+                            <select value={plantillaContactoMpSeleccionada} onChange={(e) => setPlantillaContactoMpSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                              <option value="">Sin plantilla</option>
+                              {plantillasInfoContacto.map(p => (<option key={p.id} value={String(p.id)}>{p.nombre}</option>))}
+                            </select>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-white">{productoMarketplace.nombre || productoMarketplace.plataforma}</p>
-                          <p className="text-xs text-voltech-success font-bold">${productoMarketplace.precioDetal?.toFixed(2) || '0.00'}</p>
-                          <p className="text-xs text-voltech-muted">{productoMarketplace.cantidad > 10 ? '✅ Stock disponible' : '⚠️ Pocas unidades'}</p>
-                          <div className="mt-2">
-                            <label className="text-xs text-voltech-muted block mb-1">💰 Precio para esta promoción:</label>
-                            <input type="number" step="0.01" placeholder={productoMarketplace.precioDetal?.toFixed(2) || '0.00'} value={precioPromocionMarketplace} onChange={(e) => setPrecioPromocionMarketplace(e.target.value)} className="input-voltech w-full rounded px-3 py-1.5 text-xs" />
-                            <p className="text-[10px] text-voltech-muted mt-1">Déjalo vacío para usar el precio original</p>
+
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-voltech-muted mb-2">Texto Final (Editable)</label>
+                            <textarea 
+                              value={textoMarketplace} 
+                              onChange={(e) => setTextoMarketplace(e.target.value)} 
+                              className="w-full h-64 bg-voltech-surface border border-voltech-border rounded-lg p-3 text-sm text-white whitespace-pre-wrap focus:outline-none focus:ring-2 focus:ring-voltech-purple" 
+                              placeholder="Selecciona un producto para generar el texto..."
+                            />
+                            <button onClick={() => { navigator.clipboard.writeText(textoMarketplace); toast.success('Copiado'); }} disabled={!textoMarketplace} className="mt-2 px-4 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg text-sm hover:bg-voltech-purple/30 transition-colors flex items-center gap-1 disabled:opacity-50">
+                              <Copy className="w-4 h-4" /> Copiar Texto
+                            </button>
                           </div>
                         </div>
                       </div>
                     </div>
-                  )}
-                </div>
-                <div className="bg-voltech-dark/30 border border-voltech-border rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-white mb-3">2️⃣ Seleccionar Plantilla</h4>
-                  <select value={plantillaMarketplaceSeleccionada} onChange={(e) => setPlantillaMarketplaceSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm mb-3">
-                    <option value="">Seleccionar plantilla de Marketplace...</option>
-                    {plantillasMarketplace.map(p => (<option key={p.id} value={p.id}>📄 {p.nombre}</option>))}
-                  </select>
-                  {plantillaMarketplaceSeleccionada && (
-                    <div className="bg-voltech-surface border border-voltech-border rounded-lg p-3">
-                      <p className="text-xs text-voltech-muted mb-1 font-semibold">Vista previa de la plantilla:</p>
-                      <p className="text-sm text-white whitespace-pre-wrap font-mono text-xs bg-voltech-dark/50 p-2 rounded border border-voltech-border">{plantillas.find(p => p.id === parseInt(plantillaMarketplaceSeleccionada))?.contenido || 'Sin contenido'}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              {mostrarTextoMarketplace && (
-                <div className="bg-voltech-dark/30 border border-voltech-border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-semibold text-white flex items-center gap-2"><CheckCircle className="w-4 h-4 text-voltech-success" /> 3️⃣ Texto Generado (Vista Previa)</h4>
-                    <button onClick={() => copiarTexto(textoMarketplace)} className="px-3 py-1.5 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors flex items-center gap-1 font-medium"><Copy className="w-3.5 h-3.5" /> Copiar Texto</button>
-                  </div>
-                  <div className="bg-voltech-surface border border-voltech-border rounded-lg p-4">
-                    <pre className="text-sm text-white whitespace-pre-wrap font-sans leading-relaxed">{textoMarketplace}</pre>
-                  </div>
-                </div>
-              )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         )}
@@ -831,212 +867,306 @@ export default function MarketingPage() {
           <div className="space-y-6">
             <div className="flex justify-end">
               {esAdmin && (
-                <button onClick={() => setShowCuponForm(true)} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2">
+                <button onClick={() => { setCuponEditando(null); setShowCuponForm(true); setCuponesOpen(true); }} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2">
                   <Plus className="w-4 h-4" /> Crear Nuevo Cupón
                 </button>
               )}
             </div>
 
-            <AnimatePresence>
-              {showCuponForm && esAdmin && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                        <Ticket className="w-5 h-5 text-voltech-purple" />
-                        {cuponEditando ? 'Editar Cupón' : 'Crear Nuevo Cupón'}
-                      </h3>
-                      <button onClick={() => { setShowCuponForm(false); setCuponEditando(null); setBusquedaProductoCupon(''); }} className="p-2 hover:bg-voltech-border rounded-lg transition-colors">
-                        <X className="w-5 h-5 text-voltech-muted" />
-                      </button>
-                    </div>
+            {showCuponForm && esAdmin && (
+              <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Ticket className="w-5 h-5 text-voltech-purple" />
+                    {cuponEditando ? 'Editar Cupón' : 'Crear Nuevo Cupón'}
+                  </h3>
+                  <button onClick={() => { setShowCuponForm(false); setCuponEditando(null); setBusquedaProductoCupon(''); }} className="p-2 hover:bg-voltech-border rounded-lg transition-colors">
+                    <X className="w-5 h-5 text-voltech-muted" />
+                  </button>
+                </div>
 
-                    <div className="space-y-6">
+                <div className="space-y-6">
+                  {/* A. INFORMACIÓN DEL CUPÓN */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-voltech-cyan" /> 
+                      Información del Cupón
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2"><MessageSquare className="w-4 h-4 text-voltech-cyan" /> Información del Cupón</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-xs text-voltech-muted mb-1">Título *</label>
-                            <input type="text" value={formDataCupon.titulo} onChange={(e) => setFormDataCupon({...formDataCupon, titulo: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Ej: Lanzamiento iPhone 15" />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-voltech-muted mb-1">Código (opcional)</label>
-                            <input type="text" value={formDataCupon.codigo} onChange={(e) => setFormDataCupon({...formDataCupon, codigo: e.target.value.toUpperCase().replace(/\s/g, '')})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Se genera automáticamente" />
-                          </div>
-                          <div className="md:col-span-2">
-                            <label className="block text-xs text-voltech-muted mb-1">Descripción *</label>
-                            <textarea value={formDataCupon.descripcion} onChange={(e) => setFormDataCupon({...formDataCupon, descripcion: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-20 resize-none" placeholder="20% de descuento en iPhone 15 - Edición limitada" />
-                          </div>
-                        </div>
+                        <label className="block text-xs text-voltech-muted mb-1">Título *</label>
+                        <input 
+                          type="text" 
+                          value={formDataCupon.titulo} 
+                          onChange={(e) => setFormDataCupon({...formDataCupon, titulo: e.target.value})} 
+                          className="input-voltech w-full rounded-lg px-4 py-2 text-sm" 
+                          placeholder="Ej: Lanzamiento iPhone 15" 
+                        />
                       </div>
-
                       <div>
-                        <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2"><Percent className="w-4 h-4 text-voltech-success" /> Configuración del Descuento</h4>
-                        
-                        <div className="mb-4">
-                          <label className="block text-xs text-voltech-muted mb-2">Tipo de Cupón (Aplicación)</label>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formDataCupon.tipo_aplicacion === 'todos' ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'}`}>
-                              <input type="radio" name="tipo_aplicacion" checked={formDataCupon.tipo_aplicacion === 'todos'} onChange={() => handleTipoAplicacionChange('todos')} className="w-4 h-4 text-voltech-cyan" />
-                              <div>
-                                <span className="text-sm text-white font-medium">Todos los productos</span>
-                                <p className="text-[10px] text-voltech-muted">Válido para cualquier artículo del carrito</p>
-                              </div>
-                            </label>
-                            <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formDataCupon.tipo_aplicacion === 'producto_especifico' ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'}`}>
-                              <input type="radio" name="tipo_aplicacion" checked={formDataCupon.tipo_aplicacion === 'producto_especifico'} onChange={() => handleTipoAplicacionChange('producto_especifico')} className="w-4 h-4 text-voltech-cyan" />
-                              <div>
-                                <span className="text-sm text-white font-medium">1 Producto específico</span>
-                                <p className="text-[10px] text-voltech-muted">Válido solo para un producto seleccionado</p>
-                              </div>
-                            </label>
-                            <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formDataCupon.tipo_aplicacion === 'varios_productos' ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'}`}>
-                              <input type="radio" name="tipo_aplicacion" checked={formDataCupon.tipo_aplicacion === 'varios_productos'} onChange={() => handleTipoAplicacionChange('varios_productos')} className="w-4 h-4 text-voltech-cyan" />
-                              <div>
-                                <span className="text-sm text-white font-medium">Varios productos</span>
-                                <p className="text-[10px] text-voltech-muted">Válido para una lista de productos seleccionados</p>
-                              </div>
-                            </label>
-                            <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formDataCupon.tipo_aplicacion === 'producto_gratis' ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'}`}>
-                              <input type="radio" name="tipo_aplicacion" checked={formDataCupon.tipo_aplicacion === 'producto_gratis'} onChange={() => handleTipoAplicacionChange('producto_gratis')} className="w-4 h-4 text-voltech-cyan" />
-                              <div>
-                                <span className="text-sm text-white font-medium">Producto 100% Gratis</span>
-                                <p className="text-[10px] text-voltech-muted">Hace que el producto seleccionado sea gratis</p>
-                              </div>
-                            </label>
-                          </div>
-                        </div>
-
-                        {formDataCupon.tipo_aplicacion !== 'todos' && (
-                          <div className="border-t border-voltech-border pt-4 mb-4">
-                            <label className="block text-xs text-voltech-muted mb-2">
-                              {formDataCupon.tipo_aplicacion === 'producto_especifico' ? 'Buscar y seleccionar el producto:' : 'Buscar y seleccionar los productos:'}
-                            </label>
-                            <div className="relative mb-3">
-                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
-                              <input 
-                                type="text" 
-                                value={busquedaProductoCupon} 
-                                onChange={(e) => setBusquedaProductoCupon(e.target.value)} 
-                                placeholder="Escribir nombre, plataforma o marca..." 
-                                className="input-voltech w-full rounded-lg pl-10 pr-4 py-2 text-sm" 
-                              />
-                            </div>
-                            <div className="max-h-40 overflow-y-auto space-y-2 border border-voltech-border rounded-lg p-2 bg-voltech-surface">
-                              {productosParaCupon.map(prod => {
-                                const isSelected = formDataCupon.producto_ids.includes(prod.id);
-                                const isSingle = formDataCupon.tipo_aplicacion === 'producto_especifico' || formDataCupon.tipo_aplicacion === 'producto_gratis';
-                                
-                                return (
-                                  <label key={prod.id} className={`flex items-center gap-3 p-2 rounded cursor-pointer transition-colors ${isSelected ? 'bg-voltech-cyan/10 border border-voltech-cyan/30' : 'hover:bg-voltech-dark/50'}`}>
-                                    <input 
-                                      type={isSingle ? 'radio' : 'checkbox'} 
-                                      name="producto_seleccionado"
-                                      checked={isSelected} 
-                                      onChange={() => toggleProductoCupon(prod.id, isSingle)} 
-                                      className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" 
-                                    />
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm text-white truncate">{prod.producto || prod.plataforma || prod.nombre || 'Sin nombre'}</p>
-                                      <p className="text-xs text-voltech-muted">${(prod.precioDetal || prod.precioMayor || 0).toFixed(2)} • {prod.marca || 'Sin marca'}</p>
-                                    </div>
-                                  </label>
-                                );
-                              })}
-                              {productosParaCupon.length === 0 && <p className="text-xs text-voltech-muted text-center py-2">No se encontraron productos</p>}
-                            </div>
-                            <p className="text-xs text-voltech-cyan mt-2">{formDataCupon.producto_ids.length} producto(s) seleccionado(s)</p>
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                          <div>
-                            <label className="block text-xs text-voltech-muted mb-1">Tipo de Descuento</label>
-                            <select 
-                              value={formDataCupon.tipo_descuento} 
-                              disabled={formDataCupon.tipo_aplicacion === 'producto_gratis'}
-                              onChange={(e) => setFormDataCupon({...formDataCupon, tipo_descuento: e.target.value})} 
-                              className="input-voltech w-full rounded-lg px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <option value="porcentaje">Porcentaje (%)</option>
-                              <option value="monto_fijo">Monto Fijo ($)</option>
-                              {formDataCupon.tipo_aplicacion === 'producto_gratis' && <option value="gratis">Gratis (100% off)</option>}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs text-voltech-muted mb-1">
-                              {formDataCupon.tipo_descuento === 'porcentaje' ? 'Valor (%)' : formDataCupon.tipo_descuento === 'monto_fijo' ? 'Valor ($)' : 'Valor'} *
-                            </label>
-                            <input 
-                              type="number" 
-                              disabled={formDataCupon.tipo_aplicacion === 'producto_gratis'}
-                              value={formDataCupon.valor_descuento} 
-                              onChange={(e) => setFormDataCupon({...formDataCupon, valor_descuento: parseFloat(e.target.value) || 0})} 
-                              className="input-voltech w-full rounded-lg px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed" 
-                              placeholder={formDataCupon.tipo_descuento === 'porcentaje' ? '20' : '10.00'} 
-                            />
-                          </div>
-                        </div>
-
-                        <div className="bg-voltech-dark/30 border border-voltech-border rounded-lg p-4 space-y-4">
-                          <div className="border-t border-voltech-border pt-4">
-                            <label className="flex items-center gap-3 cursor-pointer">
-                              <input type="checkbox" checked={formDataCupon.excluir_ofertas} onChange={(e) => setFormDataCupon({...formDataCupon, excluir_ofertas: e.target.checked})} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" />
-                              <div>
-                                <span className="text-sm text-white font-medium">Excluir productos que ya tienen oferta activa</span>
-                                <p className="text-xs text-voltech-muted">El cupón no se aplicará a productos que ya tengan un precio de oferta configurado.</p>
-                              </div>
-                            </label>
-                          </div>
-                        </div>
+                        <label className="block text-xs text-voltech-muted mb-1">Código (opcional)</label>
+                        <input 
+                          type="text" 
+                          value={formDataCupon.codigo} 
+                          onChange={(e) => setFormDataCupon({...formDataCupon, codigo: e.target.value.toUpperCase().replace(/\s/g, '')})} 
+                          className="input-voltech w-full rounded-lg px-4 py-2 text-sm" 
+                          placeholder="Se genera automáticamente" 
+                        />
                       </div>
-
-                      <div>
-                        <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2"><Calendar className="w-4 h-4 text-voltech-warning" /> Validez y Límites</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                          <div>
-                            <label className="block text-xs text-voltech-muted mb-1">Fecha y Hora de Inicio *</label>
-                            <input type="datetime-local" value={formDataCupon.fecha_inicio} onChange={(e) => setFormDataCupon({...formDataCupon, fecha_inicio: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-voltech-muted mb-1">Fecha y Hora de Vencimiento *</label>
-                            <input type="datetime-local" value={formDataCupon.fecha_vencimiento} onChange={(e) => setFormDataCupon({...formDataCupon, fecha_vencimiento: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-xs text-voltech-muted mb-1">Límite de Usos Totales</label>
-                            <select value={formDataCupon.limite_usos} onChange={(e) => setFormDataCupon({...formDataCupon, limite_usos: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                              <option value="ilimitado">Ilimitado</option>
-                              <option value="limitado">Limitado</option>
-                            </select>
-                          </div>
-                          {formDataCupon.limite_usos === 'limitado' && (
-                            <div>
-                              <label className="block text-xs text-voltech-muted mb-1">Máximo de Usos</label>
-                              <input type="number" value={formDataCupon.max_usos} onChange={(e) => setFormDataCupon({...formDataCupon, max_usos: parseInt(e.target.value) || 0})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex gap-3 pt-4 border-t border-voltech-border">
-                        <button onClick={() => { setShowCuponForm(false); setCuponEditando(null); setBusquedaProductoCupon(''); }} className="px-6 py-3 rounded-lg font-medium bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white hover:border-voltech-cyan/50 transition-all">Cancelar</button>
-                        <button onClick={guardarCupon} className="btn-neon flex-1 text-white font-bold py-3 rounded-lg hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center justify-center gap-2">
-                          <Save className="w-5 h-5" /> {cuponEditando ? 'Guardar Cambios' : 'Generar y Publicar Cupón'}
-                        </button>
+                      <div className="md:col-span-2">
+                        <label className="block text-xs text-voltech-muted mb-1">Descripción *</label>
+                        <textarea 
+                          value={formDataCupon.descripcion} 
+                          onChange={(e) => setFormDataCupon({...formDataCupon, descripcion: e.target.value})} 
+                          className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-20 resize-none" 
+                          placeholder="20% de descuento en iPhone 15 - Edición limitada" 
+                        />
                       </div>
                     </div>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
+                  {/* B. CONFIGURACIÓN DEL DESCUENTO */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                      <Percent className="w-4 h-4 text-voltech-success" /> 
+                      Configuración del Descuento
+                    </h4>
+                    
+                    <div className="mb-4">
+                      <label className="block text-xs text-voltech-muted mb-2">Tipo de Cupón (Aplicación)</label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formDataCupon.tipo_aplicacion === 'todos' ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'}`}>
+                          <input 
+                            type="radio" 
+                            name="tipo_aplicacion" 
+                            checked={formDataCupon.tipo_aplicacion === 'todos'} 
+                            onChange={() => handleTipoAplicacionChange('todos')} 
+                            className="w-4 h-4 text-voltech-cyan" 
+                          />
+                          <div>
+                            <span className="text-sm text-white font-medium">Todos los productos</span>
+                            <p className="text-[10px] text-voltech-muted">Válido para cualquier artículo del carrito</p>
+                          </div>
+                        </label>
+                        <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formDataCupon.tipo_aplicacion === 'producto_especifico' ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'}`}>
+                          <input 
+                            type="radio" 
+                            name="tipo_aplicacion" 
+                            checked={formDataCupon.tipo_aplicacion === 'producto_especifico'} 
+                            onChange={() => handleTipoAplicacionChange('producto_especifico')} 
+                            className="w-4 h-4 text-voltech-cyan" 
+                          />
+                          <div>
+                            <span className="text-sm text-white font-medium">1 Producto específico</span>
+                            <p className="text-[10px] text-voltech-muted">Válido solo para un producto seleccionado</p>
+                          </div>
+                        </label>
+                        <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formDataCupon.tipo_aplicacion === 'varios_productos' ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'}`}>
+                          <input 
+                            type="radio" 
+                            name="tipo_aplicacion" 
+                            checked={formDataCupon.tipo_aplicacion === 'varios_productos'} 
+                            onChange={() => handleTipoAplicacionChange('varios_productos')} 
+                            className="w-4 h-4 text-voltech-cyan" 
+                          />
+                          <div>
+                            <span className="text-sm text-white font-medium">Varios productos</span>
+                            <p className="text-[10px] text-voltech-muted">Válido para una lista de productos seleccionados</p>
+                          </div>
+                        </label>
+                        <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formDataCupon.tipo_aplicacion === 'producto_gratis' ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'}`}>
+                          <input 
+                            type="radio" 
+                            name="tipo_aplicacion" 
+                            checked={formDataCupon.tipo_aplicacion === 'producto_gratis'} 
+                            onChange={() => handleTipoAplicacionChange('producto_gratis')} 
+                            className="w-4 h-4 text-voltech-cyan" 
+                          />
+                          <div>
+                            <span className="text-sm text-white font-medium">Producto 100% Gratis</span>
+                            <p className="text-[10px] text-voltech-muted">Hace que el producto seleccionado sea gratis</p>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    {formDataCupon.tipo_aplicacion !== 'todos' && (
+                      <div className="border-t border-voltech-border pt-4 mb-4">
+                        <label className="block text-xs text-voltech-muted mb-2">
+                          {formDataCupon.tipo_aplicacion === 'producto_especifico' ? 'Buscar y seleccionar el producto:' : 'Buscar y seleccionar los productos:'}
+                        </label>
+                        <div className="relative mb-3">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
+                          <input 
+                            type="text" 
+                            value={busquedaProductoCupon} 
+                            onChange={(e) => setBusquedaProductoCupon(e.target.value)} 
+                            placeholder="Escribir nombre, plataforma o marca..." 
+                            className="input-voltech w-full rounded-lg pl-10 pr-4 py-2 text-sm" 
+                          />
+                        </div>
+                        <div className="max-h-40 overflow-y-auto space-y-2 border border-voltech-border rounded-lg p-2 bg-voltech-surface">
+                          {productosParaCupon.map(prod => {
+                            const isSelected = formDataCupon.producto_ids.includes(prod.id);
+                            const isSingle = formDataCupon.tipo_aplicacion === 'producto_especifico' || formDataCupon.tipo_aplicacion === 'producto_gratis';
+                            return (
+                              <label key={prod.id} className={`flex items-center gap-3 p-2 rounded cursor-pointer transition-colors ${isSelected ? 'bg-voltech-cyan/10 border border-voltech-cyan/30' : 'hover:bg-voltech-dark/50'}`}>
+                                <input 
+                                  type={isSingle ? 'radio' : 'checkbox'} 
+                                  name="producto_seleccionado" 
+                                  checked={isSelected} 
+                                  onChange={() => toggleProductoCupon(prod.id, isSingle)} 
+                                  className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" 
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm text-white truncate">{prod.plataforma || prod.nombre || 'Sin nombre'}</p>
+                                  <p className="text-xs text-voltech-muted">${Number(prod.precioDetal || prod.precioMayor || 0).toFixed(2)} • {prod.marca || 'Sin marca'}</p>
+                                </div>
+                              </label>
+                            );
+                          })}
+                          {productosParaCupon.length === 0 && <p className="text-xs text-voltech-muted text-center py-2">No se encontraron productos</p>}
+                        </div>
+                        <p className="text-xs text-voltech-cyan mt-2">{formDataCupon.producto_ids.length} producto(s) seleccionado(s)</p>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-xs text-voltech-muted mb-1">Tipo de Descuento</label>
+                        <select 
+                          value={formDataCupon.tipo_descuento} 
+                          disabled={formDataCupon.tipo_aplicacion === 'producto_gratis'} 
+                          onChange={(e) => setFormDataCupon({...formDataCupon, tipo_descuento: e.target.value})} 
+                          className="input-voltech w-full rounded-lg px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <option value="porcentaje">Porcentaje (%)</option>
+                          <option value="monto_fijo">Monto Fijo ($)</option>
+                          {formDataCupon.tipo_aplicacion === 'producto_gratis' && <option value="gratis">Gratis (100% off)</option>}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-voltech-muted mb-1">
+                          {formDataCupon.tipo_descuento === 'porcentaje' ? 'Valor (%)' : formDataCupon.tipo_descuento === 'monto_fijo' ? 'Valor ($)' : 'Valor'} *
+                        </label>
+                        <input 
+                          type="number" 
+                          disabled={formDataCupon.tipo_aplicacion === 'producto_gratis'} 
+                          value={formDataCupon.valor_descuento} 
+                          onChange={(e) => setFormDataCupon({...formDataCupon, valor_descuento: parseFloat(e.target.value) || 0})} 
+                          className="input-voltech w-full rounded-lg px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed" 
+                          placeholder={formDataCupon.tipo_descuento === 'porcentaje' ? '20' : '10.00'} 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-voltech-dark/30 border border-voltech-border rounded-lg p-4 space-y-4">
+                      <div className="border-t border-voltech-border pt-4">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={formDataCupon.excluir_ofertas} 
+                            onChange={(e) => setFormDataCupon({...formDataCupon, excluir_ofertas: e.target.checked})} 
+                            className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" 
+                          />
+                          <div>
+                            <span className="text-sm text-white font-medium">Excluir productos que ya tienen oferta activa</span>
+                            <p className="text-xs text-voltech-muted">El cupón no se aplicará a productos que ya tengan un precio de oferta configurado.</p>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* C. VALIDEZ Y LÍMITES */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-voltech-warning" /> 
+                      Validez y Límites
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-xs text-voltech-muted mb-1">Fecha y Hora de Inicio *</label>
+                        <input 
+                          type="datetime-local" 
+                          value={formDataCupon.fecha_inicio} 
+                          onChange={(e) => setFormDataCupon({...formDataCupon, fecha_inicio: e.target.value})} 
+                          className="input-voltech w-full rounded-lg px-4 py-2 text-sm" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-voltech-muted mb-1">Duración (días)</label>
+                        <input 
+                          type="number" 
+                          min="1" 
+                          value={formDataCupon.duracion_dias} 
+                          onChange={(e) => setFormDataCupon({...formDataCupon, duracion_dias: parseInt(e.target.value) || 0})} 
+                          className="input-voltech w-full rounded-lg px-4 py-2 text-sm" 
+                        />
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <label className="block text-xs text-voltech-muted mb-1">Fecha y Hora de Vencimiento (Auto)</label>
+                      <input 
+                        type="datetime-local" 
+                        value={formDataCupon.fecha_vencimiento} 
+                        readOnly 
+                        className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50" 
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-voltech-muted mb-1">Límite de Usos Totales</label>
+                        <select 
+                          value={formDataCupon.limite_usos} 
+                          onChange={(e) => setFormDataCupon({...formDataCupon, limite_usos: e.target.value})} 
+                          className="input-voltech w-full rounded-lg px-4 py-2 text-sm"
+                        >
+                          <option value="ilimitado">Ilimitado</option>
+                          <option value="limitado">Limitado</option>
+                        </select>
+                      </div>
+                      {formDataCupon.limite_usos === 'limitado' && (
+                        <div>
+                          <label className="block text-xs text-voltech-muted mb-1">Máximo de Usos</label>
+                          <input 
+                            type="number" 
+                            value={formDataCupon.max_usos} 
+                            onChange={(e) => setFormDataCupon({...formDataCupon, max_usos: parseInt(e.target.value) || 0})} 
+                            className="input-voltech w-full rounded-lg px-4 py-2 text-sm" 
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-4 border-t border-voltech-border">
+                    <button 
+                      onClick={() => { setShowCuponForm(false); setCuponEditando(null); setBusquedaProductoCupon(''); }} 
+                      className="px-6 py-3 rounded-lg font-medium bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white hover:border-voltech-cyan/50 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      onClick={guardarCupon} 
+                      className="btn-neon flex-1 text-white font-bold py-3 rounded-lg hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Save className="w-5 h-5" /> 
+                      {cuponEditando ? 'Guardar Cambios' : 'Generar y Publicar Cupón'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* LISTADO DE CUPONES CREADOS */}
             <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
               <div className="p-6 border-b border-voltech-border">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2"><Ticket className="w-5 h-5 text-voltech-purple" /> Cupones Creados</h3>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Ticket className="w-5 h-5 text-voltech-purple" /> 
+                  Cupones Creados
+                </h3>
               </div>
-              
               <div className="divide-y divide-voltech-border">
                 {cupones.length === 0 ? (
                   <div className="p-12 text-center">
@@ -1049,24 +1179,30 @@ export default function MarketingPage() {
                     const aplicaTexto = () => {
                       if (cupon.tipo_aplicacion === 'todos') return 'Todos los productos';
                       if (cupon.tipo_aplicacion === 'producto_gratis') return 'Producto 100% Gratis';
-                      const count = (cupon.producto_ids || cupon.productos_especificos || []).length;
+                      const count = (cupon.producto_ids || []).length;
                       return cupon.tipo_aplicacion === 'producto_especifico' ? '1 producto específico' : `${count} productos específicos`;
                     };
-
+                    
                     const descuentoTexto = cupon.es_gratis || cupon.tipo_descuento === 'gratis' 
                       ? '100% GRATIS' 
                       : cupon.tipo_descuento === 'porcentaje' 
                         ? `${cupon.valor_descuento || cupon.valor}%` 
-                        : `$${(cupon.valor_descuento || cupon.valor || 0).toFixed(2)}`;
+                        : `$${Number(cupon.valor_descuento || cupon.valor || 0).toFixed(2)}`;
+                    
+                    const estaVencido = new Date(cupon.fecha_vencimiento) < new Date();
+                    const estaAgotado = cupon.limite_usos === 'limitado' && (cupon.usos || 0) >= (cupon.max_usos || 0);
+                    const estadoDisplay = estaVencido ? 'Expirado' : estaAgotado ? 'Agotado' : cupon.estado === 'activo' ? 'Activo' : 'Inactivo';
+                    const estadoColor = estaVencido || estaAgotado ? 'text-voltech-error' : cupon.estado === 'activo' ? 'text-voltech-success' : 'text-voltech-muted';
                     
                     return (
                       <div key={cupon.id} className="p-6 hover:bg-voltech-dark/30 transition-colors">
+                        {/* Header */}
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2 flex-wrap">
                               <h4 className="text-lg font-bold text-white">{cupon.titulo}</h4>
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${cupon.estado === 'activo' ? 'bg-voltech-success/20 text-voltech-success' : 'bg-voltech-muted/20 text-voltech-muted'}`}>
-                                {cupon.estado === 'activo' ? 'Activo' : 'Inactivo'}
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${estadoColor === 'text-voltech-success' ? 'bg-voltech-success/20 text-voltech-success' : estadoColor === 'text-voltech-error' ? 'bg-voltech-error/20 text-voltech-error' : 'bg-voltech-muted/20 text-voltech-muted'}`}>
+                                {estadoDisplay}
                               </span>
                               {cupon.excluir_ofertas && (
                                 <span className="px-3 py-1 rounded-full text-xs font-medium bg-voltech-warning/20 text-voltech-warning flex items-center gap-1">
@@ -1075,12 +1211,13 @@ export default function MarketingPage() {
                               )}
                             </div>
                             <p className="text-sm text-voltech-muted mb-3">{cupon.descripcion}</p>
-                            
                             <div className="flex flex-wrap gap-4 text-sm">
                               <div className="flex items-center gap-2">
                                 <Ticket className="w-4 h-4 text-voltech-cyan" />
                                 <span className="font-mono font-bold text-voltech-cyan">{cupon.codigo}</span>
-                                <button onClick={() => copiarCodigo(cupon.codigo)} className="p-1 hover:bg-voltech-border rounded"><Copy className="w-3 h-3 text-voltech-muted" /></button>
+                                <button onClick={() => copiarCodigo(cupon.codigo)} className="p-1 hover:bg-voltech-border rounded">
+                                  <Copy className="w-3 h-3 text-voltech-muted" />
+                                </button>
                               </div>
                               <div className="flex items-center gap-2">
                                 <Percent className="w-4 h-4 text-voltech-success" />
@@ -1093,38 +1230,59 @@ export default function MarketingPage() {
                               <div className="flex items-center gap-2">
                                 <Calendar className="w-4 h-4 text-voltech-warning" />
                                 <span className="text-voltech-muted">
-                                  {new Date(cupon.fecha_inicio).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' })} - {new Date(cupon.fecha_vencimiento).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' })}
+                                  {new Date(cupon.fecha_inicio).toLocaleDateString('es-VE')} - {new Date(cupon.fecha_vencimiento).toLocaleDateString('es-VE')}
                                 </span>
                               </div>
                             </div>
                           </div>
-                          
                           <div className="flex items-center gap-2 ml-4">
-                            <button onClick={() => toggleEstadoCupon(cupon)} className={`p-2 rounded-lg transition-colors ${cupon.estado === 'activo' ? 'hover:bg-voltech-warning/20 text-voltech-warning' : 'hover:bg-voltech-success/20 text-voltech-success'}`} title={cupon.estado === 'activo' ? 'Desactivar' : 'Activar'}>
+                            <button 
+                              onClick={() => toggleEstadoCupon(cupon)} 
+                              className={`p-2 rounded-lg transition-colors ${cupon.estado === 'activo' ? 'hover:bg-voltech-warning/20 text-voltech-warning' : 'hover:bg-voltech-success/20 text-voltech-success'}`} 
+                              title={cupon.estado === 'activo' ? 'Desactivar' : 'Activar'}
+                            >
                               {cupon.estado === 'activo' ? <X className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                             </button>
-                            <button onClick={() => editarCupon(cupon)} className="p-2 hover:bg-voltech-cyan/20 rounded-lg transition-colors text-voltech-cyan" title="Editar"><Edit3 className="w-4 h-4" /></button>
-                            <button onClick={() => eliminarCupon(cupon.id)} className="p-2 hover:bg-voltech-error/20 rounded-lg transition-colors text-voltech-error" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
+                            <button 
+                              onClick={() => editarCupon(cupon)} 
+                              className="p-2 hover:bg-voltech-cyan/20 rounded-lg transition-colors text-voltech-cyan" 
+                              title="Editar"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => eliminarCupon(cupon.id)} 
+                              className="p-2 hover:bg-voltech-error/20 rounded-lg transition-colors text-voltech-error" 
+                              title="Eliminar"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
                         
+                        {/* Métricas */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-voltech-border">
                           <div>
                             <p className="text-xs text-voltech-muted mb-1">Veces Usado</p>
-                            <p className="text-lg font-bold text-white">{cupon.usos || 0} {cupon.limite_usos === 'limitado' && <span className="text-xs text-voltech-muted">/ {cupon.max_usos}</span>}</p>
+                            <p className="text-lg font-bold text-white">
+                              {cupon.usos || 0} 
+                              {cupon.limite_usos === 'limitado' && <span className="text-xs text-voltech-muted"> / {cupon.max_usos}</span>}
+                            </p>
                           </div>
                           <div>
                             <p className="text-xs text-voltech-muted mb-1">Descuento Total</p>
-                            <p className="text-lg font-bold text-voltech-success">${(cupon.descuento_total || 0).toFixed(2)}</p>
+                            <p className="text-lg font-bold text-voltech-success">${Number(cupon.descuento_total || 0).toFixed(2)}</p>
                           </div>
                           <div>
                             <p className="text-xs text-voltech-muted mb-1">Tasa de Conversión</p>
-                            <p className="text-lg font-bold text-voltech-cyan">{cupon.usos > 0 ? ((cupon.usos / (cupon.max_usos || 100)) * 100).toFixed(1) : 0}%</p>
+                            <p className="text-lg font-bold text-voltech-cyan">
+                              {cupon.usos > 0 ? ((cupon.usos / (cupon.max_usos || 100)) * 100).toFixed(1) : 0}%
+                            </p>
                           </div>
                           <div>
                             <p className="text-xs text-voltech-muted mb-1">Estado</p>
-                            <p className={`text-sm font-medium ${new Date(cupon.fecha_vencimiento) < new Date() ? 'text-voltech-error' : cupon.estado === 'activo' ? 'text-voltech-success' : 'text-voltech-muted'}`}>
-                              {new Date(cupon.fecha_vencimiento) < new Date() ? 'Expirado' : cupon.estado === 'activo' ? 'Vigente' : 'Inactivo'}
+                            <p className={`text-sm font-medium ${estaVencido || estaAgotado ? 'text-voltech-error' : cupon.estado === 'activo' ? 'text-voltech-success' : 'text-voltech-muted'}`}>
+                              {estaVencido ? 'Expirado' : estaAgotado ? 'Agotado' : cupon.estado === 'activo' ? 'Vigente' : 'Inactivo'}
                             </p>
                           </div>
                         </div>
@@ -1141,553 +1299,266 @@ export default function MarketingPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Megaphone className="w-5 h-5 text-voltech-cyan" />
-                  Gestión de Publicidad
-                </h2>
-                <p className="text-sm text-voltech-muted">Crea y gestiona banners publicitarios para el catálogo</p>
+                <h2 className="text-xl font-bold text-white">Gestión de Publicidad</h2>
               </div>
               {esAdmin && (
-                <button
-                  onClick={() => setShowPublicidadForm(true)}
-                  className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Nueva Publicidad
+                <button onClick={() => { setPublicidadEditando(null); setShowPublicidadForm(true); }} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2">
+                  <Plus className="w-4 h-4" />Nueva Publicidad
                 </button>
               )}
             </div>
-
-            <AnimatePresence>
-              {showPublicidadForm && esAdmin && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden"
-                >
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                        {publicidadEditando ? 'Editar Publicidad' : 'Crear Nueva Publicidad'}
-                      </h3>
-                      <button onClick={resetPublicidadForm} className="p-2 hover:bg-voltech-border rounded-lg">
-                        <X className="w-5 h-5 text-voltech-muted" />
-                      </button>
+            {showPublicidadForm && esAdmin && (
+              <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-white">{publicidadEditando ? 'Editar Publicidad' : 'Crear Nueva Publicidad'}</h3>
+                  <button onClick={() => { setShowPublicidadForm(false); setPublicidadEditando(null); }} className="p-2 hover:bg-voltech-border rounded-lg">
+                    <X className="w-5 h-5 text-voltech-muted" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-voltech-muted mb-2">Título *</label>
+                      <input type="text" value={formDataPublicidad.titulo} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, titulo: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" />
                     </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium text-voltech-muted mb-2">Título *</label>
-                          <input
-                            type="text"
-                            value={formDataPublicidad.titulo}
-                            onChange={(e) => setFormDataPublicidad({...formDataPublicidad, titulo: e.target.value})}
-                            className="input-voltech w-full rounded-lg px-4 py-2"
-                            placeholder="Ej: Tienda Hermana - Ropa Deportiva"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-voltech-muted mb-2">Descripción</label>
-                          <textarea
-                            value={formDataPublicidad.descripcion}
-                            onChange={(e) => setFormDataPublicidad({...formDataPublicidad, descripcion: e.target.value})}
-                            className="input-voltech w-full rounded-lg px-4 py-2 h-20 resize-none"
-                            placeholder="Breve descripción de la oferta o promoción..."
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-voltech-muted mb-2">URL de Destino</label>
-                          <input
-                            type="text"
-                            value={formDataPublicidad.url_destino}
-                            onChange={(e) => setFormDataPublicidad({...formDataPublicidad, url_destino: e.target.value})}
-                            className="input-voltech w-full rounded-lg px-4 py-2"
-                            placeholder="https://tiendahermana.com/ropadeportiva"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-voltech-muted mb-2">Agregar Imagen *</label>
-                          <input
-                            type="file"
-                            ref={fileInputRef}
-                            accept="image/*"
-                            onChange={handleFileInput}
-                            className="hidden"
-                          />
-                          <div
-                            onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
-                            onDragLeave={() => setIsDragOver(false)}
-                            onDrop={handleDrop}
-                            onClick={() => fileInputRef.current?.click()}
-                            className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
-                              isDragOver 
-                                ? 'border-voltech-cyan bg-voltech-cyan/10' 
-                                : 'border-voltech-border hover:border-voltech-cyan/50'
-                            }`}
-                          >
-                            {imagenPreview ? (
-                              <div className="space-y-3">
-                                <img src={imagenPreview} alt="Preview" className="max-h-48 mx-auto rounded-lg object-contain" />
-                                <p className="text-sm text-voltech-muted">Haz clic para cambiar la imagen</p>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center gap-3">
-                                <div className="p-3 rounded-full bg-voltech-cyan/20">
-                                  <Upload className="w-6 h-6 text-voltech-cyan" />
-                                </div>
-                                <div>
-                                  <p className="text-sm font-medium text-white">Arrastra una imagen o haz clic para seleccionar</p>
-                                  <p className="text-xs text-voltech-muted mt-1">Recomendado: 300x300px para sidebar, 728x90px para banner superior (Máx. 5MB)</p>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-voltech-muted mb-2">Lado de Visualización</label>
-                          <div className="flex gap-4">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="radio"
-                                name="lado"
-                                checked={formDataPublicidad.lado === 'izquierdo'}
-                                onChange={() => setFormDataPublicidad({...formDataPublicidad, lado: 'izquierdo'})}
-                                className="w-4 h-4 text-voltech-cyan"
-                              />
-                              <span className="text-sm text-white">Izquierdo</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="radio"
-                                name="lado"
-                                checked={formDataPublicidad.lado === 'derecho'}
-                                onChange={() => setFormDataPublicidad({...formDataPublicidad, lado: 'derecho'})}
-                                className="w-4 h-4 text-voltech-cyan"
-                              />
-                              <span className="text-sm text-white">Derecho</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="radio"
-                                name="lado"
-                                checked={formDataPublicidad.lado === 'ambos'}
-                                onChange={() => setFormDataPublicidad({...formDataPublicidad, lado: 'ambos'})}
-                                className="w-4 h-4 text-voltech-cyan"
-                              />
-                              <span className="text-sm text-white">Ambos lados</span>
-                            </label>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-voltech-muted mb-2">Posición/Espacio</label>
-                          <select
-                            value={formDataPublicidad.posicion}
-                            onChange={(e) => setFormDataPublicidad({...formDataPublicidad, posicion: e.target.value})}
-                            className="input-voltech w-full rounded-lg px-4 py-2"
-                          >
-                            <option value="sidebar">Sidebar (barra lateral)</option>
-                            <option value="banner_superior">Banner Superior</option>
-                            <option value="entre_productos">Entre productos (cada 4 productos)</option>
-                            <option value="footer">Footer (pie de página)</option>
-                          </select>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-voltech-muted mb-2">Fecha Inicio *</label>
-                            <input
-                              type="date"
-                              value={formDataPublicidad.fecha_inicio}
-                              onChange={(e) => setFormDataPublicidad({...formDataPublicidad, fecha_inicio: e.target.value})}
-                              className="input-voltech w-full rounded-lg px-4 py-2"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-voltech-muted mb-2">Hora Inicio</label>
-                            <input
-                              type="time"
-                              value={formDataPublicidad.hora_inicio}
-                              onChange={(e) => setFormDataPublicidad({...formDataPublicidad, hora_inicio: e.target.value})}
-                              className="input-voltech w-full rounded-lg px-4 py-2"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-voltech-muted mb-2">Fecha Fin *</label>
-                            <input
-                              type="date"
-                              value={formDataPublicidad.fecha_fin}
-                              onChange={(e) => setFormDataPublicidad({...formDataPublicidad, fecha_fin: e.target.value})}
-                              className="input-voltech w-full rounded-lg px-4 py-2"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-voltech-muted mb-2">Hora Fin</label>
-                            <input
-                              type="time"
-                              value={formDataPublicidad.hora_fin}
-                              onChange={(e) => setFormDataPublicidad({...formDataPublicidad, hora_fin: e.target.value})}
-                              className="input-voltech w-full rounded-lg px-4 py-2"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-voltech-muted mb-2">Prioridad</label>
-                          <div className="flex gap-4">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="radio"
-                                name="prioridad"
-                                checked={formDataPublicidad.prioridad === 'normal'}
-                                onChange={() => setFormDataPublicidad({...formDataPublicidad, prioridad: 'normal'})}
-                                className="w-4 h-4 text-voltech-cyan"
-                              />
-                              <span className="text-sm text-white">Normal</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="radio"
-                                name="prioridad"
-                                checked={formDataPublicidad.prioridad === 'alta'}
-                                onChange={() => setFormDataPublicidad({...formDataPublicidad, prioridad: 'alta'})}
-                                className="w-4 h-4 text-voltech-cyan"
-                              />
-                              <span className="text-sm text-white">Alta</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="radio"
-                                name="prioridad"
-                                checked={formDataPublicidad.prioridad === 'urgente'}
-                                onChange={() => setFormDataPublicidad({...formDataPublicidad, prioridad: 'urgente'})}
-                                className="w-4 h-4 text-voltech-cyan"
-                              />
-                              <span className="text-sm text-white">Urgente</span>
-                            </label>
-                          </div>
-                        </div>
+                    <div>
+                      <label className="block text-sm font-medium text-voltech-muted mb-2">Descripción</label>
+                      <textarea value={formDataPublicidad.descripcion} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, descripcion: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 h-20" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-voltech-muted mb-2">URL de Destino</label>
+                      <div className="space-y-2 mb-2">
+                        <label className="flex items-center gap-2 text-xs cursor-pointer">
+                          <input type="radio" checked={urlDestinoType === 'manual'} onChange={() => setFormDataPublicidad({...formDataPublicidad, url_destino: ''})} /> URL Manual
+                        </label>
+                        <label className="flex items-center gap-2 text-xs cursor-pointer">
+                          <input type="radio" checked={urlDestinoType === 'producto'} onChange={() => setFormDataPublicidad({...formDataPublicidad, url_destino: '/producto/'})} /> Seleccionar producto
+                        </label>
                       </div>
-
-                      <div className="space-y-4">
-                        <div className="bg-voltech-dark/30 border border-voltech-border rounded-lg p-4">
-                          <h4 className="text-sm font-semibold text-white mb-3">Mostrar en:</h4>
-                          <div className="space-y-2">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={formDataPublicidad.mostrar_en.inicio}
-                                onChange={(e) => setFormDataPublicidad({
-                                  ...formDataPublicidad,
-                                  mostrar_en: {...formDataPublicidad.mostrar_en, inicio: e.target.checked}
-                                })}
-                                className="w-4 h-4 rounded border-voltech-border text-voltech-cyan"
-                              />
-                              <span className="text-sm text-white">Página de inicio</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={formDataPublicidad.mostrar_en.catalogo}
-                                onChange={(e) => setFormDataPublicidad({
-                                  ...formDataPublicidad,
-                                  mostrar_en: {...formDataPublicidad.mostrar_en, catalogo: e.target.checked}
-                                })}
-                                className="w-4 h-4 rounded border-voltech-border text-voltech-cyan"
-                              />
-                              <span className="text-sm text-white">Catálogo de productos</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={formDataPublicidad.mostrar_en.streaming}
-                                onChange={(e) => setFormDataPublicidad({
-                                  ...formDataPublicidad,
-                                  mostrar_en: {...formDataPublicidad.mostrar_en, streaming: e.target.checked}
-                                })}
-                                className="w-4 h-4 rounded border-voltech-border text-voltech-cyan"
-                              />
-                              <span className="text-sm text-white">Streaming</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={formDataPublicidad.mostrar_en.ofertas}
-                                onChange={(e) => setFormDataPublicidad({
-                                  ...formDataPublicidad,
-                                  mostrar_en: {...formDataPublicidad.mostrar_en, ofertas: e.target.checked}
-                                })}
-                                className="w-4 h-4 rounded border-voltech-border text-voltech-cyan"
-                              />
-                              <span className="text-sm text-white">Ofertas</span>
-                            </label>
-                          </div>
-                        </div>
-
-                        <div className="bg-voltech-dark/30 border border-voltech-border rounded-lg p-4">
-                          <h4 className="text-sm font-semibold text-white mb-3">Dispositivos:</h4>
-                          <div className="space-y-2">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={formDataPublicidad.dispositivos.desktop}
-                                onChange={(e) => setFormDataPublicidad({
-                                  ...formDataPublicidad,
-                                  dispositivos: {...formDataPublicidad.dispositivos, desktop: e.target.checked}
-                                })}
-                                className="w-4 h-4 rounded border-voltech-border text-voltech-cyan"
-                              />
-                              <span className="text-sm text-white flex items-center gap-2"><Monitor className="w-4 h-4" /> Desktop</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={formDataPublicidad.dispositivos.movil}
-                                onChange={(e) => setFormDataPublicidad({
-                                  ...formDataPublicidad,
-                                  dispositivos: {...formDataPublicidad.dispositivos, movil: e.target.checked}
-                                })}
-                                className="w-4 h-4 rounded border-voltech-border text-voltech-cyan"
-                              />
-                              <span className="text-sm text-white flex items-center gap-2"><Smartphone className="w-4 h-4" /> Móvil</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={formDataPublicidad.dispositivos.tablet}
-                                onChange={(e) => setFormDataPublicidad({
-                                  ...formDataPublicidad,
-                                  dispositivos: {...formDataPublicidad.dispositivos, tablet: e.target.checked}
-                                })}
-                                className="w-4 h-4 rounded border-voltech-border text-voltech-cyan"
-                              />
-                              <span className="text-sm text-white flex items-center gap-2"><Tablet className="w-4 h-4" /> Tablet</span>
-                            </label>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-voltech-muted mb-2">Frecuencia de Rotación</label>
-                          <select
-                            value={formDataPublicidad.rotacion}
-                            onChange={(e) => setFormDataPublicidad({...formDataPublicidad, rotacion: parseInt(e.target.value)})}
-                            className="input-voltech w-full rounded-lg px-4 py-2"
-                          >
-                            <option value={5}>Cada 5 segundos</option>
-                            <option value={10}>Cada 10 segundos</option>
-                            <option value={15}>Cada 15 segundos</option>
-                          </select>
-                        </div>
-
-                        <div className="flex gap-3 pt-4">
-                          <button
-                            onClick={guardarPublicidad}
-                            className="flex-1 px-4 py-2 bg-voltech-cyan text-white rounded-lg hover:bg-voltech-cyan/80 flex items-center justify-center gap-2"
-                          >
-                            <Save className="w-4 h-4" />
-                            {publicidadEditando ? 'Guardar Cambios' : 'Crear Publicidad'}
-                          </button>
-                          <button
-                            onClick={resetPublicidadForm}
-                            className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-voltech-muted hover:text-white"
-                          >
-                            Cancelar
-                          </button>
-                        </div>
+                      {urlDestinoType === 'producto' ? (
+                        <select value={formDataPublicidad.url_destino} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, url_destino: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                          <option value="/producto/">Seleccionar producto...</option>
+                          {productos.map(p => (<option key={p.id} value={`/producto/${p.id}`}>{p.plataforma || p.nombre} - ${Number(p.precioDetal || 0).toFixed(2)}</option>))}
+                        </select>
+                      ) : (
+                        <input type="text" value={formDataPublicidad.url_destino} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, url_destino: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="https://..." />
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-voltech-muted mb-2">Agregar Imagen *</label>
+                      <div onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }} onDrop={(e) => { e.preventDefault(); handleImageUpload(e.dataTransfer.files[0]); }} onClick={() => fileInputRef.current?.click()} className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer ${isDragOver ? 'border-voltech-cyan bg-voltech-cyan/10' : 'border-voltech-border'}`}>
+                        {imagenPreview ? <img src={imagenPreview} alt="Preview" className="max-h-48 mx-auto" /> : <div className="flex flex-col items-center gap-2"><Upload className="w-6 h-6 text-voltech-muted" /><p className="text-sm text-voltech-muted">Arrastra o haz clic</p></div>}
                       </div>
+                      <input ref={fileInputRef} type="file" accept="image/*" onChange={(e) => handleImageUpload(e.target.files[0])} className="hidden" />
                     </div>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-voltech-muted mb-2">Fecha Inicio *</label>
+                        <input type="date" value={formDataPublicidad.fecha_inicio} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, fecha_inicio: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-voltech-muted mb-2">Duración (días)</label>
+                        <input type="number" min="1" value={formDataPublicidad.duracion_dias} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, duracion_dias: parseInt(e.target.value) || 0})} className="input-voltech w-full rounded-lg px-4 py-2" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-voltech-muted mb-2">Fecha Fin (Auto)</label>
+                      <input type="date" value={formDataPublicidad.fecha_fin} readOnly className="input-voltech w-full rounded-lg px-4 py-2 bg-voltech-dark/50" />
+                    </div>
+                    <div className="flex gap-3 pt-4">
+                      <button onClick={guardarPublicidad} className="flex-1 px-4 py-2 bg-voltech-cyan text-white rounded-lg">Guardar</button>
+                      <button onClick={() => { setShowPublicidadForm(false); setPublicidadEditando(null); }} className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-voltech-muted">Cancelar</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="bg-voltech-surface border border-voltech-border rounded-xl">
               <div className="p-6 border-b border-voltech-border">
                 <h3 className="text-lg font-bold text-white">Publicidades Creadas</h3>
               </div>
-              
               <div className="divide-y divide-voltech-border">
-                {publicidad.length === 0 ? (
-                  <div className="p-12 text-center">
-                    <Megaphone className="w-16 h-16 text-voltech-muted mx-auto mb-4 opacity-30" />
-                    <h3 className="text-lg font-semibold text-white mb-2">No hay publicidades creadas</h3>
-                    <p className="text-voltech-muted text-sm">Crea tu primera campaña publicitaria</p>
-                  </div>
-                ) : (
-                  publicidad.map(pub => (
-                    <div key={pub.id} className="p-6 hover:bg-voltech-dark/30 transition-colors">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h4 className="text-lg font-bold text-white">{pub.titulo}</h4>
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                              pub.estado === 'activo' 
-                                ? 'bg-voltech-success/20 text-voltech-success' 
-                                : 'bg-voltech-warning/20 text-voltech-warning'
-                            }`}>
-                              {pub.estado === 'activo' ? 'Activo' : 'Inactivo'}
-                            </span>
-                            <span className="px-3 py-1 rounded-full text-xs bg-voltech-cyan/20 text-voltech-cyan capitalize">
-                              {pub.posicion.replace('_', ' ')}
-                            </span>
-                          </div>
-                          
-                          {pub.descripcion && (
-                            <p className="text-xs text-voltech-muted line-clamp-2 w-full mb-2 italic">"{pub.descripcion}"</p>
-                          )}
-
-                          <div className="flex flex-wrap gap-4 text-sm text-voltech-muted mb-3">
-                            <span className="flex items-center gap-1">
-                              <span className="capitalize">{pub.lado}</span>
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
-                              {new Date(pub.fecha_inicio).toLocaleDateString('es-VE')} - {new Date(pub.fecha_fin).toLocaleDateString('es-VE')}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-4 text-sm">
-                            <div className="flex items-center gap-1">
-                              <Eye className="w-4 h-4 text-voltech-cyan" />
-                              <span className="text-voltech-muted">Impresiones:</span>
-                              <span className="font-bold text-white">{pub.impresiones || 0}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <TrendingUp className="w-4 h-4 text-voltech-success" />
-                              <span className="text-voltech-muted">Clicks:</span>
-                              <span className="font-bold text-white">{pub.clics || 0}</span>
-                              {pub.clics > 0 && pub.impresiones > 0 && (
-                                <span className="text-voltech-success">({((pub.clics / pub.impresiones) * 100).toFixed(1)}%)</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 ml-4">
-                          <button
-                            onClick={() => toggleEstadoPublicidad(pub)}
-                            className={`p-2 rounded-lg transition-colors ${
-                              pub.estado === 'activo' 
-                                ? 'hover:bg-voltech-warning/20 text-voltech-warning' 
-                                : 'hover:bg-voltech-success/20 text-voltech-success'
-                            }`}
-                            title={pub.estado === 'activo' ? 'Desactivar' : 'Activar'}
-                          >
-                            {pub.estado === 'activo' ? <X className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
-                          </button>
-                          <button
-                            onClick={() => editarPublicidad(pub)}
-                            className="p-2 hover:bg-voltech-cyan/20 rounded-lg text-voltech-cyan"
-                            title="Editar"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => eliminarPublicidad(pub.id)}
-                            className="p-2 hover:bg-voltech-error/20 rounded-lg text-voltech-error"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                {publicidad.map(pub => (
+                  <div key={pub.id} className="p-6 hover:bg-voltech-dark/30 transition-colors">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h4 className="text-lg font-bold text-white">{pub.titulo}</h4>
+                        <div className="flex gap-4 mt-2 text-sm">
+                          <span className={pub.estado === 'activo' ? 'text-voltech-success' : 'text-voltech-muted'}>{pub.estado === 'activo' ? 'Activo' : 'Inactivo'}</span>
+                          <span className="text-voltech-muted">{new Date(pub.fecha_inicio).toLocaleDateString('es-VE')} - {new Date(pub.fecha_fin).toLocaleDateString('es-VE')}</span>
                         </div>
                       </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => { setPublicidadEditando(pub); setShowPublicidadForm(true); }} className="p-2 hover:bg-voltech-cyan/20 rounded-lg text-voltech-cyan">
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button onClick={async () => { if(confirm('¿Eliminar?')) { if(supabase) await supabase.from('publicidad').delete().eq('id', pub.id); setPublicidad(publicidad.filter(p => p.id !== pub.id)); } }} className="p-2 hover:bg-voltech-error/20 rounded-lg text-voltech-error">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                  ))
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'mas-vendidos' && (
+          <div className="space-y-4">
+            <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
+              <button onClick={() => setMasVendidosOpen(!masVendidosOpen)} className="w-full flex items-center justify-between p-4 bg-voltech-dark/30 hover:bg-voltech-dark/50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <TrendingUp className="w-5 h-5 text-voltech-cyan" />
+                  <h3 className="text-lg font-bold text-white">Configuración de "Más Vendidos"</h3>
+                </div>
+                {masVendidosOpen ? <ChevronUp className="w-5 h-5 text-voltech-muted" /> : <ChevronDown className="w-5 h-5 text-voltech-muted" />}
+              </button>
+              <AnimatePresence>
+                {masVendidosOpen && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                    <div className="p-6 space-y-4 border-t border-voltech-border">
+                      <div className="flex items-center gap-3">
+                        <input type="checkbox" checked={masVendidosConfig.activo} onChange={(e) => setMasVendidosConfig({...masVendidosConfig, activo: e.target.checked})} className="w-5 h-5 rounded border-voltech-border text-voltech-cyan" />
+                        <span className="text-sm font-medium text-white">Activar sección en el catálogo</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs text-voltech-muted mb-1">Título de la Sección</label>
+                          <input type="text" value={masVendidosConfig.titulo} onChange={(e) => setMasVendidosConfig({...masVendidosConfig, titulo: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-voltech-muted mb-1">Cantidad Máxima</label>
+                          <select value={masVendidosConfig.cantidad_maxima} onChange={(e) => setMasVendidosConfig({...masVendidosConfig, cantidad_maxima: parseInt(e.target.value)})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                            <option value={1}>1</option>
+                            <option value={2}>2</option>
+                            <option value={3}>3</option>
+                            <option value={4}>4</option>
+                            <option value={5}>5</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-voltech-muted mb-1">Descripción 1</label>
+                          <input type="text" value={masVendidosConfig.descripcion_1} onChange={(e) => setMasVendidosConfig({...masVendidosConfig, descripcion_1: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-voltech-muted mb-1">Descripción 2</label>
+                          <input type="text" value={masVendidosConfig.descripcion_2} onChange={(e) => setMasVendidosConfig({...masVendidosConfig, descripcion_2: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+                        </div>
+                      </div>
+                      <button onClick={async () => { if (supabase) await supabase.from('marketing_config').upsert({ clave: 'mas_vendidos', valor: masVendidosConfig }, { onConflict: 'clave' }); localStorage.setItem('voltech_mas_vendidos_config', JSON.stringify(masVendidosConfig)); toast.success('Configuración guardada'); }} className="w-full py-2 bg-voltech-cyan text-white rounded-lg flex items-center justify-center gap-2">
+                        <RefreshCw className="w-4 h-4" /> Actualizar y Guardar
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
+              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <Eye className="w-5 h-5 text-voltech-cyan" /> Vista Previa
+              </h3>
+              <div className="bg-voltech-dark/50 border border-voltech-border rounded-xl p-4 max-w-md">
+                <h4 className="text-sm font-bold text-white mb-3">{masVendidosConfig.titulo}</h4>
+                {[1, 2, 3, 4, 5].slice(0, masVendidosConfig.cantidad_maxima).map((i) => (
+                  <div key={i} className="flex items-center gap-3 p-2 mb-2 rounded bg-voltech-surface">
+                    <div className="w-10 h-10 bg-voltech-border rounded flex items-center justify-center">
+                      <Package className="w-5 h-5 text-voltech-muted" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-white">Producto {i}</p>
+                      <p className="text-[10px] text-voltech-muted">$XX.XX</p>
+                    </div>
+                  </div>
+                ))}
+                {masVendidosConfig.descripcion_1 && <p className="text-xs text-voltech-muted mt-2">{masVendidosConfig.descripcion_1}</p>}
+                {masVendidosConfig.descripcion_2 && <p className="text-xs text-voltech-muted">{masVendidosConfig.descripcion_2}</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'calendario' && (
+          <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
+            <div className="p-6 border-b border-voltech-border">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-voltech-purple" /> Calendario de Campañas
+                </h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { if(calendarioMes === 0) { setCalendarioMes(11); setCalendarioAnio(calendarioAnio - 1); } else setCalendarioMes(calendarioMes - 1); }} className="p-2 hover:bg-voltech-border rounded">
+                    <ChevronDown className="w-5 h-5 rotate-90" />
+                  </button>
+                  <span className="text-sm font-medium text-white w-32 text-center">
+                    {new Date(calendarioAnio, calendarioMes).toLocaleDateString('es-VE', { month: 'long', year: 'numeric' })}
+                  </span>
+                  <button onClick={() => { if(calendarioMes === 11) { setCalendarioMes(0); setCalendarioAnio(calendarioAnio + 1); } else setCalendarioMes(calendarioMes + 1); }} className="p-2 hover:bg-voltech-border rounded">
+                    <ChevronDown className="w-5 h-5 -rotate-90" />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-7 gap-1 mb-6">
+                {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => (
+                  <div key={d} className="text-center text-[10px] text-voltech-muted font-medium py-1">{d}</div>
+                ))}
+                {diasVacios.map((_, i) => <div key={`empty-${i}`} />)}
+                {diasArray.map(dia => {
+                  const fechaStr = `${calendarioAnio}-${String(calendarioMes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+                  const campanasDelDia = campanasCalendario.filter(c => c.inicio?.startsWith(fechaStr) || c.fin?.startsWith(fechaStr));
+                  const tieneActiva = campanasDelDia.some(c => c.estado === 'activo');
+                  return (
+                    <div key={dia} className={`h-8 flex flex-col items-center justify-center rounded text-xs relative ${tieneActiva ? 'bg-voltech-cyan/20 text-voltech-cyan font-bold' : 'text-voltech-muted hover:bg-voltech-dark/50'}`}>
+                      {dia}
+                      {tieneActiva && <div className="w-1.5 h-1.5 bg-voltech-cyan rounded-full mt-0.5" />}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-white mb-2">Campañas Programadas</h4>
+                {campanasCalendario.length === 0 ? (
+                  <p className="text-sm text-voltech-muted text-center py-4">No hay campañas programadas</p>
+                ) : (
+                  campanasCalendario.map((campana) => {
+                    const hoy = new Date();
+                    const fin = new Date(campana.fin);
+                    const diasRestantes = Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24));
+                    let estadoVisual = '🟢';
+                    if (diasRestantes < 0) estadoVisual = '🔴';
+                    else if (diasRestantes <= 3) estadoVisual = '';
+                    return (
+                      <div key={campana.id} className="flex items-center justify-between p-4 bg-voltech-dark/30 border border-voltech-border rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <span className="text-2xl">{estadoVisual}</span>
+                          <div>
+                            <h4 className="text-sm font-bold text-white">{campana.titulo}</h4>
+                            <div className="flex items-center gap-3 mt-1">
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${campana.estado === 'activo' ? 'bg-voltech-success/20 text-voltech-success' : 'bg-voltech-muted/20 text-voltech-muted'}`}>
+                                {campana.estado === 'activo' ? 'Activo' : 'Inactivo'}
+                              </span>
+                              <span className="text-xs text-voltech-muted flex items-center gap-1">
+                                <Calendar className="w-3 h-3" /> {new Date(campana.inicio).toLocaleDateString('es-VE')} - {new Date(campana.fin).toLocaleDateString('es-VE')}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-voltech-muted">Tipo</p>
+                          <p className="text-sm font-semibold text-white">{campana.tipo}</p>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
           </div>
         )}
       </div>
-
-      <AnimatePresence>
-        {showDiffusionModal && clientes.length > 0 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-voltech-surface border border-voltech-border rounded-2xl w-full max-w-md p-6 shadow-2xl">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Send className="w-5 h-5 text-voltech-cyan" /> Difusión 1 a 1
-                </h3>
-                <button onClick={() => setShowDiffusionModal(false)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {clientesSeleccionados[diffusionIndex] && (
-                <>
-                  <div className="bg-voltech-dark/50 border border-voltech-border rounded-xl p-4 mb-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs text-voltech-muted uppercase tracking-wider">Progreso</span>
-                      <span className="text-sm font-bold text-voltech-cyan">{diffusionIndex + 1} de {clientesSeleccionados.length}</span>
-                    </div>
-                    <div className="w-full h-2 bg-voltech-border rounded-full overflow-hidden mb-4">
-                      <div className="h-full bg-voltech-cyan transition-all duration-300" style={{ width: `${((diffusionIndex + 1) / clientesSeleccionados.length) * 100}%` }}></div>
-                    </div>
-                    
-                    {(() => {
-                      const clienteActual = clientes.find(c => c.id === clientesSeleccionados[diffusionIndex]);
-                      return clienteActual ? (
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-voltech-cyan to-voltech-purple flex items-center justify-center text-white font-bold text-lg">
-                            {clienteActual.nombre.charAt(0)}
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-white">{clienteActual.nombre} {clienteActual.apellido}</p>
-                            <p className="text-xs text-voltech-muted">📱 {clienteActual.telefono}</p>
-                          </div>
-                        </div>
-                      ) : null;
-                    })()}
-                  </div>
-
-                  <div className="bg-voltech-warning/10 border border-voltech-warning/30 rounded-lg p-3 mb-6">
-                    <p className="text-xs text-voltech-warning flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                      <span>
-                        <strong>Importante:</strong> WhatsApp Web no permite adjuntar imágenes automáticamente. 
-                        Al hacer clic en "Enviar", se abrirá el chat. ¡No olvides adjuntar la imagen del producto manualmente antes de enviar!
-                      </span>
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col gap-3">
-                    {(() => {
-                      const clienteActual = clientes.find(c => c.id === clientesSeleccionados[diffusionIndex]);
-                      return clienteActual ? (
-                        <a 
-                          href={generarLinkWhatsApp(clienteActual, mensajePersonalizado)} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="w-full py-3 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
-                          onClick={() => setEnviados(prev => new Set(prev).add(clienteActual.id))}
-                        >
-                          <Send className="w-5 h-5" /> Enviar a {clienteActual.nombre.split(' ')[0]} por WhatsApp
-                        </a>
-                      ) : null;
-                    })()}
-                    
-                    <button 
-                      onClick={enviarAlSiguiente}
-                      className="w-full py-3 bg-voltech-cyan/20 text-voltech-cyan border border-voltech-cyan/30 rounded-lg font-bold hover:bg-voltech-cyan/30 transition-colors flex items-center justify-center gap-2"
-                    >
-                      Siguiente cliente ➔
-                    </button>
-                  </div>
-                </>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
