@@ -165,7 +165,10 @@ export default function VentasProductosPage() {
 
   const tasaBCV = settings.tasaBCV || 36.5;
   const vendedores = equipo.filter(m => m.activo && (m.rol === 'vendedor' || m.rol === 'admin' || m.rol === 'Admin'));
-  const productosDisponibles = productos.filter(p => p.cantidad > 0);
+  const productosDisponibles = productos.filter(p => {
+  const stock = Number(p.cantidad || 0);
+  return stock > 0;
+});
   const kitsDisponibles = kits.filter(k => k.activo !== false);
 
   const metodosPagoActivos = Object.entries(settings.pagos || {}).filter(([_, val]) => val && (val.activo === true || val === true));
