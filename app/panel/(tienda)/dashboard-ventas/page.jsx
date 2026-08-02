@@ -7,7 +7,7 @@ import {
   BarChart, TrendingUp, ShoppingCart, DollarSign,
   Calendar, Users, Package, ArrowUpRight, Trophy, 
   Medal, Award, Target, Percent, ShoppingBag,
-  TrendingDown, Activity, CheckCircle, Clock
+  TrendingDown, Activity, CheckCircle, Clock, MonitorPlay
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -37,141 +37,154 @@ export default function DashboardVentasPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-  const cargarDatos = async () => {
-    setLoading(true);
-    let ventas = [], clientes = [], usuarios = [], coms = [];
+    const cargarDatos = async () => {
+      setLoading(true);
+      let ventas = [], ventasStreaming = [], clientes = [], usuarios = [], coms = [];
 
-    try {
-      // ✅ Intentar cargar desde Supabase
-      if (supabase) {
-        console.log('🔄 Cargando desde Supabase...');
-        const [{ data: vData, error: vError }, { data: cData }, { data: uData }, { data: comData }] = await Promise.all([
-          supabase.from('ventas').select('*').order('fechaRegistro', { ascending: false }),
-          supabase.from('clientes').select('*'),
-          supabase.from('usuarios').select('*'),
-          supabase.from('comisiones_pendientes').select('*')
-        ]);
-        
-        if (vError) {
-          console.warn('⚠️ Error Supabase:', vError.message);
-          // Fallback a localStorage
-          ventas = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
-          clientes = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
-          usuarios = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
-          coms = JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]');
-        } else {
+      try {
+        if (supabase) {
+          console.log('🔄 Cargando desde Supabase...');
+          const [{ data: vData, error: vError }, { data: vsData, error: vsError }, { data: cData }, { data: uData }, { data: comData }] = await Promise.all([
+            supabase.from('ventas').select('*').order('fechaRegistro', { ascending: false }),
+            supabase.from('ventas_streaming').select('*').order('fechaRegistro', { ascending: false }),
+            supabase.from('clientes').select('*'),
+            supabase.from('usuarios').select('*'),
+            supabase.from('comisiones_pendientes').select('*')
+          ]);
+          
+          if (vError) console.warn('⚠️ Error Supabase ventas:', vError.message);
+          if (vsError) console.warn('⚠️ Error Supabase ventas_streaming:', vsError.message);
+
           ventas = vData || [];
+          ventasStreaming = vsData || [];
           clientes = cData || [];
           usuarios = uData || [];
           coms = comData || [];
-          console.log('✅ Datos cargados desde Supabase:', ventas.length, 'ventas');
+          console.log('✅ Datos cargados:', ventas.length, 'productos,', ventasStreaming.length, 'streaming');
+        } else {
+          ventas = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
+          ventasStreaming = JSON.parse(localStorage.getItem('voltech_ventas_streaming') || '[]');
+          clientes = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
+          usuarios = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
+          coms = JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]');
         }
-      } else {
-        // Sin Supabase, usar localStorage
-        ventas = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
-        clientes = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
-        usuarios = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
-        coms = JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]');
+
+        // ✅ COMBINAR ventas de productos y streaming
+        const todasLasVentas = [
+          ...ventas.map(v => ({ ...v, tipo: 'producto' })),
+          ...ventasStreaming.map(v => ({ ...v, tipo: 'streaming' }))
+        ].sort((a, b) => new Date(b.fechaRegistro || b.fecha) - new Date(a.fechaRegistro || a.fecha));
+
+        setComisiones(coms);
+        setEquipo(usuarios);
+
+        const hoy = new Date();
+        const mesActual = hoy.getMonth();
+        const anioActual = hoy.getFullYear();
+        const hoyStr = hoy.toISOString().split('T')[0];
+        const hace7DiasStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        const ventasHoy = todasLasVentas.filter(v => {
+          const fechaStr = (v.fechaRegistro || v.fecha || '').split('T')[0];
+          return fechaStr === hoyStr;
+        });
+
+        const ventasSemana = todasLasVentas.filter(v => {
+          const fechaStr = (v.fechaRegistro || v.fecha || '').split('T')[0];
+          return fechaStr >= hace7DiasStr && fechaStr <= hoyStr;
+        });
+
+        const ventasMes = todasLasVentas.filter(v => {
+          const fecha = new Date(v.fechaRegistro || v.fecha);
+          return !isNaN(fecha.getTime()) && fecha.getMonth() === mesActual && fecha.getFullYear() === anioActual;
+        });
+
+        const totalIngresosHoy = ventasHoy.reduce((sum, v) => sum + Number(v.total || 0), 0);
+        const totalIngresosSemana = ventasSemana.reduce((sum, v) => sum + Number(v.total || 0), 0);
+        const totalIngresosMes = ventasMes.reduce((sum, v) => sum + Number(v.total || 0), 0);
+
+        const comPagadas = coms.filter(c => c.estado === 'pagada').reduce((sum, c) => sum + Number(c.monto_comision || 0), 0);
+        const comPendientes = coms.filter(c => c.estado === 'pendiente').reduce((sum, c) => sum + Number(c.monto_comision || 0), 0);
+
+        // Calcular productos vendidos (solo de ventas de productos físicos)
+        const totalProductosVendidos = ventas.reduce((sum, v) => {
+          if (v.productos && Array.isArray(v.productos)) {
+            return sum + v.productos.reduce((pSum, p) => pSum + (Number(p.cantidad) || 1), 0);
+          }
+          return sum + 1;
+        }, 0);
+
+        const metaMonto = 5000;
+        const porcentajeMeta = metaMonto > 0 ? (totalIngresosMes / metaMonto) * 100 : 0;
+
+        setStats({
+          ventasHoy: ventasHoy.length,
+          ventasSemana: ventasSemana.length,
+          ventasMes: ventasMes.length,
+          ingresosHoy: totalIngresosHoy,
+          ingresosSemana: totalIngresosSemana,
+          ingresosMes: totalIngresosMes,
+          totalClientes: clientes.length,
+          productosVendidos: totalProductosVendidos,
+          comisionesPagadas: comPagadas,
+          comisionesPendientes: comPendientes,
+          metaVentas: 100,
+          metaMonto: metaMonto,
+          porcentajeMeta
+        });
+
+        // ✅ Mostrar últimas 10 ventas (combinadas)
+        setVentasRecientes(todasLasVentas.slice(0, 10));
+
+        // ✅ Calcular ranking incluyendo ventas de streaming
+        const rankingCalculado = usuarios.map(member => {
+          // Ventas de productos
+          const memberSalesProductos = ventas.filter(v => 
+            v.vendedor?.toLowerCase() === member.nombre.toLowerCase() || 
+            v.vendedorId === member.id
+          );
+          
+          // Ventas de streaming
+          const memberSalesStreaming = ventasStreaming.filter(v => 
+            v.vendedor?.toLowerCase() === member.nombre.toLowerCase()
+          );
+          
+          // Combinar ambas
+          const todasMemberSales = [...memberSalesProductos, ...memberSalesStreaming];
+          
+          const totalVentas = todasMemberSales.length;
+          const montoTotal = todasMemberSales.reduce((sum, v) => sum + Number(v.total || 0), 0);
+          
+          const memberCommissions = coms.filter(c => 
+            c.miembroId === member.id && c.estado === 'pendiente'
+          );
+          const comisionAcumulada = memberCommissions.reduce((sum, c) => sum + Number(c.monto_comision || 0), 0);
+
+          return { 
+            ...member, 
+            totalVentas, 
+            montoTotal, 
+            comisionAcumulada 
+          };
+        }).sort((a, b) => b.totalVentas - a.totalVentas);
+
+        setRanking(rankingCalculado);
+      } catch (error) {
+        console.error('Error cargando dashboard:', error);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      setComisiones(coms);
-      setEquipo(usuarios);
+    cargarDatos();
 
-      const hoy = new Date();
-      const mesActual = hoy.getMonth();
-      const anioActual = hoy.getFullYear();
-      const hoyStr = hoy.toISOString().split('T')[0];
-      const hace7DiasStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const handleActualizacion = () => cargarDatos();
+    window.addEventListener('voltech-data-updated', handleActualizacion);
 
-      const ventasHoy = ventas.filter(v => {
-        const fechaStr = (v.fechaRegistro || v.fecha || '').split('T')[0];
-        return fechaStr === hoyStr;
-      });
-
-      const ventasSemana = ventas.filter(v => {
-        const fechaStr = (v.fechaRegistro || v.fecha || '').split('T')[0];
-        return fechaStr >= hace7DiasStr && fechaStr <= hoyStr;
-      });
-
-      const ventasMes = ventas.filter(v => {
-        const fecha = new Date(v.fechaRegistro || v.fecha);
-        return !isNaN(fecha.getTime()) && fecha.getMonth() === mesActual && fecha.getFullYear() === anioActual;
-      });
-
-      const totalIngresosHoy = ventasHoy.reduce((sum, v) => sum + Number(v.total || 0), 0);
-      const totalIngresosSemana = ventasSemana.reduce((sum, v) => sum + Number(v.total || 0), 0);
-      const totalIngresosMes = ventasMes.reduce((sum, v) => sum + Number(v.total || 0), 0);
-
-      const comPagadas = coms.filter(c => c.estado === 'pagada').reduce((sum, c) => sum + Number(c.monto_comision || 0), 0);
-      const comPendientes = coms.filter(c => c.estado === 'pendiente').reduce((sum, c) => sum + Number(c.monto_comision || 0), 0);
-
-      const totalProductosVendidos = ventas.reduce((sum, v) => {
-        if (v.productos && Array.isArray(v.productos)) {
-          return sum + v.productos.reduce((pSum, p) => pSum + (Number(p.cantidad) || 1), 0);
-        }
-        return sum + 1;
-      }, 0);
-
-      const metaMonto = 5000;
-      const porcentajeMeta = metaMonto > 0 ? (totalIngresosMes / metaMonto) * 100 : 0;
-
-      setStats({
-        ventasHoy: ventasHoy.length,
-        ventasSemana: ventasSemana.length,
-        ventasMes: ventasMes.length,
-        ingresosHoy: totalIngresosHoy,
-        ingresosSemana: totalIngresosSemana,
-        ingresosMes: totalIngresosMes,
-        totalClientes: clientes.length,
-        productosVendidos: totalProductosVendidos,
-        comisionesPagadas: comPagadas,
-        comisionesPendientes: comPendientes,
-        metaVentas: 100,
-        metaMonto: metaMonto,
-        porcentajeMeta
-      });
-
-      setVentasRecientes(ventas.slice(0, 10));
-
-      const rankingCalculado = usuarios.map(member => {
-        const memberSales = ventas.filter(v => 
-          v.vendedor?.toLowerCase() === member.nombre.toLowerCase() || 
-          v.vendedorId === member.id
-        );
-        
-        const totalVentas = memberSales.length;
-        const montoTotal = memberSales.reduce((sum, v) => sum + Number(v.total || 0), 0);
-        
-        const memberCommissions = coms.filter(c => 
-          c.miembroId === member.id && c.estado === 'pendiente'
-        );
-        const comisionAcumulada = memberCommissions.reduce((sum, c) => sum + Number(c.monto_comision || 0), 0);
-
-        return { 
-          ...member, 
-          totalVentas, 
-          montoTotal, 
-          comisionAcumulada 
-        };
-      }).sort((a, b) => b.totalVentas - a.totalVentas);
-
-      setRanking(rankingCalculado);
-    } catch (error) {
-      console.error('Error cargando dashboard:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  cargarDatos();
-
-  const handleActualizacion = () => cargarDatos();
-  window.addEventListener('voltech-data-updated', handleActualizacion);
-
-  return () => {
-    window.removeEventListener('voltech-data-updated', handleActualizacion);
-  };
-}, []);
+    return () => {
+      window.removeEventListener('voltech-data-updated', handleActualizacion);
+    };
+  }, []);
 
   const getRankIcon = (index) => {
     if (index === 0) return <Trophy className="w-6 h-6 text-yellow-400" />;
@@ -418,7 +431,7 @@ export default function DashboardVentasPage() {
                       ? 'bg-voltech-purple/20 text-voltech-purple' 
                       : 'bg-voltech-success/20 text-voltech-success'
                   }`}>
-                    {venta.tipo === 'streaming' ? <TrendingUp className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
+                    {venta.tipo === 'streaming' ? <MonitorPlay className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
                   </div>
                   <div>
                     <p className="text-sm font-medium text-white">{venta.cliente || 'Cliente General'}</p>
@@ -431,12 +444,17 @@ export default function DashboardVentasPage() {
                         {venta.productos.map(p => p.nombre || p.producto).join(', ')}
                       </p>
                     )}
+                    {venta.tipo === 'streaming' && venta.plataformas && (
+                      <p className="text-xs text-voltech-muted mt-1">
+                        {venta.plataformas.map(p => p.plataforma).join(', ')}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-voltech-success">${Number(venta.total || 0).toFixed(2)}</p>
                   <p className="text-xs text-voltech-muted">
-                    {venta.productos?.length || 1} prod.
+                    {venta.tipo === 'streaming' ? 'Streaming' : (venta.productos?.length || 1) + ' prod.'}
                   </p>
                 </div>
               </motion.div>
