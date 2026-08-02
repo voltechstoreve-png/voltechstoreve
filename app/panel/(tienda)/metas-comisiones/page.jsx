@@ -33,14 +33,23 @@ export default function MetasYComisionesPage() {
   const [comentarios, setComentarios] = useState([]);
 
   useEffect(() => {
-    const cargarDatos = async () => {
-      let savedData = null;
+  const cargarDatos = async () => {
+    let savedData = null;
+    
+    try {
       if (supabase) {
-        const { data } = await supabase.from('settings').select('valor').eq('clave', 'metas_comisiones').single();
-        if (data?.valor) savedData = data.valor;
-      }
-      
-      if (!savedData) {
+        console.log('🔄 Cargando Metas desde Supabase...');
+        const { data, error } = await supabase.from('settings').select('valor').eq('clave', 'metas_comisiones').single();
+        
+        if (error) {
+          console.warn('⚠️ Error Supabase:', error.message);
+          const localData = localStorage.getItem('voltech_comisiones');
+          if (localData) savedData = JSON.parse(localData);
+        } else {
+          if (data?.valor) savedData = data.valor;
+          console.log('✅ Metas cargadas desde Supabase');
+        }
+      } else {
         const localData = localStorage.getItem('voltech_comisiones');
         if (localData) savedData = JSON.parse(localData);
       }
@@ -53,22 +62,20 @@ export default function MetasYComisionesPage() {
 
       await cargarDatosReales();
       await verificarBonosAutomaticamente();
-    };
+    } catch (error) {
+      console.error('Error cargando metas:', error);
+    }
+  };
 
-    cargarDatos();
+  cargarDatos();
 
-    // ✅ NUEVO: Escuchar el evento de sincronización desde otros paneles (ej: Ventas Productos)
-    const handleActualizacion = () => {
-      cargarDatos();
-    };
-    window.addEventListener('voltech-data-updated', handleActualizacion);
+  const handleActualizacion = () => cargarDatos();
+  window.addEventListener('voltech-data-updated', handleActualizacion);
 
-    // Cleanup del event listener al desmontar el componente
-    return () => {
-      window.removeEventListener('voltech-data-updated', handleActualizacion);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  return () => {
+    window.removeEventListener('voltech-data-updated', handleActualizacion);
+  };
+}, []);
 
   const cargarDatosReales = async () => {
     let ventasProd = [], ventasStream = [], equipo = [];

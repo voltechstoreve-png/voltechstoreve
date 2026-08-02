@@ -53,22 +53,35 @@ export default function PagosEquiposPage() {
   const [selectedComisiones, setSelectedComisiones] = useState([]);
 
   useEffect(() => {
-    const cargarDatos = async () => {
-      let movs = [], eqp = [], crt = [], coms = [], vts = [];
-      
+  const cargarDatos = async () => {
+    let movs = [], eqp = [], crt = [], coms = [], vts = [];
+    
+    try {
       if (supabase) {
-        const [{ data: d1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }] = await Promise.all([
+        console.log('🔄 Cargando Finanzas desde Supabase...');
+        const [{ data: d1, error: e1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }] = await Promise.all([
           supabase.from('movimientos_equipo').select('*').order('fechaRegistro', { ascending: false }),
           supabase.from('usuarios').select('id, nombre, rol, activo, telefono').eq('activo', true),
           supabase.from('settings').select('clave, valor').eq('clave', 'carteras'),
           supabase.from('comisiones_pendientes').select('*').order('fecha_venta', { ascending: false }),
           supabase.from('ventas').select('*')
         ]);
-        if (d1) movs = d1;
-        if (d2) eqp = d2;
-        if (d3 && d3[0]?.valor) crt = d3[0].valor;
-        if (d4) coms = d4;
-        if (d5) vts = d5;
+        
+        if (e1) {
+          console.warn('️ Error Supabase:', e1.message);
+          movs = JSON.parse(localStorage.getItem('voltech_movimientos_equipo') || '[]');
+          eqp = JSON.parse(localStorage.getItem('voltech_equipo') || '[]').filter(m => m.activo);
+          crt = JSON.parse(localStorage.getItem('voltech_carteras') || '[]');
+          coms = JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]');
+          vts = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
+        } else {
+          movs = d1 || [];
+          eqp = d2 || [];
+          crt = (d3 && d3[0]?.valor) || [];
+          coms = d4 || [];
+          vts = d5 || [];
+          console.log('✅ Finanzas cargadas desde Supabase');
+        }
       } else {
         movs = JSON.parse(localStorage.getItem('voltech_movimientos_equipo') || '[]');
         eqp = JSON.parse(localStorage.getItem('voltech_equipo') || '[]').filter(m => m.activo);
@@ -82,18 +95,20 @@ export default function PagosEquiposPage() {
       setCarteras(crt);
       setComisionesPendientes(coms);
       setVentas(vts);
-    };
-    
-    cargarDatos();
+    } catch (error) {
+      console.error('Error cargando finanzas:', error);
+    }
+  };
+  
+  cargarDatos();
 
-    // ✅ SINCRONIZACIÓN: Escuchar cuando se registra/elimina una venta en otro panel
-    const handleActualizacion = () => cargarDatos();
-    window.addEventListener('voltech-data-updated', handleActualizacion);
+  const handleActualizacion = () => cargarDatos();
+  window.addEventListener('voltech-data-updated', handleActualizacion);
 
-    return () => {
-      window.removeEventListener('voltech-data-updated', handleActualizacion);
-    };
-  }, []);
+  return () => {
+    window.removeEventListener('voltech-data-updated', handleActualizacion);
+  };
+}, []);
 
   // Cálculos para las tarjetas
   const totalInvertido = movimientos.filter(m => m.tipo === 'inversion').reduce((acc, m) => acc + Number(m.monto), 0);
