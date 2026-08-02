@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
+import { supabase } from '@/lib/supabase';
 import { 
   DollarSign, 
   TrendingUp, 
@@ -25,7 +25,6 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { motion } from 'framer-motion';
 
 export default function FinanzasPage() {
   const [productos, setProductos] = useState([]);
@@ -45,56 +44,35 @@ export default function FinanzasPage() {
       let productosData = [];
       let ventasData = [];
 
-      // ✅ 1. INTENTAR OBTENER DATOS DESDE SUPABASE
       if (supabase) {
-        // Obtener productos
-        const { data: prodsData, error: errorProds } = await supabase
-          .from('productos')
-          .select('*')
-          .eq('publicado', true);
+        const { data: prodsData } = await supabase.from('productos').select('*').eq('publicado', true);
+        if (prodsData) productosData = prodsData;
 
-        if (!errorProds && prodsData) {
-          productosData = prodsData;
-        }
-
-        // Obtener ventas
-        const { data: vtsData, error: errorVentas } = await supabase
-          .from('ventas')
-          .select('*');
-
-        if (!errorVentas && vtsData) {
-          ventasData = vtsData;
-        }
+        const { data: vtsData } = await supabase.from('ventas').select('*');
+        if (vtsData) ventasData = vtsData;
       }
 
-      // ✅ 2. FALLBACK A LOCALSTORAGE (Si Supabase está vacío o falla)
       if (productosData.length === 0) {
         const productosGuardados = localStorage.getItem('voltech_productos');
-        if (productosGuardados) {
-          productosData = JSON.parse(productosGuardados);
-        }
+        if (productosGuardados) productosData = JSON.parse(productosGuardados);
       }
 
       if (ventasData.length === 0) {
         const ventasGuardadas = localStorage.getItem('voltech_ventas');
-        if (ventasGuardadas) {
-          ventasData = JSON.parse(ventasGuardadas);
-        }
+        if (ventasGuardadas) ventasData = JSON.parse(ventasGuardadas);
       }
 
-      // ✅ 3. CALCULAR ESTADÍSTICAS
       setProductos(productosData);
       setVentas(ventasData);
 
-      // Calcular stats de productos
-      const inversion = productosData.reduce((acc, p) => acc + ((p.precioMayor || 0) * (p.cantidad || 0)), 0);
-      const valorVenta = productosData.reduce((acc, p) => acc + (((p.precioDetal || p.precioMayor) || 0) * (p.cantidad || 0)), 0);
+      // ✅ CORRECCIÓN: Usar Number() para evitar errores de tipos
+      const inversion = productosData.reduce((acc, p) => acc + (Number(p.precioMayor || 0) * Number(p.cantidad || 0)), 0);
+      const valorVenta = productosData.reduce((acc, p) => acc + (Number(p.precioDetal || p.precioMayor || 0) * Number(p.cantidad || 0)), 0);
       const ganancia = valorVenta - inversion;
       const margen = inversion > 0 ? (ganancia / inversion) * 100 : 0;
-      const conMargen = productosData.filter(p => (p.precioDetal || 0) > (p.precioMayor || 0)).length;
+      const conMargen = productosData.filter(p => Number(p.precioDetal || 0) > Number(p.precioMayor || 0)).length;
 
-      // Calcular stats de ventas
-      const ingresosTotales = ventasData.reduce((acc, v) => acc + (v.montoAbonado || v.total || 0), 0);
+      const ingresosTotales = ventasData.reduce((acc, v) => acc + Number(v.montoAbonado || v.total || 0), 0);
 
       setStats({
         inversionTotal: inversion,
@@ -110,13 +88,21 @@ export default function FinanzasPage() {
     cargarDatos();
   }, []);
 
+  // ✅ CORRECCIÓN: Asegurar que los valores sean números antes de calcular
   const datosMargenes = productos
-    .filter(p => (p.precioDetal || 0) > 0)
-    .map(p => ({
-      nombre: (p.plataforma || p.producto || '').length > 15 ? (p.plataforma || p.producto || '').substring(0, 15) + '...' : (p.plataforma || p.producto || ''),
-      margen: (p.precioMayor || 0) > 0 ? (((p.precioDetal || 0) - (p.precioMayor || 0)) / (p.precioMayor || 0) * 100) : 0,
-      ganancia: (((p.precioDetal || 0) - (p.precioMayor || 0)) * (p.cantidad || 0)),
-    }))
+    .filter(p => Number(p.precioDetal || 0) > 0)
+    .map(p => {
+      const pDetal = Number(p.precioDetal || 0);
+      const pMayor = Number(p.precioMayor || 0);
+      const cant = Number(p.cantidad || 0);
+      return {
+        nombre: (p.plataforma || p.producto || 'Sin nombre').length > 15 
+          ? (p.plataforma || p.producto || 'Sin nombre').substring(0, 15) + '...' 
+          : (p.plataforma || p.producto || 'Sin nombre'),
+        margen: pMayor > 0 ? ((pDetal - pMayor) / pMayor * 100) : 0,
+        ganancia: (pDetal - pMayor) * cant,
+      };
+    })
     .sort((a, b) => b.margen - a.margen)
     .slice(0, 6);
 
@@ -126,7 +112,8 @@ export default function FinanzasPage() {
     if (!categoriasData[cat]) {
       categoriasData[cat] = 0;
     }
-    categoriasData[cat] += (p.precioMayor || 0) * (p.cantidad || 0);
+    // ✅ CORRECCIÓN: Usar Number()
+    categoriasData[cat] += Number(p.precioMayor || 0) * Number(p.cantidad || 0);
   });
 
   const datosCategorias = Object.entries(categoriasData).map(([name, value]) => ({ name, value }));
@@ -149,7 +136,7 @@ export default function FinanzasPage() {
             </div>
           </div>
           <p className="text-xs text-voltech-muted mb-1">Inversión Total</p>
-          <p className="text-2xl font-bold text-white">${stats.inversionTotal.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-white">${Number(stats.inversionTotal).toFixed(2)}</p>
           <p className="text-xs text-voltech-muted mt-1">Precio mayor × stock</p>
         </div>
 
@@ -160,7 +147,7 @@ export default function FinanzasPage() {
             </div>
           </div>
           <p className="text-xs text-voltech-muted mb-1">Valor de Venta</p>
-          <p className="text-2xl font-bold text-white">${stats.valorVentaTotal.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-white">${Number(stats.valorVentaTotal).toFixed(2)}</p>
           <p className="text-xs text-voltech-muted mt-1">Precio detal × stock</p>
         </div>
 
@@ -175,7 +162,7 @@ export default function FinanzasPage() {
             </div>
           </div>
           <p className="text-xs text-voltech-muted mb-1">Ganancia Potencial</p>
-          <p className="text-2xl font-bold text-voltech-success">${stats.gananciaPotencial.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-voltech-success">${Number(stats.gananciaPotencial).toFixed(2)}</p>
           <p className="text-xs text-voltech-muted mt-1">Si se vende todo el stock</p>
         </div>
 
@@ -186,7 +173,7 @@ export default function FinanzasPage() {
             </div>
           </div>
           <p className="text-xs text-voltech-muted mb-1">Margen Promedio</p>
-          <p className="text-2xl font-bold text-white">{stats.margenPromedio.toFixed(1)}%</p>
+          <p className="text-2xl font-bold text-white">{Number(stats.margenPromedio).toFixed(1)}%</p>
           <p className="text-xs text-voltech-muted mt-1">{stats.productosConMargen} productos con margen</p>
         </div>
       </div>
@@ -218,7 +205,7 @@ export default function FinanzasPage() {
                     border: '1px solid #1e1e2e',
                     borderRadius: '8px'
                   }}
-                  formatter={(value) => `${value.toFixed(1)}%`}
+                  formatter={(value) => `${Number(value).toFixed(1)}%`}
                 />
                 <Bar dataKey="margen" fill="#00d4ff" radius={[0, 4, 4, 0]} />
               </BarChart>
@@ -248,7 +235,7 @@ export default function FinanzasPage() {
                   outerRadius={90}
                   paddingAngle={5}
                   dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name} ${(Number(percent) * 100).toFixed(0)}%`}
                 >
                   {datosCategorias.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -260,7 +247,7 @@ export default function FinanzasPage() {
                     border: '1px solid #1e1e2e',
                     borderRadius: '8px'
                   }}
-                  formatter={(value) => `$${value.toFixed(2)}`}
+                  formatter={(value) => `$${Number(value).toFixed(2)}`}
                 />
               </RePieChart>
             </ResponsiveContainer>
@@ -296,9 +283,10 @@ export default function FinanzasPage() {
                 </tr>
               ) : (
                 productos.map((producto) => {
-                  const precioDetal = producto.precioDetal || producto.precioMayor || 0;
-                  const precioMayor = producto.precioMayor || 0;
-                  const cantidad = producto.cantidad || 0;
+                  // ✅ CORRECCIÓN CRÍTICA: Forzar conversión a Number antes de cualquier operación
+                  const precioDetal = Number(producto.precioDetal || producto.precioMayor || 0);
+                  const precioMayor = Number(producto.precioMayor || 0);
+                  const cantidad = Number(producto.cantidad || 0);
                   const gananciaUnid = precioDetal - precioMayor;
                   const margen = precioMayor > 0 ? (gananciaUnid / precioMayor * 100) : 0;
                   const gananciaTotal = gananciaUnid * cantidad;
@@ -306,8 +294,8 @@ export default function FinanzasPage() {
                   return (
                     <tr key={producto.id} className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
                       <td className="px-4 py-3">
-                        <p className="text-sm font-medium text-white">{producto.plataforma || producto.producto}</p>
-                        <p className="text-xs text-voltech-muted">{producto.marca}</p>
+                        <p className="text-sm font-medium text-white">{producto.plataforma || producto.producto || 'Sin nombre'}</p>
+                        <p className="text-xs text-voltech-muted">{producto.marca || 'N/A'}</p>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-sm font-medium ${

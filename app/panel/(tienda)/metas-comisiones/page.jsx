@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
-import { useNotificaciones } from '@/app/context/NotificationContext'; // ✅ Para notificaciones
+import { useNotificaciones } from '@/app/context/NotificationContext';
 import { 
   DollarSign, BarChart, Target, MessageCircle, CheckCircle, 
   User, Save, Trash2, Plus, Calendar, Bell, X, TrendingUp, 
@@ -16,7 +16,7 @@ import 'jspdf-autotable';
 
 export default function MetasYComisionesPage() {
   const { esAdmin, esSocio, esVendedor, usuarioActual } = usePermissions();
-  const { agregarNotificacion } = useNotificaciones(); // ✅ Hook de notificaciones
+  const { agregarNotificacion } = useNotificaciones();
   const puedeGestionar = esAdmin || esSocio;
 
   const [mostrarFormMetas, setMostrarFormMetas] = useState(false);
@@ -26,7 +26,6 @@ export default function MetasYComisionesPage() {
   const [statsReales, setStatsReales] = useState({ ventasMes: 0, metaActual: 0 });
   const [ranking, setRanking] = useState([]);
   
-  // ✅ NUEVO: Bonos generados por metas (se integran con Pagos al Equipo)
   const [bonosPendientes, setBonosPendientes] = useState([]);
   const [loadingBonos, setLoadingBonos] = useState(false);
 
@@ -53,10 +52,21 @@ export default function MetasYComisionesPage() {
       }
 
       await cargarDatosReales();
-      await verificarBonosAutomaticamente(); // ✅ Verifica al cargar la página
+      await verificarBonosAutomaticamente();
     };
 
     cargarDatos();
+
+    // ✅ NUEVO: Escuchar el evento de sincronización desde otros paneles (ej: Ventas Productos)
+    const handleActualizacion = () => {
+      cargarDatos();
+    };
+    window.addEventListener('voltech-data-updated', handleActualizacion);
+
+    // Cleanup del event listener al desmontar el componente
+    return () => {
+      window.removeEventListener('voltech-data-updated', handleActualizacion);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -79,7 +89,7 @@ export default function MetasYComisionesPage() {
     }
 
     const todasLasVentas = [...ventasProd, ...ventasStream];
-    const mesActual = new Date().toISOString().slice(0, 7); // Formato: YYYY-MM
+    const mesActual = new Date().toISOString().slice(0, 7);
 
     const ventasDelMes = todasLasVentas.filter(v => {
       const fecha = v.fechaRegistro || v.fecha;
@@ -127,12 +137,11 @@ export default function MetasYComisionesPage() {
     });
   };
 
-  // ✅ NUEVO: Función para verificar metas y generar bonos en comisiones_pendientes
   const verificarBonosAutomaticamente = async () => {
     setLoadingBonos(true);
     try {
       let ventasProd = [], ventasStream = [], equipo = [], bonosExistentes = [];
-      const periodoActual = new Date().toISOString().slice(0, 7); // Ej: '2026-07'
+      const periodoActual = new Date().toISOString().slice(0, 7);
 
       if (supabase) {
         const [{ data: vp }, { data: vs }, { data: eq }, { data: be }] = await Promise.all([
@@ -169,22 +178,16 @@ export default function MetasYComisionesPage() {
 
       const nuevosBonos = [];
 
-      // Revisar cada vendedor contra las metas
       for (const miembro of equipo) {
         const ventasCount = ventasPorVendedor[miembro.nombre] || 0;
         
-        // Buscar la meta más alta que haya alcanzado
         const metasAlcanzadas = metas.filter(m => m.activo && ventasCount >= m.ventas).sort((a, b) => b.ventas - a.ventas);
         const mejorMeta = metasAlcanzadas[0];
 
         if (mejorMeta) {
-          // Verificar si ya se le pagó o generó este bono este período
           const yaBonificado = bonosExistentes.some(b => b.miembro_id === miembro.id && b.meta_id === mejorMeta.id);
 
           if (!yaBonificado) {
-            // Calcular monto del bono (puede ser fijo o % sobre un monto base, aquí usamos un valor fijo de ejemplo o calculado)
-            // Para este ejemplo, asumimos que la meta tiene un campo 'bono_monto' o usamos un cálculo estándar.
-            // Si no existe, usamos $20 como ejemplo del prompt.
             const montoBono = mejorMeta.bono_monto || 20.00; 
 
             const nuevoBono = {
@@ -200,7 +203,7 @@ export default function MetasYComisionesPage() {
               monto_comision: montoBono,
               fecha_venta: new Date().toISOString().split('T')[0],
               estado: 'pendiente',
-              tipo: 'bono_meta', // ✅ Clave para que aparezca en Pagos al Equipo
+              tipo: 'bono_meta',
               periodo: periodoActual,
               meta_id: mejorMeta.id,
               fecha_registro: new Date().toISOString()
@@ -208,7 +211,6 @@ export default function MetasYComisionesPage() {
 
             nuevosBonos.push(nuevoBono);
 
-            // ✅ Enviar notificación
             if (agregarNotificacion) {
               agregarNotificacion({
                 tipo: 'meta_alcanzada',
@@ -232,7 +234,6 @@ export default function MetasYComisionesPage() {
         toast.success(`Se generaron ${nuevosBonos.length} bonos por metas alcanzadas. Revisa "Pagos al Equipo".`);
       }
 
-      // Cargar bonos para mostrar en esta página
       let todosLosBonos = [];
       if (supabase) {
         const { data } = await supabase.from('comisiones_pendientes').select('*').eq('tipo', 'bono_meta').order('fecha_registro', { ascending: false });
@@ -241,7 +242,6 @@ export default function MetasYComisionesPage() {
         todosLosBonos = JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]').filter(b => b.tipo === 'bono_meta');
       }
       
-      // Filtrar si es vendedor
       const bonosVisibles = (esVendedor && usuarioActual?.nombre) 
         ? todosLosBonos.filter(b => b.miembro_nombre === usuarioActual.nombre)
         : todosLosBonos;
@@ -305,7 +305,7 @@ export default function MetasYComisionesPage() {
         tipo: 'sugerencia_aprobada',
         titulo: 'Sugerencia Aprobada',
         mensaje: `Tu sugerencia ha sido aprobada: "${comentario.texto.substring(0, 30)}..."`,
-        usuario_id: comentario.usuario // Asumiendo que el nombre coincide, idealmente usar ID
+        usuario_id: comentario.usuario
       });
     }
   };
@@ -326,7 +326,7 @@ export default function MetasYComisionesPage() {
       id: Date.now(),
       ventas: (ultimaMeta?.ventas || 0) + 10,
       porcentaje: ultimaMeta?.porcentaje ? Math.min(ultimaMeta.porcentaje + 2, 15) : 7,
-      bono_monto: 20.00, // ✅ Valor por defecto del bono
+      bono_monto: 20.00,
       activo: true,
       fechaInicio: '',
       fechaFin: ''
@@ -401,7 +401,6 @@ export default function MetasYComisionesPage() {
         error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } },
       }} />
 
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Metas y Comisiones</h1>
@@ -436,7 +435,6 @@ export default function MetasYComisionesPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
@@ -476,7 +474,6 @@ export default function MetasYComisionesPage() {
         </div>
       </div>
 
-      {/* ✅ NUEVO: Bonos Pendientes de Pago (Integración con Pagos al Equipo) */}
       <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
@@ -528,7 +525,6 @@ export default function MetasYComisionesPage() {
         )}
       </div>
 
-      {/* 🏆 RANKING DE VENTAS DEL MES */}
       <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
         <div className="flex items-center gap-2 mb-6">
           <div className="p-2 rounded-lg bg-voltech-warning/20"><Award className="w-5 h-5 text-voltech-warning" /></div>
@@ -580,7 +576,6 @@ export default function MetasYComisionesPage() {
         </div>
       </div>
 
-      {/* 🎯 METAS ESCALONADAS (COLAPSABLE - SOLO ADMIN/SOCIO) */}
       {puedeGestionar && (
         <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
           <button 
@@ -709,7 +704,6 @@ export default function MetasYComisionesPage() {
         </div>
       )}
 
-      {/* Sugerencias del Socio / Equipo */}
       <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">

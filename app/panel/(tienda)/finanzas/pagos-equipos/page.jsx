@@ -23,13 +23,13 @@ export default function PagosEquiposPage() {
   const [equipo, setEquipo] = useState([]);
   const [carteras, setCarteras] = useState([]);
   const [comisionesPendientes, setComisionesPendientes] = useState([]);
-  const [ventas, setVentas] = useState([]); // ✅ NUEVO: Para calcular estadísticas
+  const [ventas, setVentas] = useState([]);
   
   // Estados UI
   const [showForm, setShowForm] = useState(false);
   const [expandedRowId, setExpandedRowId] = useState(null);
   const [editingId, setEditingId] = useState(null);
-  const [selectedMiembro, setSelectedMiembro] = useState(null); // ✅ NUEVO: Para ver detalle de miembro
+  const [selectedMiembro, setSelectedMiembro] = useState(null);
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -83,7 +83,16 @@ export default function PagosEquiposPage() {
       setComisionesPendientes(coms);
       setVentas(vts);
     };
+    
     cargarDatos();
+
+    // ✅ SINCRONIZACIÓN: Escuchar cuando se registra/elimina una venta en otro panel
+    const handleActualizacion = () => cargarDatos();
+    window.addEventListener('voltech-data-updated', handleActualizacion);
+
+    return () => {
+      window.removeEventListener('voltech-data-updated', handleActualizacion);
+    };
   }, []);
 
   // Cálculos para las tarjetas
@@ -92,7 +101,7 @@ export default function PagosEquiposPage() {
   const totalPendienteComisiones = comisionesPendientes.filter(c => c.estado === 'pendiente').reduce((acc, c) => acc + Number(c.monto_comision), 0);
   const balance = totalInvertido - totalPagado;
 
-  // ✅ NUEVO: Calcular estadísticas de un miembro
+  // Calcular estadísticas de un miembro
   const getMiembroStats = (miembroId) => {
     const miembroComisiones = comisionesPendientes.filter(c => c.miembroId === miembroId);
     const ventasPagadas = miembroComisiones.filter(c => c.estado === 'pagada');
@@ -106,7 +115,6 @@ export default function PagosEquiposPage() {
     const montoPagado = ventasPagadas.reduce((acc, c) => acc + Number(c.monto_comision), 0);
     const montoPendiente = ventasPendientes.reduce((acc, c) => acc + Number(c.monto_comision), 0);
     
-    // Calcular porcentaje promedio
     const porcentajePromedio = totalVentas > 0 
       ? (miembroComisiones.reduce((acc, c) => acc + Number(c.porcentaje_comision), 0) / totalVentas).toFixed(1)
       : 0;
@@ -123,7 +131,6 @@ export default function PagosEquiposPage() {
     };
   };
 
-  // Manejar selección de comisiones en el formulario
   const toggleComision = (comision) => {
     const exists = selectedComisiones.find(c => c.id === comision.id);
     if (exists) {
@@ -133,7 +140,6 @@ export default function PagosEquiposPage() {
     }
   };
 
-  // Actualizar monto automáticamente al seleccionar comisiones
   useEffect(() => {
     if (formData.tipo === 'pago' && selectedComisiones.length > 0) {
       const total = selectedComisiones.reduce((sum, c) => sum + Number(c.monto_comision), 0);
@@ -164,7 +170,6 @@ export default function PagosEquiposPage() {
       fechaRegistro: new Date().toISOString(),
     };
 
-    // 1. Guardar Movimiento
     if (supabase) {
       const { error } = await supabase.from('movimientos_equipo').upsert(nuevoMovimiento, { onConflict: 'id' });
       if (error) { toast.error('Error al guardar movimiento: ' + error.message); return; }
@@ -176,7 +181,6 @@ export default function PagosEquiposPage() {
     setMovimientos(movsActualizados);
     localStorage.setItem('voltech_movimientos_equipo', JSON.stringify(movsActualizados));
 
-    // 2. Si es PAGO, marcar comisiones como pagadas
     if (formData.tipo === 'pago' && selectedComisiones.length > 0) {
       const comisionesActualizadas = comisionesPendientes.map(c => {
         if (selectedComisiones.find(sc => sc.id === c.id)) {
@@ -199,9 +203,10 @@ export default function PagosEquiposPage() {
 
     toast.success(editingId ? 'Movimiento actualizado' : 'Pago registrado exitosamente');
     resetForm();
+    // ✅ SINCRONIZACIÓN: Avisar a otros paneles si es necesario
+    window.dispatchEvent(new Event('voltech-data-updated'));
   };
 
-  // ✅ NUEVO: Editar movimiento
   const handleEdit = (movimiento) => {
     setEditingId(movimiento.id);
     setFormData({
@@ -219,7 +224,6 @@ export default function PagosEquiposPage() {
     setShowForm(true);
   };
 
-  // ✅ NUEVO: Eliminar movimiento
   const handleDelete = async (movimiento) => {
     if (!confirm('¿Estás seguro de eliminar este movimiento?')) return;
     
@@ -231,7 +235,6 @@ export default function PagosEquiposPage() {
     setMovimientos(movsActualizados);
     localStorage.setItem('voltech_movimientos_equipo', JSON.stringify(movsActualizados));
     
-    // Si era un pago, devolver las comisiones a pendiente
     if (movimiento.tipo === 'pago') {
       const comisionesActualizadas = comisionesPendientes.map(c => {
         if (c.movimiento_pago_id === movimiento.id) {
@@ -252,16 +255,14 @@ export default function PagosEquiposPage() {
     }
     
     toast.success('Movimiento eliminado');
+    window.dispatchEvent(new Event('voltech-data-updated'));
   };
 
-  // ✅ NUEVO: Generar Recibo PDF
   const generarReciboPDF = (movimiento) => {
     const detalles = getDetallesMovimiento(movimiento.id);
     const miembro = equipo.find(e => e.id === movimiento.miembroId);
     
     const doc = new jsPDF();
-    
-    // Encabezado
     doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
     doc.text("RECIBO DE PAGO", 105, 20, { align: 'center' });
@@ -270,7 +271,6 @@ export default function PagosEquiposPage() {
     doc.setFont("helvetica", "normal");
     doc.text("VOLTECH STORE", 105, 30, { align: 'center' });
     
-    // Información del recibo
     doc.setFontSize(10);
     let y = 45;
     
@@ -336,7 +336,6 @@ export default function PagosEquiposPage() {
       y += 10;
     }
     
-    // Espacio para firmas
     y += 20;
     doc.setFont("helvetica", "italic");
     doc.text("_______________________________", 14, y);
@@ -353,7 +352,6 @@ export default function PagosEquiposPage() {
     toast.success('Recibo PDF generado correctamente');
   };
 
-  // ✅ NUEVO: Notificar por WhatsApp
   const notificarWhatsApp = (movimiento) => {
     const miembro = equipo.find(e => e.id === movimiento.miembroId);
     const telefono = miembro?.telefono?.replace(/\D/g, '') || '';
@@ -396,20 +394,17 @@ export default function PagosEquiposPage() {
     setEditingId(null);
   };
 
-  // Filtrar comisiones pendientes por miembro seleccionado en el formulario
   const comisionesDelMiembro = comisionesPendientes.filter(c => 
     c.miembroId === formData.miembroId && c.estado === 'pendiente'
   );
 
-  // Filtrar historial
   const movimientosFiltrados = movimientos.filter(m => {
     const matchSearch = m.miembroNombre.toLowerCase().includes(searchTerm.toLowerCase()) || m.descripcion?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchMiembro = filtroMiembro === 'todos' || m.miembroId === filtroMiembro;
-    const matchTipo = m.tipo === activeTab; // Solo mostrar según la pestaña activa
+    const matchTipo = m.tipo === activeTab;
     return matchSearch && matchMiembro && matchTipo;
   });
 
-  // Obtener detalles de un movimiento (qué comisiones pagó)
   const getDetallesMovimiento = (movId) => {
     return comisionesPendientes.filter(c => c.movimiento_pago_id === movId);
   };
@@ -432,7 +427,6 @@ export default function PagosEquiposPage() {
         </button>
       </div>
 
-      {/* PESTAÑAS */}
       <div className="flex gap-4 border-b border-voltech-border">
         <button 
           onClick={() => setActiveTab('pagos')}
@@ -448,7 +442,6 @@ export default function PagosEquiposPage() {
         </button>
       </div>
 
-      {/* TARJETAS RESUMEN */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {activeTab === 'pagos' ? (
           <>
@@ -466,14 +459,12 @@ export default function PagosEquiposPage() {
             </div>
           </>
         ) : (
-          <>
-            <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-voltech-success/20"><TrendingUp className="w-5 h-5 text-voltech-success" /></div>
-                <div><p className="text-xs text-voltech-muted">Total Invertido</p><p className="text-xl font-bold text-voltech-success">${totalInvertido.toFixed(2)}</p></div>
-              </div>
+          <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-voltech-success/20"><TrendingUp className="w-5 h-5 text-voltech-success" /></div>
+              <div><p className="text-xs text-voltech-muted">Total Invertido</p><p className="text-xl font-bold text-voltech-success">${totalInvertido.toFixed(2)}</p></div>
             </div>
-          </>
+          </div>
         )}
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
@@ -489,7 +480,6 @@ export default function PagosEquiposPage() {
         </div>
       </div>
 
-      {/* ✅ NUEVO: SELECCIÓN DE MIEMBRO PARA VER DETALLES */}
       {activeTab === 'pagos' && (
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -549,7 +539,6 @@ export default function PagosEquiposPage() {
         </div>
       )}
 
-      {/* ✅ NUEVO: DETALLE DEL MIEMBRO SELECCIONADO */}
       <AnimatePresence>
         {selectedMiembro && activeTab === 'pagos' && (
           <motion.div
@@ -580,7 +569,6 @@ export default function PagosEquiposPage() {
                 
                 return (
                   <div className="space-y-6">
-                    {/* Estadísticas */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4">
                         <p className="text-xs text-voltech-muted mb-1">Total Ventas</p>
@@ -600,7 +588,6 @@ export default function PagosEquiposPage() {
                       </div>
                     </div>
                     
-                    {/* Montos */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4">
                         <p className="text-xs text-voltech-muted mb-1">Monto Total en Ventas</p>
@@ -616,7 +603,6 @@ export default function PagosEquiposPage() {
                       </div>
                     </div>
                     
-                    {/* Tabla de comisiones */}
                     <div>
                       <h4 className="text-sm font-bold text-white mb-3">Historial de Comisiones</h4>
                       <div className="overflow-x-auto">
@@ -668,7 +654,6 @@ export default function PagosEquiposPage() {
         )}
       </AnimatePresence>
 
-      {/* FORMULARIO NUEVO MOVIMIENTO */}
       <AnimatePresence>
         {showForm && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
@@ -741,7 +726,6 @@ export default function PagosEquiposPage() {
                 </div>
               </div>
 
-              {/* SECCIÓN: SELECCIONAR VENTAS A PAGAR (Solo si es Pago) */}
               {formData.tipo === 'pago' && formData.miembroId && (
                 <div className="mb-6 bg-voltech-dark/30 border border-voltech-border rounded-lg p-4">
                   <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
@@ -795,7 +779,6 @@ export default function PagosEquiposPage() {
         )}
       </AnimatePresence>
 
-      {/* HISTORIAL */}
       <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
         <div className="p-4 border-b border-voltech-border flex flex-col md:flex-row items-center justify-between gap-4">
           <h3 className="text-lg font-bold text-white">Historial de {activeTab === 'pagos' ? 'Pagos' : 'Inversiones'}</h3>
@@ -832,8 +815,8 @@ export default function PagosEquiposPage() {
                   const isExpanded = expandedRowId === mov.id;
                   
                   return (
-                    <>
-                      <tr key={mov.id} className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors cursor-pointer" onClick={() => setExpandedRowId(isExpanded ? null : mov.id)}>
+                    <React.Fragment key={mov.id}>
+                      <tr className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors cursor-pointer" onClick={() => setExpandedRowId(isExpanded ? null : mov.id)}>
                         <td className="px-4 py-3 text-sm text-voltech-muted flex items-center gap-2"><Calendar className="w-3 h-3" /> {mov.fecha}</td>
                         <td className="px-4 py-3"><p className="text-sm font-medium text-white">{mov.miembroNombre}</p></td>
                         <td className="px-4 py-3 text-sm text-voltech-muted max-w-xs truncate">{mov.descripcion || (mov.tipo === 'pago' ? 'Pago de comisiones' : 'Aporte de capital')}</td>
@@ -853,7 +836,6 @@ export default function PagosEquiposPage() {
                                 {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                               </button>
                             )}
-                            {/* ✅ BOTÓN EDITAR */}
                             <button 
                               onClick={(e) => { e.stopPropagation(); handleEdit(mov); }} 
                               className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors"
@@ -861,7 +843,6 @@ export default function PagosEquiposPage() {
                             >
                               <Edit3 className="w-4 h-4" />
                             </button>
-                            {/* ✅ BOTÓN ELIMINAR */}
                             <button 
                               onClick={(e) => { e.stopPropagation(); handleDelete(mov); }} 
                               className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"
@@ -873,7 +854,6 @@ export default function PagosEquiposPage() {
                         </td>
                       </tr>
                       
-                      {/* FILA EXPANDIDA CON DETALLES */}
                       {isExpanded && detalles.length > 0 && (
                         <tr className="bg-voltech-dark/50">
                           <td colSpan="6" className="px-4 py-4">
@@ -881,14 +861,12 @@ export default function PagosEquiposPage() {
                               <div className="flex items-center justify-between mb-3">
                                 <h5 className="text-xs font-bold text-voltech-muted uppercase">Ventas incluidas en este pago</h5>
                                 <div className="flex gap-2">
-                                  {/* ✅ BOTÓN WHATSAPP */}
                                   <button 
                                     onClick={() => notificarWhatsApp(mov)}
                                     className="px-3 py-1.5 bg-green-500/20 text-green-500 rounded-lg text-xs hover:bg-green-500/30 transition-colors flex items-center gap-1"
                                   >
                                     <MessageCircle className="w-3 h-3" /> WhatsApp
                                   </button>
-                                  {/* ✅ BOTÓN PDF */}
                                   <button 
                                     onClick={() => generarReciboPDF(mov)}
                                     className="px-3 py-1.5 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors flex items-center gap-1"
@@ -927,7 +905,7 @@ export default function PagosEquiposPage() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </React.Fragment>
                   );
                 })
               )}

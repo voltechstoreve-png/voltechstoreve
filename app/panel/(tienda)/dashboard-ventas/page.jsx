@@ -42,7 +42,6 @@ export default function DashboardVentasPage() {
       let ventas = [], clientes = [], usuarios = [], coms = [];
 
       try {
-        // Cargar desde Supabase
         if (supabase) {
           const [{ data: vData }, { data: cData }, { data: uData }, { data: comData }] = await Promise.all([
             supabase.from('ventas').select('*').order('fechaRegistro', { ascending: false }),
@@ -56,7 +55,6 @@ export default function DashboardVentasPage() {
           usuarios = uData || [];
           coms = comData || [];
         } else {
-          // Fallback localStorage
           ventas = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
           clientes = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
           usuarios = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
@@ -66,37 +64,35 @@ export default function DashboardVentasPage() {
         setComisiones(coms);
         setEquipo(usuarios);
 
-        // Fechas
-        const hoy = new Date().toISOString().split('T')[0];
-        const hace7Dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const mesActual = new Date().toISOString().slice(0, 7); // YYYY-MM
+        // ✅ CORRECCIÓN DE FECHAS: Usar objetos Date reales en lugar de strings
+        const hoy = new Date();
+        const mesActual = hoy.getMonth();
+        const anioActual = hoy.getFullYear();
+        const hoyStr = hoy.toISOString().split('T')[0];
+        const hace7DiasStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-        // Filtrar ventas CORRECTAMENTE
         const ventasHoy = ventas.filter(v => {
-          const fechaVenta = v.fecha || (v.fechaRegistro ? v.fechaRegistro.split('T')[0] : '');
-          return fechaVenta === hoy;
+          const fechaStr = (v.fechaRegistro || v.fecha || '').split('T')[0];
+          return fechaStr === hoyStr;
         });
 
         const ventasSemana = ventas.filter(v => {
-          const fechaVenta = v.fecha || (v.fechaRegistro ? v.fechaRegistro.split('T')[0] : '');
-          return fechaVenta >= hace7Dias && fechaVenta <= hoy;
+          const fechaStr = (v.fechaRegistro || v.fecha || '').split('T')[0];
+          return fechaStr >= hace7DiasStr && fechaStr <= hoyStr;
         });
 
         const ventasMes = ventas.filter(v => {
-          const fechaRegistro = v.fechaRegistro || (v.fecha ? `${v.fecha}T00:00:00` : '');
-          return fechaRegistro.startsWith(mesActual);
+          const fecha = new Date(v.fechaRegistro || v.fecha);
+          return !isNaN(fecha.getTime()) && fecha.getMonth() === mesActual && fecha.getFullYear() === anioActual;
         });
 
-        // Calcular totales
         const totalIngresosHoy = ventasHoy.reduce((sum, v) => sum + Number(v.total || 0), 0);
         const totalIngresosSemana = ventasSemana.reduce((sum, v) => sum + Number(v.total || 0), 0);
         const totalIngresosMes = ventasMes.reduce((sum, v) => sum + Number(v.total || 0), 0);
 
-        // Comisiones
         const comPagadas = coms.filter(c => c.estado === 'pagada').reduce((sum, c) => sum + Number(c.monto_comision || 0), 0);
         const comPendientes = coms.filter(c => c.estado === 'pendiente').reduce((sum, c) => sum + Number(c.monto_comision || 0), 0);
 
-        // Productos vendidos
         const totalProductosVendidos = ventas.reduce((sum, v) => {
           if (v.productos && Array.isArray(v.productos)) {
             return sum + v.productos.reduce((pSum, p) => pSum + (Number(p.cantidad) || 1), 0);
@@ -104,7 +100,6 @@ export default function DashboardVentasPage() {
           return sum + 1;
         }, 0);
 
-        // Meta (por defecto 100 ventas o $5000)
         const metaMonto = 5000;
         const porcentajeMeta = metaMonto > 0 ? (totalIngresosMes / metaMonto) * 100 : 0;
 
@@ -124,10 +119,8 @@ export default function DashboardVentasPage() {
           porcentajeMeta
         });
 
-        // Últimas 10 ventas
         setVentasRecientes(ventas.slice(0, 10));
 
-        // Ranking de vendedores
         const rankingCalculado = usuarios.map(member => {
           const memberSales = ventas.filter(v => 
             v.vendedor?.toLowerCase() === member.nombre.toLowerCase() || 
@@ -159,6 +152,17 @@ export default function DashboardVentasPage() {
     };
 
     cargarDatos();
+
+    // ✅ NUEVO: Escuchar el evento de sincronización desde otros paneles
+    const handleActualizacion = () => {
+      cargarDatos();
+    };
+    window.addEventListener('voltech-data-updated', handleActualizacion);
+
+    // Cleanup del event listener al desmontar el componente
+    return () => {
+      window.removeEventListener('voltech-data-updated', handleActualizacion);
+    };
   }, []);
 
   const getRankIcon = (index) => {
@@ -188,7 +192,6 @@ export default function DashboardVentasPage() {
         <p className="text-sm text-voltech-muted mt-1">Análisis de rendimiento y ranking de vendedores</p>
       </div>
 
-      {/* TARJETAS DE MÉTRICAS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center justify-between">
@@ -287,7 +290,6 @@ export default function DashboardVentasPage() {
         </div>
       </div>
 
-      {/* RANKING DE VENDEDORES */}
       <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
@@ -383,7 +385,6 @@ export default function DashboardVentasPage() {
         )}
       </div>
 
-      {/* ÚLTIMAS VENTAS */}
       <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
         <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
           <Activity className="w-5 h-5 text-voltech-cyan" /> Últimas Ventas

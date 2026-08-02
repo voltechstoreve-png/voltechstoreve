@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
+import { useNotificaciones } from '@/app/context/NotificationContext';
 import { 
   ShoppingCart, DollarSign, TrendingUp, Users, Plus, X, Save, Search,
   Calendar, CreditCard, Tag, MessageCircle, Edit3, Trash2, CheckCircle,
@@ -18,6 +19,7 @@ import autoTable from 'jspdf-autotable';
 export default function VentasProductosPage() {
   const router = useRouter();
   const { esVendedor, usuarioActual } = usePermissions();
+  const { agregarNotificacion } = useNotificaciones();
   
   const [ventas, setVentas] = useState([]);
   const [productos, setProductos] = useState([]);
@@ -61,7 +63,7 @@ export default function VentasProductosPage() {
   const [formData, setFormData] = useState({
     numeroOrden: generarNumeroOrden(),
     fecha: new Date().toISOString().split('T')[0],
-    vendedor: '',
+    vendedor: esVendedor ? (usuarioActual?.nombre || '') : '',
     cliente: '',
     telefono: '',
     productos: [{ 
@@ -166,7 +168,6 @@ export default function VentasProductosPage() {
     }
   };
 
-  // ✅ FILTRADO RELACIONAL: Producto, Marca, Categoría
   const actualizarCampoProducto = (index, field, value) => {
     const nuevosProductos = [...formData.productos];
     nuevosProductos[index][field] = value;
@@ -182,7 +183,6 @@ export default function VentasProductosPage() {
         nuevosProductos[index].filtroMarca = producto.marca || '';
       }
     } else if (field === 'filtroCategoria') {
-      // Si selecciona Categoría: mostrar productos de esa categoría y marcas disponibles
       nuevosProductos[index].filtroMarca = '';
       nuevosProductos[index].productoId = '';
       nuevosProductos[index].sku = '';
@@ -190,7 +190,6 @@ export default function VentasProductosPage() {
       nuevosProductos[index].marca = '';
       nuevosProductos[index].precioUnitario = 0;
     } else if (field === 'filtroMarca') {
-      // Si selecciona Marca: mostrar productos de esa marca y categorías disponibles
       nuevosProductos[index].productoId = '';
       nuevosProductos[index].sku = '';
       nuevosProductos[index].categoria = '';
@@ -201,10 +200,8 @@ export default function VentasProductosPage() {
     setFormData({ ...formData, productos: nuevosProductos });
   };
 
-  // ✅ Obtener marcas disponibles según filtro
   const getMarcasDisponibles = (producto) => {
     if (producto.filtroCategoria) {
-      // Si hay categoría filtrada, mostrar marcas de esa categoría
       return [...new Set(
         productosDisponibles
           .filter(p => p.categoria === producto.filtroCategoria)
@@ -212,14 +209,11 @@ export default function VentasProductosPage() {
           .filter(Boolean)
       )];
     }
-    // Si no, mostrar todas las marcas
     return [...new Set(productosDisponibles.map(p => p.marca).filter(Boolean))];
   };
 
-  // ✅ Obtener categorías disponibles según filtro
   const getCategoriasDisponibles = (producto) => {
     if (producto.filtroMarca) {
-      // Si hay marca filtrada, mostrar categorías de esa marca
       return [...new Set(
         productosDisponibles
           .filter(p => p.marca === producto.filtroMarca)
@@ -227,26 +221,20 @@ export default function VentasProductosPage() {
           .filter(Boolean)
       )];
     }
-    // Si no, mostrar todas las categorías
     return [...new Set(productosDisponibles.map(p => p.categoria).filter(Boolean))];
   };
 
-  // ✅ Obtener productos disponibles según filtros (intersección estricta)
   const getProductosDisponibles = (producto) => {
     return productosDisponibles.filter(p => {
-      // Si hay filtro de categoría Y marca, aplicar intersección estricta
       if (producto.filtroCategoria && producto.filtroMarca) {
         return p.categoria === producto.filtroCategoria && p.marca === producto.filtroMarca;
       }
-      // Si solo hay filtro de categoría
       if (producto.filtroCategoria) {
         return p.categoria === producto.filtroCategoria;
       }
-      // Si solo hay filtro de marca
       if (producto.filtroMarca) {
         return p.marca === producto.filtroMarca;
       }
-      // Si no hay filtros, mostrar todos
       return true;
     });
   };
@@ -421,23 +409,23 @@ export default function VentasProductosPage() {
     let descuento = 0;
     const subtotalAplicable = formData.productos
       .filter(p => productosAplicables.includes(p.productoId))
-      .reduce((acc, p) => acc + (p.cantidad * p.precioUnitario), 0);
+      .reduce((acc, p) => acc + (Number(p.cantidad || 1) * Number(p.precioUnitario || 0)), 0);
 
     if (cupon.tipo_descuento === 'gratis' || cupon.es_gratis) {
       descuento = subtotalAplicable;
     } else if (cupon.tipo_descuento === 'porcentaje') {
-      descuento = subtotalAplicable * ((cupon.valor_descuento || cupon.valor || 0) / 100);
+      descuento = subtotalAplicable * ((Number(cupon.valor_descuento || cupon.valor || 0)) / 100);
     } else if (cupon.tipo_descuento === 'monto_fijo') {
-      descuento = Math.min(cupon.valor_descuento || cupon.valor || 0, subtotalAplicable);
+      descuento = Math.min(Number(cupon.valor_descuento || cupon.valor || 0), subtotalAplicable);
     }
 
     setCuponAplicado({ ...cupon, descuentoCalculado: descuento });
   };
 
-  const subtotal = formData.productos.reduce((acc, p) => acc + (p.cantidad * p.precioUnitario), 0);
-  const descuentoAplicado = cuponAplicado ? cuponAplicado.descuentoCalculado : 0;
-  const totalVenta = subtotal + (formData.delivery ? formData.montoDelivery : 0) - descuentoAplicado;
-  const montoPendiente = formData.enCuotas ? totalVenta - formData.montoAbonado : 0;
+  const subtotal = formData.productos.reduce((acc, p) => acc + (Number(p.cantidad || 1) * Number(p.precioUnitario || 0)), 0);
+  const descuentoAplicado = cuponAplicado ? Number(cuponAplicado.descuentoCalculado || 0) : 0;
+  const totalVenta = subtotal + (formData.delivery ? Number(formData.montoDelivery || 0) : 0) - descuentoAplicado;
+  const montoPendiente = formData.enCuotas ? totalVenta - Number(formData.montoAbonado || 0) : 0;
 
   const registrarVenta = async () => {
     if (!formData.cliente || !formData.telefono || formData.productos.some(p => !p.productoId)) {
@@ -445,13 +433,16 @@ export default function VentasProductosPage() {
       return;
     }
 
-    // ✅ VALIDAR STOCK - Including kits
+    const vendedorNombre = formData.vendedor || (esVendedor ? usuarioActual?.nombre : '');
+    if (!vendedorNombre) {
+      toast.error('Debes seleccionar un vendedor');
+      return;
+    }
+
     for (const prod of formData.productos) {
       if (prod.esKit) {
-        // Validar stock de cada producto en el kit
         for (const prodKit of prod.productosIncluidos || []) {
           const productoBase = productos.find(p => String(p.id) === String(prodKit.producto_id));
-          const cantidadNecesaria = productoBase ? productoBase.cantidad * prod.cantidad : 0;
           if (!productoBase || productoBase.cantidad < prodKit.cantidad * prod.cantidad) {
             toast.error(`Stock insuficiente para ${productoBase?.plataforma || 'producto'} en el kit`);
             return;
@@ -481,27 +472,36 @@ export default function VentasProductosPage() {
     const nuevaVenta = {
       id: editingId || Date.now().toString(),
       numeroOrden: formData.numeroOrden || generarNumeroOrden(),
-      fecha: formData.fecha, vendedor: formData.vendedor, cliente: formData.cliente, telefono: formData.telefono,
+      fecha: formData.fecha, 
+      vendedor: vendedorNombre,
+      cliente: formData.cliente, 
+      telefono: formData.telefono,
       productos: formData.productos.map(p => {
         const producto = productos.find(prod => String(prod.id) === String(p.productoId));
         return {
-          productoId: p.productoId, sku: p.sku, nombre: producto?.plataforma || producto?.producto || 'Producto',
-          categoria: p.categoria, marca: p.marca, cantidad: p.cantidad, precioUnitario: p.precioUnitario,
-          total: p.cantidad * p.precioUnitario, tipo: producto?.tipo || 'fisico',
+          productoId: p.productoId, 
+          sku: p.sku, 
+          nombre: producto?.plataforma || producto?.producto || 'Producto',
+          categoria: p.categoria, 
+          marca: p.marca, 
+          cantidad: Number(p.cantidad || 1), 
+          precioUnitario: Number(p.precioUnitario || 0),
+          total: Number(p.cantidad || 1) * Number(p.precioUnitario || 0), 
+          tipo: producto?.tipo || 'fisico',
           esKit: p.esKit || false,
           productosIncluidos: p.productosIncluidos || []
         };
       }),
-      subtotal, 
+      subtotal: Number(subtotal), 
       delivery: formData.delivery, 
-      montoDelivery: formData.delivery ? formData.montoDelivery : 0,
+      montoDelivery: Number(formData.montoDelivery || 0),
       cupon_aplicado: cuponAplicado ? cuponAplicado.codigo : null,
-      descuento_aplicado: descuentoAplicado,
-      total_con_descuento: totalVenta,
-      total: totalVenta, 
+      descuento_aplicado: Number(descuentoAplicado),
+      total_con_descuento: Number(totalVenta),
+      total: Number(totalVenta), 
       enCuotas: formData.enCuotas, 
-      montoAbonado: formData.enCuotas ? formData.montoAbonado : totalVenta,
-      montoPendiente: montoPendiente, 
+      montoAbonado: formData.enCuotas ? Number(formData.montoAbonado || 0) : Number(totalVenta),
+      montoPendiente: Number(montoPendiente), 
       fechaPago: formData.fechaPago, 
       metodoPago: formData.metodoPago,
       carteraId: formData.carteraId, 
@@ -510,12 +510,10 @@ export default function VentasProductosPage() {
       fechaRegistro: new Date().toISOString(),
     };
 
-    // ✅ ACTUALIZAR INVENTARIO - Including kits
     let productosActualizados = [...productos];
     
     for (const prod of formData.productos) {
       if (prod.esKit && prod.productosIncluidos && prod.productosIncluidos.length > 0) {
-        // Descontar cada producto individual del kit
         for (const prodKit of prod.productosIncluidos) {
           const index = productosActualizados.findIndex(p => String(p.id) === String(prodKit.producto_id));
           if (index !== -1) {
@@ -526,7 +524,6 @@ export default function VentasProductosPage() {
           }
         }
       } else {
-        // Producto normal
         const index = productosActualizados.findIndex(p => String(p.id) === String(prod.productoId));
         if (index !== -1) {
           productosActualizados[index] = {
@@ -542,19 +539,21 @@ export default function VentasProductosPage() {
       : [nuevaVenta, ...ventas];
 
     let cuponesActualizados = [...cupones];
-    if (supabase && cuponAplicado) {
+    
+    if (supabase) {
       await supabase.from('ventas').upsert(nuevaVenta, { onConflict: 'id' });
       await supabase.from('clientes').upsert(nuevoCliente, { onConflict: 'id' });
       
-      // Actualizar inventario en Supabase
       for (const prodActualizado of productosActualizados) {
         await supabase.from('productos').update({ cantidad: prodActualizado.cantidad }).eq('id', prodActualizado.id);
       }
       
-      await supabase.from('cupones').update({ 
-        usos: (cuponAplicado.usos || 0) + 1,
-        descuento_total: (cuponAplicado.descuento_total || 0) + descuentoAplicado
-      }).eq('id', cuponAplicado.id);
+      if (cuponAplicado) {
+        await supabase.from('cupones').update({ 
+          usos: (cuponAplicado.usos || 0) + 1,
+          descuento_total: (cuponAplicado.descuento_total || 0) + descuentoAplicado
+        }).eq('id', cuponAplicado.id);
+      }
     }
 
     if (cuponAplicado) {
@@ -575,20 +574,41 @@ export default function VentasProductosPage() {
     localStorage.setItem('voltech_clientes', JSON.stringify(clientesActualizados));
 
     toast.success(editingId ? 'Venta actualizada correctamente' : 'Venta registrada exitosamente');
+
+    if (agregarNotificacion && !editingId) {
+      agregarNotificacion({
+        tipo: 'nueva_venta',
+        titulo: '¡Nueva Venta Registrada! 💰',
+        mensaje: `Se registró una venta por $${Number(totalVenta).toFixed(2)} a nombre de ${formData.cliente}.`,
+        detalle: `Vendedor: ${vendedorNombre} | Orden: ${nuevaVenta.numeroOrden}`,
+        usuario_id: 'admin'
+      });
+    }
+
     resetForm();
+    // ✅ SINCRONIZACIÓN: Avisar a los otros paneles que hubo un cambio
+    window.dispatchEvent(new Event('voltech-data-updated'));
   };
 
   const resetForm = () => {
     setFormData({
-      numeroOrden: generarNumeroOrden(), fecha: new Date().toISOString().split('T')[0],
+      numeroOrden: generarNumeroOrden(), 
+      fecha: new Date().toISOString().split('T')[0],
       vendedor: esVendedor ? (usuarioActual?.nombre || '') : '',
-      cliente: '', telefono: '',
+      cliente: '', 
+      telefono: '',
       productos: [{ 
         productoId: '', sku: '', categoria: '', marca: '', cantidad: 1, precioUnitario: 0,
         filtroCategoria: '', filtroMarca: '', esKit: false, productosIncluidos: []
       }],
-      delivery: false, montoDelivery: 0, enCuotas: false, montoAbonado: 0, fechaPago: '',
-      metodoPago: 'efectivo', carteraId: '', referencia: '',
+      delivery: false, 
+      montoDelivery: 0, 
+      enCuotas: false, 
+      montoAbonado: 0, 
+      fechaPago: '',
+      metodoPago: 'efectivo', 
+      carteraId: '', 
+      referencia: '',
     });
     setClienteSearch(''); 
     setCuponInput('');
@@ -600,14 +620,16 @@ export default function VentasProductosPage() {
   };
 
   const marcarPagado = async (venta) => {
-    const ventaActualizada = { ...venta, estado: 'pagado', montoPendiente: 0, montoAbonado: venta.total, fechaPago: new Date().toISOString().split('T')[0] };
+    const ventaActualizada = { ...venta, estado: 'pagado', montoPendiente: 0, montoAbonado: Number(venta.total || 0), fechaPago: new Date().toISOString().split('T')[0] };
     const ventasActualizadas = ventas.map(v => String(v.id) === String(venta.id) ? ventaActualizada : v);
     if (supabase) {
-      await supabase.from('ventas').update({ estado: 'pagado', montoPendiente: 0, montoAbonado: venta.total, fechaPago: ventaActualizada.fechaPago }).eq('id', venta.id);
+      await supabase.from('ventas').update({ estado: 'pagado', montoPendiente: 0, montoAbonado: Number(venta.total || 0), fechaPago: ventaActualizada.fechaPago }).eq('id', venta.id);
     }
     setVentas(ventasActualizadas);
     localStorage.setItem('voltech_ventas', JSON.stringify(ventasActualizadas));
     toast.success('Venta marcada como pagada');
+    // ✅ SINCRONIZACIÓN: Avisar a los otros paneles que hubo un cambio
+    window.dispatchEvent(new Event('voltech-data-updated'));
   };
 
   const eliminarVenta = async (venta) => {
@@ -615,10 +637,8 @@ export default function VentasProductosPage() {
     
     let productosActualizados = [...productos];
     
-    // Devolver stock de kits y productos normales
     for (const prod of venta.productos) {
       if (prod.esKit && prod.productosIncluidos && prod.productosIncluidos.length > 0) {
-        // Devolver cada producto del kit
         for (const prodKit of prod.productosIncluidos) {
           const index = productosActualizados.findIndex(p => String(p.id) === String(prodKit.producto_id));
           if (index !== -1) {
@@ -629,7 +649,6 @@ export default function VentasProductosPage() {
           }
         }
       } else {
-        // Producto normal
         const index = productosActualizados.findIndex(p => String(p.id) === String(prod.productoId));
         if (index !== -1) {
           productosActualizados[index] = {
@@ -645,25 +664,43 @@ export default function VentasProductosPage() {
       await supabase.from('ventas').delete().eq('id', venta.id);
       for (const p of productosActualizados) await supabase.from('productos').update({ cantidad: p.cantidad }).eq('id', p.id);
     }
-    setVentas(ventasActualizadas); setProductos(productosActualizados);
+    setVentas(ventasActualizadas); 
+    setProductos(productosActualizados);
     localStorage.setItem('voltech_ventas', JSON.stringify(ventasActualizadas));
     localStorage.setItem('voltech_productos', JSON.stringify(productosActualizados));
     toast.success('Venta eliminada y stock devuelto');
+    // ✅ SINCRONIZACIÓN: Avisar a los otros paneles que hubo un cambio
+    window.dispatchEvent(new Event('voltech-data-updated'));
   };
 
   const editarVenta = (venta) => {
     setEditingId(venta.id);
     setFormData({
-      numeroOrden: venta.numeroOrden || generarNumeroOrden(), fecha: venta.fecha, vendedor: venta.vendedor,
-      cliente: venta.cliente, telefono: venta.telefono,
+      numeroOrden: venta.numeroOrden || generarNumeroOrden(), 
+      fecha: venta.fecha, 
+      vendedor: venta.vendedor,
+      cliente: venta.cliente, 
+      telefono: venta.telefono,
       productos: venta.productos.map(p => ({ 
-        productoId: p.productoId, sku: p.sku || '', categoria: p.categoria || '', marca: p.marca || '', 
-        cantidad: p.cantidad, precioUnitario: p.precioUnitario, filtroCategoria: '', filtroMarca: '',
+        productoId: p.productoId, 
+        sku: p.sku || '', 
+        categoria: p.categoria || '', 
+        marca: p.marca || '', 
+        cantidad: p.cantidad, 
+        precioUnitario: p.precioUnitario, 
+        filtroCategoria: '', 
+        filtroMarca: '',
         esKit: p.esKit || false,
         productosIncluidos: p.productosIncluidos || []
       })),
-      delivery: venta.delivery, montoDelivery: venta.montoDelivery, enCuotas: venta.enCuotas, montoAbonado: venta.montoAbonado,
-      fechaPago: venta.fechaPago || '', metodoPago: venta.metodoPago, carteraId: venta.carteraId, referencia: venta.referencia,
+      delivery: venta.delivery, 
+      montoDelivery: venta.montoDelivery, 
+      enCuotas: venta.enCuotas, 
+      montoAbonado: venta.montoAbonado,
+      fechaPago: venta.fechaPago || '', 
+      metodoPago: venta.metodoPago, 
+      carteraId: venta.carteraId, 
+      referencia: venta.referencia,
     });
     setClienteSearch(venta.cliente); 
     setCuponInput(venta.cupon_aplicado || '');
@@ -709,8 +746,8 @@ export default function VentasProductosPage() {
     const tableData = venta.productos.map(p => [
       `${p.nombre}${p.esKit ? ' (KIT)' : ''}`,
       p.cantidad.toString(),
-      `$${p.precioUnitario.toFixed(2)}`,
-      `$${p.total.toFixed(2)}`
+      `$${Number(p.precioUnitario || 0).toFixed(2)}`,
+      `$${Number(p.total || 0).toFixed(2)}`
     ]);
 
     autoTable(doc, {
@@ -733,23 +770,23 @@ export default function VentasProductosPage() {
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     
-    if (venta.descuento_aplicado > 0) {
-      doc.text(`SUBTOTAL: $${venta.subtotal.toFixed(2)}`, 195, finalY, { align: 'right' });
+    if (Number(venta.descuento_aplicado || 0) > 0) {
+      doc.text(`SUBTOTAL: $${Number(venta.subtotal || 0).toFixed(2)}`, 195, finalY, { align: 'right' });
       doc.setFontSize(10);
       doc.setTextColor(34, 197, 94);
-      doc.text(`DESCUENTO: -$${venta.descuento_aplicado.toFixed(2)}`, 195, finalY + 6, { align: 'right' });
+      doc.text(`DESCUENTO: -$${Number(venta.descuento_aplicado || 0).toFixed(2)}`, 195, finalY + 6, { align: 'right' });
       doc.setFontSize(12);
       doc.setTextColor(0, 0, 0);
-      doc.text(`TOTAL: $${venta.total.toFixed(2)}`, 195, finalY + 12, { align: 'right' });
+      doc.text(`TOTAL: $${Number(venta.total || 0).toFixed(2)}`, 195, finalY + 12, { align: 'right' });
       finalY += 12;
     } else {
-      doc.text(`TOTAL GENERAL: $${venta.total.toFixed(2)}`, 195, finalY, { align: 'right' });
+      doc.text(`TOTAL GENERAL: $${Number(venta.total || 0).toFixed(2)}`, 195, finalY, { align: 'right' });
     }
     
-    if (venta.montoPendiente > 0) {
+    if (Number(venta.montoPendiente || 0) > 0) {
       doc.setFontSize(10);
       doc.setTextColor(220, 38, 38);
-      doc.text(`PENDIENTE: $${venta.montoPendiente.toFixed(2)}`, 195, finalY + 6, { align: 'right' });
+      doc.text(`PENDIENTE: $${Number(venta.montoPendiente || 0).toFixed(2)}`, 195, finalY + 6, { align: 'right' });
       doc.setTextColor(0, 0, 0);
     }
 
@@ -787,20 +824,20 @@ export default function VentasProductosPage() {
   };
 
   const enviarWhatsapp = (venta) => {
-    const totalBs = (venta.total * tasaBCV).toFixed(2);
-    const productosTexto = venta.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n');
+    const totalBs = (Number(venta.total || 0) * tasaBCV).toFixed(2);
+    const productosTexto = venta.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${Number(p.total || 0).toFixed(2)}`).join('\n');
     const mensaje = whatsappMode === 'gracias' 
-      ? `Gracias por su compra ️\n\nRecuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos \n\n Instagram @Voltechstore.ve\n Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos\n\n${productosTexto}\n\n Total: $${venta.total.toFixed(2)} (Bs ${totalBs})\n\n¡Gracias por tu compra!\n${settings.tienda?.nombre || 'VOLTECH STORE'}`
-      : `¡Buen día, ${venta.cliente}!\n\nTe escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto \n\n${productosTexto}\nMonto: $${venta.montoPendiente.toFixed(2)}\n\nSi ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!\n\nQue tengas un excelente día,\nEl equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}\n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos`;
+      ? `Gracias por su compra ❤️\n\nRecuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos \n\n Instagram @Voltechstore.ve\n Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos\n\n${productosTexto}\n\n Total: $${Number(venta.total || 0).toFixed(2)} (Bs ${totalBs})\n\n¡Gracias por tu compra!\n${settings.tienda?.nombre || 'VOLTECH STORE'}`
+      : `¡Buen día, ${venta.cliente}!\n\nTe escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto \n\n${productosTexto}\nMonto: $${Number(venta.montoPendiente || 0).toFixed(2)}\n\nSi ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!\n\nQue tengas un excelente día,\nEl equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}\n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos`;
     const telefonoLimpio = venta.telefono.replace(/\D/g, '');
     window.open(`https://wa.me/58${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`, '_blank');
     setShowWhatsappModal(null);
   };
 
   const ventasHoy = ventas.filter(v => v.fecha === new Date().toISOString().split('T')[0]);
-  const totalIngresosHoy = ventasHoy.reduce((acc, v) => acc + v.montoAbonado, 0);
-  const totalPendiente = ventas.reduce((acc, v) => acc + v.montoPendiente, 0);
-  const totalProductosVendidos = ventas.reduce((acc, v) => acc + v.productos.reduce((a, p) => a + p.cantidad, 0), 0);
+  const totalIngresosHoy = ventasHoy.reduce((acc, v) => acc + Number(v.montoAbonado || v.total || 0), 0);
+  const totalPendiente = ventas.reduce((acc, v) => acc + Number(v.montoPendiente || 0), 0);
+  const totalProductosVendidos = ventas.reduce((acc, v) => acc + v.productos.reduce((a, p) => a + Number(p.cantidad || 1), 0), 0);
   const ventasFiltradas = ventas.filter(v => v.cliente.toLowerCase().includes(searchTerm.toLowerCase()) || v.productos.some(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase())));
 
   return (
@@ -910,7 +947,7 @@ export default function VentasProductosPage() {
                                 </p>
                               </div>
                               <p className="text-sm font-bold text-voltech-success">
-                                ${kit.precio_kit?.toFixed(2) || kit.precioCombo?.toFixed(2) || '0.00'}
+                                ${Number(kit.precio_kit || kit.precioCombo || 0).toFixed(2)}
                               </p>
                             </div>
                           </button>
@@ -1015,7 +1052,7 @@ export default function VentasProductosPage() {
                           </div>
                           <div className="col-span-3 md:col-span-1">
                             <label className="block text-xs text-voltech-muted mb-1 ml-1">Total</label>
-                            <div className="bg-voltech-dark border border-voltech-border rounded-lg px-3 py-2 text-sm font-bold text-voltech-success">${(prod.cantidad * prod.precioUnitario).toFixed(2)}</div>
+                            <div className="bg-voltech-dark border border-voltech-border rounded-lg px-3 py-2 text-sm font-bold text-voltech-success">${(Number(prod.cantidad || 1) * Number(prod.precioUnitario || 0)).toFixed(2)}</div>
                           </div>
                           <div className="col-span-1 flex justify-end">
                             {formData.productos.length > 1 && (<button onClick={() => eliminarProductoVenta(index)} className="p-2 text-voltech-error hover:bg-voltech-error/10 rounded-lg"><Trash2 className="w-4 h-4" /></button>)}
@@ -1060,7 +1097,7 @@ export default function VentasProductosPage() {
                 {cuponAplicado && (
                   <p className="text-xs text-voltech-success mt-2 flex items-center gap-1">
                     <CheckCircle className="w-3 h-3" /> 
-                    Cupón "{cuponAplicado.codigo}" aplicado: -$ {cuponAplicado.descuentoCalculado.toFixed(2)}
+                    Cupón "{cuponAplicado.codigo}" aplicado: -$ {Number(cuponAplicado.descuentoCalculado || 0).toFixed(2)}
                   </p>
                 )}
               </div>
@@ -1078,10 +1115,10 @@ export default function VentasProductosPage() {
 
               <div className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 mb-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                  <div><p className="text-xs text-voltech-muted">Subtotal</p><p className="text-xl font-bold text-white">${subtotal.toFixed(2)}</p></div>
-                  <div><p className="text-xs text-voltech-muted">Descuento</p><p className="text-xl font-bold text-voltech-success">-${descuentoAplicado.toFixed(2)}</p></div>
-                  <div><p className="text-xs text-voltech-muted">Total Venta</p><p className="text-2xl font-bold text-voltech-success">${totalVenta.toFixed(2)}</p></div>
-                  <div><p className="text-xs text-voltech-muted">Pendiente</p><p className="text-xl font-bold text-voltech-error">${montoPendiente.toFixed(2)}</p></div>
+                  <div><p className="text-xs text-voltech-muted">Subtotal</p><p className="text-xl font-bold text-white">${Number(subtotal).toFixed(2)}</p></div>
+                  <div><p className="text-xs text-voltech-muted">Descuento</p><p className="text-xl font-bold text-voltech-success">-${Number(descuentoAplicado).toFixed(2)}</p></div>
+                  <div><p className="text-xs text-voltech-muted">Total Venta</p><p className="text-2xl font-bold text-voltech-success">${Number(totalVenta).toFixed(2)}</p></div>
+                  <div><p className="text-xs text-voltech-muted">Pendiente</p><p className="text-xl font-bold text-voltech-error">${Number(montoPendiente).toFixed(2)}</p></div>
                 </div>
               </div>
 
@@ -1115,11 +1152,11 @@ export default function VentasProductosPage() {
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Mayor ($) <span className="text-voltech-warning">(Tu costo)</span></label><input type="number" step="0.01" value={nuevoProducto.precioMayor} onChange={(e) => setNuevoProducto({ ...nuevoProducto, precioMayor: Number(e.target.value) })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Detal ($) <span className="text-voltech-success">(Venta al público)</span></label><input type="number" step="0.01" value={nuevoProducto.precioDetal} onChange={(e) => setNuevoProducto({ ...nuevoProducto, precioDetal: Number(e.target.value) })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio (Bs)</label><input type="number" step="0.01" value={nuevoProducto.precioBs} onChange={(e) => setNuevoProducto({ ...nuevoProducto, precioBs: Number(e.target.value) })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
-                  <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Total</label><div className="bg-voltech-dark border border-voltech-border rounded-lg px-4 py-2 text-sm font-bold text-voltech-success">${(nuevoProducto.precioMayor * nuevoProducto.cantidad).toFixed(2)}</div></div>
+                  <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Total</label><div className="bg-voltech-dark border border-voltech-border rounded-lg px-4 py-2 text-sm font-bold text-voltech-success">${(Number(nuevoProducto.precioMayor || 0) * Number(nuevoProducto.cantidad || 1)).toFixed(2)}</div></div>
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Método de Pago</label><select value={nuevoProducto.metodoPago} onChange={(e) => setNuevoProducto({ ...nuevoProducto, metodoPago: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="efectivo">Efectivo</option><option value="pago_movil">Pago Móvil</option><option value="transferencia">Transferencia</option><option value="zelle">Zelle</option><option value="binance">Binance</option></select></div>
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cartera</label><select value={nuevoProducto.cartera} onChange={(e) => setNuevoProducto({ ...nuevoProducto, cartera: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="">-- Selecciona --</option>{carteras.map(c => (<option key={c.id} value={c.nombre}>{c.nombre}</option>))}</select></div>
                 </div>
-                {nuevoProducto.precioMayor > 0 && nuevoProducto.precioDetal > 0 && (<div className="bg-voltech-success/10 border border-voltech-success/30 rounded-lg p-3 text-sm text-voltech-success">Ganancia por unidad: ${(nuevoProducto.precioDetal - nuevoProducto.precioMayor).toFixed(2)} ({((nuevoProducto.precioDetal - nuevoProducto.precioMayor) / nuevoProducto.precioMayor * 100).toFixed(0)}%)</div>)}
+                {Number(nuevoProducto.precioMayor || 0) > 0 && Number(nuevoProducto.precioDetal || 0) > 0 && (<div className="bg-voltech-success/10 border border-voltech-success/30 rounded-lg p-3 text-sm text-voltech-success">Ganancia por unidad: ${(Number(nuevoProducto.precioDetal) - Number(nuevoProducto.precioMayor)).toFixed(2)} ({((Number(nuevoProducto.precioDetal) - Number(nuevoProducto.precioMayor)) / Number(nuevoProducto.precioMayor) * 100).toFixed(0)}%)</div>)}
               </div>
               <div className="border-t border-voltech-border p-4 flex gap-3 sticky bottom-0 bg-voltech-surface rounded-b-2xl">
                 <button onClick={guardarProductoYRedirigir} className="flex-1 btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"><ExternalLink className="w-4 h-4" /> Guardar y Abrir en Productos</button>
@@ -1140,13 +1177,13 @@ export default function VentasProductosPage() {
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-voltech-success/20"><DollarSign className="w-5 h-5 text-voltech-success" /></div>
-            <div><p className="text-xs text-voltech-muted">Ingresos Hoy</p><p className="text-xl font-bold text-white">${totalIngresosHoy.toFixed(2)}</p></div>
+            <div><p className="text-xs text-voltech-muted">Ingresos Hoy</p><p className="text-xl font-bold text-white">${Number(totalIngresosHoy).toFixed(2)}</p></div>
           </div>
         </div>
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-voltech-error/20"><TrendingUp className="w-5 h-5 text-voltech-error" /></div>
-            <div><p className="text-xs text-voltech-muted">Por Cobrar</p><p className="text-xl font-bold text-white">${totalPendiente.toFixed(2)}</p></div>
+            <div><p className="text-xs text-voltech-muted">Por Cobrar</p><p className="text-xl font-bold text-white">${Number(totalPendiente).toFixed(2)}</p></div>
           </div>
         </div>
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
@@ -1188,16 +1225,16 @@ export default function VentasProductosPage() {
                 <tr><td colSpan="11" className="text-center py-12 text-voltech-muted"><ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>No hay ventas registradas aún</p></td></tr>
               ) : (
                 ventasFiltradas.map((venta) => (
-                  <>
-                    <tr key={venta.id} className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
+                  <React.Fragment key={venta.id}>
+                    <tr className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
                       <td className="px-4 py-3 text-sm font-mono text-voltech-cyan">{venta.numeroOrden || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-voltech-muted flex items-center gap-2"><Calendar className="w-3 h-3" /> {venta.fecha}</td>
                       <td className="px-4 py-3"><p className="text-sm font-medium text-white">{venta.cliente}</p><p className="text-xs text-voltech-muted">{venta.telefono}</p></td>
                       <td className="px-4 py-3"><p className="text-sm text-white">{venta.productos[0]?.nombre}{venta.productos[0]?.esKit && <span className="text-xs text-voltech-purple ml-1">(KIT)</span>}{venta.productos.length > 1 && (<span className="text-xs text-voltech-muted ml-1">(+{venta.productos.length - 1} más)</span>)}</p><button onClick={() => setExpandedId(expandedId === venta.id ? null : venta.id)} className="text-xs text-voltech-cyan hover:underline flex items-center gap-1 mt-1"><ChevronDown className={`w-3 h-3 transition-transform ${expandedId === venta.id ? 'rotate-180' : ''}`} /> Ver detalle</button></td>
-                      <td className="px-4 py-3 text-sm font-bold text-voltech-success">${venta.total.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-voltech-success">${Number(venta.total || 0).toFixed(2)}</td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{venta.fechaPago || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-voltech-warning">{calcularDiasAtraso(venta) > 0 ? `+${calcularDiasAtraso(venta)}` : '0'}</td>
-                      <td className="px-4 py-3 text-sm text-voltech-muted">{venta.metodoPago.replace('_', ' ')}</td>
+                      <td className="px-4 py-3 text-sm text-voltech-muted">{(venta.metodoPago || '').replace('_', ' ')}</td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{venta.carteraId || 'N/A'}</td>
                       <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full ${venta.estado === 'pagado' ? 'bg-voltech-success/20 text-voltech-success' : 'bg-voltech-warning/20 text-voltech-warning'}`}>{venta.estado === 'pagado' ? 'Pagado' : 'Pendiente'}</span></td>
                       <td className="px-4 py-3">
@@ -1244,31 +1281,31 @@ export default function VentasProductosPage() {
                                       <td className="px-3 py-2 text-voltech-muted">{prod.categoria || 'N/A'}</td>
                                       <td className="px-3 py-2 text-voltech-muted">{prod.marca || 'N/A'}</td>
                                       <td className="px-3 py-2 text-center text-white">{prod.cantidad}</td>
-                                      <td className="px-3 py-2 text-right text-voltech-muted">${prod.precioUnitario?.toFixed(2)}</td>
-                                      <td className="px-3 py-2 text-right font-semibold text-voltech-success">${prod.total?.toFixed(2)}</td>
+                                      <td className="px-3 py-2 text-right text-voltech-muted">${Number(prod.precioUnitario || 0).toFixed(2)}</td>
+                                      <td className="px-3 py-2 text-right font-semibold text-voltech-success">${Number(prod.total || 0).toFixed(2)}</td>
                                     </tr>
                                   ))}
                                 </tbody>
                                 <tfoot className="bg-voltech-dark/50">
                                   <tr>
                                     <td colSpan="6" className="px-3 py-2 text-right font-bold text-white">SUBTOTAL:</td>
-                                    <td className="px-3 py-2 text-right font-bold text-voltech-cyan">${venta.subtotal?.toFixed(2)}</td>
+                                    <td className="px-3 py-2 text-right font-bold text-voltech-cyan">${Number(venta.subtotal || 0).toFixed(2)}</td>
                                   </tr>
-                                  {venta.descuento_aplicado > 0 && (
+                                  {Number(venta.descuento_aplicado || 0) > 0 && (
                                     <tr>
                                       <td colSpan="6" className="px-3 py-2 text-right text-voltech-muted">Descuento:</td>
-                                      <td className="px-3 py-2 text-right text-voltech-success">-${venta.descuento_aplicado?.toFixed(2)}</td>
+                                      <td className="px-3 py-2 text-right text-voltech-success">-${Number(venta.descuento_aplicado || 0).toFixed(2)}</td>
                                     </tr>
                                   )}
-                                  {venta.delivery && venta.montoDelivery > 0 && (
+                                  {venta.delivery && Number(venta.montoDelivery || 0) > 0 && (
                                     <tr>
                                       <td colSpan="6" className="px-3 py-2 text-right text-voltech-muted">Delivery:</td>
-                                      <td className="px-3 py-2 text-right text-voltech-warning">${venta.montoDelivery?.toFixed(2)}</td>
+                                      <td className="px-3 py-2 text-right text-voltech-warning">${Number(venta.montoDelivery || 0).toFixed(2)}</td>
                                     </tr>
                                   )}
                                   <tr>
                                     <td colSpan="6" className="px-3 py-2 text-right font-bold text-lg text-white">TOTAL:</td>
-                                    <td className="px-3 py-2 text-right font-bold text-lg text-voltech-success">${venta.total?.toFixed(2)}</td>
+                                    <td className="px-3 py-2 text-right font-bold text-lg text-voltech-success">${Number(venta.total || 0).toFixed(2)}</td>
                                   </tr>
                                 </tfoot>
                               </table>
@@ -1293,11 +1330,11 @@ export default function VentasProductosPage() {
                                 <>
                                   <div>
                                     <p className="text-xs text-voltech-muted mb-1">Monto Abonado:</p>
-                                    <p className="text-sm text-voltech-success font-medium">${venta.montoAbonado?.toFixed(2)}</p>
+                                    <p className="text-sm text-voltech-success font-medium">${Number(venta.montoAbonado || 0).toFixed(2)}</p>
                                   </div>
                                   <div>
                                     <p className="text-xs text-voltech-muted mb-1">Monto Pendiente:</p>
-                                    <p className="text-sm text-voltech-error font-medium">${venta.montoPendiente?.toFixed(2)}</p>
+                                    <p className="text-sm text-voltech-error font-medium">${Number(venta.montoPendiente || 0).toFixed(2)}</p>
                                   </div>
                                   {venta.fechaPago && (
                                     <div>
@@ -1311,7 +1348,7 @@ export default function VentasProductosPage() {
                                 <div className="md:col-span-2">
                                   <p className="text-xs text-voltech-muted mb-1">Cupón Aplicado:</p>
                                   <p className="text-sm text-voltech-purple font-medium flex items-center gap-1">
-                                    <Tag className="w-3 h-3" /> {venta.cupon_aplicado} (-${venta.descuento_aplicado?.toFixed(2)})
+                                    <Tag className="w-3 h-3" /> {venta.cupon_aplicado} (-${Number(venta.descuento_aplicado || 0).toFixed(2)})
                                   </p>
                                 </div>
                               )}
@@ -1320,7 +1357,7 @@ export default function VentasProductosPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))
               )}
             </tbody>
@@ -1340,7 +1377,7 @@ export default function VentasProductosPage() {
                 <p className="text-sm text-voltech-muted mb-4">Se enviará un mensaje a <strong className="text-white">{showWhatsappModal.telefono}</strong> con el detalle de la venta.</p>
                 <div className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-3 mb-4 max-h-48 overflow-y-auto">
                   <p className="text-xs text-white whitespace-pre-wrap">
-                    {whatsappMode === 'gracias' ? `Gracias por su compra ️\n\nRecuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos \n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos\n\n${showWhatsappModal.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n')}\n\n Total: $${showWhatsappModal.total.toFixed(2)} (Bs ${(showWhatsappModal.total * tasaBCV).toFixed(2)})\n\n¡Gracias por tu compra!\n${settings.tienda?.nombre || 'VOLTECH STORE'}` : `¡Buen día, ${showWhatsappModal.cliente}!\n\nTe escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto \n\n${showWhatsappModal.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${p.total.toFixed(2)}`).join('\n')}\nMonto: $${showWhatsappModal.montoPendiente.toFixed(2)}\n\nSi ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!\n\nQue tengas un excelente día,\nEl equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}\n\n📸 Instagram @Voltechstore.ve\n Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos`}
+                    {whatsappMode === 'gracias' ? `Gracias por su compra ❤️\n\nRecuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos \n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos\n\n${showWhatsappModal.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${Number(p.total || 0).toFixed(2)}`).join('\n')}\n\n Total: $${Number(showWhatsappModal.total || 0).toFixed(2)} (Bs ${(Number(showWhatsappModal.total || 0) * tasaBCV).toFixed(2)})\n\n¡Gracias por tu compra!\n${settings.tienda?.nombre || 'VOLTECH STORE'}` : `¡Buen día, ${showWhatsappModal.cliente}!\n\nTe escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto \n\n${showWhatsappModal.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${Number(p.total || 0).toFixed(2)}`).join('\n')}\nMonto: $${Number(showWhatsappModal.montoPendiente || 0).toFixed(2)}\n\nSi ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!\n\nQue tengas un excelente día,\nEl equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}\n\n📸 Instagram @Voltechstore.ve\n Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos`}
                   </p>
                 </div>
                 <div className="flex items-center justify-between gap-3">
