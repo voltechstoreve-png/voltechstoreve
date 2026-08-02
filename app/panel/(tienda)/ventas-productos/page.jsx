@@ -167,7 +167,9 @@ export default function VentasProductosPage() {
   const vendedores = equipo.filter(m => m.activo && (m.rol === 'vendedor' || m.rol === 'admin' || m.rol === 'Admin'));
   const productosDisponibles = productos.filter(p => {
   const stock = Number(p.cantidad || 0);
-  return stock > 0;
+  const tipo = (p.tipo || '').toLowerCase();
+  // Solo mostrar físicos y kits (NO streaming)
+  return stock > 0 && (tipo === 'fisico' || tipo === 'kit');
 });
   const kitsDisponibles = kits.filter(k => k.activo !== false);
 
