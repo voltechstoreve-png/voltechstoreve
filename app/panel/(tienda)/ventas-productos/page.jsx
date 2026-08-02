@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
@@ -78,73 +78,89 @@ export default function VentasProductosPage() {
     const cargarDatos = async () => {
       let vts = [], prods = [], clts = [], eqp = [], crt = [], sttngs = {}, cpons = [], kts = [];
       
-      if (supabase) {
-        const [{ data: d1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }, { data: d6 }, { data: d7 }] = await Promise.all([
-          supabase.from('ventas').select('*').order('fechaRegistro', { ascending: false }),
-          supabase.from('productos').select('*'),
-          supabase.from('clientes').select('*'),
-          supabase.from('usuarios').select('*'),
-          supabase.from('settings').select('clave, valor'),
-          supabase.from('cupones').select('*'),
-          supabase.from('kits').select('*').eq('activo', true)
-        ]);
-        if (d1) vts = d1;
-        if (d2) prods = d2;
-        if (d3) clts = d3;
-        if (d4) eqp = d4;
-        if (d5) {
-          const tienda = d5.find(s => s.clave === 'tienda')?.valor || {};
-          const pagos = d5.find(s => s.clave === 'pagos')?.valor || {};
-          const carterasDb = d5.find(s => s.clave === 'carteras')?.valor || [];
-          sttngs = { 
-            tienda, 
-            pagos, 
-            carteras: carterasDb.length > 0 ? carterasDb : [], 
-            tasaBCV: 36.5 
-          };
+      try {
+        if (supabase) {
+          console.log('🔄 Cargando desde Supabase...');
+          const [{ data: d1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }, { data: d6 }, { data: d7 }] = await Promise.all([
+            supabase.from('ventas').select('*').order('fechaRegistro', { ascending: false }),
+            supabase.from('productos').select('*'),
+            supabase.from('clientes').select('*'),
+            supabase.from('usuarios').select('*').eq('activo', true),
+            supabase.from('settings').select('clave, valor'),
+            supabase.from('cupones').select('*'),
+            supabase.from('kits').select('*').eq('activo', true)
+          ]);
+          
+          if (d1) vts = d1;
+          if (d2) prods = d2;
+          if (d3) clts = d3;
+          if (d4) eqp = d4;
+          if (d5) {
+            const tienda = d5.find(s => s.clave === 'tienda')?.valor || {};
+            const pagos = d5.find(s => s.clave === 'pagos')?.valor || {};
+            const carterasDb = d5.find(s => s.clave === 'carteras')?.valor || [];
+            sttngs = { 
+              tienda, 
+              pagos, 
+              carteras: carterasDb.length > 0 ? carterasDb : [], 
+              tasaBCV: 36.5 
+            };
+          }
+          if (d6) cpons = d6;
+          if (d7) kts = d7;
+          
+          console.log('✅ Datos cargados desde Supabase:', vts.length, 'ventas');
+        } else {
+          vts = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
+          prods = JSON.parse(localStorage.getItem('voltech_productos') || '[]');
+          clts = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
+          eqp = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
+          crt = JSON.parse(localStorage.getItem('voltech_carteras') || '[]');
+          cpons = JSON.parse(localStorage.getItem('voltech_cupones') || '[]');
+          kts = JSON.parse(localStorage.getItem('voltech_kits') || '[]');
+          
+          const settingsLocales = JSON.parse(localStorage.getItem('voltech_settings') || '{}');
+          const tasaLocales = JSON.parse(localStorage.getItem('voltech_tasa_bcv') || '{"tasa": 36.5}');
+          
+          if (!sttngs.tienda || Object.keys(sttngs.tienda).length === 0) {
+            sttngs = { 
+              pagos: settingsLocales.pagos || {}, 
+              carteras: settingsLocales.carteras || crt, 
+              tienda: settingsLocales.tienda || {}, 
+              tasaBCV: tasaLocales.tasa || 36.5 
+            };
+          } else {
+            if (!sttngs.carteras || sttngs.carteras.length === 0) {
+              sttngs.carteras = settingsLocales.carteras || crt;
+            }
+          }
         }
-        if (d6) cpons = d6;
-        if (d7) kts = d7;
-      }
 
-      if (vts.length === 0) vts = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
-      if (prods.length === 0) prods = JSON.parse(localStorage.getItem('voltech_productos') || '[]');
-      if (clts.length === 0) clts = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
-      if (eqp.length === 0) eqp = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
-      if (crt.length === 0) crt = JSON.parse(localStorage.getItem('voltech_carteras') || '[]');
-      if (cpons.length === 0) cpons = JSON.parse(localStorage.getItem('voltech_cupones') || '[]');
-      if (kts.length === 0) kts = JSON.parse(localStorage.getItem('voltech_kits') || '[]');
-      
-      const settingsLocales = JSON.parse(localStorage.getItem('voltech_settings') || '{}');
-      const tasaLocales = JSON.parse(localStorage.getItem('voltech_tasa_bcv') || '{"tasa": 36.5}');
-      
-      if (!sttngs.tienda || Object.keys(sttngs.tienda).length === 0) {
-        sttngs = { 
-          pagos: settingsLocales.pagos || {}, 
-          carteras: settingsLocales.carteras || crt, 
-          tienda: settingsLocales.tienda || {}, 
-          tasaBCV: tasaLocales.tasa || 36.5 
-        };
-      } else {
-        if (!sttngs.carteras || sttngs.carteras.length === 0) {
-          sttngs.carteras = settingsLocales.carteras || crt;
+        if (esVendedor && usuarioActual?.nombre) {
+          vts = vts.filter(v => v.vendedor?.toLowerCase() === usuarioActual.nombre.toLowerCase());
         }
-      }
 
-      if (esVendedor && usuarioActual?.nombre) {
-        vts = vts.filter(v => v.vendedor?.toLowerCase() === usuarioActual.nombre.toLowerCase());
+        setVentas(vts);
+        setProductos(prods);
+        setClientes(clts);
+        setEquipo(eqp);
+        setCarteras(sttngs.carteras || []);
+        setSettings(sttngs);
+        setCupones(cpons);
+        setKits(kts);
+      } catch (error) {
+        console.error('Error cargando datos:', error);
       }
-
-      setVentas(vts);
-      setProductos(prods);
-      setClientes(clts);
-      setEquipo(eqp);
-      setCarteras(sttngs.carteras || []);
-      setSettings(sttngs);
-      setCupones(cpons);
-      setKits(kts);
     };
+    
     cargarDatos();
+
+    const handleActualizacion = () => cargarDatos();
+    window.addEventListener('voltech-data-updated', handleActualizacion);
+
+    return () => {
+      window.removeEventListener('voltech-data-updated', handleActualizacion);
+    };
   }, [esVendedor, usuarioActual]);
 
   const tasaBCV = settings.tasaBCV || 36.5;
@@ -316,51 +332,55 @@ export default function VentasProductosPage() {
       return;
     }
 
-    const productoExistente = productos.find(p => 
-      p.plataforma?.toLowerCase() === nuevoProducto.plataforma.toLowerCase() &&
-      p.categoria?.toLowerCase() === nuevoProducto.categoria.toLowerCase() &&
-      p.marca?.toLowerCase() === nuevoProducto.marca.toLowerCase()
-    );
+    try {
+      const productoExistente = productos.find(p => 
+        p.plataforma?.toLowerCase() === nuevoProducto.plataforma.toLowerCase() &&
+        p.categoria?.toLowerCase() === nuevoProducto.categoria.toLowerCase() &&
+        p.marca?.toLowerCase() === nuevoProducto.marca.toLowerCase()
+      );
 
-    let productoFinal;
-    if (productoExistente) {
-      productoFinal = {
-        ...productoExistente,
-        cantidad: productoExistente.cantidad + nuevoProducto.cantidad,
-        precioDetal: nuevoProducto.precioDetal || productoExistente.precioDetal,
-        precioMayor: nuevoProducto.precioMayor || productoExistente.precioMayor,
-        precioBs: nuevoProducto.precioBs || productoExistente.precioBs,
-      };
-    } else {
-      const sku = `${nuevoProducto.plataforma.substring(0, 3).toUpperCase()}-${nuevoProducto.categoria.substring(0, 3).toUpperCase()}-${String(productos.length + 1).padStart(3, '0')}`;
-      productoFinal = {
-        id: Date.now().toString(),
-        tipo: nuevoProducto.tipo, plataforma: nuevoProducto.plataforma, producto: nuevoProducto.plataforma,
-        categoria: nuevoProducto.categoria, marca: nuevoProducto.marca, precioDetal: nuevoProducto.precioDetal,
-        precioMayor: nuevoProducto.precioMayor, precioBs: nuevoProducto.precioBs, cantidad: nuevoProducto.cantidad,
-        sku, publicado: false, estado: 'nuevo', fechaCreacion: new Date().toISOString(), fecha: new Date().toISOString().split('T')[0],
-      };
+      let productoFinal;
+      if (productoExistente) {
+        productoFinal = {
+          ...productoExistente,
+          cantidad: productoExistente.cantidad + nuevoProducto.cantidad,
+          precioDetal: nuevoProducto.precioDetal || productoExistente.precioDetal,
+          precioMayor: nuevoProducto.precioMayor || productoExistente.precioMayor,
+          precioBs: nuevoProducto.precioBs || productoExistente.precioBs,
+        };
+      } else {
+        const sku = `${nuevoProducto.plataforma.substring(0, 3).toUpperCase()}-${nuevoProducto.categoria.substring(0, 3).toUpperCase()}-${String(productos.length + 1).padStart(3, '0')}`;
+        productoFinal = {
+          id: crypto.randomUUID(),
+          tipo: nuevoProducto.tipo, plataforma: nuevoProducto.plataforma, producto: nuevoProducto.plataforma,
+          categoria: nuevoProducto.categoria, marca: nuevoProducto.marca, precioDetal: nuevoProducto.precioDetal,
+          precioMayor: nuevoProducto.precioMayor, precioBs: nuevoProducto.precioBs, cantidad: nuevoProducto.cantidad,
+          sku, publicado: false, estado: 'nuevo', fechaCreacion: new Date().toISOString(), fecha: new Date().toISOString().split('T')[0],
+        };
+      }
+
+      if (supabase) {
+        const { error } = await supabase.from('productos').upsert(productoFinal, { onConflict: 'id' });
+        if (error) throw error;
+      }
+
+      const productosActualizados = productoExistente 
+        ? productos.map(p => String(p.id) === String(productoExistente.id) ? productoFinal : p)
+        : [...productos, productoFinal];
+
+      setProductos(productosActualizados);
+      
+      if (productoModalIndex !== null) {
+        actualizarCampoProducto(productoModalIndex, 'productoId', productoFinal.id);
+      }
+      
+      setShowProductoModal(false);
+      toast.success('Producto creado. Redirigiendo...');
+      setTimeout(() => router.push('/panel/productos'), 1000);
+    } catch (error) {
+      console.error('Error guardando producto:', error);
+      toast.error('Error al guardar producto: ' + error.message);
     }
-
-    if (supabase) {
-      const { error } = await supabase.from('productos').upsert(productoFinal, { onConflict: 'id' });
-      if (error) toast.error('Error al guardar en la nube: ' + error.message);
-    }
-
-    const productosActualizados = productoExistente 
-      ? productos.map(p => String(p.id) === String(productoExistente.id) ? productoFinal : p)
-      : [...productos, productoFinal];
-
-    setProductos(productosActualizados);
-    localStorage.setItem('voltech_productos', JSON.stringify(productosActualizados));
-    
-    if (productoModalIndex !== null) {
-      actualizarCampoProducto(productoModalIndex, 'productoId', productoFinal.id);
-    }
-    
-    setShowProductoModal(false);
-    toast.success('Producto creado. Redirigiendo...');
-    setTimeout(() => router.push('/panel/productos'), 1000);
   };
 
   const validarYAplicarCupon = () => {
@@ -433,161 +453,163 @@ export default function VentasProductosPage() {
       return;
     }
 
-    const vendedorNombre = formData.vendedor || (esVendedor ? usuarioActual?.nombre : '');
-    if (!vendedorNombre) {
-      toast.error('Debes seleccionar un vendedor');
-      return;
-    }
+    try {
+      const vendedorNombre = formData.vendedor || (esVendedor ? usuarioActual?.nombre : '');
+      if (!vendedorNombre) {
+        toast.error('Debes seleccionar un vendedor');
+        return;
+      }
 
-    for (const prod of formData.productos) {
-      if (prod.esKit) {
-        for (const prodKit of prod.productosIncluidos || []) {
-          const productoBase = productos.find(p => String(p.id) === String(prodKit.producto_id));
-          if (!productoBase || productoBase.cantidad < prodKit.cantidad * prod.cantidad) {
-            toast.error(`Stock insuficiente para ${productoBase?.plataforma || 'producto'} en el kit`);
+      for (const prod of formData.productos) {
+        if (prod.esKit) {
+          for (const prodKit of prod.productosIncluidos || []) {
+            const productoBase = productos.find(p => String(p.id) === String(prodKit.producto_id));
+            if (!productoBase || productoBase.cantidad < prodKit.cantidad * prod.cantidad) {
+              toast.error(`Stock insuficiente para ${productoBase?.plataforma || 'producto'} en el kit`);
+              return;
+            }
+          }
+        } else {
+          const producto = productos.find(p => String(p.id) === String(prod.productoId));
+          if (!producto || producto.cantidad < prod.cantidad) {
+            toast.error(`Stock insuficiente para ${producto?.plataforma || 'producto'}`);
             return;
           }
         }
-      } else {
-        const producto = productos.find(p => String(p.id) === String(prod.productoId));
-        if (!producto || producto.cantidad < prod.cantidad) {
-          toast.error(`Stock insuficiente para ${producto?.plataforma || 'producto'}`);
-          return;
-        }
       }
-    }
 
-    const clienteExistente = clientes.find(c => c.nombre.toLowerCase() === formData.cliente.toLowerCase() || c.telefono === formData.telefono);
-    let clientesActualizados = [...clientes];
-    const nuevoCliente = clienteExistente ? 
-      { ...clienteExistente, nombre: formData.cliente, telefono: formData.telefono, ultimaCompra: new Date().toISOString() } :
-      { id: Date.now().toString(), nombre: formData.cliente, telefono: formData.telefono, email: '', fechaRegistro: new Date().toISOString(), ultimaCompra: new Date().toISOString(), totalCompras: 0 };
+      const clienteExistente = clientes.find(c => c.nombre.toLowerCase() === formData.cliente.toLowerCase() || c.telefono === formData.telefono);
+      let clientesActualizados = [...clientes];
+      const nuevoCliente = clienteExistente ? 
+        { ...clienteExistente, nombre: formData.cliente, telefono: formData.telefono, ultimaCompra: new Date().toISOString() } :
+        { id: crypto.randomUUID(), nombre: formData.cliente, telefono: formData.telefono, email: '', fechaRegistro: new Date().toISOString(), ultimaCompra: new Date().toISOString(), totalCompras: 0 };
 
-    if (clienteExistente) {
-      clientesActualizados = clientes.map(c => String(c.id) === String(clienteExistente.id) ? nuevoCliente : c);
-    } else {
-      clientesActualizados.push(nuevoCliente);
-    }
+      if (clienteExistente) {
+        clientesActualizados = clientes.map(c => String(c.id) === String(clienteExistente.id) ? nuevoCliente : c);
+      } else {
+        clientesActualizados.push(nuevoCliente);
+      }
 
-    const nuevaVenta = {
-      id: editingId || Date.now().toString(),
-      numeroOrden: formData.numeroOrden || generarNumeroOrden(),
-      fecha: formData.fecha, 
-      vendedor: vendedorNombre,
-      cliente: formData.cliente, 
-      telefono: formData.telefono,
-      productos: formData.productos.map(p => {
-        const producto = productos.find(prod => String(prod.id) === String(p.productoId));
-        return {
-          productoId: p.productoId, 
-          sku: p.sku, 
-          nombre: producto?.plataforma || producto?.producto || 'Producto',
-          categoria: p.categoria, 
-          marca: p.marca, 
-          cantidad: Number(p.cantidad || 1), 
-          precioUnitario: Number(p.precioUnitario || 0),
-          total: Number(p.cantidad || 1) * Number(p.precioUnitario || 0), 
-          tipo: producto?.tipo || 'fisico',
-          esKit: p.esKit || false,
-          productosIncluidos: p.productosIncluidos || []
-        };
-      }),
-      subtotal: Number(subtotal), 
-      delivery: formData.delivery, 
-      montoDelivery: Number(formData.montoDelivery || 0),
-      cupon_aplicado: cuponAplicado ? cuponAplicado.codigo : null,
-      descuento_aplicado: Number(descuentoAplicado),
-      total_con_descuento: Number(totalVenta),
-      total: Number(totalVenta), 
-      enCuotas: formData.enCuotas, 
-      montoAbonado: formData.enCuotas ? Number(formData.montoAbonado || 0) : Number(totalVenta),
-      montoPendiente: Number(montoPendiente), 
-      fechaPago: formData.fechaPago, 
-      metodoPago: formData.metodoPago,
-      carteraId: formData.carteraId, 
-      referencia: formData.referencia,
-      estado: formData.enCuotas && montoPendiente > 0 ? 'pendiente' : 'pagado',
-      fechaRegistro: new Date().toISOString(),
-    };
+      const nuevaVenta = {
+        id: editingId || crypto.randomUUID(),
+        numeroOrden: formData.numeroOrden || generarNumeroOrden(),
+        fecha: formData.fecha, 
+        vendedor: vendedorNombre,
+        cliente: formData.cliente, 
+        telefono: formData.telefono,
+        productos: formData.productos.map(p => {
+          const producto = productos.find(prod => String(prod.id) === String(p.productoId));
+          return {
+            productoId: p.productoId, 
+            sku: p.sku, 
+            nombre: producto?.plataforma || producto?.producto || 'Producto',
+            categoria: p.categoria, 
+            marca: p.marca, 
+            cantidad: Number(p.cantidad || 1), 
+            precioUnitario: Number(p.precioUnitario || 0),
+            total: Number(p.cantidad || 1) * Number(p.precioUnitario || 0), 
+            tipo: producto?.tipo || 'fisico',
+            esKit: p.esKit || false,
+            productosIncluidos: p.productosIncluidos || []
+          };
+        }),
+        subtotal: Number(subtotal), 
+        delivery: formData.delivery, 
+        montoDelivery: Number(formData.montoDelivery || 0),
+        cupon_aplicado: cuponAplicado ? cuponAplicado.codigo : null,
+        descuento_aplicado: Number(descuentoAplicado),
+        total_con_descuento: Number(totalVenta),
+        total: Number(totalVenta), 
+        enCuotas: formData.enCuotas, 
+        montoAbonado: formData.enCuotas ? Number(formData.montoAbonado || 0) : Number(totalVenta),
+        montoPendiente: Number(montoPendiente), 
+        fechaPago: formData.fechaPago, 
+        metodoPago: formData.metodoPago,
+        carteraId: formData.carteraId, 
+        referencia: formData.referencia,
+        estado: formData.enCuotas && montoPendiente > 0 ? 'pendiente' : 'pagado',
+        fechaRegistro: new Date().toISOString(),
+        tipo: 'producto'
+      };
 
-    let productosActualizados = [...productos];
-    
-    for (const prod of formData.productos) {
-      if (prod.esKit && prod.productosIncluidos && prod.productosIncluidos.length > 0) {
-        for (const prodKit of prod.productosIncluidos) {
-          const index = productosActualizados.findIndex(p => String(p.id) === String(prodKit.producto_id));
+      let productosActualizados = [...productos];
+      
+      for (const prod of formData.productos) {
+        if (prod.esKit && prod.productosIncluidos && prod.productosIncluidos.length > 0) {
+          for (const prodKit of prod.productosIncluidos) {
+            const index = productosActualizados.findIndex(p => String(p.id) === String(prodKit.producto_id));
+            if (index !== -1) {
+              productosActualizados[index] = {
+                ...productosActualizados[index],
+                cantidad: productosActualizados[index].cantidad - (prodKit.cantidad * prod.cantidad)
+              };
+            }
+          }
+        } else {
+          const index = productosActualizados.findIndex(p => String(p.id) === String(prod.productoId));
           if (index !== -1) {
             productosActualizados[index] = {
               ...productosActualizados[index],
-              cantidad: productosActualizados[index].cantidad - (prodKit.cantidad * prod.cantidad)
+              cantidad: productosActualizados[index].cantidad - prod.cantidad
             };
           }
         }
-      } else {
-        const index = productosActualizados.findIndex(p => String(p.id) === String(prod.productoId));
-        if (index !== -1) {
-          productosActualizados[index] = {
-            ...productosActualizados[index],
-            cantidad: productosActualizados[index].cantidad - prod.cantidad
-          };
+      }
+
+      const ventasActualizadas = editingId 
+        ? ventas.map(v => String(v.id) === String(editingId) ? nuevaVenta : v)
+        : [nuevaVenta, ...ventas];
+
+      let cuponesActualizados = [...cupones];
+      
+      if (supabase) {
+        await supabase.from('ventas').upsert(nuevaVenta, { onConflict: 'id' });
+        await supabase.from('clientes').upsert(nuevoCliente, { onConflict: 'id' });
+        
+        for (const prodActualizado of productosActualizados) {
+          await supabase.from('productos').update({ cantidad: prodActualizado.cantidad }).eq('id', prodActualizado.id);
+        }
+        
+        if (cuponAplicado) {
+          await supabase.from('cupones').update({ 
+            usos: (cuponAplicado.usos || 0) + 1,
+            descuento_total: (cuponAplicado.descuento_total || 0) + descuentoAplicado
+          }).eq('id', cuponAplicado.id);
         }
       }
-    }
 
-    const ventasActualizadas = editingId 
-      ? ventas.map(v => String(v.id) === String(editingId) ? nuevaVenta : v)
-      : [nuevaVenta, ...ventas];
-
-    let cuponesActualizados = [...cupones];
-    
-    if (supabase) {
-      await supabase.from('ventas').upsert(nuevaVenta, { onConflict: 'id' });
-      await supabase.from('clientes').upsert(nuevoCliente, { onConflict: 'id' });
-      
-      for (const prodActualizado of productosActualizados) {
-        await supabase.from('productos').update({ cantidad: prodActualizado.cantidad }).eq('id', prodActualizado.id);
-      }
-      
       if (cuponAplicado) {
-        await supabase.from('cupones').update({ 
-          usos: (cuponAplicado.usos || 0) + 1,
-          descuento_total: (cuponAplicado.descuento_total || 0) + descuentoAplicado
-        }).eq('id', cuponAplicado.id);
+        cuponesActualizados = cupones.map(c => 
+          c.id === cuponAplicado.id 
+            ? { ...c, usos: (c.usos || 0) + 1, descuento_total: (c.descuento_total || 0) + descuentoAplicado }
+            : c
+        );
+        setCupones(cuponesActualizados);
       }
+
+      setVentas(ventasActualizadas); 
+      setProductos(productosActualizados); 
+      setClientes(clientesActualizados);
+
+      toast.success(editingId ? 'Venta actualizada correctamente' : 'Venta registrada exitosamente');
+
+      if (agregarNotificacion && !editingId) {
+        agregarNotificacion({
+          tipo: 'nueva_venta',
+          titulo: '¡Nueva Venta Registrada! 💰',
+          mensaje: `Se registró una venta por $${Number(totalVenta).toFixed(2)} a nombre de ${formData.cliente}.`,
+          detalle: `Vendedor: ${vendedorNombre} | Orden: ${nuevaVenta.numeroOrden}`,
+          usuario_id: 'admin'
+        });
+      }
+
+      window.dispatchEvent(new Event('voltech-data-updated'));
+
+      resetForm();
+    } catch (error) {
+      console.error('Error registrando venta:', error);
+      toast.error('Error al registrar venta: ' + error.message);
     }
-
-    if (cuponAplicado) {
-      cuponesActualizados = cupones.map(c => 
-        c.id === cuponAplicado.id 
-          ? { ...c, usos: (c.usos || 0) + 1, descuento_total: (c.descuento_total || 0) + descuentoAplicado }
-          : c
-      );
-      setCupones(cuponesActualizados);
-      localStorage.setItem('voltech_cupones', JSON.stringify(cuponesActualizados));
-    }
-
-    setVentas(ventasActualizadas); 
-    setProductos(productosActualizados); 
-    setClientes(clientesActualizados);
-    localStorage.setItem('voltech_ventas', JSON.stringify(ventasActualizadas));
-    localStorage.setItem('voltech_productos', JSON.stringify(productosActualizados));
-    localStorage.setItem('voltech_clientes', JSON.stringify(clientesActualizados));
-
-    toast.success(editingId ? 'Venta actualizada correctamente' : 'Venta registrada exitosamente');
-
-    if (agregarNotificacion && !editingId) {
-      agregarNotificacion({
-        tipo: 'nueva_venta',
-        titulo: '¡Nueva Venta Registrada! 💰',
-        mensaje: `Se registró una venta por $${Number(totalVenta).toFixed(2)} a nombre de ${formData.cliente}.`,
-        detalle: `Vendedor: ${vendedorNombre} | Orden: ${nuevaVenta.numeroOrden}`,
-        usuario_id: 'admin'
-      });
-    }
-
-    resetForm();
-    // ✅ SINCRONIZACIÓN: Avisar a los otros paneles que hubo un cambio
-    window.dispatchEvent(new Event('voltech-data-updated'));
   };
 
   const resetForm = () => {
@@ -620,57 +642,73 @@ export default function VentasProductosPage() {
   };
 
   const marcarPagado = async (venta) => {
-    const ventaActualizada = { ...venta, estado: 'pagado', montoPendiente: 0, montoAbonado: Number(venta.total || 0), fechaPago: new Date().toISOString().split('T')[0] };
-    const ventasActualizadas = ventas.map(v => String(v.id) === String(venta.id) ? ventaActualizada : v);
-    if (supabase) {
-      await supabase.from('ventas').update({ estado: 'pagado', montoPendiente: 0, montoAbonado: Number(venta.total || 0), fechaPago: ventaActualizada.fechaPago }).eq('id', venta.id);
+    try {
+      const ventaActualizada = { ...venta, estado: 'pagado', montoPendiente: 0, montoAbonado: Number(venta.total || 0), fechaPago: new Date().toISOString().split('T')[0] };
+      const ventasActualizadas = ventas.map(v => String(v.id) === String(venta.id) ? ventaActualizada : v);
+      
+      if (supabase) {
+        await supabase.from('ventas').update({ 
+          estado: 'pagado', 
+          montoPendiente: 0, 
+          montoAbonado: Number(venta.total || 0), 
+          fechaPago: ventaActualizada.fechaPago 
+        }).eq('id', venta.id);
+      }
+      
+      setVentas(ventasActualizadas);
+      toast.success('Venta marcada como pagada');
+      window.dispatchEvent(new Event('voltech-data-updated'));
+    } catch (error) {
+      console.error('Error marcando como pagado:', error);
+      toast.error('Error al marcar como pagada: ' + error.message);
     }
-    setVentas(ventasActualizadas);
-    localStorage.setItem('voltech_ventas', JSON.stringify(ventasActualizadas));
-    toast.success('Venta marcada como pagada');
-    // ✅ SINCRONIZACIÓN: Avisar a los otros paneles que hubo un cambio
-    window.dispatchEvent(new Event('voltech-data-updated'));
   };
 
   const eliminarVenta = async (venta) => {
     if (!confirm('¿Estás seguro de eliminar esta venta? El stock será devuelto.')) return;
     
-    let productosActualizados = [...productos];
-    
-    for (const prod of venta.productos) {
-      if (prod.esKit && prod.productosIncluidos && prod.productosIncluidos.length > 0) {
-        for (const prodKit of prod.productosIncluidos) {
-          const index = productosActualizados.findIndex(p => String(p.id) === String(prodKit.producto_id));
+    try {
+      let productosActualizados = [...productos];
+      
+      for (const prod of venta.productos) {
+        if (prod.esKit && prod.productosIncluidos && prod.productosIncluidos.length > 0) {
+          for (const prodKit of prod.productosIncluidos) {
+            const index = productosActualizados.findIndex(p => String(p.id) === String(prodKit.producto_id));
+            if (index !== -1) {
+              productosActualizados[index] = {
+                ...productosActualizados[index],
+                cantidad: productosActualizados[index].cantidad + (prodKit.cantidad * prod.cantidad)
+              };
+            }
+          }
+        } else {
+          const index = productosActualizados.findIndex(p => String(p.id) === String(prod.productoId));
           if (index !== -1) {
             productosActualizados[index] = {
               ...productosActualizados[index],
-              cantidad: productosActualizados[index].cantidad + (prodKit.cantidad * prod.cantidad)
+              cantidad: productosActualizados[index].cantidad + prod.cantidad
             };
           }
         }
-      } else {
-        const index = productosActualizados.findIndex(p => String(p.id) === String(prod.productoId));
-        if (index !== -1) {
-          productosActualizados[index] = {
-            ...productosActualizados[index],
-            cantidad: productosActualizados[index].cantidad + prod.cantidad
-          };
+      }
+      
+      const ventasActualizadas = ventas.filter(v => String(v.id) !== String(venta.id));
+      
+      if (supabase) {
+        await supabase.from('ventas').delete().eq('id', venta.id);
+        for (const p of productosActualizados) {
+          await supabase.from('productos').update({ cantidad: p.cantidad }).eq('id', p.id);
         }
       }
+      
+      setVentas(ventasActualizadas); 
+      setProductos(productosActualizados);
+      toast.success('Venta eliminada y stock devuelto');
+      window.dispatchEvent(new Event('voltech-data-updated'));
+    } catch (error) {
+      console.error('Error eliminando venta:', error);
+      toast.error('Error al eliminar venta: ' + error.message);
     }
-    
-    const ventasActualizadas = ventas.filter(v => String(v.id) !== String(venta.id));
-    if (supabase) {
-      await supabase.from('ventas').delete().eq('id', venta.id);
-      for (const p of productosActualizados) await supabase.from('productos').update({ cantidad: p.cantidad }).eq('id', p.id);
-    }
-    setVentas(ventasActualizadas); 
-    setProductos(productosActualizados);
-    localStorage.setItem('voltech_ventas', JSON.stringify(ventasActualizadas));
-    localStorage.setItem('voltech_productos', JSON.stringify(productosActualizados));
-    toast.success('Venta eliminada y stock devuelto');
-    // ✅ SINCRONIZACIÓN: Avisar a los otros paneles que hubo un cambio
-    window.dispatchEvent(new Event('voltech-data-updated'));
   };
 
   const editarVenta = (venta) => {
@@ -828,7 +866,7 @@ export default function VentasProductosPage() {
     const productosTexto = venta.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${Number(p.total || 0).toFixed(2)}`).join('\n');
     const mensaje = whatsappMode === 'gracias' 
       ? `Gracias por su compra ❤️\n\nRecuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos \n\n Instagram @Voltechstore.ve\n Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos\n\n${productosTexto}\n\n Total: $${Number(venta.total || 0).toFixed(2)} (Bs ${totalBs})\n\n¡Gracias por tu compra!\n${settings.tienda?.nombre || 'VOLTECH STORE'}`
-      : `¡Buen día, ${venta.cliente}!\n\nTe escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto \n\n${productosTexto}\nMonto: $${Number(venta.montoPendiente || 0).toFixed(2)}\n\nSi ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!\n\nQue tengas un excelente día,\nEl equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}\n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos`;
+      : `¡Buen día, ${venta.cliente}!\n\nTe escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto \n\n${productosTexto}\nMonto: $${Number(venta.montoPendiente || 0).toFixed(2)}\n\nSi ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!\n\nQue tengas un excelente día,\nEl equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}\n\n Instagram @Voltechstore.ve\n Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos`;
     const telefonoLimpio = venta.telefono.replace(/\D/g, '');
     window.open(`https://wa.me/58${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`, '_blank');
     setShowWhatsappModal(null);
@@ -841,8 +879,12 @@ export default function VentasProductosPage() {
   const ventasFiltradas = ventas.filter(v => v.cliente.toLowerCase().includes(searchTerm.toLowerCase()) || v.productos.some(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase())));
 
   return (
-    <div className="space-y-6">
-      <Toaster position="top-right" toastOptions={{ style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' }, success: { iconTheme: { primary: '#00ff88', secondary: '#fff' } }, error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } } }} />
+        <div className="space-y-6">
+      <Toaster position="top-right" toastOptions={{ 
+        style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' }, 
+        success: { iconTheme: { primary: '#00ff88', secondary: '#fff' } }, 
+        error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } } 
+      }} />
 
       <div className="flex items-center justify-between">
         <div>
@@ -852,6 +894,33 @@ export default function VentasProductosPage() {
         <button onClick={() => { resetForm(); setShowForm(true); }} className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2">
           <Plus className="w-4 h-4" /> Nueva Venta
         </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-voltech-cyan/20"><ShoppingCart className="w-5 h-5 text-voltech-cyan" /></div>
+            <div><p className="text-xs text-voltech-muted">Ventas Hoy</p><p className="text-xl font-bold text-white">{ventasHoy.length}</p></div>
+          </div>
+        </div>
+        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-voltech-success/20"><DollarSign className="w-5 h-5 text-voltech-success" /></div>
+            <div><p className="text-xs text-voltech-muted">Ingresos Hoy</p><p className="text-xl font-bold text-white">${Number(totalIngresosHoy).toFixed(2)}</p></div>
+          </div>
+        </div>
+        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-voltech-error/20"><TrendingUp className="w-5 h-5 text-voltech-error" /></div>
+            <div><p className="text-xs text-voltech-muted">Por Cobrar</p><p className="text-xl font-bold text-white">${Number(totalPendiente).toFixed(2)}</p></div>
+          </div>
+        </div>
+        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-voltech-warning/20"><Users className="w-5 h-5 text-voltech-warning" /></div>
+            <div><p className="text-xs text-voltech-muted">Productos Vendidos</p><p className="text-xl font-bold text-white">{totalProductosVendidos}</p></div>
+          </div>
+        </div>
       </div>
 
       <AnimatePresence>
@@ -1166,33 +1235,6 @@ export default function VentasProductosPage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-cyan/20"><ShoppingCart className="w-5 h-5 text-voltech-cyan" /></div>
-            <div><p className="text-xs text-voltech-muted">Ventas Hoy</p><p className="text-xl font-bold text-white">{ventasHoy.length}</p></div>
-          </div>
-        </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-success/20"><DollarSign className="w-5 h-5 text-voltech-success" /></div>
-            <div><p className="text-xs text-voltech-muted">Ingresos Hoy</p><p className="text-xl font-bold text-white">${Number(totalIngresosHoy).toFixed(2)}</p></div>
-          </div>
-        </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-error/20"><TrendingUp className="w-5 h-5 text-voltech-error" /></div>
-            <div><p className="text-xs text-voltech-muted">Por Cobrar</p><p className="text-xl font-bold text-white">${Number(totalPendiente).toFixed(2)}</p></div>
-          </div>
-        </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-warning/20"><Users className="w-5 h-5 text-voltech-warning" /></div>
-            <div><p className="text-xs text-voltech-muted">Productos Vendidos</p><p className="text-xl font-bold text-white">{totalProductosVendidos}</p></div>
-          </div>
-        </div>
-      </div>
 
       <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
         <div className="p-4 border-b border-voltech-border flex items-center justify-between gap-4">
