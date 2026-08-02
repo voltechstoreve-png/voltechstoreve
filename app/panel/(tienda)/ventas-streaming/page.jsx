@@ -382,7 +382,7 @@ export default function VentasStreamingPage() {
       const total = subtotal - descuentoAplicado;
 
       const nuevaVenta = {
-        id: editingId || Date.now().toString(), 
+        id: editingId || crypto.randomUUID(),
         fecha: formDataNueva.fecha,
         vendedor: formDataNueva.vendedor,
         cliente: formDataNueva.cliente,
