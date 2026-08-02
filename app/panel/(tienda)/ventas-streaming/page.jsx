@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { usePermissions } from '@/app/context/PermissionsContext';
+import { useNotificaciones } from '@/app/context/NotificationContext'; // ✅ NUEVO
 import { 
   MonitorPlay, Database, AlertTriangle, DollarSign, Package, Search, 
   Edit3, Trash2, X, Save, Calendar, MessageCircle, Mail, RefreshCw,
@@ -12,6 +14,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function VentasStreamingPage() {
+  const { usuarioActual, esVendedor } = usePermissions();
+  const { agregarNotificacion } = useNotificaciones(); // ✅ NUEVO
+  
   const [activeTab, setActiveTab] = useState('nueva');
   const [ventas, setVentas] = useState([]);
   const [cuentas, setCuentas] = useState([]);
@@ -19,7 +24,7 @@ export default function VentasStreamingPage() {
   const [clientes, setClientes] = useState([]);
   const [equipo, setEquipo] = useState([]);
   const [plataformas, setPlataformas] = useState([]);
-  const [cupones, setCupones] = useState([]); // ✅ NUEVO: Estado para cupones
+  const [cupones, setCupones] = useState([]);
   
   const [currentUser, setCurrentUser] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -64,7 +69,6 @@ export default function VentasStreamingPage() {
   const [showFormCuenta, setShowFormCuenta] = useState(false);
   const [showFormInventario, setShowFormInventario] = useState(false);
 
-  // ✅ NUEVO: Estados para el cupón en streaming
   const [cuponInput, setCuponInput] = useState('');
   const [cuponAplicado, setCuponAplicado] = useState(null);
   const [errorCupon, setErrorCupon] = useState('');
@@ -110,7 +114,7 @@ export default function VentasStreamingPage() {
           supabase.from('cuentas_streaming').select('*'),
           supabase.from('inventario_streaming').select('*'),
           supabase.from('settings').select('valor').eq('clave', 'plataformas_streaming').single(),
-          supabase.from('cupones').select('*') // ✅ Cargar cupones
+          supabase.from('cupones').select('*')
         ]);
         if (v) vData = v;
         if (c) cData = c;
@@ -191,10 +195,18 @@ export default function VentasStreamingPage() {
       setVentas(vData);
       setCuentas(cData);
       setInventario(iData);
-      setCupones(cponsData); // ✅ Guardar cupones
+      setCupones(cponsData);
     };
 
     cargarDatos();
+
+    // ✅ NUEVO: Escuchar evento de sincronización
+    const handleActualizacion = () => cargarDatos();
+    window.addEventListener('voltech-data-updated', handleActualizacion);
+
+    return () => {
+      window.removeEventListener('voltech-data-updated', handleActualizacion);
+    };
   }, []);
 
   const calcularFechaVencimiento = (fechaInicio, dias) => {
@@ -274,7 +286,6 @@ export default function VentasStreamingPage() {
     setFormDataNueva(prev => ({ ...prev, plataformas: nuevasPlataformas }));
   };
 
-  // ✅ NUEVO: Función para validar y aplicar cupón en Streaming
   const validarYAplicarCupon = () => {
     setErrorCupon('');
     setCuponAplicado(null);
@@ -303,7 +314,6 @@ export default function VentasStreamingPage() {
       return;
     }
 
-    // Lógica específica para Streaming: verificar si las plataformas coinciden
     let descuento = 0;
     const subtotal = formDataNueva.plataformas.reduce((acc, p) => acc + (p.precioDetal || 0), 0);
 
@@ -316,28 +326,8 @@ export default function VentasStreamingPage() {
         descuento = Math.min(cupon.valor_descuento || cupon.valor || 0, subtotal);
       }
     } else {
-      // Verificar si alguna plataforma en la venta coincide con los productos objetivo del cupón
-      const targetedProductIds = cupon.producto_ids || cupon.productos_especificos || [];
-      const plataformasAplicables = formDataNueva.plataformas.filter(p => {
-        // Buscar si el nombre de la plataforma coincide con algún producto en la base de datos que esté en la lista del cupón
-        const prod = productos.find(prod => prod.plataforma === p.plataforma || prod.nombre === p.plataforma);
-        return prod && targetedProductIds.includes(prod.id);
-      });
-
-      if (plataformasAplicables.length === 0) {
-        setErrorCupon('Este cupón no aplica a las plataformas seleccionadas');
-        return;
-      }
-
-      const subtotalAplicable = plataformasAplicables.reduce((acc, p) => acc + (p.precioDetal || 0), 0);
-      
-      if (cupon.tipo_descuento === 'gratis' || cupon.es_gratis) {
-        descuento = subtotalAplicable;
-      } else if (cupon.tipo_descuento === 'porcentaje') {
-        descuento = subtotalAplicable * ((cupon.valor_descuento || cupon.valor || 0) / 100);
-      } else if (cupon.tipo_descuento === 'monto_fijo') {
-        descuento = Math.min(cupon.valor_descuento || cupon.valor || 0, subtotalAplicable);
-      }
+      setErrorCupon('Este cupón no aplica a las plataformas seleccionadas');
+      return;
     }
 
     setCuponAplicado({ ...cupon, descuentoCalculado: descuento });
@@ -379,6 +369,9 @@ export default function VentasStreamingPage() {
     toast.success(`${tipo === 'regalo' ? 'Días de regalo' : 'Días de falla'} aplicados correctamente`);
     setShowRegaloModal(false);
     setRegaloData({ ventaId: null, plataformaIndex: 0, dias: 0, tipo: 'regalo', nota: '' });
+    
+    // ✅ NUEVO: Disparar evento de sincronización
+    window.dispatchEvent(new Event('voltech-data-updated'));
   };
 
   const guardarNuevaPlataforma = async () => {
@@ -395,13 +388,17 @@ export default function VentasStreamingPage() {
       id: editingId || Date.now().toString(), 
       ...formDataNueva, 
       subtotal,
-      cupon_aplicado: cuponAplicado ? cuponAplicado.codigo : null, // ✅ NUEVO
-      descuento_aplicado: descuentoAplicado, // ✅ NUEVO
-      total_con_descuento: total, // ✅ NUEVO
+      cupon_aplicado: cuponAplicado ? cuponAplicado.codigo : null,
+      descuento_aplicado: descuentoAplicado,
+      total_con_descuento: total,
       total,
       estado: 'activa', 
       fechaRegistro: new Date().toISOString(),
       registradoPor: currentUser?.nombre || 'Admin',
+      tipo: 'streaming', // ✅ IMPORTANTE: Para que otros paneles la identifiquen
+      vendedor: formDataNueva.vendedor,
+      cliente: formDataNueva.cliente,
+      telefono: formDataNueva.telefono,
     };
 
     let cuentasActualizadas = cuentas;
@@ -420,7 +417,6 @@ export default function VentasStreamingPage() {
       ? ventas.map(v => v.id === editingId ? nuevaVenta : v)
       : [nuevaVenta, ...ventas];
 
-    // ✅ NUEVO: Actualizar usos del cupón si se aplicó
     let cuponesActualizados = [...cupones];
     if (supabase) {
       await supabase.from('ventas_streaming').upsert(nuevaVenta, { onConflict: 'id' });
@@ -480,6 +476,21 @@ export default function VentasStreamingPage() {
     }
 
     toast.success(editingId ? 'Venta actualizada' : 'Venta registrada correctamente');
+    
+    // ✅ NUEVO: Enviar notificación
+    if (agregarNotificacion && !editingId) {
+      agregarNotificacion({
+        tipo: 'nueva_venta_streaming',
+        titulo: '¡Nueva Venta Streaming! 📺',
+        mensaje: `Se registró una venta streaming por $${Number(total).toFixed(2)} a nombre de ${formDataNueva.cliente}.`,
+        detalle: `Vendedor: ${formDataNueva.vendedor} | Plataformas: ${formDataNueva.plataformas.map(p => p.plataforma).join(', ')}`,
+        usuario_id: 'admin'
+      });
+    }
+    
+    // ✅ NUEVO: Disparar evento de sincronización
+    window.dispatchEvent(new Event('voltech-data-updated'));
+    
     resetForm('nueva');
     setShowFormNueva(false);
   };
@@ -640,6 +651,9 @@ export default function VentasStreamingPage() {
     toast.success('Cuenta asignada correctamente');
     setShowAssignModal(false);
     setSelectedVenta(null);
+    
+    // ✅ NUEVO: Disparar evento de sincronización
+    window.dispatchEvent(new Event('voltech-data-updated'));
   };
 
   const generarRecordatorio = (venta) => {
@@ -738,7 +752,7 @@ El equipo de Voltechstore.ve`;
 *☑️ Perfil:* ${cuenta.nombrePerfil || 'N/A'}
 *🔐 PIN:* ${cuenta.pin || 'N/A'}
 
-*📍 Vence:*  *${fechaVenc}*`;
+* Vence:*  *${fechaVenc}*`;
 
     setReemplazoText(texto);
     setSelectedVenta(venta);
@@ -793,6 +807,9 @@ El equipo de Voltechstore.ve`;
     setVentas(ventasActualizadas);
     localStorage.setItem('voltech_ventas_streaming', JSON.stringify(ventasActualizadas));
     toast.success('Venta eliminada');
+    
+    // ✅ NUEVO: Disparar evento de sincronización
+    window.dispatchEvent(new Event('voltech-data-updated'));
   };
 
   const agregarPlataforma = async () => {
@@ -877,8 +894,7 @@ El equipo de Voltechstore.ve`;
     if (activeTab === 'inventario') return 'Nueva Compra Streaming';
     return 'Nueva Venta Streaming';
   };
-
-  return (
+    return (
     <div className="space-y-6">
       <Toaster position="top-right" toastOptions={{
         style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' },
