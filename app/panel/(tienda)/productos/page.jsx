@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
@@ -43,8 +43,12 @@ export default function ProductosPage() {
   const [bulkCommissionPercent, setBulkCommissionPercent] = useState(5);
   
   const [showGestionModal, setShowGestionModal] = useState(false);
+  const [gestionTipo, setGestionTipo] = useState('');
+  const [gestionValor, setGestionValor] = useState('');
   const [editCatMarca, setEditCatMarca] = useState({ tipo: '', valorOriginal: '', valorNuevo: '' });
   const [busquedaKit, setBusquedaKit] = useState('');
+  const [nuevoCampo, setNuevoCampo] = useState({ tipo: '', valor: '' });
+  const [showNuevoCampo, setShowNuevoCampo] = useState({ tipo: '', show: false });
 
   const [items, setItems] = useState([{
     id: crypto.randomUUID(),
@@ -98,8 +102,6 @@ export default function ProductosPage() {
   });
 
   const [nuevaCartera, setNuevaCartera] = useState({ nombre: '', tipo: 'pago_movil', datos: '' });
-  const [nuevoCampo, setNuevoCampo] = useState({ tipo: '', valor: '' });
-  const [showNuevoCampo, setShowNuevoCampo] = useState({ tipo: '', show: false });
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -187,77 +189,72 @@ export default function ProductosPage() {
   };
 
   const handleChange = (index, e) => {
-  const { name, value } = e.target;
-  const nuevosItems = [...items];
-  const item = nuevosItems[index];
-  
-  // 1. Reset automático al cambiar de tipo
-  if (name === 'tipo') {
-    item.plataforma = '';
-    item.categoria = '';
-    item.marca = '';
-    item.sku = ''; // ✅ LIMPIAR SKU al cambiar de tipo
-    if (value === 'streaming') {
-      item.categoria = 'STREAMING';
-      item.marca = 'Voltech';
-    } else if (value === 'kit') {
-      item.categoria = 'KIT';
-      item.marca = 'Voltech';
-    }
-  }
-  
-  // 2. Asignar nuevo valor
-  item[name] = value;
-
-  // 3. Filtros cruzados dependientes
-  if (name === 'plataforma' && value) {
-    const prod = productos.find(p => p.plataforma === value && p.tipo === item.tipo);
-    if (prod) {
-      item.categoria = prod.categoria;
-      item.marca = prod.marca;
-    }
-  }
-
-  if (name === 'categoria' && item.plataforma) {
-    const prodValido = productos.find(p => p.plataforma === item.plataforma && p.categoria === value && p.tipo === item.tipo);
-    if (!prodValido) item.plataforma = ''; // Limpiar si no coincide
-  }
-
-  if (name === 'marca' && item.plataforma) {
-    const prodValido = productos.find(p => p.plataforma === item.plataforma && p.marca === value && p.tipo === item.tipo);
-    if (!prodValido) item.plataforma = ''; // Limpiar si no coincide
-  }
-
-  // 4. ✅ CORRECCIÓN FINANCIERA: Cálculo automático de Total y Bs
-  const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
-  const qty = parseInt(item.cantidad) || 1;
-  let precioUnitario = 0;
-
-  if (item.tipo === 'kit') {
-    precioUnitario = parseFloat(item.precioDetal) || 0;
-  } else {
-    precioUnitario = (parseFloat(item.precioOferta) > 0) ? parseFloat(item.precioOferta) : (parseFloat(item.precioDetal) || 0);
-  }
-
-  item.total = precioUnitario * qty;
-  item.precioBs = precioUnitario * tasa;
-  
-  setItems(nuevosItems);
-  
-  // ✅ FORZAR actualización de SKU después de cambiar tipo o plataforma/categoria/marca
-  if (['plataforma', 'categoria', 'marca', 'tipo'].includes(name)) {
-    setTimeout(() => {
-      const itemActualizado = items[index]; // Obtener el item ya actualizado
-      if (itemActualizado.plataforma && itemActualizado.categoria) {
-        const siguientesItems = [...items];
-        const siguienteNum = obtenerSiguienteNumero(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca);
-        const nuevoSKU = generarSKU(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca, siguienteNum);
-        siguientesItems[index].sku = nuevoSKU;
-        setItems(siguientesItems);
+    const { name, value } = e.target;
+    const nuevosItems = [...items];
+    const item = nuevosItems[index];
+    
+    if (name === 'tipo') {
+      item.plataforma = '';
+      item.categoria = '';
+      item.marca = '';
+      item.sku = '';
+      if (value === 'streaming') {
+        item.categoria = 'STREAMING';
+        item.marca = 'Voltech';
+      } else if (value === 'kit') {
+        item.categoria = 'KIT';
+        item.marca = 'Voltech';
       }
-    }, 100);
-  }
-};
+    }
+    
+    item[name] = value;
+
+    if (name === 'plataforma' && value) {
+      const prod = productos.find(p => p.plataforma === value && p.tipo === item.tipo);
+      if (prod) {
+        item.categoria = prod.categoria;
+        item.marca = prod.marca;
+      }
+    }
+
+    if (name === 'categoria' && item.plataforma) {
+      const prodValido = productos.find(p => p.plataforma === item.plataforma && p.categoria === value && p.tipo === item.tipo);
+      if (!prodValido) item.plataforma = '';
+    }
+
+    if (name === 'marca' && item.plataforma) {
+      const prodValido = productos.find(p => p.plataforma === item.plataforma && p.marca === value && p.tipo === item.tipo);
+      if (!prodValido) item.plataforma = '';
+    }
+
+    const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
+    const qty = parseInt(item.cantidad) || 1;
+    let precioUnitario = 0;
+
+    if (item.tipo === 'kit') {
+      precioUnitario = parseFloat(item.precioDetal) || 0;
+    } else {
+      precioUnitario = (parseFloat(item.precioOferta) > 0) ? parseFloat(item.precioOferta) : (parseFloat(item.precioDetal) || 0);
+    }
+
+    item.total = precioUnitario * qty;
+    item.precioBs = precioUnitario * tasa;
+    
+    setItems(nuevosItems);
+    
+    if (['plataforma', 'categoria', 'marca', 'tipo'].includes(name)) {
+      setTimeout(() => {
+        const itemActualizado = nuevosItems[index];
+        if (itemActualizado.plataforma && itemActualizado.categoria) {
+          const siguientesItems = [...nuevosItems];
+          const siguienteNum = obtenerSiguienteNumero(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca);
+          const nuevoSKU = generarSKU(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca, siguienteNum);
+          siguientesItems[index].sku = nuevoSKU;
+          setItems(siguientesItems);
+        }
+      }, 100);
+    }
+  };
 
   const toggleProductoKit = (index, producto) => {
     const nuevosItems = [...items];
@@ -374,20 +371,21 @@ export default function ProductosPage() {
     }
   };
 
-  const abrirNuevoCampo = (tipo) => {
-    setShowNuevoCampo({ tipo, show: true });
-    setNuevoCampo({ tipo, valor: '' });
+  const abrirGestionModal = (tipo) => {
+    setGestionTipo(tipo);
+    setGestionValor('');
+    setShowGestionModal(true);
   };
 
-  const guardarNuevoCampo = async () => {
-    if (!nuevoCampo.valor.trim()) {
+  const agregarDesdeGestion = async () => {
+    if (!gestionValor.trim()) {
       toast.error('Ingresa un valor');
       return;
     }
 
-    if (nuevoCampo.tipo === 'categoria') {
-      if (!categorias.includes(nuevoCampo.valor)) {
-        const nuevasCategorias = [...categorias, nuevoCampo.valor];
+    if (gestionTipo === 'categoria') {
+      if (!categorias.includes(gestionValor)) {
+        const nuevasCategorias = [...categorias, gestionValor];
         setCategorias(nuevasCategorias);
         if (supabase) await supabase.from('settings').upsert({ clave: 'categorias', valor: nuevasCategorias }, { onConflict: 'clave' });
         localStorage.setItem('voltech_categorias', JSON.stringify(nuevasCategorias));
@@ -395,9 +393,9 @@ export default function ProductosPage() {
       } else {
         toast.error('Esta categoría ya existe');
       }
-    } else if (nuevoCampo.tipo === 'marca') {
-      if (!marcas.includes(nuevoCampo.valor)) {
-        const nuevasMarcas = [...marcas, nuevoCampo.valor];
+    } else if (gestionTipo === 'marca') {
+      if (!marcas.includes(gestionValor)) {
+        const nuevasMarcas = [...marcas, gestionValor];
         setMarcas(nuevasMarcas);
         if (supabase) await supabase.from('settings').upsert({ clave: 'marcas', valor: nuevasMarcas }, { onConflict: 'clave' });
         localStorage.setItem('voltech_marcas', JSON.stringify(nuevasMarcas));
@@ -405,12 +403,29 @@ export default function ProductosPage() {
       } else {
         toast.error('Esta marca ya existe');
       }
-    } else if (nuevoCampo.tipo === 'plataforma') {
+    } else if (gestionTipo === 'plataforma') {
       toast.success('Nombre registrado (se guardará al crear el producto)');
     }
     
-    setShowNuevoCampo({ tipo: '', show: false });
-    setNuevoCampo({ tipo: '', valor: '' });
+    setGestionValor('');
+  };
+
+  const eliminarDesdeGestion = async (tipo, valor) => {
+    if (!confirm(`¿Estás seguro de eliminar "${valor}"?`)) return;
+
+    if (tipo === 'categoria') {
+      const nuevas = categorias.filter(c => c !== valor);
+      setCategorias(nuevas);
+      if (supabase) await supabase.from('settings').upsert({ clave: 'categorias', valor: nuevas }, { onConflict: 'clave' });
+      localStorage.setItem('voltech_categorias', JSON.stringify(nuevas));
+      toast.success('Categoría eliminada');
+    } else if (tipo === 'marca') {
+      const nuevas = marcas.filter(m => m !== valor);
+      setMarcas(nuevas);
+      if (supabase) await supabase.from('settings').upsert({ clave: 'marcas', valor: nuevas }, { onConflict: 'clave' });
+      localStorage.setItem('voltech_marcas', JSON.stringify(nuevas));
+      toast.success('Marca eliminada');
+    }
   };
 
   const eliminarCatMarca = (tipo, valor) => {
@@ -526,6 +541,28 @@ export default function ProductosPage() {
 
   const selectAll = () => {
     setSelectedProducts(selectedProducts.length === productosFiltrados.length ? [] : productosFiltrados.map(p => p.id));
+  };
+
+  const eliminarSeleccionados = async () => {
+    if (selectedProducts.length === 0) {
+      toast.error('Selecciona al menos un producto');
+      return;
+    }
+    if (!confirm(`¿Eliminar ${selectedProducts.length} producto(s) seleccionado(s)?`)) return;
+    
+    try {
+      if (supabase) {
+        await supabase.from('productos').delete().in('id', selectedProducts);
+      }
+      const nuevosProductos = productos.filter(p => !selectedProducts.includes(p.id));
+      setProductos(nuevosProductos);
+      localStorage.setItem('voltech_productos', JSON.stringify(nuevosProductos));
+      toast.success(`${selectedProducts.length} producto(s) eliminado(s)`);
+      setSelectedProducts([]);
+    } catch (error) {
+      console.error('Error eliminando productos:', error);
+      toast.error('Error al eliminar productos');
+    }
   };
 
   const guardarProductos = async () => {
@@ -828,6 +865,11 @@ export default function ProductosPage() {
 
   const productosParaKit = productos.filter(p => p.tipo === 'fisico' && p.cantidad > 0 && (p.plataforma?.toLowerCase().includes(busquedaKit.toLowerCase()) || p.sku?.toLowerCase().includes(busquedaKit.toLowerCase())));
 
+  // ✅ LISTAS FILTRADAS POR TIPO
+  const productosFisicos = [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.plataforma).filter(Boolean))];
+  const plataformasStreaming = [...new Set(productos.filter(p => p.tipo === 'streaming').map(p => p.plataforma).filter(Boolean))];
+  const nombresKits = [...new Set(productos.filter(p => p.tipo === 'kit').map(p => p.plataforma).filter(Boolean))];
+
   return (
     <div className="space-y-6">
       <Toaster position="top-right" toastOptions={{ style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' }, success: { iconTheme: { primary: '#00ff88', secondary: '#fff' } }, error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } } }} />
@@ -848,55 +890,56 @@ export default function ProductosPage() {
         </div>
       </div>
 
+      {/* ✅ MODAL DE GESTIÓN UNIFICADO */}
       <AnimatePresence>
         {showGestionModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-voltech-surface border border-voltech-border rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-bold text-white">Gestionar Categorías y Marcas</h3>
-                  <button onClick={() => { setShowGestionModal(false); setEditCatMarca({ tipo: '', valorOriginal: '', valorNuevo: '' }); }} className="p-2 rounded-lg hover:bg-voltech-border"><X className="w-5 h-5" /></button>
+                  <h3 className="text-lg font-bold text-white">
+                    Gestionar {gestionTipo === 'categoria' ? 'Categorías' : gestionTipo === 'marca' ? 'Marcas' : 'Nombres de Producto'}
+                  </h3>
+                  <button onClick={() => { setShowGestionModal(false); setGestionTipo(''); }} className="p-2 rounded-lg hover:bg-voltech-border"><X className="w-5 h-5" /></button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="text-sm font-semibold text-voltech-cyan mb-3">Categorías</h4>
-                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                      {categorias.map((cat, idx) => (
-                        <div key={idx} className="flex items-center gap-2 bg-voltech-dark/50 p-2 rounded-lg border border-voltech-border">
-                          {editCatMarca.tipo === 'categoria' && editCatMarca.valorOriginal === cat ? (
-                            <input type="text" value={editCatMarca.valorNuevo} onChange={(e) => setEditCatMarca({...editCatMarca, valorNuevo: e.target.value})} className="input-voltech flex-1 rounded px-2 py-1 text-sm" autoFocus />
-                          ) : (
-                            <span className="flex-1 text-sm text-white truncate">{cat}</span>
-                          )}
-                          {editCatMarca.tipo === 'categoria' && editCatMarca.valorOriginal === cat ? (
-                            <button onClick={guardarEdicionCatMarca} className="p-1 text-voltech-success hover:bg-voltech-success/10 rounded"><CheckCircle className="w-4 h-4" /></button>
-                          ) : (
-                            <button onClick={() => setEditCatMarca({ tipo: 'categoria', valorOriginal: cat, valorNuevo: cat })} className="p-1 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit className="w-4 h-4" /></button>
-                          )}
-                          <button onClick={() => eliminarCatMarca('categoria', cat)} className="p-1 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-4 h-4" /></button>
-                        </div>
-                      ))}
-                    </div>
+                
+                <div className="mb-6 p-4 bg-voltech-dark/50 rounded-lg border border-voltech-border">
+                  <h4 className="text-sm font-semibold text-voltech-cyan mb-3">Agregar Nuevo</h4>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={gestionValor}
+                      onChange={(e) => setGestionValor(e.target.value)}
+                      placeholder="Ingresa el nombre..."
+                      className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm"
+                      onKeyDown={(e) => e.key === 'Enter' && agregarDesdeGestion()}
+                    />
+                    <button onClick={agregarDesdeGestion} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2">
+                      <Plus className="w-4 h-4" /> Agregar
+                    </button>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-voltech-purple mb-3">Marcas</h4>
-                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                      {marcas.map((mar, idx) => (
-                        <div key={idx} className="flex items-center gap-2 bg-voltech-dark/50 p-2 rounded-lg border border-voltech-border">
-                          {editCatMarca.tipo === 'marca' && editCatMarca.valorOriginal === mar ? (
-                            <input type="text" value={editCatMarca.valorNuevo} onChange={(e) => setEditCatMarca({...editCatMarca, valorNuevo: e.target.value})} className="input-voltech flex-1 rounded px-2 py-1 text-sm" autoFocus />
-                          ) : (
-                            <span className="flex-1 text-sm text-white truncate">{mar}</span>
-                          )}
-                          {editCatMarca.tipo === 'marca' && editCatMarca.valorOriginal === mar ? (
-                            <button onClick={guardarEdicionCatMarca} className="p-1 text-voltech-success hover:bg-voltech-success/10 rounded"><CheckCircle className="w-4 h-4" /></button>
-                          ) : (
-                            <button onClick={() => setEditCatMarca({ tipo: 'marca', valorOriginal: mar, valorNuevo: mar })} className="p-1 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit className="w-4 h-4" /></button>
-                          )}
-                          <button onClick={() => eliminarCatMarca('marca', mar)} className="p-1 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-4 h-4" /></button>
-                        </div>
-                      ))}
-                    </div>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-semibold text-voltech-purple mb-3">
+                    {gestionTipo === 'categoria' ? 'Categorías Existentes' : gestionTipo === 'marca' ? 'Marcas Existentes' : 'Nombres Existentes'}
+                  </h4>
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                    {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : productosFisicos).map((valor, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-voltech-dark/50 p-3 rounded-lg border border-voltech-border">
+                        <span className="text-sm text-white flex-1">{valor}</span>
+                        <button 
+                          onClick={() => eliminarDesdeGestion(gestionTipo, valor)}
+                          className="p-2 text-voltech-error hover:bg-voltech-error/10 rounded transition-colors"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                    {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : productosFisicos).length === 0 && (
+                      <p className="text-xs text-voltech-muted text-center py-4">No hay registros</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -987,6 +1030,7 @@ export default function ProductosPage() {
           </div>
           <div className="flex gap-2">
             <button onClick={() => setShowBulkCommissionModal(true)} className="px-4 py-2 bg-voltech-purple text-white rounded-lg text-sm font-medium hover:bg-voltech-purple/80 transition-colors flex items-center gap-2"><Percent className="w-4 h-4" /> Asignar % Comisión</button>
+            <button onClick={eliminarSeleccionados} className="px-4 py-2 bg-voltech-error/20 text-voltech-error rounded-lg text-sm font-medium hover:bg-voltech-error/30 transition-colors flex items-center gap-2"><Trash2 className="w-4 h-4" /> Eliminar Seleccionados</button>
             <button onClick={() => setSelectedProducts([])} className="px-4 py-2 bg-voltech-surface border border-voltech-border text-voltech-muted rounded-lg text-sm hover:text-white transition-colors"><X className="w-4 h-4" /></button>
           </div>
         </motion.div>
@@ -1024,6 +1068,7 @@ export default function ProductosPage() {
                   <div key={item.id} className="border border-voltech-border rounded-lg p-4 relative">
                     {items.length > 1 && (<button onClick={() => eliminarItem(itemIndex)} className="absolute top-2 right-2 p-2 rounded-lg hover:bg-voltech-error/10 text-voltech-muted hover:text-voltech-error transition-colors"><Minus className="w-4 h-4" /></button>)}
                     <h3 className="text-sm font-semibold text-voltech-muted mb-4">Producto {itemIndex + 1}</h3>
+                    
                     <div className="mb-4">
                       <label className="block text-xs text-voltech-muted mb-2 ml-1">Tipo de Producto</label>
                       <div className="flex gap-3">
@@ -1032,6 +1077,7 @@ export default function ProductosPage() {
                         <button type="button" onClick={() => handleChange(itemIndex, { target: { name: 'tipo', value: 'kit' } })} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'kit' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Gift className="w-4 h-4" />Kit</button>
                       </div>
                     </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       <div className="lg:col-span-3">
                         <label className="block text-xs text-voltech-muted mb-1 ml-1">Imagen/Video</label>
@@ -1047,8 +1093,8 @@ export default function ProductosPage() {
                       </div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">SKU (automático)</label><input type="text" value={item.sku} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-mono text-voltech-cyan bg-voltech-dark/50" /></div>
                       
-                      {/* ✅ SELECT DE PLATAFORMA CON FILTRO CRUZADO */}
-                      <div className="lg:col-span-2 relative">
+                      {/* ✅ SELECT DE NOMBRE HOMOGÉNEO */}
+                      <div className="lg:col-span-2">
                         <label className="block text-xs text-voltech-muted mb-1 ml-1">
                           {item.tipo === 'streaming' ? 'Nombre Plataforma *' : item.tipo === 'kit' ? 'Nombre del Kit *' : 'Nombre del Producto *'}
                         </label>
@@ -1056,37 +1102,33 @@ export default function ProductosPage() {
                           <select 
                             value={item.plataforma} 
                             onChange={(e) => handleChange(itemIndex, { target: { name: 'plataforma', value: e.target.value } })} 
-                            className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm"
+                            className="w-full bg-[#111827] border border-voltech-border rounded-md px-4 py-2 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
                           >
                             <option value="">-- Selecciona --</option>
-                            {productos
-                              .filter(p => p.tipo === item.tipo)
-                              .filter(p => !item.categoria || p.categoria === item.categoria)
-                              .filter(p => !item.marca || p.marca === item.marca)
-                              .map((p, idx) => (
-                                <option key={idx} value={p.plataforma}>{p.plataforma}</option>
-                              ))}
+                            {(item.tipo === 'fisico' ? productosFisicos : item.tipo === 'streaming' ? plataformasStreaming : nombresKits).map((nombre, idx) => (
+                              <option key={idx} value={nombre}>{nombre}</option>
+                            ))}
                           </select>
-                          <button onClick={() => abrirNuevoCampo('plataforma')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors" title="Agregar nuevo"><Plus className="w-4 h-4" /></button>
+                          <button onClick={() => abrirGestionModal('plataforma')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors" title="Gestionar"><Plus className="w-4 h-4" /></button>
                         </div>
                       </div>
                       
-                      {/* ✅ SELECT DE CATEGORÍA CON FILTRO CRUZADO */}
+                      {/* ✅ SELECT DE CATEGORÍA HOMOGÉNEO */}
                       {item.tipo === 'fisico' ? (
-                        <div className="relative">
+                        <div>
                           <label className="block text-xs text-voltech-muted mb-1 ml-1">Categoría *</label>
                           <div className="flex gap-2">
                             <select 
                               value={item.categoria} 
                               onChange={(e) => handleChange(itemIndex, { target: { name: 'categoria', value: e.target.value } })} 
-                              className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm"
+                              className="w-full bg-[#111827] border border-voltech-border rounded-md px-4 py-2 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
                             >
                               <option value="">-- Selecciona --</option>
-                              {[...new Set(productos.filter(p => p.tipo === 'fisico' && (!item.marca || p.marca === item.marca)).map(p => p.categoria))].map((cat, idx) => (
+                              {categorias.map((cat, idx) => (
                                 <option key={idx} value={cat}>{cat}</option>
                               ))}
                             </select>
-                            <button onClick={() => abrirNuevoCampo('categoria')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors"><Plus className="w-4 h-4" /></button>
+                            <button onClick={() => abrirGestionModal('categoria')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors" title="Gestionar"><Plus className="w-4 h-4" /></button>
                           </div>
                         </div>
                       ) : (
@@ -1096,22 +1138,22 @@ export default function ProductosPage() {
                         </div>
                       )}
 
-                      {/* ✅ SELECT DE MARCA CON FILTRO CRUZADO */}
+                      {/* ✅ SELECT DE MARCA HOMOGÉNEO */}
                       {item.tipo === 'fisico' && (
-                        <div className="relative">
+                        <div>
                           <label className="block text-xs text-voltech-muted mb-1 ml-1">Marca *</label>
                           <div className="flex gap-2">
                             <select 
                               value={item.marca} 
                               onChange={(e) => handleChange(itemIndex, { target: { name: 'marca', value: e.target.value } })} 
-                              className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm"
+                              className="w-full bg-[#111827] border border-voltech-border rounded-md px-4 py-2 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
                             >
                               <option value="">-- Selecciona --</option>
-                              {[...new Set(productos.filter(p => p.tipo === 'fisico' && (!item.categoria || p.categoria === item.categoria)).map(p => p.marca))].map((marca, idx) => (
+                              {marcas.map((marca, idx) => (
                                 <option key={idx} value={marca}>{marca}</option>
                               ))}
                             </select>
-                            <button onClick={() => abrirNuevoCampo('marca')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors"><Plus className="w-4 h-4" /></button>
+                            <button onClick={() => abrirGestionModal('marca')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors" title="Gestionar"><Plus className="w-4 h-4" /></button>
                           </div>
                         </div>
                       )}
@@ -1218,7 +1260,6 @@ export default function ProductosPage() {
         )}
       </AnimatePresence>
 
-      {/* ... El resto del código (Modales, Tablas, Grid) se mantiene EXACTAMENTE igual que en tu versión original ... */}
       <AnimatePresence>
         {showComboModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
@@ -1398,7 +1439,7 @@ export default function ProductosPage() {
               </div>
               <div className="p-6 space-y-4">
                 <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Nombre</label><input type="text" value={nuevoCampo.valor} onChange={(e) => setNuevoCampo({ ...nuevoCampo, valor: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" placeholder="Ingresa el nombre" autoFocus /></div>
-                <button onClick={guardarNuevoCampo} className="w-full btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"><Plus className="w-4 h-4" />Agregar</button>
+                <button onClick={() => { /* Legacy */ }} className="w-full btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"><Plus className="w-4 h-4" />Agregar</button>
               </div>
             </motion.div>
           </motion.div>
