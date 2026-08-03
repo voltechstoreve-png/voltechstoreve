@@ -14,7 +14,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
-// ✅ COMPONENTE CUSTOM SELECT UNIFICADO PARA TODA LA APP
+// ✅ COMPONENTE CUSTOM SELECT UNIFICADO CON PALETA VOLTECH
 const CustomSelect = ({ label, value, onChange, options, placeholder = '-- Selecciona --', disabled = false, className = '' }) => {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef(null);
@@ -36,8 +36,8 @@ const CustomSelect = ({ label, value, onChange, options, placeholder = '-- Selec
       {label && <label className="block text-xs text-voltech-muted mb-1 ml-1">{label}</label>}
       <div
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`w-full bg-[#030712] border border-cyan-500/50 rounded-md px-4 py-2 text-sm cursor-pointer flex items-center justify-between transition-colors ${
-          disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-cyan-500'
+        className={`w-full bg-voltech-dark border border-voltech-cyan/30 rounded-md px-4 py-2 text-sm cursor-pointer flex items-center justify-between transition-colors ${
+          disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-voltech-cyan'
         }`}
       >
         <span className={selectedOption ? 'text-white' : 'text-voltech-muted'}>
@@ -47,7 +47,7 @@ const CustomSelect = ({ label, value, onChange, options, placeholder = '-- Selec
       </div>
       
       {isOpen && !disabled && (
-        <div className="absolute top-full left-0 w-full mt-1 bg-[#030712] border border-cyan-500/50 rounded-md z-50 max-h-60 overflow-y-auto shadow-xl">
+        <div className="absolute top-full left-0 w-full mt-1 bg-voltech-dark border border-voltech-cyan/30 rounded-md z-50 max-h-60 overflow-y-auto shadow-xl">
           {options.length === 0 ? (
             <div className="px-4 py-2 text-sm text-voltech-muted">No hay opciones disponibles</div>
           ) : (
@@ -60,8 +60,8 @@ const CustomSelect = ({ label, value, onChange, options, placeholder = '-- Selec
                 }}
                 className={`px-4 py-2 text-sm cursor-pointer transition-colors ${
                   value === opt.value 
-                    ? 'bg-purple-700 text-white' 
-                    : 'bg-gray-900 text-white hover:bg-purple-700'
+                    ? 'bg-voltech-purple text-white' 
+                    : 'bg-voltech-surface text-white hover:bg-voltech-purple'
                 }`}
               >
                 {opt.label}
@@ -744,7 +744,7 @@ export default function ProductosPage() {
         precioBs: item.precioBs || 0,
         preciobs: item.precioBs || 0,
         precioOferta: item.precioOferta || 0,
-        precio_oferta: item.precioOferta || 0, // ✅ CORREGIDO: snake_case para BD
+        precio_oferta: item.precioOferta || 0,
         tipoOferta: item.tipoOferta || ''
       };
 
@@ -1279,45 +1279,80 @@ export default function ProductosPage() {
                       </div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">SKU (automático)</label><input type="text" value={item.sku} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-mono text-voltech-cyan bg-voltech-dark/50" /></div>
                       
-                      <div className="lg:col-span-2">
-                        <CustomSelect
-                          label={item.tipo === 'streaming' ? 'Nombre Plataforma *' : item.tipo === 'kit' ? 'Nombre del Kit *' : 'Nombre del Producto *'}
-                          value={item.plataforma}
-                          onChange={(value) => handleChange(itemIndex, 'plataforma', value)}
-                          options={productosDisponibles.map(nombre => ({ value: nombre, label: nombre }))}
-                          placeholder="-- Selecciona --"
-                        />
-                        <button onClick={() => abrirGestionModal('plataforma', item.tipo)} className="absolute right-0 top-8 px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors" title="Gestionar"><Plus className="w-4 h-4" /></button>
+                      {/* ✅ ALINEACIÓN HORIZONTAL: NOMBRE DEL PRODUCTO */}
+                      <div className="flex flex-col gap-1 w-full lg:col-span-2">
+                        <label className="text-xs text-voltech-muted font-medium">
+                          {item.tipo === 'streaming' ? 'Nombre Plataforma *' : item.tipo === 'kit' ? 'Nombre del Kit *' : 'Nombre del Producto *'}
+                        </label>
+                        <div className="flex items-center gap-2 w-full">
+                          <CustomSelect
+                            value={item.plataforma}
+                            onChange={(value) => handleChange(itemIndex, 'plataforma', value)}
+                            options={productosDisponibles.map(nombre => ({ value: nombre, label: nombre }))}
+                            placeholder="-- Selecciona --"
+                            className="flex-1"
+                          />
+                          <button 
+                            type="button" 
+                            onClick={() => abrirGestionModal('plataforma', item.tipo)} 
+                            className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
+                            title="Gestionar"
+                          >
+                            <Plus className="w-5 h-5"/>
+                          </button>
+                        </div>
                       </div>
                       
+                      {/* ✅ ALINEACIÓN HORIZONTAL: CATEGORÍA */}
                       {item.tipo === 'fisico' ? (
-                        <div>
-                          <CustomSelect
-                            label="Categoría *"
-                            value={item.categoria}
-                            onChange={(value) => handleChange(itemIndex, 'categoria', value)}
-                            options={categoriasDisponibles.map(cat => ({ value: cat, label: cat }))}
-                            placeholder="-- Selecciona --"
-                          />
-                          <button onClick={() => abrirGestionModal('categoria')} className="absolute right-0 top-20 px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors" title="Gestionar"><Plus className="w-4 h-4" /></button>
+                        <div className="flex flex-col gap-1 w-full">
+                          <label className="text-xs text-voltech-muted font-medium">Categoría *</label>
+                          <div className="flex items-center gap-2 w-full">
+                            <CustomSelect
+                              value={item.categoria}
+                              onChange={(value) => handleChange(itemIndex, 'categoria', value)}
+                              options={categoriasDisponibles.map(cat => ({ value: cat, label: cat }))}
+                              placeholder="-- Selecciona --"
+                              className="flex-1"
+                            />
+                            <button 
+                              type="button" 
+                              onClick={() => abrirGestionModal('categoria')} 
+                              className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
+                              title="Gestionar"
+                            >
+                              <Plus className="w-5 h-5"/>
+                            </button>
+                          </div>
                         </div>
                       ) : (
-                        <div>
-                          <label className="block text-xs text-voltech-muted mb-1 ml-1">Categoría (Fija)</label>
-                          <input type="text" value={item.categoria} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed" />
+                        <div className="flex flex-col gap-1 w-full">
+                          <label className="text-xs text-voltech-muted font-medium">Categoría (Fija)</label>
+                          <input type="text" value={item.categoria} readOnly className="input-voltech w-full rounded-md px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed border border-voltech-border" />
                         </div>
                       )}
 
+                      {/* ✅ ALINEACIÓN HORIZONTAL: MARCA */}
                       {item.tipo === 'fisico' && (
-                        <div>
-                          <CustomSelect
-                            label="Marca *"
-                            value={item.marca}
-                            onChange={(value) => handleChange(itemIndex, 'marca', value)}
-                            options={marcasDisponibles.map(marca => ({ value: marca, label: marca }))}
-                            placeholder="-- Selecciona --"
-                          />
-                          <button onClick={() => abrirGestionModal('marca')} className="absolute right-0 top-20 px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors" title="Gestionar"><Plus className="w-4 h-4" /></button>
+                        <div className="flex flex-col gap-1 w-full">
+                          <label className="text-xs text-voltech-muted font-medium">Marca *</label>
+                          <div className="flex items-center gap-2 w-full">
+                            <CustomSelect
+                              value={item.marca}
+                              onChange={(value) => handleChange(itemIndex, 'marca', value)}
+                              options={marcasDisponibles.map(marca => ({ value: marca, label: marca }))}
+                              placeholder="-- Selecciona --"
+                              className="flex-1"
+                            />
+                            <button 
+                              type="button" 
+                              onClick={() => abrirGestionModal('marca')} 
+                              className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
+                              title="Gestionar"
+                            >
+                              <Plus className="w-5 h-5"/>
+                            </button>
+                          </div>
                         </div>
                       )}
 
