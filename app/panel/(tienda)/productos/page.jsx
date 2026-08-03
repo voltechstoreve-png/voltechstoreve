@@ -102,6 +102,11 @@ export default function ProductosPage() {
   const [nuevoCampo, setNuevoCampo] = useState({ tipo: '', valor: '' });
   const [showNuevoCampo, setShowNuevoCampo] = useState({ tipo: '', show: false });
 
+  // ✅ Extraer listas independientes por tipo
+  const productosFisicos = [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.plataforma).filter(Boolean))];
+  const plataformasStreaming = [...new Set(productos.filter(p => p.tipo === 'streaming').map(p => p.plataforma).filter(Boolean))];
+  const nombresKits = [...new Set(productos.filter(p => p.tipo === 'kit').map(p => p.plataforma).filter(Boolean))];
+
   useEffect(() => {
     const cargarDatos = async () => {
       let pData = [], cData = [], sData = {};
@@ -219,9 +224,21 @@ export default function ProductosPage() {
     const nuevosItems = [...items];
     nuevosItems[index][name] = value;
     
-    if (name === 'tipo' && value === 'kit') {
-      nuevosItems[index].categoria = 'KIT';
-      nuevosItems[index].marca = 'Voltech';
+    // ✅ Forzar categorías fijas y limpiar al cambiar tipo
+    if (name === 'tipo') {
+      if (value === 'streaming') {
+        nuevosItems[index].categoria = 'STREAMING';
+        nuevosItems[index].marca = 'Voltech';
+        nuevosItems[index].plataforma = '';
+      } else if (value === 'kit') {
+        nuevosItems[index].categoria = 'KIT';
+        nuevosItems[index].marca = 'Voltech';
+        nuevosItems[index].plataforma = '';
+      } else if (value === 'fisico') {
+        nuevosItems[index].categoria = '';
+        nuevosItems[index].marca = '';
+        nuevosItems[index].plataforma = '';
+      }
     }
     
     setItems(nuevosItems);
@@ -378,6 +395,8 @@ export default function ProductosPage() {
       } else {
         toast.error('Esta marca ya existe');
       }
+    } else if (nuevoCampo.tipo === 'plataforma') {
+      toast.success('Nombre registrado (se guardará al crear el producto)');
     }
     
     setShowNuevoCampo({ tipo: '', show: false });
@@ -499,7 +518,6 @@ export default function ProductosPage() {
     setSelectedProducts(selectedProducts.length === productosFiltrados.length ? [] : productosFiltrados.map(p => p.id));
   };
 
-  // ✅ CORRECCIÓN CRÍTICA: Construir el objeto explícitamente sin usar "...item" para evitar enviar campos inexistentes
   const guardarProductos = async () => {
     let productosGuardados = 0;
     let productosActualizados = 0;
@@ -522,7 +540,6 @@ export default function ProductosPage() {
         p.id !== item.id
       );
 
-      // ✅ Mapeo EXPLÍCITO de solo las columnas que existen en la tabla 'productos'
       const productoData = {
         tipo: item.tipo,
         imagen: item.imagen || null,
@@ -549,7 +566,6 @@ export default function ProductosPage() {
         especificaciones: null,
         colores: null,
         caracteristicas: null,
-        // Mapeo dual por compatibilidad con nombres de columna en la BD
         precioMayor: item.precioMayor || 0,
         preciomayor: item.precioMayor || 0,
         precioDetal: item.precioDetal || item.precioMayor || 0,
@@ -670,7 +686,7 @@ export default function ProductosPage() {
         }]);
         setShowForm(false);
       } catch (error) {
-        console.error('❌ Error guardando productos:', error);
+        console.error(' Error guardando productos:', error);
         toast.error('Error: ' + error.message);
       }
     }
@@ -1090,23 +1106,87 @@ export default function ProductosPage() {
                         </div>
                       </div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">SKU (automático)</label><input type="text" value={item.sku} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-mono text-voltech-cyan bg-voltech-dark/50" /></div>
+                      
+                      {/* ✅ CAMBIO: Select para Nombre según tipo */}
                       <div className="lg:col-span-2">
-                        <label className="block text-xs text-voltech-muted mb-1 ml-1">Nombre del {item.tipo === 'kit' ? 'Kit' : 'Producto'} *</label>
-                        <input type="text" value={item.plataforma} onChange={(e) => handleChange(itemIndex, { target: { name: 'plataforma', value: e.target.value } })} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" placeholder={item.tipo === 'kit' ? 'Ej: Kit iPhone Completo' : 'Ej: Audífonos JBL'} />
+                        <label className="block text-xs text-voltech-muted mb-1 ml-1">
+                          {item.tipo === 'streaming' ? 'Nombre Plataforma' : item.tipo === 'kit' ? 'Nombre del Kit' : 'Nombre del Producto'} *
+                        </label>
+                        <div className="flex gap-2">
+                          <select 
+                            value={item.plataforma} 
+                            onChange={(e) => handleChange(itemIndex, { target: { name: 'plataforma', value: e.target.value } })} 
+                            className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm"
+                          >
+                            <option value="">-- Selecciona --</option>
+                            {item.tipo === 'fisico' && productosFisicos.map((nombre, idx) => (
+                              <option key={idx} value={nombre}>{nombre}</option>
+                            ))}
+                            {item.tipo === 'streaming' && plataformasStreaming.map((nombre, idx) => (
+                              <option key={idx} value={nombre}>{nombre}</option>
+                            ))}
+                            {item.tipo === 'kit' && nombresKits.map((nombre, idx) => (
+                              <option key={idx} value={nombre}>{nombre}</option>
+                            ))}
+                          </select>
+                          <button 
+                            onClick={() => abrirNuevoCampo('plataforma')} 
+                            className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors"
+                            title="Agregar nuevo"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                       
-                      {item.tipo !== 'kit' && (
-                        <>
-                          <div>
-                            <label className="block text-xs text-voltech-muted mb-1 ml-1">Categoría *</label>
-                            <div className="flex gap-2">
-                              <input type="text" value={item.categoria} onChange={(e) => handleChange(itemIndex, { target: { name: 'categoria', value: e.target.value } })} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" placeholder="Ej: STREAMING" list={`categorias-list-${item.id}`} />
-                              <datalist id={`categorias-list-${item.id}`}>{categorias.map(c => (<option key={c} value={c} />))}</datalist>
-                              <button onClick={() => abrirNuevoCampo('categoria')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors"><Plus className="w-4 h-4" /></button>
-                            </div>
+                      {/* ✅ CAMBIO: Select para Categoría (solo Físico) */}
+                      {item.tipo === 'fisico' ? (
+                        <div>
+                          <label className="block text-xs text-voltech-muted mb-1 ml-1">Categoría *</label>
+                          <div className="flex gap-2">
+                            <select 
+                              value={item.categoria} 
+                              onChange={(e) => handleChange(itemIndex, { target: { name: 'categoria', value: e.target.value } })} 
+                              className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm"
+                            >
+                              <option value="">-- Selecciona --</option>
+                              {categorias.map((cat, idx) => (
+                                <option key={idx} value={cat}>{cat}</option>
+                              ))}
+                            </select>
+                            <button onClick={() => abrirNuevoCampo('categoria')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors"><Plus className="w-4 h-4" /></button>
                           </div>
-                          {item.tipo === 'fisico' && (<div><label className="block text-xs text-voltech-muted mb-1 ml-1">Marca *</label><div className="flex gap-2"><select value={item.marca} onChange={(e) => handleChange(itemIndex, { target: { name: 'marca', value: e.target.value } })} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm"><option value="">-- Selecciona --</option>{marcas.map(m => (<option key={m} value={m}>{m}</option>))}</select><button onClick={() => abrirNuevoCampo('marca')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors"><Plus className="w-4 h-4" /></button></div></div>)}
-                        </>
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="block text-xs text-voltech-muted mb-1 ml-1">Categoría (Fija)</label>
+                          <input 
+                            type="text" 
+                            value={item.categoria} 
+                            readOnly 
+                            className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed" 
+                          />
+                        </div>
+                      )}
+
+                      {/* ✅ CAMBIO: Select para Marca (solo Físico) */}
+                      {item.tipo === 'fisico' && (
+                        <div>
+                          <label className="block text-xs text-voltech-muted mb-1 ml-1">Marca *</label>
+                          <div className="flex gap-2">
+                            <select 
+                              value={item.marca} 
+                              onChange={(e) => handleChange(itemIndex, { target: { name: 'marca', value: e.target.value } })} 
+                              className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm"
+                            >
+                              <option value="">-- Selecciona --</option>
+                              {marcas.map((marca, idx) => (
+                                <option key={idx} value={marca}>{marca}</option>
+                              ))}
+                            </select>
+                            <button onClick={() => abrirNuevoCampo('marca')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors"><Plus className="w-4 h-4" /></button>
+                          </div>
+                        </div>
                       )}
 
                       {item.tipo === 'kit' && (
@@ -1154,7 +1234,13 @@ export default function ProductosPage() {
                             <div><p className="text-xs text-voltech-muted">Valor Individual:</p><p className="font-bold text-white">${(item.precio_individual_total || 0).toFixed(2)}</p></div>
                             <div>
                               <label className="text-xs text-voltech-muted block">Precio del Kit ($):</label>
-                              <input type="number" step="0.01" value={item.precioDetal} onChange={(e) => handleChange(itemIndex, { target: { name: 'precioDetal', value: e.target.value } })} className="input-voltech w-full rounded px-2 py-1 text-sm font-bold text-voltech-success" />
+                              <input 
+                                type="number" 
+                                step="0.01" 
+                                value={item.precioDetal} 
+                                onChange={(e) => calcularPrecioCruzado(itemIndex, 'precioDetal', e.target.value)} 
+                                className="input-voltech w-full rounded px-2 py-1 text-sm font-bold text-voltech-success" 
+                              />
                             </div>
                             <div><p className="text-xs text-voltech-muted">Ganancia Estimada:</p><p className="font-bold text-voltech-success">${(item.precioDetal - (item.precio_costo_total || 0)).toFixed(2)}</p></div>
                           </div>
@@ -1417,7 +1503,7 @@ export default function ProductosPage() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-voltech-surface border border-voltech-border rounded-2xl w-full max-w-md">
               <div className="border-b border-voltech-border p-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-white">Agregar {showNuevoCampo.tipo === 'categoria' ? 'Categoría' : 'Campo'}</h2>
+                <h2 className="text-lg font-bold text-white">Agregar {showNuevoCampo.tipo === 'categoria' ? 'Categoría' : showNuevoCampo.tipo === 'marca' ? 'Marca' : 'Nombre de Producto'}</h2>
                 <button onClick={() => setShowNuevoCampo({ tipo: '', show: false })} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted"><X className="w-5 h-5" /></button>
               </div>
               <div className="p-6 space-y-4">
