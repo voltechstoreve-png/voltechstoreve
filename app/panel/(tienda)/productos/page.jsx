@@ -439,6 +439,7 @@ export default function ProductosPage() {
       esCombo: true,
       plataformasCombo: comboPlataformas,
       precioDetal: 0,
+      preciodetal: 0,
       duracion: '1 mes',
       tipoOferta: `Pack ${comboPlataformas.length} plataformas`,
       cantidad: 100,
@@ -498,6 +499,7 @@ export default function ProductosPage() {
     setSelectedProducts(selectedProducts.length === productosFiltrados.length ? [] : productosFiltrados.map(p => p.id));
   };
 
+  // ✅ CORRECCIÓN CRÍTICA: Construir el objeto explícitamente sin usar "...item" para evitar enviar campos inexistentes
   const guardarProductos = async () => {
     let productosGuardados = 0;
     let productosActualizados = 0;
@@ -513,7 +515,6 @@ export default function ProductosPage() {
         return;
       }
 
-      // ✅ CORRECCIÓN: Agregar verificación de tipo para no sobrescribir productos diferentes con mismo nombre
       const productoExistente = productos.find(p => 
         normalizarTexto(p.plataforma) === normalizarTexto(item.plataforma) &&
         normalizarTexto(p.categoria) === normalizarTexto(item.categoria) &&
@@ -521,43 +522,57 @@ export default function ProductosPage() {
         p.id !== item.id
       );
 
+      // ✅ Mapeo EXPLÍCITO de solo las columnas que existen en la tabla 'productos'
+      const productoData = {
+        tipo: item.tipo,
+        imagen: item.imagen || null,
+        sku: item.sku,
+        fecha: item.fecha,
+        fechaCreacion: new Date().toISOString(),
+        creado_en: new Date().toISOString(),
+        plataforma: item.plataforma,
+        producto: item.plataforma,
+        categoria: item.categoria,
+        marca: item.marca,
+        cantidad: item.cantidad,
+        descripcion: '',
+        descripcion_detallada: item.descripcion_detallada || '',
+        duracion: item.duracion || '',
+        estado: item.estado || 'nuevo',
+        publicado: false,
+        porcentaje_comision: item.porcentaje_comision || 5,
+        productos_kit: item.productos_kit || [],
+        precio_costo_total: item.precio_costo_total || 0,
+        precio_individual_total: item.precio_individual_total || 0,
+        esCombo: item.esCombo || false,
+        plataformasCombo: item.plataformasCombo || [],
+        especificaciones: null,
+        colores: null,
+        caracteristicas: null,
+        // Mapeo dual por compatibilidad con nombres de columna en la BD
+        precioMayor: item.precioMayor || 0,
+        preciomayor: item.precioMayor || 0,
+        precioDetal: item.precioDetal || item.precioMayor || 0,
+        preciodetal: item.precioDetal || item.precioMayor || 0,
+        precioBs: item.precioBs || 0,
+        preciobs: item.precioBs || 0,
+        precioOferta: item.precioOferta || 0,
+        precio_oferta: item.precioOferta || 0,
+        tipoOferta: item.tipoOferta || ''
+      };
+
       if (productoExistente) {
         const productoActualizado = {
           ...productoExistente,
+          ...productoData,
           cantidad: item.tipo !== 'kit' ? productoExistente.cantidad + item.cantidad : item.cantidad,
-          precioMayor: item.precioMayor,
-          precioDetal: item.precioDetal || item.precioMayor,
-          precioOferta: item.precioOferta || 0,
-          estado: item.estado || 'nuevo',
-          precioBs: item.precioBs,
-          fecha: item.fecha,
-          tipo: item.tipo,
-          duracion: item.duracion,
-          tipoOferta: item.tipoOferta,
-          imagen: item.imagen || productoExistente.imagen,
-          porcentaje_comision: item.porcentaje_comision || 5,
-          productos_kit: item.productos_kit || [],
-          precio_costo_total: item.precio_costo_total || 0,
-          precio_individual_total: item.precio_individual_total || 0,
-          descripcion_detallada: item.descripcion_detallada || productoExistente.descripcion_detallada || ''
         };
         nuevosProductos.push(productoActualizado);
         productosActualizados++;
       } else {
         const nuevoProducto = {
-          ...item,
-          id: item.id || crypto.randomUUID(), // ✅ CORRECCIÓN: Usar UUID válido
-          precioDetal: item.precioDetal || item.precioMayor,
-          precioOferta: item.precioOferta || 0,
-          estado: item.estado || 'nuevo',
-          descripcion: '',
-          descripcion_detallada: item.descripcion_detallada || '',
-          publicado: false,
-          fechaCreacion: new Date().toISOString(),
-          porcentaje_comision: item.porcentaje_comision || 5,
-          productos_kit: item.productos_kit || [],
-          precio_costo_total: item.precio_costo_total || 0,
-          precio_individual_total: item.precio_individual_total || 0
+          ...productoData,
+          id: item.id || crypto.randomUUID(),
         };
         nuevosProductos.push(nuevoProducto);
         productosGuardados++;
@@ -733,7 +748,7 @@ export default function ProductosPage() {
       toast.error('Completa todos los campos');
       return;
     }
-    const nueva = { ...nuevaCartera, id: crypto.randomUUID() }; // ✅ CORRECCIÓN: UUID válido
+    const nueva = { ...nuevaCartera, id: crypto.randomUUID() };
     
     if (supabase) {
       await supabase.from('carteras').insert(nueva);
