@@ -45,6 +45,7 @@ export default function ProductosPage() {
   const [showGestionModal, setShowGestionModal] = useState(false);
   const [gestionTipo, setGestionTipo] = useState('');
   const [gestionValor, setGestionValor] = useState('');
+  const [gestionSubtipo, setGestionSubtipo] = useState(''); // Para guardar tipo BD al crear
   const [editCatMarca, setEditCatMarca] = useState({ tipo: '', valorOriginal: '', valorNuevo: '' });
   const [busquedaKit, setBusquedaKit] = useState('');
   const [nuevoCampo, setNuevoCampo] = useState({ tipo: '', valor: '' });
@@ -102,6 +103,9 @@ export default function ProductosPage() {
   });
 
   const [nuevaCartera, setNuevaCartera] = useState({ nombre: '', tipo: 'pago_movil', datos: '' });
+
+  // ✅ ESTILOS HOMOGÉNEOS PARA SELECTS (Imagen 1)
+  const selectClass = "w-full bg-[#030712] border border-cyan-500/50 rounded-md px-4 py-2 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors";
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -371,8 +375,10 @@ export default function ProductosPage() {
     }
   };
 
-  const abrirGestionModal = (tipo) => {
+  // ✅ MODAL DE GESTIÓN CON PERSISTENCIA BD Y AUTO-SELECCIÓN
+  const abrirGestionModal = (tipo, subtipo = null) => {
     setGestionTipo(tipo);
+    setGestionSubtipo(subtipo || tipo); // fisico, streaming, kit
     setGestionValor('');
     setShowGestionModal(true);
   };
@@ -404,7 +410,64 @@ export default function ProductosPage() {
         toast.error('Esta marca ya existe');
       }
     } else if (gestionTipo === 'plataforma') {
-      toast.success('Nombre registrado (se guardará al crear el producto)');
+      // ✅ GUARDAR EN BD CON TIPO CORRESPONDIENTE
+      const nuevoProducto = {
+        id: crypto.randomUUID(),
+        tipo: gestionSubtipo, // fisico, streaming o kit
+        plataforma: gestionValor,
+        producto: gestionValor,
+        categoria: gestionSubtipo === 'streaming' ? 'STREAMING' : gestionSubtipo === 'kit' ? 'KIT' : '',
+        marca: gestionSubtipo === 'streaming' || gestionSubtipo === 'kit' ? 'Voltech' : '',
+        cantidad: 0,
+        precioDetal: 0,
+        precioMayor: 0,
+        precioBs: 0,
+        estado: 'nuevo',
+        publicado: false,
+        porcentaje_comision: 5,
+        fechaCreacion: new Date().toISOString(),
+        creado_en: new Date().toISOString(),
+        productos_kit: [],
+        precio_costo_total: 0,
+        precio_individual_total: 0,
+        esCombo: false,
+        plataformasCombo: [],
+        especificaciones: null,
+        colores: null,
+        caracteristicas: null,
+        precio_oferta: 0,
+        tipoOferta: ''
+      };
+
+      if (supabase) {
+        const { error } = await supabase.from('productos').insert(nuevoProducto);
+        if (error) {
+          console.error('Error al guardar:', error);
+          toast.error('Error al guardar en BD: ' + error.message);
+          return;
+        }
+      }
+
+      // ✅ RE-FETCH: Actualizar lista local inmediatamente
+      const nuevosProductos = [...productos, nuevoProducto];
+      setProductos(nuevosProductos);
+      localStorage.setItem('voltech_productos', JSON.stringify(nuevosProductos));
+
+      // ✅ AUTO-SELECCIONAR el nuevo producto en el select
+      if (items.length > 0) {
+        const nuevosItems = [...items];
+        nuevosItems[0].plataforma = gestionValor;
+        if (gestionSubtipo === 'streaming') {
+          nuevosItems[0].categoria = 'STREAMING';
+          nuevosItems[0].marca = 'Voltech';
+        } else if (gestionSubtipo === 'kit') {
+          nuevosItems[0].categoria = 'KIT';
+          nuevosItems[0].marca = 'Voltech';
+        }
+        setItems(nuevosItems);
+      }
+
+      toast.success(`"${gestionValor}" creado y seleccionado`);
     }
     
     setGestionValor('');
@@ -425,6 +488,16 @@ export default function ProductosPage() {
       if (supabase) await supabase.from('settings').upsert({ clave: 'marcas', valor: nuevas }, { onConflict: 'clave' });
       localStorage.setItem('voltech_marcas', JSON.stringify(nuevas));
       toast.success('Marca eliminada');
+    } else if (tipo === 'plataforma') {
+      // ✅ ELIMINAR PRODUCTO DE LA BD
+      const productoAEliminar = productos.find(p => p.plataforma === valor && p.tipo === gestionSubtipo);
+      if (productoAEliminar && supabase) {
+        await supabase.from('productos').delete().eq('id', productoAEliminar.id);
+      }
+      const nuevosProductos = productos.filter(p => !(p.plataforma === valor && p.tipo === gestionSubtipo));
+      setProductos(nuevosProductos);
+      localStorage.setItem('voltech_productos', JSON.stringify(nuevosProductos));
+      toast.success(`"${valor}" eliminado`);
     }
   };
 
@@ -865,10 +938,49 @@ export default function ProductosPage() {
 
   const productosParaKit = productos.filter(p => p.tipo === 'fisico' && p.cantidad > 0 && (p.plataforma?.toLowerCase().includes(busquedaKit.toLowerCase()) || p.sku?.toLowerCase().includes(busquedaKit.toLowerCase())));
 
-  // ✅ LISTAS FILTRADAS POR TIPO
+  // ✅ LISTAS FILTRADAS POR TIPO (Carga estricta)
   const productosFisicos = [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.plataforma).filter(Boolean))];
   const plataformasStreaming = [...new Set(productos.filter(p => p.tipo === 'streaming').map(p => p.plataforma).filter(Boolean))];
   const nombresKits = [...new Set(productos.filter(p => p.tipo === 'kit').map(p => p.plataforma).filter(Boolean))];
+
+  // ✅ FILTROS CRUZADOS (Solo para Físico)
+  const categoriasFisico = useMemo(() => {
+    return [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.categoria).filter(Boolean))];
+  }, [productos]);
+
+  const marcasFisico = useMemo(() => {
+    return [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.marca).filter(Boolean))];
+  }, [productos]);
+
+  const getProductosFisicosFiltrados = (categoria, marca) => {
+    return productosFisicos.filter(p => {
+      const prod = productos.find(x => x.plataforma === p && x.tipo === 'fisico');
+      if (!prod) return false;
+      if (categoria && prod.categoria !== categoria) return false;
+      if (marca && prod.marca !== marca) return false;
+      return true;
+    });
+  };
+
+  const getCategoriasFiltradas = (marca) => {
+    if (!marca) return categoriasFisico;
+    return [...new Set(
+      productos
+        .filter(p => p.tipo === 'fisico' && p.marca === marca)
+        .map(p => p.categoria)
+        .filter(Boolean)
+    )];
+  };
+
+  const getMarcasFiltradas = (categoria) => {
+    if (!categoria) return marcasFisico;
+    return [...new Set(
+      productos
+        .filter(p => p.tipo === 'fisico' && p.categoria === categoria)
+        .map(p => p.marca)
+        .filter(Boolean)
+    )];
+  };
 
   return (
     <div className="space-y-6">
@@ -890,7 +1002,7 @@ export default function ProductosPage() {
         </div>
       </div>
 
-      {/* ✅ MODAL DE GESTIÓN UNIFICADO */}
+      {/* ✅ MODAL DE GESTIÓN UNIFICADO CON PERSISTENCIA */}
       <AnimatePresence>
         {showGestionModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
@@ -925,7 +1037,10 @@ export default function ProductosPage() {
                     {gestionTipo === 'categoria' ? 'Categorías Existentes' : gestionTipo === 'marca' ? 'Marcas Existentes' : 'Nombres Existentes'}
                   </h4>
                   <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                    {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : productosFisicos).map((valor, idx) => (
+                    {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : 
+                      (gestionSubtipo === 'streaming' ? plataformasStreaming : 
+                       gestionSubtipo === 'kit' ? nombresKits : productosFisicos)
+                    ).map((valor, idx) => (
                       <div key={idx} className="flex items-center justify-between bg-voltech-dark/50 p-3 rounded-lg border border-voltech-border">
                         <span className="text-sm text-white flex-1">{valor}</span>
                         <button 
@@ -937,7 +1052,10 @@ export default function ProductosPage() {
                         </button>
                       </div>
                     ))}
-                    {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : productosFisicos).length === 0 && (
+                    {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : 
+                      (gestionSubtipo === 'streaming' ? plataformasStreaming : 
+                       gestionSubtipo === 'kit' ? nombresKits : productosFisico)
+                    ).length === 0 && (
                       <p className="text-xs text-voltech-muted text-center py-4">No hay registros</p>
                     )}
                   </div>
@@ -1064,7 +1182,19 @@ export default function ProductosPage() {
                 <button onClick={() => { setShowForm(false); setItems([{ id: crypto.randomUUID(), tipo: 'fisico', imagen: '', imagenFile: null, sku: '', fecha: new Date().toISOString().split('T')[0], comprador: '', plataforma: '', categoria: '', marca: '', cantidad: 1, metodoPago: 'efectivo', cartera: '', precioMayor: 0, precioDetal: 0, precioOferta: 0, estado: 'nuevo', precioBs: 0, total: 0, monedaCompra: 'usd', duracion: '', tipoOferta: '', esCombo: false, plataformasCombo: [], porcentaje_comision: 5, productos_kit: [], precio_costo_total: 0, precio_individual_total: 0, descripcion_detallada: '' }]); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"><X className="w-5 h-5" /></button>
               </div>
               <div className="space-y-6">
-                {items.map((item, itemIndex) => (
+                {items.map((item, itemIndex) => {
+                  // ✅ FILTROS CRUZADOS DINÁMICOS (Solo Físico)
+                  const categoriasDisponibles = item.tipo === 'fisico' 
+                    ? getCategoriasFiltradas(item.marca)
+                    : [];
+                  const marcasDisponibles = item.tipo === 'fisico'
+                    ? getMarcasFiltradas(item.categoria)
+                    : [];
+                  const productosDisponibles = item.tipo === 'fisico'
+                    ? getProductosFisicosFiltrados(item.categoria, item.marca)
+                    : (item.tipo === 'streaming' ? plataformasStreaming : nombresKits);
+
+                  return (
                   <div key={item.id} className="border border-voltech-border rounded-lg p-4 relative">
                     {items.length > 1 && (<button onClick={() => eliminarItem(itemIndex)} className="absolute top-2 right-2 p-2 rounded-lg hover:bg-voltech-error/10 text-voltech-muted hover:text-voltech-error transition-colors"><Minus className="w-4 h-4" /></button>)}
                     <h3 className="text-sm font-semibold text-voltech-muted mb-4">Producto {itemIndex + 1}</h3>
@@ -1093,7 +1223,7 @@ export default function ProductosPage() {
                       </div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">SKU (automático)</label><input type="text" value={item.sku} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-mono text-voltech-cyan bg-voltech-dark/50" /></div>
                       
-                      {/* ✅ SELECT DE NOMBRE HOMOGÉNEO */}
+                      {/* ✅ SELECT DE NOMBRE HOMOGÉNEO (Imagen 1) */}
                       <div className="lg:col-span-2">
                         <label className="block text-xs text-voltech-muted mb-1 ml-1">
                           {item.tipo === 'streaming' ? 'Nombre Plataforma *' : item.tipo === 'kit' ? 'Nombre del Kit *' : 'Nombre del Producto *'}
@@ -1102,14 +1232,14 @@ export default function ProductosPage() {
                           <select 
                             value={item.plataforma} 
                             onChange={(e) => handleChange(itemIndex, { target: { name: 'plataforma', value: e.target.value } })} 
-                            className="w-full bg-[#111827] border border-voltech-border rounded-md px-4 py-2 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
+                            className={selectClass}
                           >
                             <option value="">-- Selecciona --</option>
-                            {(item.tipo === 'fisico' ? productosFisicos : item.tipo === 'streaming' ? plataformasStreaming : nombresKits).map((nombre, idx) => (
+                            {productosDisponibles.map((nombre, idx) => (
                               <option key={idx} value={nombre}>{nombre}</option>
                             ))}
                           </select>
-                          <button onClick={() => abrirGestionModal('plataforma')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors" title="Gestionar"><Plus className="w-4 h-4" /></button>
+                          <button onClick={() => abrirGestionModal('plataforma', item.tipo)} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors" title="Gestionar"><Plus className="w-4 h-4" /></button>
                         </div>
                       </div>
                       
@@ -1121,10 +1251,10 @@ export default function ProductosPage() {
                             <select 
                               value={item.categoria} 
                               onChange={(e) => handleChange(itemIndex, { target: { name: 'categoria', value: e.target.value } })} 
-                              className="w-full bg-[#111827] border border-voltech-border rounded-md px-4 py-2 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
+                              className={selectClass}
                             >
                               <option value="">-- Selecciona --</option>
-                              {categorias.map((cat, idx) => (
+                              {categoriasDisponibles.map((cat, idx) => (
                                 <option key={idx} value={cat}>{cat}</option>
                               ))}
                             </select>
@@ -1146,10 +1276,10 @@ export default function ProductosPage() {
                             <select 
                               value={item.marca} 
                               onChange={(e) => handleChange(itemIndex, { target: { name: 'marca', value: e.target.value } })} 
-                              className="w-full bg-[#111827] border border-voltech-border rounded-md px-4 py-2 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
+                              className={selectClass}
                             >
                               <option value="">-- Selecciona --</option>
-                              {marcas.map((marca, idx) => (
+                              {marcasDisponibles.map((marca, idx) => (
                                 <option key={idx} value={marca}>{marca}</option>
                               ))}
                             </select>
@@ -1219,7 +1349,7 @@ export default function ProductosPage() {
                       
                       <div>
                         <label className="block text-xs text-voltech-muted mb-1 ml-1">Estado</label>
-                        <select value={item.estado} onChange={(e) => handleChange(itemIndex, { target: { name: 'estado', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                        <select value={item.estado} onChange={(e) => handleChange(itemIndex, { target: { name: 'estado', value: e.target.value } })} className={selectClass}>
                           <option value="nuevo">Nuevo</option>
                           <option value="oferta">Oferta</option>
                           <option value="kit">Kit</option>
@@ -1233,8 +1363,8 @@ export default function ProductosPage() {
 
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio (Bs)</label><input type="number" step="0.01" value={item.precioBs} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-cyan bg-voltech-dark/50" /></div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Total</label><input type="number" step="0.01" value={item.total} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-success bg-voltech-dark/50" /></div>
-                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Método de Pago</label><select value={item.metodoPago} onChange={(e) => handleChange(itemIndex, { target: { name: 'metodoPago', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="efectivo">Efectivo</option><option value="pago_movil">Pago Móvil</option><option value="transferencia">Transferencia</option><option value="zelle">Zelle</option><option value="binance">Binance</option><option value="otro">Otro</option></select></div>
-                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cartera</label><select value={item.cartera} onChange={(e) => handleChange(itemIndex, { target: { name: 'cartera', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="">-- Selecciona --</option>{carteras.map(c => (<option key={c.id} value={c.nombre}>{c.nombre}</option>))}</select></div>
+                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Método de Pago</label><select value={item.metodoPago} onChange={(e) => handleChange(itemIndex, { target: { name: 'metodoPago', value: e.target.value } })} className={selectClass}><option value="efectivo">Efectivo</option><option value="pago_movil">Pago Móvil</option><option value="transferencia">Transferencia</option><option value="zelle">Zelle</option><option value="binance">Binance</option><option value="otro">Otro</option></select></div>
+                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cartera</label><select value={item.cartera} onChange={(e) => handleChange(itemIndex, { target: { name: 'cartera', value: e.target.value } })} className={selectClass}><option value="">-- Selecciona --</option>{carteras.map(c => (<option key={c.id} value={c.nombre}>{c.nombre}</option>))}</select></div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">% Comisión por Venta</label><input type="number" step="0.01" value={item.porcentaje_comision} onChange={(e) => handleChange(itemIndex, { target: { name: 'porcentaje_comision', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                       
                       <div className="lg:col-span-3">
@@ -1249,7 +1379,7 @@ export default function ProductosPage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                );})}
               </div>
               <div className="mt-6 flex gap-3">
                 <button onClick={agregarItem} className="px-6 py-3 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2"><Plus className="w-4 h-4" />Agregar Otro Producto</button>
