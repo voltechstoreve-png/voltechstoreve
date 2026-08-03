@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
@@ -13,6 +13,66 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
+
+// ✅ COMPONENTE CUSTOM SELECT UNIFICADO PARA TODA LA APP
+const CustomSelect = ({ label, value, onChange, options, placeholder = '-- Selecciona --', disabled = false, className = '' }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(opt => opt.value === value);
+
+  return (
+    <div className={`relative ${className}`} ref={ref}>
+      {label && <label className="block text-xs text-voltech-muted mb-1 ml-1">{label}</label>}
+      <div
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`w-full bg-[#030712] border border-cyan-500/50 rounded-md px-4 py-2 text-sm cursor-pointer flex items-center justify-between transition-colors ${
+          disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-cyan-500'
+        }`}
+      >
+        <span className={selectedOption ? 'text-white' : 'text-voltech-muted'}>
+          {selectedOption?.label || placeholder}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-voltech-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </div>
+      
+      {isOpen && !disabled && (
+        <div className="absolute top-full left-0 w-full mt-1 bg-[#030712] border border-cyan-500/50 rounded-md z-50 max-h-60 overflow-y-auto shadow-xl">
+          {options.length === 0 ? (
+            <div className="px-4 py-2 text-sm text-voltech-muted">No hay opciones disponibles</div>
+          ) : (
+            options.map((opt) => (
+              <div
+                key={opt.value}
+                onClick={() => { 
+                  onChange(opt.value); 
+                  setIsOpen(false); 
+                }}
+                className={`px-4 py-2 text-sm cursor-pointer transition-colors ${
+                  value === opt.value 
+                    ? 'bg-purple-700 text-white' 
+                    : 'bg-gray-900 text-white hover:bg-purple-700'
+                }`}
+              >
+                {opt.label}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const normalizarTexto = (texto) => {
   if (!texto) return '';
@@ -45,7 +105,7 @@ export default function ProductosPage() {
   const [showGestionModal, setShowGestionModal] = useState(false);
   const [gestionTipo, setGestionTipo] = useState('');
   const [gestionValor, setGestionValor] = useState('');
-  const [gestionSubtipo, setGestionSubtipo] = useState(''); // Para guardar tipo BD al crear
+  const [gestionSubtipo, setGestionSubtipo] = useState('');
   const [editCatMarca, setEditCatMarca] = useState({ tipo: '', valorOriginal: '', valorNuevo: '' });
   const [busquedaKit, setBusquedaKit] = useState('');
   const [nuevoCampo, setNuevoCampo] = useState({ tipo: '', valor: '' });
@@ -103,9 +163,6 @@ export default function ProductosPage() {
   });
 
   const [nuevaCartera, setNuevaCartera] = useState({ nombre: '', tipo: 'pago_movil', datos: '' });
-
-  // ✅ ESTILOS HOMOGÉNEOS PARA SELECTS (Imagen 1)
-  const selectClass = "w-full bg-[#030712] border border-cyan-500/50 rounded-md px-4 py-2 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors";
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -192,8 +249,7 @@ export default function ProductosPage() {
     }
   };
 
-  const handleChange = (index, e) => {
-    const { name, value } = e.target;
+  const handleChange = (index, name, value) => {
     const nuevosItems = [...items];
     const item = nuevosItems[index];
     
@@ -375,10 +431,9 @@ export default function ProductosPage() {
     }
   };
 
-  // ✅ MODAL DE GESTIÓN CON PERSISTENCIA BD Y AUTO-SELECCIÓN
   const abrirGestionModal = (tipo, subtipo = null) => {
     setGestionTipo(tipo);
-    setGestionSubtipo(subtipo || tipo); // fisico, streaming, kit
+    setGestionSubtipo(subtipo || tipo);
     setGestionValor('');
     setShowGestionModal(true);
   };
@@ -410,10 +465,9 @@ export default function ProductosPage() {
         toast.error('Esta marca ya existe');
       }
     } else if (gestionTipo === 'plataforma') {
-      // ✅ GUARDAR EN BD CON TIPO CORRESPONDIENTE
       const nuevoProducto = {
         id: crypto.randomUUID(),
-        tipo: gestionSubtipo, // fisico, streaming o kit
+        tipo: gestionSubtipo,
         plataforma: gestionValor,
         producto: gestionValor,
         categoria: gestionSubtipo === 'streaming' ? 'STREAMING' : gestionSubtipo === 'kit' ? 'KIT' : '',
@@ -448,12 +502,10 @@ export default function ProductosPage() {
         }
       }
 
-      // ✅ RE-FETCH: Actualizar lista local inmediatamente
       const nuevosProductos = [...productos, nuevoProducto];
       setProductos(nuevosProductos);
       localStorage.setItem('voltech_productos', JSON.stringify(nuevosProductos));
 
-      // ✅ AUTO-SELECCIONAR el nuevo producto en el select
       if (items.length > 0) {
         const nuevosItems = [...items];
         nuevosItems[0].plataforma = gestionValor;
@@ -489,7 +541,6 @@ export default function ProductosPage() {
       localStorage.setItem('voltech_marcas', JSON.stringify(nuevas));
       toast.success('Marca eliminada');
     } else if (tipo === 'plataforma') {
-      // ✅ ELIMINAR PRODUCTO DE LA BD
       const productoAEliminar = productos.find(p => p.plataforma === valor && p.tipo === gestionSubtipo);
       if (productoAEliminar && supabase) {
         await supabase.from('productos').delete().eq('id', productoAEliminar.id);
@@ -693,7 +744,7 @@ export default function ProductosPage() {
         precioBs: item.precioBs || 0,
         preciobs: item.precioBs || 0,
         precioOferta: item.precioOferta || 0,
-        precio_oferta: item.precioOferta || 0,
+        precio_oferta: item.precioOferta || 0, // ✅ CORREGIDO: snake_case para BD
         tipoOferta: item.tipoOferta || ''
       };
 
@@ -805,7 +856,7 @@ export default function ProductosPage() {
         }]);
         setShowForm(false);
       } catch (error) {
-        console.error('❌ Error guardando productos:', error);
+        console.error(' Error guardando productos:', error);
         toast.error('Error: ' + error.message);
       }
     }
@@ -938,12 +989,10 @@ export default function ProductosPage() {
 
   const productosParaKit = productos.filter(p => p.tipo === 'fisico' && p.cantidad > 0 && (p.plataforma?.toLowerCase().includes(busquedaKit.toLowerCase()) || p.sku?.toLowerCase().includes(busquedaKit.toLowerCase())));
 
-  // ✅ LISTAS FILTRADAS POR TIPO (Carga estricta)
   const productosFisicos = [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.plataforma).filter(Boolean))];
   const plataformasStreaming = [...new Set(productos.filter(p => p.tipo === 'streaming').map(p => p.plataforma).filter(Boolean))];
   const nombresKits = [...new Set(productos.filter(p => p.tipo === 'kit').map(p => p.plataforma).filter(Boolean))];
 
-  // ✅ FILTROS CRUZADOS (Solo para Físico)
   const categoriasFisico = useMemo(() => {
     return [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.categoria).filter(Boolean))];
   }, [productos]);
@@ -1002,7 +1051,6 @@ export default function ProductosPage() {
         </div>
       </div>
 
-      {/* ✅ MODAL DE GESTIÓN UNIFICADO CON PERSISTENCIA */}
       <AnimatePresence>
         {showGestionModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
@@ -1054,7 +1102,7 @@ export default function ProductosPage() {
                     ))}
                     {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : 
                       (gestionSubtipo === 'streaming' ? plataformasStreaming : 
-                       gestionSubtipo === 'kit' ? nombresKits : productosFisico)
+                       gestionSubtipo === 'kit' ? nombresKits : productosFisicos)
                     ).length === 0 && (
                       <p className="text-xs text-voltech-muted text-center py-4">No hay registros</p>
                     )}
@@ -1086,9 +1134,18 @@ export default function ProductosPage() {
                 <h4 className="text-xs font-semibold text-voltech-muted">Agregar Nueva Cartera</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   <input type="text" placeholder="Nombre" value={nuevaCartera.nombre} onChange={(e) => setNuevaCartera({ ...nuevaCartera, nombre: e.target.value })} className="input-voltech rounded-lg px-3 py-2 text-sm" />
-                  <select value={nuevaCartera.tipo} onChange={(e) => setNuevaCartera({ ...nuevaCartera, tipo: e.target.value })} className="input-voltech rounded-lg px-3 py-2 text-sm">
-                    <option value="pago_movil">Pago Móvil</option><option value="transferencia">Transferencia</option><option value="zelle">Zelle</option><option value="binance">Binance</option><option value="efectivo">Efectivo</option>
-                  </select>
+                  <CustomSelect
+                    label="Tipo"
+                    value={nuevaCartera.tipo}
+                    onChange={(value) => setNuevaCartera({ ...nuevaCartera, tipo: value })}
+                    options={[
+                      { value: 'pago_movil', label: 'Pago Móvil' },
+                      { value: 'transferencia', label: 'Transferencia' },
+                      { value: 'zelle', label: 'Zelle' },
+                      { value: 'binance', label: 'Binance' },
+                      { value: 'efectivo', label: 'Efectivo' }
+                    ]}
+                  />
                   <div className="flex gap-2">
                     <input type="text" placeholder="Datos" value={nuevaCartera.datos} onChange={(e) => setNuevaCartera({ ...nuevaCartera, datos: e.target.value })} className="input-voltech rounded-lg px-3 py-2 text-sm flex-1" />
                     <button onClick={agregarCartera} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors"><Plus className="w-4 h-4" /></button>
@@ -1183,7 +1240,6 @@ export default function ProductosPage() {
               </div>
               <div className="space-y-6">
                 {items.map((item, itemIndex) => {
-                  // ✅ FILTROS CRUZADOS DINÁMICOS (Solo Físico)
                   const categoriasDisponibles = item.tipo === 'fisico' 
                     ? getCategoriasFiltradas(item.marca)
                     : [];
@@ -1202,9 +1258,9 @@ export default function ProductosPage() {
                     <div className="mb-4">
                       <label className="block text-xs text-voltech-muted mb-2 ml-1">Tipo de Producto</label>
                       <div className="flex gap-3">
-                        <button type="button" onClick={() => handleChange(itemIndex, { target: { name: 'tipo', value: 'fisico' } })} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'fisico' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Package className="w-4 h-4" />Físico</button>
-                        <button type="button" onClick={() => handleChange(itemIndex, { target: { name: 'tipo', value: 'streaming' } })} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'streaming' ? 'bg-voltech-purple/20 border-voltech-purple text-voltech-purple' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-purple'}`}><MonitorPlay className="w-4 h-4" />Streaming</button>
-                        <button type="button" onClick={() => handleChange(itemIndex, { target: { name: 'tipo', value: 'kit' } })} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'kit' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Gift className="w-4 h-4" />Kit</button>
+                        <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'fisico')} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'fisico' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Package className="w-4 h-4" />Físico</button>
+                        <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'streaming')} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'streaming' ? 'bg-voltech-purple/20 border-voltech-purple text-voltech-purple' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-purple'}`}><MonitorPlay className="w-4 h-4" />Streaming</button>
+                        <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'kit')} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'kit' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Gift className="w-4 h-4" />Kit</button>
                       </div>
                     </div>
 
@@ -1223,43 +1279,27 @@ export default function ProductosPage() {
                       </div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">SKU (automático)</label><input type="text" value={item.sku} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-mono text-voltech-cyan bg-voltech-dark/50" /></div>
                       
-                      {/* ✅ SELECT DE NOMBRE HOMOGÉNEO (Imagen 1) */}
                       <div className="lg:col-span-2">
-                        <label className="block text-xs text-voltech-muted mb-1 ml-1">
-                          {item.tipo === 'streaming' ? 'Nombre Plataforma *' : item.tipo === 'kit' ? 'Nombre del Kit *' : 'Nombre del Producto *'}
-                        </label>
-                        <div className="flex gap-2">
-                          <select 
-                            value={item.plataforma} 
-                            onChange={(e) => handleChange(itemIndex, { target: { name: 'plataforma', value: e.target.value } })} 
-                            className={selectClass}
-                          >
-                            <option value="">-- Selecciona --</option>
-                            {productosDisponibles.map((nombre, idx) => (
-                              <option key={idx} value={nombre}>{nombre}</option>
-                            ))}
-                          </select>
-                          <button onClick={() => abrirGestionModal('plataforma', item.tipo)} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors" title="Gestionar"><Plus className="w-4 h-4" /></button>
-                        </div>
+                        <CustomSelect
+                          label={item.tipo === 'streaming' ? 'Nombre Plataforma *' : item.tipo === 'kit' ? 'Nombre del Kit *' : 'Nombre del Producto *'}
+                          value={item.plataforma}
+                          onChange={(value) => handleChange(itemIndex, 'plataforma', value)}
+                          options={productosDisponibles.map(nombre => ({ value: nombre, label: nombre }))}
+                          placeholder="-- Selecciona --"
+                        />
+                        <button onClick={() => abrirGestionModal('plataforma', item.tipo)} className="absolute right-0 top-8 px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors" title="Gestionar"><Plus className="w-4 h-4" /></button>
                       </div>
                       
-                      {/* ✅ SELECT DE CATEGORÍA HOMOGÉNEO */}
                       {item.tipo === 'fisico' ? (
                         <div>
-                          <label className="block text-xs text-voltech-muted mb-1 ml-1">Categoría *</label>
-                          <div className="flex gap-2">
-                            <select 
-                              value={item.categoria} 
-                              onChange={(e) => handleChange(itemIndex, { target: { name: 'categoria', value: e.target.value } })} 
-                              className={selectClass}
-                            >
-                              <option value="">-- Selecciona --</option>
-                              {categoriasDisponibles.map((cat, idx) => (
-                                <option key={idx} value={cat}>{cat}</option>
-                              ))}
-                            </select>
-                            <button onClick={() => abrirGestionModal('categoria')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors" title="Gestionar"><Plus className="w-4 h-4" /></button>
-                          </div>
+                          <CustomSelect
+                            label="Categoría *"
+                            value={item.categoria}
+                            onChange={(value) => handleChange(itemIndex, 'categoria', value)}
+                            options={categoriasDisponibles.map(cat => ({ value: cat, label: cat }))}
+                            placeholder="-- Selecciona --"
+                          />
+                          <button onClick={() => abrirGestionModal('categoria')} className="absolute right-0 top-20 px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors" title="Gestionar"><Plus className="w-4 h-4" /></button>
                         </div>
                       ) : (
                         <div>
@@ -1268,23 +1308,16 @@ export default function ProductosPage() {
                         </div>
                       )}
 
-                      {/* ✅ SELECT DE MARCA HOMOGÉNEO */}
                       {item.tipo === 'fisico' && (
                         <div>
-                          <label className="block text-xs text-voltech-muted mb-1 ml-1">Marca *</label>
-                          <div className="flex gap-2">
-                            <select 
-                              value={item.marca} 
-                              onChange={(e) => handleChange(itemIndex, { target: { name: 'marca', value: e.target.value } })} 
-                              className={selectClass}
-                            >
-                              <option value="">-- Selecciona --</option>
-                              {marcasDisponibles.map((marca, idx) => (
-                                <option key={idx} value={marca}>{marca}</option>
-                              ))}
-                            </select>
-                            <button onClick={() => abrirGestionModal('marca')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors" title="Gestionar"><Plus className="w-4 h-4" /></button>
-                          </div>
+                          <CustomSelect
+                            label="Marca *"
+                            value={item.marca}
+                            onChange={(value) => handleChange(itemIndex, 'marca', value)}
+                            options={marcasDisponibles.map(marca => ({ value: marca, label: marca }))}
+                            placeholder="-- Selecciona --"
+                          />
+                          <button onClick={() => abrirGestionModal('marca')} className="absolute right-0 top-20 px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors" title="Gestionar"><Plus className="w-4 h-4" /></button>
                         </div>
                       )}
 
@@ -1323,7 +1356,7 @@ export default function ProductosPage() {
                         </div>
                       )}
 
-                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cantidad</label><input type="number" value={item.cantidad} onChange={(e) => handleChange(itemIndex, { target: { name: 'cantidad', value: e.target.value } })} min="0" className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
+                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cantidad</label><input type="number" value={item.cantidad} onChange={(e) => handleChange(itemIndex, 'cantidad', e.target.value)} min="0" className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                       
                       {item.tipo === 'kit' && (item.productos_kit || []).length > 0 && (
                         <div className="lg:col-span-3 bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 space-y-2">
@@ -1333,7 +1366,7 @@ export default function ProductosPage() {
                             <div><p className="text-xs text-voltech-muted">Valor Individual:</p><p className="font-bold text-white">${(item.precio_individual_total || 0).toFixed(2)}</p></div>
                             <div>
                               <label className="text-xs text-voltech-muted block">Precio del Kit ($):</label>
-                              <input type="number" step="0.01" value={item.precioDetal} onChange={(e) => handleChange(itemIndex, { target: { name: 'precioDetal', value: e.target.value } })} className="input-voltech w-full rounded px-2 py-1 text-sm font-bold text-voltech-success" />
+                              <input type="number" step="0.01" value={item.precioDetal} onChange={(e) => handleChange(itemIndex, 'precioDetal', e.target.value)} className="input-voltech w-full rounded px-2 py-1 text-sm font-bold text-voltech-success" />
                             </div>
                             <div><p className="text-xs text-voltech-muted">Ganancia Estimada:</p><p className="font-bold text-voltech-success">${(item.precioDetal - (item.precio_costo_total || 0)).toFixed(2)}</p></div>
                           </div>
@@ -1342,36 +1375,61 @@ export default function ProductosPage() {
 
                       {item.tipo !== 'kit' && (
                         <>
-                          {item.tipo === 'fisico' && (<div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Mayor ($) <span className="text-voltech-warning">(Tu costo)</span></label><input type="number" step="0.01" value={item.precioMayor} onChange={(e) => handleChange(itemIndex, { target: { name: 'precioMayor', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>)}
-                          <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Detal ($) <span className="text-voltech-success">(Venta al público)</span></label><input type="number" step="0.01" value={item.precioDetal} onChange={(e) => handleChange(itemIndex, { target: { name: 'precioDetal', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Precio de venta" />{item.tipo === 'fisico' && item.precioMayor > 0 && item.precioDetal > 0 && (<p className="text-xs text-voltech-success mt-1">Ganancia: ${(item.precioDetal - item.precioMayor).toFixed(2)} ({((item.precioDetal - item.precioMayor) / item.precioMayor * 100).toFixed(0)}%)</p>)}</div>
+                          {item.tipo === 'fisico' && (<div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Mayor ($) <span className="text-voltech-warning">(Tu costo)</span></label><input type="number" step="0.01" value={item.precioMayor} onChange={(e) => handleChange(itemIndex, 'precioMayor', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>)}
+                          <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Detal ($) <span className="text-voltech-success">(Venta al público)</span></label><input type="number" step="0.01" value={item.precioDetal} onChange={(e) => handleChange(itemIndex, 'precioDetal', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Precio de venta" />{item.tipo === 'fisico' && item.precioMayor > 0 && item.precioDetal > 0 && (<p className="text-xs text-voltech-success mt-1">Ganancia: ${(item.precioDetal - item.precioMayor).toFixed(2)} ({((item.precioDetal - item.precioMayor) / item.precioMayor * 100).toFixed(0)}%)</p>)}</div>
                         </>
                       )}
                       
                       <div>
-                        <label className="block text-xs text-voltech-muted mb-1 ml-1">Estado</label>
-                        <select value={item.estado} onChange={(e) => handleChange(itemIndex, { target: { name: 'estado', value: e.target.value } })} className={selectClass}>
-                          <option value="nuevo">Nuevo</option>
-                          <option value="oferta">Oferta</option>
-                          <option value="kit">Kit</option>
-                          <option value="agotado">Agotado</option>
-                        </select>
+                        <CustomSelect
+                          label="Estado"
+                          value={item.estado}
+                          onChange={(value) => handleChange(itemIndex, 'estado', value)}
+                          options={[
+                            { value: 'nuevo', label: 'Nuevo' },
+                            { value: 'oferta', label: 'Oferta' },
+                            { value: 'kit', label: 'Kit' },
+                            { value: 'agotado', label: 'Agotado' }
+                          ]}
+                        />
                       </div>
                       <div>
                         <label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Oferta ($) <span className="text-voltech-warning">(Opcional)</span></label>
-                        <input type="number" step="0.01" value={item.precioOferta} onChange={(e) => handleChange(itemIndex, { target: { name: 'precioOferta', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="0.00" />
+                        <input type="number" step="0.01" value={item.precioOferta} onChange={(e) => handleChange(itemIndex, 'precioOferta', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="0.00" />
                       </div>
 
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio (Bs)</label><input type="number" step="0.01" value={item.precioBs} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-cyan bg-voltech-dark/50" /></div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Total</label><input type="number" step="0.01" value={item.total} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-success bg-voltech-dark/50" /></div>
-                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Método de Pago</label><select value={item.metodoPago} onChange={(e) => handleChange(itemIndex, { target: { name: 'metodoPago', value: e.target.value } })} className={selectClass}><option value="efectivo">Efectivo</option><option value="pago_movil">Pago Móvil</option><option value="transferencia">Transferencia</option><option value="zelle">Zelle</option><option value="binance">Binance</option><option value="otro">Otro</option></select></div>
-                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cartera</label><select value={item.cartera} onChange={(e) => handleChange(itemIndex, { target: { name: 'cartera', value: e.target.value } })} className={selectClass}><option value="">-- Selecciona --</option>{carteras.map(c => (<option key={c.id} value={c.nombre}>{c.nombre}</option>))}</select></div>
-                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">% Comisión por Venta</label><input type="number" step="0.01" value={item.porcentaje_comision} onChange={(e) => handleChange(itemIndex, { target: { name: 'porcentaje_comision', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
+                      <div>
+                        <CustomSelect
+                          label="Método de Pago"
+                          value={item.metodoPago}
+                          onChange={(value) => handleChange(itemIndex, 'metodoPago', value)}
+                          options={[
+                            { value: 'efectivo', label: 'Efectivo' },
+                            { value: 'pago_movil', label: 'Pago Móvil' },
+                            { value: 'transferencia', label: 'Transferencia' },
+                            { value: 'zelle', label: 'Zelle' },
+                            { value: 'binance', label: 'Binance' },
+                            { value: 'otro', label: 'Otro' }
+                          ]}
+                        />
+                      </div>
+                      <div>
+                        <CustomSelect
+                          label="Cartera"
+                          value={item.cartera}
+                          onChange={(value) => handleChange(itemIndex, 'cartera', value)}
+                          options={[{ value: '', label: '-- Selecciona --' }, ...carteras.map(c => ({ value: c.nombre, label: c.nombre }))]}
+                        />
+                      </div>
+                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">% Comisión por Venta</label><input type="number" step="0.01" value={item.porcentaje_comision} onChange={(e) => handleChange(itemIndex, 'porcentaje_comision', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                       
                       <div className="lg:col-span-3">
                         <label className="block text-xs text-voltech-muted mb-1 ml-1">Descripción Detallada (para Chatbot)</label>
                         <textarea 
                           value={item.descripcion_detallada || ''} 
-                          onChange={(e) => handleChange(itemIndex, { target: { name: 'descripcion_detallada', value: e.target.value } })} 
+                          onChange={(e) => handleChange(itemIndex, 'descripcion_detallada', e.target.value)} 
                           className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-24 resize-none" 
                           placeholder="Ej: Batería de 5000mAh, carga rápida 25W, resistencia al agua IP68, incluye cargador y cable USB-C..."
                         />
