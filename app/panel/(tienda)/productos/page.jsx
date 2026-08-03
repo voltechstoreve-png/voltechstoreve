@@ -47,7 +47,7 @@ export default function ProductosPage() {
   const [busquedaKit, setBusquedaKit] = useState('');
 
   const [items, setItems] = useState([{
-    id: Date.now(),
+    id: crypto.randomUUID(),
     tipo: 'fisico',
     imagen: '',
     imagenFile: null,
@@ -127,7 +127,7 @@ export default function ProductosPage() {
       }
 
       const equipoGuardado = localStorage.getItem('voltech_equipo');
-      const eqData = equipoGuardado ? JSON.parse(equipoGuardado) : [{ id: 1, nombre: 'Administrador', rol: 'Admin', email: 'admin@voltech.store' }];
+      const eqData = equipoGuardado ? JSON.parse(equipoGuardado) : [{ id: crypto.randomUUID(), nombre: 'Administrador', rol: 'Admin', email: 'admin@voltech.store' }];
       
       const catsData = sData.categorias || (localStorage.getItem('voltech_categorias') ? JSON.parse(localStorage.getItem('voltech_categorias')) : []);
       const marData = sData.marcas || (localStorage.getItem('voltech_marcas') ? JSON.parse(localStorage.getItem('voltech_marcas')) : []);
@@ -147,9 +147,9 @@ export default function ProductosPage() {
       }
       if (cData.length === 0 && !localStorage.getItem('voltech_carteras')) {
         const carterasDefault = [
-          { id: '1', nombre: 'Pago Móvil Principal', tipo: 'pago_movil', datos: '0412-1234567 - 12345678 - 0102' },
-          { id: '2', nombre: 'Zelle', tipo: 'zelle', datos: 'voltech@email.com' },
-          { id: '3', nombre: 'Binance', tipo: 'cripto', datos: 'voltech@binance.com' },
+          { id: crypto.randomUUID(), nombre: 'Pago Móvil Principal', tipo: 'pago_movil', datos: '0412-1234567 - 12345678 - 0102' },
+          { id: crypto.randomUUID(), nombre: 'Zelle', tipo: 'zelle', datos: 'voltech@email.com' },
+          { id: crypto.randomUUID(), nombre: 'Binance', tipo: 'cripto', datos: 'voltech@binance.com' },
         ];
         setCarteras(carterasDefault);
         if (supabase) await supabase.from('carteras').insert(carterasDefault);
@@ -309,7 +309,7 @@ export default function ProductosPage() {
 
   const agregarItem = () => {
     setItems([...items, {
-      id: Date.now(),
+      id: crypto.randomUUID(),
       tipo: 'fisico',
       imagen: '',
       imagenFile: null,
@@ -432,7 +432,7 @@ export default function ProductosPage() {
     }
 
     const nuevoCombo = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       tipo: 'streaming',
       plataforma: comboNombre,
       categoria: 'COMBO',
@@ -513,9 +513,11 @@ export default function ProductosPage() {
         return;
       }
 
+      // ✅ CORRECCIÓN: Agregar verificación de tipo para no sobrescribir productos diferentes con mismo nombre
       const productoExistente = productos.find(p => 
         normalizarTexto(p.plataforma) === normalizarTexto(item.plataforma) &&
         normalizarTexto(p.categoria) === normalizarTexto(item.categoria) &&
+        (p.tipo || 'fisico') === (item.tipo || 'fisico') &&
         p.id !== item.id
       );
 
@@ -544,7 +546,7 @@ export default function ProductosPage() {
       } else {
         const nuevoProducto = {
           ...item,
-          id: (Date.now() + index).toString(),
+          id: item.id || crypto.randomUUID(), // ✅ CORRECCIÓN: Usar UUID válido
           precioDetal: item.precioDetal || item.precioMayor,
           precioOferta: item.precioOferta || 0,
           estado: item.estado || 'nuevo',
@@ -563,85 +565,99 @@ export default function ProductosPage() {
     });
 
     if (productosGuardados > 0 || productosActualizados > 0) {
-      if (supabase) {
-        await supabase.from('productos').upsert(nuevosProductos, { onConflict: 'id' });
-      }
+      try {
+        if (supabase) {
+          console.log('🔄 Guardando en Supabase:', nuevosProductos);
+          const { data, error } = await supabase.from('productos').upsert(nuevosProductos, { onConflict: 'id' });
+          
+          if (error) {
+            console.error('❌ Error Supabase:', error);
+            toast.error('Error al guardar en base de datos: ' + error.message);
+            return;
+          }
+          console.log('✅ Guardado en Supabase:', data);
+        }
 
-      let productosFinales = [...productos];
-      nuevosProductos.forEach(p => {
-        const index = productosFinales.findIndex(existing => 
-          normalizarTexto(existing.plataforma) === normalizarTexto(p.plataforma) && 
-          normalizarTexto(existing.categoria) === normalizarTexto(p.categoria)
-        );
+        let productosFinales = [...productos];
+        nuevosProductos.forEach(p => {
+          const index = productosFinales.findIndex(existing => 
+            normalizarTexto(existing.plataforma) === normalizarTexto(p.plataforma) && 
+            normalizarTexto(existing.categoria) === normalizarTexto(p.categoria) &&
+            (existing.tipo || 'fisico') === (p.tipo || 'fisico')
+          );
+          
+          if (index !== -1) {
+            productosFinales[index] = p;
+          } else {
+            productosFinales.push(p);
+          }
+        });
+
+        setProductos(productosFinales);
+        localStorage.setItem('voltech_productos', JSON.stringify(productosFinales));
+
+        const nuevasCategorias = [...categorias];
+        const nuevasMarcas = [...marcas];
+        nuevosProductos.forEach(p => {
+          if (p.categoria && !nuevasCategorias.includes(p.categoria)) {
+            nuevasCategorias.push(p.categoria);
+          }
+          if (p.marca && !nuevasMarcas.includes(p.marca)) {
+            nuevasMarcas.push(p.marca);
+          }
+        });
+        setCategorias(nuevasCategorias);
+        setMarcas(nuevasMarcas);
+        if (supabase) {
+          await supabase.from('settings').upsert({ clave: 'categorias', valor: nuevasCategorias }, { onConflict: 'clave' });
+          await supabase.from('settings').upsert({ clave: 'marcas', valor: nuevasMarcas }, { onConflict: 'clave' });
+        }
+        localStorage.setItem('voltech_categorias', JSON.stringify(nuevasCategorias));
+        localStorage.setItem('voltech_marcas', JSON.stringify(nuevasMarcas));
+
+        const mensaje = productosActualizados > 0 
+          ? `${productosGuardados} nuevo(s) y ${productosActualizados} actualizado(s)`
+          : `${productosGuardados} producto(s) guardado(s)`;
         
-        if (index !== -1) {
-          productosFinales[index] = p;
-        } else {
-          productosFinales.push(p);
-        }
-      });
-
-      setProductos(productosFinales);
-      localStorage.setItem('voltech_productos', JSON.stringify(productosFinales));
-
-      const nuevasCategorias = [...categorias];
-      const nuevasMarcas = [...marcas];
-      nuevosProductos.forEach(p => {
-        if (p.categoria && !nuevasCategorias.includes(p.categoria)) {
-          nuevasCategorias.push(p.categoria);
-        }
-        if (p.marca && !nuevasMarcas.includes(p.marca)) {
-          nuevasMarcas.push(p.marca);
-        }
-      });
-      setCategorias(nuevasCategorias);
-      setMarcas(nuevasMarcas);
-      if (supabase) {
-        await supabase.from('settings').upsert({ clave: 'categorias', valor: nuevasCategorias }, { onConflict: 'clave' });
-        await supabase.from('settings').upsert({ clave: 'marcas', valor: nuevasMarcas }, { onConflict: 'clave' });
+        toast.success(mensaje);
+        
+        setItems([{
+          id: crypto.randomUUID(),
+          tipo: 'fisico',
+          imagen: '',
+          imagenFile: null,
+          sku: '',
+          fecha: new Date().toISOString().split('T')[0],
+          comprador: '',
+          plataforma: '',
+          plataformas: [],
+          categoria: '',
+          marca: '',
+          cantidad: 1,
+          metodoPago: 'efectivo',
+          cartera: '',
+          precioMayor: 0,
+          precioDetal: 0,
+          precioOferta: 0,
+          estado: 'nuevo',
+          precioBs: 0,
+          total: 0,
+          monedaCompra: 'usd',
+          duracion: '',
+          tipoOferta: '',
+          esCombo: false,
+          plataformasCombo: [],
+          porcentaje_comision: 5,
+          productos_kit: [],
+          precio_costo_total: 0,
+          precio_individual_total: 0,
+          descripcion_detallada: ''
+        }]);
+        setShowForm(false);
+      } catch (error) {
+        console.error('❌ Error guardando productos:', error);
+        toast.error('Error: ' + error.message);
       }
-      localStorage.setItem('voltech_categorias', JSON.stringify(nuevasCategorias));
-      localStorage.setItem('voltech_marcas', JSON.stringify(nuevasMarcas));
-
-      const mensaje = productosActualizados > 0 
-        ? `${productosGuardados} nuevo(s) y ${productosActualizados} actualizado(s)`
-        : `${productosGuardados} producto(s) guardado(s)`;
-      
-      toast.success(mensaje);
-      
-      setItems([{
-        id: Date.now(),
-        tipo: 'fisico',
-        imagen: '',
-        imagenFile: null,
-        sku: '',
-        fecha: new Date().toISOString().split('T')[0],
-        comprador: '',
-        plataforma: '',
-        plataformas: [],
-        categoria: '',
-        marca: '',
-        cantidad: 1,
-        metodoPago: 'efectivo',
-        cartera: '',
-        precioMayor: 0,
-        precioDetal: 0,
-        precioOferta: 0,
-        estado: 'nuevo',
-        precioBs: 0,
-        total: 0,
-        monedaCompra: 'usd',
-        duracion: '',
-        tipoOferta: '',
-        esCombo: false,
-        plataformasCombo: [],
-        porcentaje_comision: 5,
-        productos_kit: [],
-        precio_costo_total: 0,
-        precio_individual_total: 0,
-        descripcion_detallada: ''
-      }]);
-      setShowForm(false);
     }
   };
 
@@ -717,7 +733,7 @@ export default function ProductosPage() {
       toast.error('Completa todos los campos');
       return;
     }
-    const nueva = { ...nuevaCartera, id: Date.now().toString() };
+    const nueva = { ...nuevaCartera, id: crypto.randomUUID() }; // ✅ CORRECCIÓN: UUID válido
     
     if (supabase) {
       await supabase.from('carteras').insert(nueva);
@@ -1030,7 +1046,7 @@ export default function ProductosPage() {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2"><Package className="w-5 h-5 text-voltech-cyan" />Nuevo Producto{items.length > 1 && `s (${items.length} items)`}</h2>
-                <button onClick={() => { setShowForm(false); setItems([{ id: Date.now(), tipo: 'fisico', imagen: '', imagenFile: null, sku: '', fecha: new Date().toISOString().split('T')[0], comprador: '', plataforma: '', plataformas: [], categoria: '', marca: '', cantidad: 1, metodoPago: 'efectivo', cartera: '', precioMayor: 0, precioDetal: 0, precioOferta: 0, estado: 'nuevo', precioBs: 0, total: 0, monedaCompra: 'usd', duracion: '', tipoOferta: '', esCombo: false, plataformasCombo: [], porcentaje_comision: 5, productos_kit: [], precio_costo_total: 0, precio_individual_total: 0, descripcion_detallada: '' }]); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"><X className="w-5 h-5" /></button>
+                <button onClick={() => { setShowForm(false); setItems([{ id: crypto.randomUUID(), tipo: 'fisico', imagen: '', imagenFile: null, sku: '', fecha: new Date().toISOString().split('T')[0], comprador: '', plataforma: '', plataformas: [], categoria: '', marca: '', cantidad: 1, metodoPago: 'efectivo', cartera: '', precioMayor: 0, precioDetal: 0, precioOferta: 0, estado: 'nuevo', precioBs: 0, total: 0, monedaCompra: 'usd', duracion: '', tipoOferta: '', esCombo: false, plataformasCombo: [], porcentaje_comision: 5, productos_kit: [], precio_costo_total: 0, precio_individual_total: 0, descripcion_detallada: '' }]); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"><X className="w-5 h-5" /></button>
               </div>
               <div className="space-y-6">
                 {items.map((item, itemIndex) => (
@@ -1157,7 +1173,6 @@ export default function ProductosPage() {
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cartera</label><select value={item.cartera} onChange={(e) => handleChange(itemIndex, { target: { name: 'cartera', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="">-- Selecciona --</option>{carteras.map(c => (<option key={c.id} value={c.nombre}>{c.nombre}</option>))}</select></div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">% Comisión por Venta</label><input type="number" step="0.01" value={item.porcentaje_comision} onChange={(e) => { const nuevosItems = [...items]; nuevosItems[itemIndex].porcentaje_comision = parseFloat(e.target.value); setItems(nuevosItems); }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                       
-                      {/* NUEVO CAMPO: DESCRIPCIÓN DETALLADA */}
                       <div className="lg:col-span-3">
                         <label className="block text-xs text-voltech-muted mb-1 ml-1">Descripción Detallada (para Chatbot)</label>
                         <textarea 
@@ -1364,7 +1379,6 @@ export default function ProductosPage() {
             </div>
             <div className="lg:col-span-3"><label className="block text-xs text-voltech-muted mb-1 ml-1">Descripción</label><textarea value={editData.descripcion} onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-20 resize-none" placeholder="Descripción corta del producto..." /></div>
             
-            {/* NUEVO CAMPO: DESCRIPCIÓN DETALLADA EN EDICIÓN */}
             <div className="lg:col-span-3">
               <label className="block text-xs text-voltech-muted mb-1 ml-1">Descripción Detallada (para Chatbot)</label>
               <textarea 
