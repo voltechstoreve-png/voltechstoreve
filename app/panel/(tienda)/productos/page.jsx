@@ -55,7 +55,6 @@ export default function ProductosPage() {
     fecha: new Date().toISOString().split('T')[0],
     comprador: '',
     plataforma: '',
-    plataformas: [],
     categoria: '',
     marca: '',
     cantidad: 1,
@@ -101,11 +100,6 @@ export default function ProductosPage() {
   const [nuevaCartera, setNuevaCartera] = useState({ nombre: '', tipo: 'pago_movil', datos: '' });
   const [nuevoCampo, setNuevoCampo] = useState({ tipo: '', valor: '' });
   const [showNuevoCampo, setShowNuevoCampo] = useState({ tipo: '', show: false });
-
-  // ✅ Extraer listas independientes por tipo
-  const productosFisicos = [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.plataforma).filter(Boolean))];
-  const plataformasStreaming = [...new Set(productos.filter(p => p.tipo === 'streaming').map(p => p.plataforma).filter(Boolean))];
-  const nombresKits = [...new Set(productos.filter(p => p.tipo === 'kit').map(p => p.plataforma).filter(Boolean))];
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -192,54 +186,61 @@ export default function ProductosPage() {
     }
   };
 
-  const calcularTotal = (index) => {
-    const item = items[index];
-    const nuevosItems = [...items];
-    nuevosItems[index].total = item.precioMayor * item.cantidad;
-    setItems(nuevosItems);
-  };
-
-  const calcularPrecioCruzado = (index, campo, valor) => {
-    const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
-    const nuevosItems = [...items];
-    const valorNum = parseFloat(valor) || 0;
-    
-    if (campo === 'precioMayor') {
-      nuevosItems[index].precioMayor = valorNum;
-      nuevosItems[index].precioBs = parseFloat((valorNum * tasa).toFixed(2));
-    } else if (campo === 'precioDetal') {
-      nuevosItems[index].precioDetal = valorNum;
-      nuevosItems[index].precioBs = parseFloat((valorNum * tasa).toFixed(2));
-    } else if (campo === 'precioBs') {
-      nuevosItems[index].precioBs = valorNum;
-      nuevosItems[index].precioDetal = parseFloat((valorNum / tasa).toFixed(2));
-    }
-    
-    setItems(nuevosItems);
-    calcularTotal(index);
-  };
-
+  // ✅ CORRECCIÓN: Manejo centralizado con filtros cruzados y cálculo financiero
   const handleChange = (index, e) => {
     const { name, value } = e.target;
     const nuevosItems = [...items];
-    nuevosItems[index][name] = value;
+    const item = nuevosItems[index];
     
-    // ✅ Forzar categorías fijas y limpiar al cambiar tipo
+    // 1. Reset automático al cambiar de tipo
     if (name === 'tipo') {
+      item.plataforma = '';
+      item.categoria = '';
+      item.marca = '';
       if (value === 'streaming') {
-        nuevosItems[index].categoria = 'STREAMING';
-        nuevosItems[index].marca = 'Voltech';
-        nuevosItems[index].plataforma = '';
+        item.categoria = 'STREAMING';
+        item.marca = 'Voltech';
       } else if (value === 'kit') {
-        nuevosItems[index].categoria = 'KIT';
-        nuevosItems[index].marca = 'Voltech';
-        nuevosItems[index].plataforma = '';
-      } else if (value === 'fisico') {
-        nuevosItems[index].categoria = '';
-        nuevosItems[index].marca = '';
-        nuevosItems[index].plataforma = '';
+        item.categoria = 'KIT';
+        item.marca = 'Voltech';
       }
     }
+    
+    // 2. Asignar nuevo valor
+    item[name] = value;
+
+    // 3. Filtros cruzados dependientes
+    if (name === 'plataforma' && value) {
+      const prod = productos.find(p => p.plataforma === value && p.tipo === item.tipo);
+      if (prod) {
+        item.categoria = prod.categoria;
+        item.marca = prod.marca;
+      }
+    }
+
+    if (name === 'categoria' && item.plataforma) {
+      const prodValido = productos.find(p => p.plataforma === item.plataforma && p.categoria === value && p.tipo === item.tipo);
+      if (!prodValido) item.plataforma = ''; // Limpiar si no coincide
+    }
+
+    if (name === 'marca' && item.plataforma) {
+      const prodValido = productos.find(p => p.plataforma === item.plataforma && p.marca === value && p.tipo === item.tipo);
+      if (!prodValido) item.plataforma = ''; // Limpiar si no coincide
+    }
+
+    // 4. ✅ CORRECCIÓN FINANCIERA: Cálculo automático de Total y Bs (Arregla el bug de $0 en Kits)
+    const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
+    const qty = parseInt(item.cantidad) || 1;
+    let precioUnitario = 0;
+
+    if (item.tipo === 'kit') {
+      precioUnitario = parseFloat(item.precioDetal) || 0;
+    } else {
+      precioUnitario = (parseFloat(item.precioOferta) > 0) ? parseFloat(item.precioOferta) : (parseFloat(item.precioDetal) || 0);
+    }
+
+    item.total = precioUnitario * qty;
+    item.precioBs = precioUnitario * tasa;
     
     setItems(nuevosItems);
     if (['plataforma', 'categoria', 'marca', 'tipo'].includes(name)) {
@@ -286,10 +287,8 @@ export default function ProductosPage() {
     const producto = kitActual.find(p => p.producto_id === productoId);
     if (producto) {
       producto.cantidad = nuevaCantidad;
-      
       const costoTotal = kitActual.reduce((sum, p) => sum + (p.precio_costo * p.cantidad), 0);
       const ventaTotal = kitActual.reduce((sum, p) => sum + (p.precio_venta * p.cantidad), 0);
-      
       nuevosItems[index].productos_kit = kitActual;
       nuevosItems[index].precio_costo_total = costoTotal;
       nuevosItems[index].precio_individual_total = ventaTotal;
@@ -661,7 +660,6 @@ export default function ProductosPage() {
           fecha: new Date().toISOString().split('T')[0],
           comprador: '',
           plataforma: '',
-          plataformas: [],
           categoria: '',
           marca: '',
           cantidad: 1,
@@ -686,7 +684,7 @@ export default function ProductosPage() {
         }]);
         setShowForm(false);
       } catch (error) {
-        console.error(' Error guardando productos:', error);
+        console.error('❌ Error guardando productos:', error);
         toast.error('Error: ' + error.message);
       }
     }
@@ -765,11 +763,7 @@ export default function ProductosPage() {
       return;
     }
     const nueva = { ...nuevaCartera, id: crypto.randomUUID() };
-    
-    if (supabase) {
-      await supabase.from('carteras').insert(nueva);
-    }
-    
+    if (supabase) await supabase.from('carteras').insert(nueva);
     const carterasActualizadas = [...carteras, nueva];
     setCarteras(carterasActualizadas);
     localStorage.setItem('voltech_carteras', JSON.stringify(carterasActualizadas));
@@ -778,9 +772,7 @@ export default function ProductosPage() {
   };
 
   const eliminarCartera = async (id) => {
-    if (supabase) {
-      await supabase.from('carteras').delete().eq('id', id);
-    }
+    if (supabase) await supabase.from('carteras').delete().eq('id', id);
     const carterasActualizadas = carteras.filter(c => c.id !== id);
     setCarteras(carterasActualizadas);
     localStorage.setItem('voltech_carteras', JSON.stringify(carterasActualizadas));
@@ -788,43 +780,15 @@ export default function ProductosPage() {
   };
 
   const guardarTasa = async () => {
-    const tasaData = {
-      tasa: usarTasaBCV ? tasaBCV : tasaPersonalizada,
-      usarBCV: usarTasaBCV,
-      tasaPersonalizada,
-    };
-    if (supabase) {
-      await supabase.from('settings').upsert({ clave: 'tasa_bcv', valor: tasaData }, { onConflict: 'clave' });
-    }
+    const tasaData = { tasa: usarTasaBCV ? tasaBCV : tasaPersonalizada, usarBCV: usarTasaBCV, tasaPersonalizada };
+    if (supabase) await supabase.from('settings').upsert({ clave: 'tasa_bcv', valor: tasaData }, { onConflict: 'clave' });
     localStorage.setItem('voltech_tasa_bcv', JSON.stringify(tasaData));
     toast.success('Tasa actualizada');
   };
 
   const generarPDFCatalogo = () => {
     const productosPublicados = productos.filter(p => p.publicado);
-    const contenido = `
-      CATALOGO VOLTECH STORE
-      ======================
-      Fecha: ${new Date().toLocaleDateString()}
-      
-      Total Productos: ${productosPublicados.length}
-      
-      ${productosPublicados.map(p => `
-      ${p.plataforma} ${p.tipo === 'streaming' ? '(Streaming)' : ''} ${p.esCombo ? '(Combo)' : ''}
-      SKU: ${p.sku}
-      Categoría: ${p.categoria}
-      Estado: ${p.estado || 'nuevo'}
-      Precio Detal: $${(p.precioDetal || p.precioMayor).toFixed(2)}
-      ${p.precioOferta > 0 ? `Precio Oferta: $${p.precioOferta.toFixed(2)}\n` : ''}
-      (Bs ${p.precioBs.toFixed(2)})
-      Stock: ${p.cantidad} unidades
-      Duración: ${p.duracion || 'N/A'}
-      Oferta: ${p.tipoOferta || 'N/A'}
-      Comisión: ${p.porcentaje_comision || 5}%
-      ---
-      `).join('\n')}
-    `;
-    
+    const contenido = `CATALOGO VOLTECH STORE\n======================\nFecha: ${new Date().toLocaleDateString()}\n\nTotal Productos: ${productosPublicados.length}\n\n${productosPublicados.map(p => `${p.plataforma} ${p.tipo === 'streaming' ? '(Streaming)' : ''} ${p.esCombo ? '(Combo)' : ''}\nSKU: ${p.sku}\nCategoría: ${p.categoria}\nEstado: ${p.estado || 'nuevo'}\nPrecio Detal: $${(p.precioDetal || p.precioMayor).toFixed(2)}\n${p.precioOferta > 0 ? `Precio Oferta: $${p.precioOferta.toFixed(2)}\n` : ''}(Bs ${p.precioBs.toFixed(2)})\nStock: ${p.cantidad} unidades\nDuración: ${p.duracion || 'N/A'}\nOferta: ${p.tipoOferta || 'N/A'}\nComisión: ${p.porcentaje_comision || 5}%\n---`).join('\n')}`;
     const blob = new Blob([contenido], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -844,33 +808,18 @@ export default function ProductosPage() {
   const totalProductos = productos.length;
   const stockBajo = productos.filter(p => p.cantidad <= 2).length;
   const agotados = productos.filter(p => p.cantidad === 0).length;
-  const valorInventario = productos.reduce((acc, p) => 
-  acc + (parseFloat(p.precioMayor || 0) * (p.cantidad || 0)), 0
-);
+  const valorInventario = productos.reduce((acc, p) => acc + (parseFloat(p.precioMayor || 0) * (p.cantidad || 0)), 0);
 
   const getEstadoBadge = (estado) => {
-    const estilos = {
-      nuevo: 'bg-voltech-success/20 text-voltech-success',
-      oferta: 'bg-voltech-warning/20 text-voltech-warning',
-      kit: 'bg-voltech-cyan/20 text-voltech-cyan',
-      agotado: 'bg-voltech-error/20 text-voltech-error',
-      combo: 'bg-voltech-purple/20 text-voltech-purple'
-    };
+    const estilos = { nuevo: 'bg-voltech-success/20 text-voltech-success', oferta: 'bg-voltech-warning/20 text-voltech-warning', kit: 'bg-voltech-cyan/20 text-voltech-cyan', agotado: 'bg-voltech-error/20 text-voltech-error', combo: 'bg-voltech-purple/20 text-voltech-purple' };
     return estilos[estado] || estilos.nuevo;
   };
 
-  const productosParaKit = productos.filter(p => 
-    p.tipo === 'fisico' && p.cantidad > 0 &&
-    (p.plataforma?.toLowerCase().includes(busquedaKit.toLowerCase()) || p.sku?.toLowerCase().includes(busquedaKit.toLowerCase()))
-  );
+  const productosParaKit = productos.filter(p => p.tipo === 'fisico' && p.cantidad > 0 && (p.plataforma?.toLowerCase().includes(busquedaKit.toLowerCase()) || p.sku?.toLowerCase().includes(busquedaKit.toLowerCase())));
 
   return (
     <div className="space-y-6">
-      <Toaster position="top-right" toastOptions={{
-        style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' },
-        success: { iconTheme: { primary: '#00ff88', secondary: '#fff' } },
-        error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } },
-      }} />
+      <Toaster position="top-right" toastOptions={{ style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' }, success: { iconTheme: { primary: '#00ff88', secondary: '#fff' } }, error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } } }} />
 
       <div className="flex items-center justify-between">
         <div>
@@ -878,22 +827,12 @@ export default function ProductosPage() {
           <p className="text-sm text-voltech-muted mt-1">Gestiona tu catálogo e inventario</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={generarPDFCatalogo} className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2">
-            <Download className="w-4 h-4" /> Catálogo
-          </button>
-          <button onClick={() => setShowGestionModal(true)} className={`px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}>
-            <Filter className="w-4 h-4" /> Gestionar Cats/Marcas
-          </button>
-          <button onClick={() => setShowCarterasModal(!showCarterasModal)} className={`px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}>
-            <DollarSign className="w-4 h-4" /> Carteras
-          </button>
-          <Link href="/panel/compras" className={`px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}>
-            <Database className="w-4 h-4" /> Compras
-          </Link>
+          <button onClick={generarPDFCatalogo} className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2"><Download className="w-4 h-4" /> Catálogo</button>
+          <button onClick={() => setShowGestionModal(true)} className={`px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}><Filter className="w-4 h-4" /> Gestionar Cats/Marcas</button>
+          <button onClick={() => setShowCarterasModal(!showCarterasModal)} className={`px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}><DollarSign className="w-4 h-4" /> Carteras</button>
+          <Link href="/panel/compras" className={`px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}><Database className="w-4 h-4" /> Compras</Link>
           {!showForm && tienePermiso('puedeVerInventarioCompleto') && (
-            <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Nuevo Producto
-            </button>
+            <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2"><Plus className="w-4 h-4" /> Nuevo Producto</button>
           )}
         </div>
       </div>
@@ -907,7 +846,6 @@ export default function ProductosPage() {
                   <h3 className="text-lg font-bold text-white">Gestionar Categorías y Marcas</h3>
                   <button onClick={() => { setShowGestionModal(false); setEditCatMarca({ tipo: '', valorOriginal: '', valorNuevo: '' }); }} className="p-2 rounded-lg hover:bg-voltech-border"><X className="w-5 h-5" /></button>
                 </div>
-                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <h4 className="text-sm font-semibold text-voltech-cyan mb-3">Categorías</h4>
@@ -927,10 +865,8 @@ export default function ProductosPage() {
                           <button onClick={() => eliminarCatMarca('categoria', cat)} className="p-1 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       ))}
-                      {categorias.length === 0 && <p className="text-xs text-voltech-muted text-center py-4">No hay categorías registradas</p>}
                     </div>
                   </div>
-
                   <div>
                     <h4 className="text-sm font-semibold text-voltech-purple mb-3">Marcas</h4>
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
@@ -949,7 +885,6 @@ export default function ProductosPage() {
                           <button onClick={() => eliminarCatMarca('marca', mar)} className="p-1 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       ))}
-                      {marcas.length === 0 && <p className="text-xs text-voltech-muted text-center py-4">No hay marcas registradas</p>}
                     </div>
                   </div>
                 </div>
@@ -980,11 +915,7 @@ export default function ProductosPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   <input type="text" placeholder="Nombre" value={nuevaCartera.nombre} onChange={(e) => setNuevaCartera({ ...nuevaCartera, nombre: e.target.value })} className="input-voltech rounded-lg px-3 py-2 text-sm" />
                   <select value={nuevaCartera.tipo} onChange={(e) => setNuevaCartera({ ...nuevaCartera, tipo: e.target.value })} className="input-voltech rounded-lg px-3 py-2 text-sm">
-                    <option value="pago_movil">Pago Móvil</option>
-                    <option value="transferencia">Transferencia</option>
-                    <option value="zelle">Zelle</option>
-                    <option value="binance">Binance</option>
-                    <option value="efectivo">Efectivo</option>
+                    <option value="pago_movil">Pago Móvil</option><option value="transferencia">Transferencia</option><option value="zelle">Zelle</option><option value="binance">Binance</option><option value="efectivo">Efectivo</option>
                   </select>
                   <div className="flex gap-2">
                     <input type="text" placeholder="Datos" value={nuevaCartera.datos} onChange={(e) => setNuevaCartera({ ...nuevaCartera, datos: e.target.value })} className="input-voltech rounded-lg px-3 py-2 text-sm flex-1" />
@@ -1044,9 +975,7 @@ export default function ProductosPage() {
             <span className="text-sm text-white font-medium">{selectedProducts.length} producto(s) seleccionado(s)</span>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setShowBulkCommissionModal(true)} className="px-4 py-2 bg-voltech-purple text-white rounded-lg text-sm font-medium hover:bg-voltech-purple/80 transition-colors flex items-center gap-2">
-              <Percent className="w-4 h-4" /> Asignar % Comisión
-            </button>
+            <button onClick={() => setShowBulkCommissionModal(true)} className="px-4 py-2 bg-voltech-purple text-white rounded-lg text-sm font-medium hover:bg-voltech-purple/80 transition-colors flex items-center gap-2"><Percent className="w-4 h-4" /> Asignar % Comisión</button>
             <button onClick={() => setSelectedProducts([])} className="px-4 py-2 bg-voltech-surface border border-voltech-border text-voltech-muted rounded-lg text-sm hover:text-white transition-colors"><X className="w-4 h-4" /></button>
           </div>
         </motion.div>
@@ -1077,7 +1006,7 @@ export default function ProductosPage() {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2"><Package className="w-5 h-5 text-voltech-cyan" />Nuevo Producto{items.length > 1 && `s (${items.length} items)`}</h2>
-                <button onClick={() => { setShowForm(false); setItems([{ id: crypto.randomUUID(), tipo: 'fisico', imagen: '', imagenFile: null, sku: '', fecha: new Date().toISOString().split('T')[0], comprador: '', plataforma: '', plataformas: [], categoria: '', marca: '', cantidad: 1, metodoPago: 'efectivo', cartera: '', precioMayor: 0, precioDetal: 0, precioOferta: 0, estado: 'nuevo', precioBs: 0, total: 0, monedaCompra: 'usd', duracion: '', tipoOferta: '', esCombo: false, plataformasCombo: [], porcentaje_comision: 5, productos_kit: [], precio_costo_total: 0, precio_individual_total: 0, descripcion_detallada: '' }]); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"><X className="w-5 h-5" /></button>
+                <button onClick={() => { setShowForm(false); setItems([{ id: crypto.randomUUID(), tipo: 'fisico', imagen: '', imagenFile: null, sku: '', fecha: new Date().toISOString().split('T')[0], comprador: '', plataforma: '', categoria: '', marca: '', cantidad: 1, metodoPago: 'efectivo', cartera: '', precioMayor: 0, precioDetal: 0, precioOferta: 0, estado: 'nuevo', precioBs: 0, total: 0, monedaCompra: 'usd', duracion: '', tipoOferta: '', esCombo: false, plataformasCombo: [], porcentaje_comision: 5, productos_kit: [], precio_costo_total: 0, precio_individual_total: 0, descripcion_detallada: '' }]); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"><X className="w-5 h-5" /></button>
               </div>
               <div className="space-y-6">
                 {items.map((item, itemIndex) => (
@@ -1087,9 +1016,9 @@ export default function ProductosPage() {
                     <div className="mb-4">
                       <label className="block text-xs text-voltech-muted mb-2 ml-1">Tipo de Producto</label>
                       <div className="flex gap-3">
-                        <button type="button" onClick={() => { const nuevosItems = [...items]; nuevosItems[itemIndex].tipo = 'fisico'; setItems(nuevosItems); }} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'fisico' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Package className="w-4 h-4" />Físico</button>
-                        <button type="button" onClick={() => { const nuevosItems = [...items]; nuevosItems[itemIndex].tipo = 'streaming'; setItems(nuevosItems); }} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'streaming' ? 'bg-voltech-purple/20 border-voltech-purple text-voltech-purple' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-purple'}`}><MonitorPlay className="w-4 h-4" />Streaming</button>
-                        <button type="button" onClick={() => { const nuevosItems = [...items]; nuevosItems[itemIndex].tipo = 'kit'; nuevosItems[itemIndex].categoria = 'KIT'; nuevosItems[itemIndex].marca = 'Voltech'; setItems(nuevosItems); }} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'kit' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Gift className="w-4 h-4" />Kit</button>
+                        <button type="button" onClick={() => handleChange(itemIndex, { target: { name: 'tipo', value: 'fisico' } })} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'fisico' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Package className="w-4 h-4" />Físico</button>
+                        <button type="button" onClick={() => handleChange(itemIndex, { target: { name: 'tipo', value: 'streaming' } })} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'streaming' ? 'bg-voltech-purple/20 border-voltech-purple text-voltech-purple' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-purple'}`}><MonitorPlay className="w-4 h-4" />Streaming</button>
+                        <button type="button" onClick={() => handleChange(itemIndex, { target: { name: 'tipo', value: 'kit' } })} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'kit' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Gift className="w-4 h-4" />Kit</button>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1107,10 +1036,10 @@ export default function ProductosPage() {
                       </div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">SKU (automático)</label><input type="text" value={item.sku} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-mono text-voltech-cyan bg-voltech-dark/50" /></div>
                       
-                      {/* ✅ CAMBIO: Select para Nombre según tipo */}
-                      <div className="lg:col-span-2">
+                      {/* ✅ SELECT DE PLATAFORMA CON FILTRO CRUZADO */}
+                      <div className="lg:col-span-2 relative">
                         <label className="block text-xs text-voltech-muted mb-1 ml-1">
-                          {item.tipo === 'streaming' ? 'Nombre Plataforma' : item.tipo === 'kit' ? 'Nombre del Kit' : 'Nombre del Producto'} *
+                          {item.tipo === 'streaming' ? 'Nombre Plataforma *' : item.tipo === 'kit' ? 'Nombre del Kit *' : 'Nombre del Producto *'}
                         </label>
                         <div className="flex gap-2">
                           <select 
@@ -1119,29 +1048,21 @@ export default function ProductosPage() {
                             className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm"
                           >
                             <option value="">-- Selecciona --</option>
-                            {item.tipo === 'fisico' && productosFisicos.map((nombre, idx) => (
-                              <option key={idx} value={nombre}>{nombre}</option>
-                            ))}
-                            {item.tipo === 'streaming' && plataformasStreaming.map((nombre, idx) => (
-                              <option key={idx} value={nombre}>{nombre}</option>
-                            ))}
-                            {item.tipo === 'kit' && nombresKits.map((nombre, idx) => (
-                              <option key={idx} value={nombre}>{nombre}</option>
-                            ))}
+                            {productos
+                              .filter(p => p.tipo === item.tipo)
+                              .filter(p => !item.categoria || p.categoria === item.categoria)
+                              .filter(p => !item.marca || p.marca === item.marca)
+                              .map((p, idx) => (
+                                <option key={idx} value={p.plataforma}>{p.plataforma}</option>
+                              ))}
                           </select>
-                          <button 
-                            onClick={() => abrirNuevoCampo('plataforma')} 
-                            className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors"
-                            title="Agregar nuevo"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
+                          <button onClick={() => abrirNuevoCampo('plataforma')} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors" title="Agregar nuevo"><Plus className="w-4 h-4" /></button>
                         </div>
                       </div>
                       
-                      {/* ✅ CAMBIO: Select para Categoría (solo Físico) */}
+                      {/* ✅ SELECT DE CATEGORÍA CON FILTRO CRUZADO */}
                       {item.tipo === 'fisico' ? (
-                        <div>
+                        <div className="relative">
                           <label className="block text-xs text-voltech-muted mb-1 ml-1">Categoría *</label>
                           <div className="flex gap-2">
                             <select 
@@ -1150,7 +1071,7 @@ export default function ProductosPage() {
                               className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm"
                             >
                               <option value="">-- Selecciona --</option>
-                              {categorias.map((cat, idx) => (
+                              {[...new Set(productos.filter(p => p.tipo === 'fisico' && (!item.marca || p.marca === item.marca)).map(p => p.categoria))].map((cat, idx) => (
                                 <option key={idx} value={cat}>{cat}</option>
                               ))}
                             </select>
@@ -1160,18 +1081,13 @@ export default function ProductosPage() {
                       ) : (
                         <div>
                           <label className="block text-xs text-voltech-muted mb-1 ml-1">Categoría (Fija)</label>
-                          <input 
-                            type="text" 
-                            value={item.categoria} 
-                            readOnly 
-                            className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed" 
-                          />
+                          <input type="text" value={item.categoria} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed" />
                         </div>
                       )}
 
-                      {/* ✅ CAMBIO: Select para Marca (solo Físico) */}
+                      {/* ✅ SELECT DE MARCA CON FILTRO CRUZADO */}
                       {item.tipo === 'fisico' && (
-                        <div>
+                        <div className="relative">
                           <label className="block text-xs text-voltech-muted mb-1 ml-1">Marca *</label>
                           <div className="flex gap-2">
                             <select 
@@ -1180,7 +1096,7 @@ export default function ProductosPage() {
                               className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm"
                             >
                               <option value="">-- Selecciona --</option>
-                              {marcas.map((marca, idx) => (
+                              {[...new Set(productos.filter(p => p.tipo === 'fisico' && (!item.categoria || p.categoria === item.categoria)).map(p => p.marca))].map((marca, idx) => (
                                 <option key={idx} value={marca}>{marca}</option>
                               ))}
                             </select>
@@ -1224,7 +1140,7 @@ export default function ProductosPage() {
                         </div>
                       )}
 
-                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cantidad</label><input type="number" value={item.cantidad} onChange={(e) => { handleChange(itemIndex, { target: { name: 'cantidad', value: e.target.value } }); calcularTotal(itemIndex); }} min="0" className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
+                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cantidad</label><input type="number" value={item.cantidad} onChange={(e) => handleChange(itemIndex, { target: { name: 'cantidad', value: e.target.value } })} min="0" className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                       
                       {item.tipo === 'kit' && (item.productos_kit || []).length > 0 && (
                         <div className="lg:col-span-3 bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 space-y-2">
@@ -1234,13 +1150,7 @@ export default function ProductosPage() {
                             <div><p className="text-xs text-voltech-muted">Valor Individual:</p><p className="font-bold text-white">${(item.precio_individual_total || 0).toFixed(2)}</p></div>
                             <div>
                               <label className="text-xs text-voltech-muted block">Precio del Kit ($):</label>
-                              <input 
-                                type="number" 
-                                step="0.01" 
-                                value={item.precioDetal} 
-                                onChange={(e) => calcularPrecioCruzado(itemIndex, 'precioDetal', e.target.value)} 
-                                className="input-voltech w-full rounded px-2 py-1 text-sm font-bold text-voltech-success" 
-                              />
+                              <input type="number" step="0.01" value={item.precioDetal} onChange={(e) => handleChange(itemIndex, { target: { name: 'precioDetal', value: e.target.value } })} className="input-voltech w-full rounded px-2 py-1 text-sm font-bold text-voltech-success" />
                             </div>
                             <div><p className="text-xs text-voltech-muted">Ganancia Estimada:</p><p className="font-bold text-voltech-success">${(item.precioDetal - (item.precio_costo_total || 0)).toFixed(2)}</p></div>
                           </div>
@@ -1249,8 +1159,8 @@ export default function ProductosPage() {
 
                       {item.tipo !== 'kit' && (
                         <>
-                          {item.tipo === 'fisico' && (<div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Mayor ($) <span className="text-voltech-warning">(Tu costo)</span></label><input type="number" step="0.01" value={item.precioMayor} onChange={(e) => calcularPrecioCruzado(itemIndex, 'precioMayor', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>)}
-                          <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Detal ($) <span className="text-voltech-success">(Venta al público)</span></label><input type="number" step="0.01" value={item.precioDetal} onChange={(e) => calcularPrecioCruzado(itemIndex, 'precioDetal', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Precio de venta" />{item.tipo === 'fisico' && item.precioMayor > 0 && item.precioDetal > 0 && (<p className="text-xs text-voltech-success mt-1">Ganancia: ${(item.precioDetal - item.precioMayor).toFixed(2)} ({((item.precioDetal - item.precioMayor) / item.precioMayor * 100).toFixed(0)}%)</p>)}</div>
+                          {item.tipo === 'fisico' && (<div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Mayor ($) <span className="text-voltech-warning">(Tu costo)</span></label><input type="number" step="0.01" value={item.precioMayor} onChange={(e) => handleChange(itemIndex, { target: { name: 'precioMayor', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>)}
+                          <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Detal ($) <span className="text-voltech-success">(Venta al público)</span></label><input type="number" step="0.01" value={item.precioDetal} onChange={(e) => handleChange(itemIndex, { target: { name: 'precioDetal', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Precio de venta" />{item.tipo === 'fisico' && item.precioMayor > 0 && item.precioDetal > 0 && (<p className="text-xs text-voltech-success mt-1">Ganancia: ${(item.precioDetal - item.precioMayor).toFixed(2)} ({((item.precioDetal - item.precioMayor) / item.precioMayor * 100).toFixed(0)}%)</p>)}</div>
                         </>
                       )}
                       
@@ -1268,21 +1178,17 @@ export default function ProductosPage() {
                         <input type="number" step="0.01" value={item.precioOferta} onChange={(e) => handleChange(itemIndex, { target: { name: 'precioOferta', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="0.00" />
                       </div>
 
-                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio (Bs)</label><input type="number" step="0.01" value={item.precioBs} onChange={(e) => calcularPrecioCruzado(itemIndex, 'precioBs', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
+                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio (Bs)</label><input type="number" step="0.01" value={item.precioBs} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-cyan bg-voltech-dark/50" /></div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Total</label><input type="number" step="0.01" value={item.total} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-success bg-voltech-dark/50" /></div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Método de Pago</label><select value={item.metodoPago} onChange={(e) => handleChange(itemIndex, { target: { name: 'metodoPago', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="efectivo">Efectivo</option><option value="pago_movil">Pago Móvil</option><option value="transferencia">Transferencia</option><option value="zelle">Zelle</option><option value="binance">Binance</option><option value="otro">Otro</option></select></div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cartera</label><select value={item.cartera} onChange={(e) => handleChange(itemIndex, { target: { name: 'cartera', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="">-- Selecciona --</option>{carteras.map(c => (<option key={c.id} value={c.nombre}>{c.nombre}</option>))}</select></div>
-                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">% Comisión por Venta</label><input type="number" step="0.01" value={item.porcentaje_comision} onChange={(e) => { const nuevosItems = [...items]; nuevosItems[itemIndex].porcentaje_comision = parseFloat(e.target.value); setItems(nuevosItems); }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
+                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">% Comisión por Venta</label><input type="number" step="0.01" value={item.porcentaje_comision} onChange={(e) => handleChange(itemIndex, { target: { name: 'porcentaje_comision', value: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                       
                       <div className="lg:col-span-3">
                         <label className="block text-xs text-voltech-muted mb-1 ml-1">Descripción Detallada (para Chatbot)</label>
                         <textarea 
                           value={item.descripcion_detallada || ''} 
-                          onChange={(e) => {
-                            const nuevosItems = [...items];
-                            nuevosItems[itemIndex].descripcion_detallada = e.target.value;
-                            setItems(nuevosItems);
-                          }} 
+                          onChange={(e) => handleChange(itemIndex, { target: { name: 'descripcion_detallada', value: e.target.value } })} 
                           className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-24 resize-none" 
                           placeholder="Ej: Batería de 5000mAh, carga rápida 25W, resistencia al agua IP68, incluye cargador y cable USB-C..."
                         />
@@ -1301,6 +1207,7 @@ export default function ProductosPage() {
         )}
       </AnimatePresence>
 
+      {/* ... El resto del código (Modales, Tablas, Grid) se mantiene EXACTAMENTE igual que en tu versión original ... */}
       <AnimatePresence>
         {showComboModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
@@ -1364,32 +1271,15 @@ export default function ProductosPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">{producto.tipo === 'streaming' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-purple/20 text-voltech-purple flex items-center gap-1 w-fit"><MonitorPlay className="w-3 h-3" />Streaming</span>) : producto.tipo === 'kit' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit"><Gift className="w-3 h-3" />Kit</span>) : (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit"><Package className="w-3 h-3" />Físico</span>)}</td>
-                      
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${getEstadoBadge(producto.estado)}`}>
-                          {producto.estado ? producto.estado.charAt(0).toUpperCase() + producto.estado.slice(1) : 'Nuevo'}
-                        </span>
-                      </td>
-                      
+                      <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full font-medium ${getEstadoBadge(producto.estado)}`}>{producto.estado ? producto.estado.charAt(0).toUpperCase() + producto.estado.slice(1) : 'Nuevo'}</span></td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{producto.categoria}</td>
                       <td className="px-4 py-3"><span className={`text-sm font-medium ${producto.cantidad === 0 ? 'text-voltech-error' : producto.cantidad <= 2 ? 'text-voltech-warning' : 'text-voltech-success'}`}>{producto.cantidad}</span></td>
-                      
                       <td className="px-4 py-3">
                         {producto.precioOferta > 0 && producto.estado === 'oferta' ? (
-                          <div className="flex flex-col">
-                            <span className="text-xs text-gray-400 line-through">$${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</span>
-                            <span className="text-sm font-bold text-voltech-warning">${parseFloat(producto.precioOferta || 0).toFixed(2)}</span>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-white">$${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</span>
-                        )}
+                          <div className="flex flex-col"><span className="text-xs text-gray-400 line-through">$${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</span><span className="text-sm font-bold text-voltech-warning">${parseFloat(producto.precioOferta || 0).toFixed(2)}</span></div>
+                        ) : (<span className="text-sm text-white">$${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</span>)}
                       </td>
-                      
-                      <td className="px-4 py-3">
-                        {tienePermiso('puedeVerInventarioCompleto') ? (
-                          <input type="number" step="0.01" value={producto.porcentaje_comision || 5} onChange={(e) => { const nuevosProductos = productos.map(p => p.id === producto.id ? { ...p, porcentaje_comision: parseFloat(e.target.value) } : p); setProductos(nuevosProductos); localStorage.setItem('voltech_productos', JSON.stringify(nuevosProductos)); }} className="input-voltech w-20 rounded-lg px-2 py-1 text-sm" />
-                        ) : (<span className="text-sm text-voltech-muted">{producto.porcentaje_comision || 5}%</span>)}
-                      </td>
+                      <td className="px-4 py-3">{tienePermiso('puedeVerInventarioCompleto') ? (<input type="number" step="0.01" value={producto.porcentaje_comision || 5} onChange={(e) => { const nuevosProductos = productos.map(p => p.id === producto.id ? { ...p, porcentaje_comision: parseFloat(e.target.value) } : p); setProductos(nuevosProductos); localStorage.setItem('voltech_productos', JSON.stringify(nuevosProductos)); }} className="input-voltech w-20 rounded-lg px-2 py-1 text-sm" />) : (<span className="text-sm text-voltech-muted">{producto.porcentaje_comision || 5}%</span>)}</td>
                       <td className="px-4 py-3 text-center">
                         <button onClick={() => togglePublicado(producto.id)} className={`p-2 rounded-lg transition-colors ${producto.publicado ? 'bg-voltech-success/20 text-voltech-success hover:bg-voltech-success/30' : 'bg-voltech-dark text-voltech-muted hover:bg-voltech-border'}`} title={producto.publicado ? 'Ocultar de la tienda' : 'Publicar en la tienda'}>{producto.publicado ? <Globe className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
                       </td>
@@ -1437,13 +1327,8 @@ export default function ProductosPage() {
                   <div className="flex items-center justify-between mb-3">
                     <div>
                       {producto.precioOferta > 0 && producto.estado === 'oferta' ? (
-                        <>
-                          <p className="text-xs text-gray-400 line-through">${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</p>
-                          <p className="text-lg font-bold text-voltech-warning">${Number(producto.precioOferta || 0).toFixed(2)}</p>
-                        </>
-                      ) : (
-                        <p className="text-lg font-bold text-white">${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</p>
-                      )}
+                        <><p className="text-xs text-gray-400 line-through">${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</p><p className="text-lg font-bold text-voltech-warning">${Number(producto.precioOferta || 0).toFixed(2)}</p></>
+                      ) : (<p className="text-lg font-bold text-white">${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</p>)}
                       <p className="text-xs text-voltech-muted">Bs {producto.precioBs.toFixed(2)}</p>
                     </div>
                     <div className="text-right"><p className="text-xs text-voltech-muted">Comisión</p><p className="text-sm font-bold text-voltech-purple">{producto.porcentaje_comision || 5}%</p></div>
@@ -1479,15 +1364,9 @@ export default function ProductosPage() {
               <div className="flex gap-2">{['nuevo', 'oferta', 'kit', 'agotado'].map((estado) => (<button key={estado} onClick={() => setEditData({ ...editData, estado })} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${editData.estado === estado ? estado === 'nuevo' ? 'bg-voltech-success text-white' : estado === 'oferta' ? 'bg-voltech-warning text-white' : estado === 'kit' ? 'bg-voltech-cyan text-white' : 'bg-voltech-error text-white' : 'bg-voltech-dark border border-voltech-border text-voltech-muted hover:border-voltech-muted'}`}>{estado.charAt(0).toUpperCase() + estado.slice(1)}</button>))}</div>
             </div>
             <div className="lg:col-span-3"><label className="block text-xs text-voltech-muted mb-1 ml-1">Descripción</label><textarea value={editData.descripcion} onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-20 resize-none" placeholder="Descripción corta del producto..." /></div>
-            
             <div className="lg:col-span-3">
               <label className="block text-xs text-voltech-muted mb-1 ml-1">Descripción Detallada (para Chatbot)</label>
-              <textarea 
-                value={editData.descripcion_detallada || ''} 
-                onChange={(e) => setEditData({ ...editData, descripcion_detallada: e.target.value })} 
-                className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-24 resize-none" 
-                placeholder="Ej: Batería de 5000mAh, carga rápida 25W, resistencia al agua IP68, incluye cargador y cable USB-C..."
-              />
+              <textarea value={editData.descripcion_detallada || ''} onChange={(e) => setEditData({ ...editData, descripcion_detallada: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-24 resize-none" placeholder="Ej: Batería de 5000mAh, carga rápida 25W, resistencia al agua IP68, incluye cargador y cable USB-C..." />
               <p className="text-xs text-voltech-muted mt-1">Información técnica detallada para que el chatbot responda preguntas</p>
             </div>
           </div>
