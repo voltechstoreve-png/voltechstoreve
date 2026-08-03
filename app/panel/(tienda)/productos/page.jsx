@@ -186,67 +186,78 @@ export default function ProductosPage() {
     }
   };
 
-  // ✅ CORRECCIÓN: Manejo centralizado con filtros cruzados y cálculo financiero
   const handleChange = (index, e) => {
-    const { name, value } = e.target;
-    const nuevosItems = [...items];
-    const item = nuevosItems[index];
-    
-    // 1. Reset automático al cambiar de tipo
-    if (name === 'tipo') {
-      item.plataforma = '';
-      item.categoria = '';
-      item.marca = '';
-      if (value === 'streaming') {
-        item.categoria = 'STREAMING';
-        item.marca = 'Voltech';
-      } else if (value === 'kit') {
-        item.categoria = 'KIT';
-        item.marca = 'Voltech';
+  const { name, value } = e.target;
+  const nuevosItems = [...items];
+  const item = nuevosItems[index];
+  
+  // 1. Reset automático al cambiar de tipo
+  if (name === 'tipo') {
+    item.plataforma = '';
+    item.categoria = '';
+    item.marca = '';
+    item.sku = ''; // ✅ LIMPIAR SKU al cambiar de tipo
+    if (value === 'streaming') {
+      item.categoria = 'STREAMING';
+      item.marca = 'Voltech';
+    } else if (value === 'kit') {
+      item.categoria = 'KIT';
+      item.marca = 'Voltech';
+    }
+  }
+  
+  // 2. Asignar nuevo valor
+  item[name] = value;
+
+  // 3. Filtros cruzados dependientes
+  if (name === 'plataforma' && value) {
+    const prod = productos.find(p => p.plataforma === value && p.tipo === item.tipo);
+    if (prod) {
+      item.categoria = prod.categoria;
+      item.marca = prod.marca;
+    }
+  }
+
+  if (name === 'categoria' && item.plataforma) {
+    const prodValido = productos.find(p => p.plataforma === item.plataforma && p.categoria === value && p.tipo === item.tipo);
+    if (!prodValido) item.plataforma = ''; // Limpiar si no coincide
+  }
+
+  if (name === 'marca' && item.plataforma) {
+    const prodValido = productos.find(p => p.plataforma === item.plataforma && p.marca === value && p.tipo === item.tipo);
+    if (!prodValido) item.plataforma = ''; // Limpiar si no coincide
+  }
+
+  // 4. ✅ CORRECCIÓN FINANCIERA: Cálculo automático de Total y Bs
+  const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
+  const qty = parseInt(item.cantidad) || 1;
+  let precioUnitario = 0;
+
+  if (item.tipo === 'kit') {
+    precioUnitario = parseFloat(item.precioDetal) || 0;
+  } else {
+    precioUnitario = (parseFloat(item.precioOferta) > 0) ? parseFloat(item.precioOferta) : (parseFloat(item.precioDetal) || 0);
+  }
+
+  item.total = precioUnitario * qty;
+  item.precioBs = precioUnitario * tasa;
+  
+  setItems(nuevosItems);
+  
+  // ✅ FORZAR actualización de SKU después de cambiar tipo o plataforma/categoria/marca
+  if (['plataforma', 'categoria', 'marca', 'tipo'].includes(name)) {
+    setTimeout(() => {
+      const itemActualizado = items[index]; // Obtener el item ya actualizado
+      if (itemActualizado.plataforma && itemActualizado.categoria) {
+        const siguientesItems = [...items];
+        const siguienteNum = obtenerSiguienteNumero(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca);
+        const nuevoSKU = generarSKU(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca, siguienteNum);
+        siguientesItems[index].sku = nuevoSKU;
+        setItems(siguientesItems);
       }
-    }
-    
-    // 2. Asignar nuevo valor
-    item[name] = value;
-
-    // 3. Filtros cruzados dependientes
-    if (name === 'plataforma' && value) {
-      const prod = productos.find(p => p.plataforma === value && p.tipo === item.tipo);
-      if (prod) {
-        item.categoria = prod.categoria;
-        item.marca = prod.marca;
-      }
-    }
-
-    if (name === 'categoria' && item.plataforma) {
-      const prodValido = productos.find(p => p.plataforma === item.plataforma && p.categoria === value && p.tipo === item.tipo);
-      if (!prodValido) item.plataforma = ''; // Limpiar si no coincide
-    }
-
-    if (name === 'marca' && item.plataforma) {
-      const prodValido = productos.find(p => p.plataforma === item.plataforma && p.marca === value && p.tipo === item.tipo);
-      if (!prodValido) item.plataforma = ''; // Limpiar si no coincide
-    }
-
-    // 4. ✅ CORRECCIÓN FINANCIERA: Cálculo automático de Total y Bs (Arregla el bug de $0 en Kits)
-    const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
-    const qty = parseInt(item.cantidad) || 1;
-    let precioUnitario = 0;
-
-    if (item.tipo === 'kit') {
-      precioUnitario = parseFloat(item.precioDetal) || 0;
-    } else {
-      precioUnitario = (parseFloat(item.precioOferta) > 0) ? parseFloat(item.precioOferta) : (parseFloat(item.precioDetal) || 0);
-    }
-
-    item.total = precioUnitario * qty;
-    item.precioBs = precioUnitario * tasa;
-    
-    setItems(nuevosItems);
-    if (['plataforma', 'categoria', 'marca', 'tipo'].includes(name)) {
-      setTimeout(() => actualizarSKU(index), 100);
-    }
-  };
+    }, 100);
+  }
+};
 
   const toggleProductoKit = (index, producto) => {
     const nuevosItems = [...items];
