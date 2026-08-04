@@ -1,250 +1,435 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useTheme } from '@/app/context/ThemeContext';
-import { usePermissions } from '@/app/context/PermissionsContext';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 import { 
-  LayoutDashboard, 
-  Package, 
-  ShoppingCart, 
-  Users, 
-  TrendingUp, 
-  Megaphone, 
-  Gift, 
-  MessageSquare, 
+  Menu, 
+  Search,
+  ChevronDown,
+  User,
   Settings,
-  ChevronLeft,
-  Monitor,
-  Moon,
   LogOut,
-  PlayCircle,
-  UserCog,
-  BarChart,      
-  Target,        
-  DollarSign,
-  Truck,
-  CreditCard
+  X,
+  TrendingUp,
+  Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
+import { useNotificaciones } from '@/app/context/NotificationContext';
+import NotificationBell from '@/components/NotificationBell';
 
-export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }) {
-  const pathname = usePathname();
-  const { darkMode, setDarkMode } = useTheme();
+export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkMode }) {
+  const router = useRouter();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
-  const { usuarioActual, tienePermiso, esAdmin, esSocio } = usePermissions();
+  const [userData, setUserData] = useState({
+    nombre: 'Administrador',
+    email: 'admin@voltech.store',
+    rol: 'Admin',
+    avatar: 'https://ui-avatars.com/api/?name=Administrador&background=00d4ff&color=fff&bold=true',
+    id: null
+  });
 
-  const finalIsOpen = sidebarOpen !== undefined ? sidebarOpen : isOpen;
-  const finalOnClose = setSidebarOpen ? () => setSidebarOpen(false) : onClose;
+  const [salesStats, setSalesStats] = useState({
+    clics: 0,
+    ventas: 0,
+    comisiones: 0
+  });
 
-  // ✅ DETECTA SI ES MÓVIL (< 1024px)
-  const [isMobile, setIsMobile] = useState(false);
+  const { notificaciones } = useNotificaciones();
+
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 1023px)');
-    const update = () => setIsMobile(mq.matches);
-    update();
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
+    const fetchUserDataAndStats = async () => {
+      let user = null;
+      const userLoggedStr = localStorage.getItem('voltech_user');
+      
+      if (userLoggedStr) {
+        const localUser = JSON.parse(userLoggedStr);
+        
+        if (supabase && localUser.id) {
+          const { data, error } = await supabase
+            .from('usuarios')
+            .select('*')
+            .eq('id', localUser.id)
+            .single();
+          
+          if (!error && data) {
+            user = data;
+          } else {
+            user = localUser;
+          }
+        } else {
+          user = localUser;
+        }
+      }
+
+      if (user) {
+        setUserData(prev => ({
+          ...prev,
+          nombre: user.nombre || 'Administrador',
+          email: user.email || 'admin@voltech.store',
+          rol: user.rol || 'Admin',
+          avatar: user.avatar || `https://ui-avatars.com/api/?name=${user.nombre || 'Admin'}&background=00d4ff&color=fff&bold=true`,
+          id: user.id || null
+        }));
+
+        let ventasCount = 0;
+        let comisionesTotal = 0;
+        const nombreVendedor = user.nombre?.toLowerCase() || '';
+        
+        const normalizarNombre = (nombre) => {
+          if (!nombre) return '';
+          return nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        };
+        const nombreNormalizado = normalizarNombre(nombreVendedor);
+
+        const calcularDesdeLocalStorage = () => {
+          const ventasProductos = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
+          const ventasStreaming = JSON.parse(localStorage.getItem('voltech_ventas_streaming') || '[]');
+          
+          [...ventasProductos, ...ventasStreaming].forEach(venta => {
+            const vendedorVenta = normalizarNombre(
+              venta.vendedor || 
+              venta.vendedorNombre || 
+              venta.usuario || 
+              venta.user || 
+              venta.empleado || 
+              venta.nombreVendedor ||
+              ''
+            );
+            
+            const coincide = 
+              vendedorVenta === nombreNormalizado ||
+              vendedorVenta.includes(nombreNormalizado) ||
+              nombreNormalizado.includes(vendedorVenta);
+
+            if (coincide) {
+              ventasCount += 1;
+              const total = venta.total || 0;
+              comisionesTotal += total * 0.10;
+            }
+          });
+        };
+
+        if (supabase) {
+          const { data: ventasData, error } = await supabase
+            .from('ventas')
+            .select('*');
+          
+          if (!error && ventasData) {
+            ventasData.forEach(venta => {
+              const vendedorVenta = normalizarNombre(
+                venta.vendedor || 
+                venta.vendedorNombre || 
+                venta.usuario || 
+                venta.user || 
+                venta.empleado || 
+                venta.nombreVendedor ||
+                ''
+              );
+              
+              const coincide = 
+                vendedorVenta === nombreNormalizado ||
+                vendedorVenta.includes(nombreNormalizado) ||
+                nombreNormalizado.includes(vendedorVenta);
+
+              if (coincide) {
+                ventasCount += 1;
+                const total = venta.total || 0;
+                comisionesTotal += total * 0.10;
+              }
+            });
+          } else {
+            calcularDesdeLocalStorage();
+          }
+        } else {
+          calcularDesdeLocalStorage();
+        }
+
+        const clics = parseInt(localStorage.getItem(`clics_ref_${user.nombre}`) || '0') || 8;
+
+        setSalesStats({
+          clics,
+          ventas: ventasCount,
+          comisiones: comisionesTotal
+        });
+      }
+    };
+
+    fetchUserDataAndStats();
   }, []);
 
-  const menuItems = [
-    {
-      section: 'PANEL TIENDA',
-      items: [
-        { name: 'Catálogo Público', icon: Package, path: '/catalogo', siempreVisible: true },
-        { name: 'Productos', icon: Package, path: '/panel/productos', siempreVisible: true },
-        { name: 'Proveedores', icon: Truck, path: '/panel/proveedores', requierePermiso: 'puedeVerConfiguracion' },
-        { name: 'Sorteos', icon: Gift, path: '/panel/sorteos', requierePermiso: 'puedeVerConfiguracion' },
-        { name: 'Opiniones', icon: MessageSquare, path: '/panel/opiniones', requierePermiso: 'puedeVerConfiguracion' },
-      ]
-    },
-    {
-      section: 'PANEL VENTAS',
-      items: [
-        { name: 'Dashboard Ventas', icon: BarChart, path: '/panel/dashboard-ventas', siempreVisible: true },
-        { name: 'Ventas Productos', icon: ShoppingCart, path: '/panel/ventas-productos', siempreVisible: true },
-        { name: 'Ventas Streaming', icon: PlayCircle, path: '/panel/ventas-streaming', siempreVisible: true },
-        { name: 'Clientes', icon: Users, path: '/panel/clientes', siempreVisible: true },
-      ]
-    },
-    {
-      section: 'PANEL FINANZAS',
-      items: [
-        { name: 'Dashboard Finanzas', icon: DollarSign, path: '/panel/finanzas', requierePermiso: 'puedeVerFinanzas' },
-        { name: 'Pagos al Equipo', icon: CreditCard, path: '/panel/finanzas/pagos-equipos', requierePermiso: 'puedeVerFinanzas' },
-        { name: 'Metas y Comisiones', icon: Target, path: '/panel/metas-comisiones', siempreVisible: true },
-      ]
-    },
-    {
-      section: 'PANEL MARKETING',
-      items: [
-        { name: 'Marketing', icon: Megaphone, path: '/panel/marketing', siempreVisible: true },
-      ]
-    },
-    {
-      section: 'SISTEMA',
-      items: [
-        { name: 'Equipo', icon: UserCog, path: '/panel/equipo', requierePermiso: 'puedeCrearUsuarios' },
-        { name: 'Ajustes', icon: Settings, path: '/panel/ajustes', requierePermiso: 'puedeVerConfiguracion' },
-      ]
-    }
-  ];
+  const referralCode = userData.nombre ? `VOLTECHSTORE-${userData.nombre.substring(0, 5).toUpperCase()}-${(userData.id || '0000').toString().slice(-4)}` : 'voltech2024';
+  const referralLink = typeof window !== 'undefined' ? `${window.location.origin}/catalogo?ref=${referralCode}` : '';
 
-  const menuItemsFiltrados = menuItems.map(section => ({
-    ...section,
-    items: section.items.filter(item => {
-      if (item.siempreVisible) return true;
-      if (item.requierePermiso && tienePermiso(item.requierePermiso)) return true;
-      return false;
-    })
-  })).filter(section => section.items.length > 0);
-
-  const handleLogout = () => {
-    localStorage.removeItem('voltech_user');
-    window.location.href = '/login';
+  const copyReferralLink = () => {
+    navigator.clipboard.writeText(referralLink);
+    toast.success('Link de referido copiado al portapapeles');
   };
 
-  // ✅ CONTENIDO INTERNO (compartido por móvil y PC)
-  const contenido = (
-    <div className={`flex flex-col h-full ${isMobile ? 'w-full' : 'w-64'}`}>
-      <div className="flex items-center justify-between p-4 border-b border-voltech-border">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-xl font-extrabold bg-gradient-to-r from-voltech-cyan to-voltech-purple bg-clip-text text-transparent cursor-pointer"
-          onClick={() => window.location.href = '/'}
-        >
-          VOLTECH
-        </motion.div>
-        <button
-          onClick={finalOnClose}
-          className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-      </div>
+  const handleLogout = () => {
+    if (confirm('¿Estás seguro de que deseas cerrar sesión?')) {
+      localStorage.removeItem('voltech_user');
+      toast.success('Sesión cerrada correctamente');
+      setTimeout(() => {
+        router.push('/login');
+      }, 1000);
+    }
+  };
 
-      <nav className="flex-1 overflow-y-auto p-4 space-y-6">
-        {menuItemsFiltrados.map((section, sectionIndex) => (
-          <div key={sectionIndex}>
-            <motion.h3
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-[10px] font-bold text-voltech-muted uppercase tracking-wider mb-2"
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+        setTimeout(() => {
+          document.getElementById('global-search-input')?.focus();
+        }, 100);
+      }
+      if (e.key === 'Escape') {
+        setSearchOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/panel/productos?search=${encodeURIComponent(searchQuery)}`);
+      setSearchOpen(false);
+      setSearchQuery('');
+    }
+  };
+
+  return (
+    <>
+      <header className="bg-voltech-surface border-b border-voltech-border px-3 sm:px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors"
+              title={sidebarOpen ? 'Contraer menú' : 'Expandir menú'}
             >
-              {section.section}
-            </motion.h3>
-            <div className="space-y-1">
-              {section.items.map((item) => {
-                const isActive = pathname === item.path;
-                const Icon = item.icon;
-                
-                return (
-                  <div key={item.path} className="relative group">
-                    <Link
-                      href={item.path}
-                      onClick={() => { if (isMobile) finalOnClose(); }}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
-                        isActive
-                          ? 'bg-gradient-to-r from-voltech-cyan/20 to-voltech-purple/20 text-voltech-cyan border-l-2 border-voltech-cyan'
-                          : 'text-voltech-muted hover:bg-voltech-border hover:text-white'
-                      }`}
-                    >
-                      <Icon className="w-5 h-5 flex-shrink-0" />
-                      <motion.span
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="text-sm font-medium"
-                      >
-                        {item.name}
-                      </motion.span>
-                    </Link>
-                    
-                    {!isMobile && !finalIsOpen && (
-                      <div className="absolute left-full ml-2 px-3 py-2 bg-voltech-surface border border-voltech-border rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50">
-                        <span className="text-sm font-medium text-white">{item.name}</span>
-                        <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 w-2 h-2 bg-voltech-surface border-l border-b border-voltech-border rotate-45"></div>
+              <Menu className="w-5 h-5" />
+            </button>
+
+            {/* ✅ Búsqueda visible en móvil */}
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="md:hidden p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors"
+              title="Buscar"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="hidden md:flex items-center gap-2 bg-voltech-dark border border-voltech-border rounded-lg px-3 py-2 hover:border-voltech-cyan transition-colors"
+            >
+              <Search className="w-4 h-4 text-voltech-muted" />
+              <span className="text-sm text-voltech-muted">Buscar...</span>
+              <span className="text-[10px] text-voltech-muted bg-voltech-border px-2 py-0.5 rounded">
+                Ctrl Shift K
+              </span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1 sm:gap-4">
+            <NotificationBell />
+
+            <div className="relative">
+              <button
+                onClick={() => setStatsOpen(!statsOpen)}
+                className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors relative"
+                title="Mis Ventas"
+              >
+                <TrendingUp className="w-5 h-5" />
+                {salesStats.ventas > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-voltech-success rounded-full"></span>
+                )}
+              </button>
+
+              <AnimatePresence>
+                {statsOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute right-0 mt-2 w-72 sm:w-80 max-w-[calc(100vw-1.5rem)] bg-voltech-surface border border-voltech-border rounded-lg shadow-xl z-50"
+                  >
+                    <div className="p-3 border-b border-voltech-border">
+                      <h3 className="font-semibold text-white flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-voltech-cyan" />
+                        Mis Ventas
+                      </h3>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      <div>
+                        <p className="text-xs text-voltech-muted mb-1">Tu link de referencia:</p>
+                        <div className="flex items-center gap-2 bg-voltech-dark border border-voltech-border rounded-lg p-2">
+                          <span className="text-xs text-voltech-cyan truncate flex-1">{referralLink}</span>
+                          <button 
+                            onClick={copyReferralLink}
+                            className="p-1 hover:bg-voltech-border rounded transition-colors"
+                            title="Copiar"
+                          >
+                            <Copy className="w-3 h-3 text-voltech-muted" />
+                          </button>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                      
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-voltech-dark/50 rounded-lg p-2">
+                          <p className="text-lg font-bold text-white">{salesStats.clics}</p>
+                          <p className="text-[10px] text-voltech-muted">Clics</p>
+                        </div>
+                        <div className="bg-voltech-dark/50 rounded-lg p-2">
+                          <p className="text-lg font-bold text-voltech-success">{salesStats.ventas}</p>
+                          <p className="text-[10px] text-voltech-muted">Ventas</p>
+                        </div>
+                        <div className="bg-voltech-dark/50 rounded-lg p-2">
+                          <p className="text-lg font-bold text-voltech-cyan">${salesStats.comisiones.toFixed(2)}</p>
+                          <p className="text-[10px] text-voltech-muted">Comisiones</p>
+                        </div>
+                      </div>
+
+                      <button 
+                        onClick={() => {
+                          router.push('/panel/dashboard-ventas');
+                          setStatsOpen(false);
+                        }}
+                        className="w-full py-2 text-xs text-voltech-cyan hover:bg-voltech-cyan/10 rounded-lg transition-colors flex items-center justify-center gap-1"
+                      >
+                        Ver reporte completo <TrendingUp className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <div className="relative">
+              <button
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="flex items-center gap-2 p-2 rounded-lg hover:bg-voltech-border transition-colors"
+              >
+                <img 
+                  src={userData.avatar} 
+                  alt={userData.nombre} 
+                  className="w-8 h-8 rounded-full" 
+                />
+                <div className="hidden md:block text-left">
+                  <p className="text-sm font-medium text-white">{userData.nombre}</p>
+                  <p className="text-[10px] text-voltech-muted">{userData.rol}</p>
+                </div>
+                <ChevronDown className="w-4 h-4 text-voltech-muted" />
+              </button>
+
+              <AnimatePresence>
+                {userMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1.5rem)] bg-voltech-surface border border-voltech-border rounded-lg shadow-xl z-50 overflow-hidden"
+                  >
+                    <div className="p-3 border-b border-voltech-border">
+                      <p className="text-sm font-semibold text-white">{userData.nombre}</p>
+                      <p className="text-xs text-voltech-muted">{userData.email}</p>
+                    </div>
+                    
+                    <div className="py-2">
+                      <button 
+                        onClick={() => {
+                          router.push('/panel/perfil');
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-voltech-muted hover:bg-voltech-border hover:text-white transition-colors"
+                      >
+                        <User className="w-4 h-4" />
+                        Mi Perfil
+                      </button>
+                      <button 
+                        onClick={() => {
+                          router.push('/panel/configuracion');
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-voltech-muted hover:bg-voltech-border hover:text-white transition-colors"
+                      >
+                        <Settings className="w-4 h-4" />
+                        Configuración
+                      </button>
+                    </div>
+
+                    <div className="border-t border-voltech-border py-2">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-voltech-error hover:bg-voltech-error/10 transition-colors"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Cerrar Sesión
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
-        ))}
-      </nav>
+        </div>
+      </header>
 
-      <div className="p-4 border-t border-voltech-border space-y-2">
-        {usuarioActual && (
-          <div className="px-3 py-2 mb-2">
-            <p className="text-xs text-voltech-muted">Conectado como:</p>
-            <p className="text-sm font-semibold text-white">{usuarioActual.nombre}</p>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-              esAdmin ? 'bg-voltech-purple/20 text-voltech-purple' : 
-              esSocio ? 'bg-voltech-warning/20 text-voltech-warning' : 
-              'bg-voltech-cyan/20 text-voltech-cyan'
-            }`}>
-              {esAdmin ? 'Administrador' : esSocio ? 'Socio' : 'Vendedor'}
-            </span>
-          </div>
-        )}
-
-        <button
-          onClick={() => setDarkMode(!darkMode)}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-voltech-muted hover:bg-voltech-border hover:text-white transition-colors"
-        >
-          {darkMode ? <Monitor className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          <span className="text-sm">{darkMode ? 'Modo Claro' : 'Modo Oscuro'}</span>
-        </button>
-
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-voltech-error hover:bg-voltech-error/10 transition-colors"
-        >
-          <LogOut className="w-5 h-5" />
-          <span className="text-sm">Cerrar Sesión</span>
-        </button>
-      </div>
-    </div>
-  );
-
-  // ✅ MÓVIL: overlay a PANTALLA COMPLETA con fondo oscuro
-  if (isMobile) {
-    return (
       <AnimatePresence>
-        {finalIsOpen && (
-          <>
+        {searchOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 z-[60] flex items-start justify-center pt-[20vh] px-4"
+            onClick={() => setSearchOpen(false)}
+          >
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={finalOnClose}
-              className="fixed inset-0 bg-black/60 z-40"
-            />
-            <motion.aside
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'tween', duration: 0.25 }}
-              className="fixed left-0 top-0 h-full w-full z-50 bg-voltech-surface"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-voltech-surface border border-voltech-border rounded-2xl w-full max-w-2xl shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
             >
-              {contenido}
-            </motion.aside>
-          </>
+              <form onSubmit={handleSearch}>
+                <div className="flex items-center gap-3 p-4 border-b border-voltech-border">
+                  <Search className="w-5 h-5 text-voltech-muted" />
+                  <input
+                    id="global-search-input"
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Buscar productos, clientes, ventas..."
+                    className="flex-1 bg-transparent border-none outline-none text-white text-lg placeholder-voltech-muted"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSearchOpen(false)}
+                    className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </form>
+              <div className="p-4 text-xs text-voltech-muted hidden sm:block">
+                <p>Presiona <kbd className="px-2 py-1 bg-voltech-dark rounded">Ctrl Shift K</kbd> para buscar</p>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
-    );
-  }
-
-  // ✅ PC/TABLET GRANDE: sidebar fijo colapsable como antes
-  return (
-    <motion.aside
-      initial={false}
-      animate={{ width: finalIsOpen ? 256 : 0 }}
-      className="h-full bg-voltech-surface border-r border-voltech-border overflow-hidden transition-all duration-300 flex-shrink-0"
-    >
-      {contenido}
-    </motion.aside>
+    </>
   );
 }
