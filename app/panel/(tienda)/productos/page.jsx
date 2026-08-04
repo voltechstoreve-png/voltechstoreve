@@ -249,72 +249,66 @@ export default function ProductosPage() {
     }
   };
 
-  const handleChange = (index, name, value) => {
-    const nuevosItems = [...items];
-    const item = nuevosItems[index];
-    
-    if (name === 'tipo') {
-      item.plataforma = '';
-      item.categoria = '';
-      item.marca = '';
-      item.sku = '';
-      if (value === 'streaming') {
-        item.categoria = 'STREAMING';
-        item.marca = 'Voltech';
-      } else if (value === 'kit') {
-        item.categoria = 'KIT';
-        item.marca = 'Voltech';
+ const handleChange = (index, name, value) => {
+  const nuevosItems = [...items];
+  const item = nuevosItems[index];
+  
+  if (name === 'tipo') {
+    item.plataforma = '';
+    item.categoria = '';
+    item.marca = '';
+    item.sku = '';
+    if (value === 'streaming') {
+      item.categoria = 'STREAMING';
+      item.marca = 'Voltech';
+    } else if (value === 'kit') {
+      item.categoria = 'KIT';
+      item.marca = 'Voltech';
+    }
+  }
+  
+  item[name] = value;
+
+  // ✅ SOLO autocompletar si seleccionamos un producto específico
+  if (name === 'plataforma' && value) {
+    const prod = productos.find(p => p.plataforma === value && p.tipo === item.tipo);
+    if (prod) {
+      item.categoria = prod.categoria;
+      item.marca = prod.marca;
+    }
+  }
+
+  // ❌ ELIMINAR: Ya NO limpiamos plataforma al cambiar categoría/marca
+  // Esto causaba que se borrara todo
+
+  const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
+  const qty = parseInt(item.cantidad) || 1;
+  let precioUnitario = 0;
+
+  if (item.tipo === 'kit') {
+    precioUnitario = parseFloat(item.precioDetal) || 0;
+  } else {
+    precioUnitario = (parseFloat(item.precioOferta) > 0) ? parseFloat(item.precioOferta) : (parseFloat(item.precioDetal) || 0);
+  }
+
+  item.total = precioUnitario * qty;
+  item.precioBs = precioUnitario * tasa;
+  
+  setItems(nuevosItems);
+  
+  if (['plataforma', 'categoria', 'marca', 'tipo'].includes(name)) {
+    setTimeout(() => {
+      const itemActualizado = nuevosItems[index];
+      if (itemActualizado.plataforma && itemActualizado.categoria) {
+        const siguientesItems = [...nuevosItems];
+        const siguienteNum = obtenerSiguienteNumero(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca);
+        const nuevoSKU = generarSKU(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca, siguienteNum);
+        siguientesItems[index].sku = nuevoSKU;
+        setItems(siguientesItems);
       }
-    }
-    
-    item[name] = value;
-
-    if (name === 'plataforma' && value) {
-      const prod = productos.find(p => p.plataforma === value && p.tipo === item.tipo);
-      if (prod) {
-        item.categoria = prod.categoria;
-        item.marca = prod.marca;
-      }
-    }
-
-    if (name === 'categoria' && item.plataforma) {
-      const prodValido = productos.find(p => p.plataforma === item.plataforma && p.categoria === value && p.tipo === item.tipo);
-      if (!prodValido) item.plataforma = '';
-    }
-
-    if (name === 'marca' && item.plataforma) {
-      const prodValido = productos.find(p => p.plataforma === item.plataforma && p.marca === value && p.tipo === item.tipo);
-      if (!prodValido) item.plataforma = '';
-    }
-
-    const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
-    const qty = parseInt(item.cantidad) || 1;
-    let precioUnitario = 0;
-
-    if (item.tipo === 'kit') {
-      precioUnitario = parseFloat(item.precioDetal) || 0;
-    } else {
-      precioUnitario = (parseFloat(item.precioOferta) > 0) ? parseFloat(item.precioOferta) : (parseFloat(item.precioDetal) || 0);
-    }
-
-    item.total = precioUnitario * qty;
-    item.precioBs = precioUnitario * tasa;
-    
-    setItems(nuevosItems);
-    
-    if (['plataforma', 'categoria', 'marca', 'tipo'].includes(name)) {
-      setTimeout(() => {
-        const itemActualizado = nuevosItems[index];
-        if (itemActualizado.plataforma && itemActualizado.categoria) {
-          const siguientesItems = [...nuevosItems];
-          const siguienteNum = obtenerSiguienteNumero(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca);
-          const nuevoSKU = generarSKU(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca, siguienteNum);
-          siguientesItems[index].sku = nuevoSKU;
-          setItems(siguientesItems);
-        }
-      }, 100);
-    }
-  };
+    }, 100);
+  }
+};
 
   const toggleProductoKit = (index, producto) => {
     const nuevosItems = [...items];
