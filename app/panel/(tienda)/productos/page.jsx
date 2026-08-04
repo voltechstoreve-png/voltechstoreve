@@ -87,6 +87,8 @@ export default function ProductosPage() {
   const [equipo, setEquipo] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [marcas, setMarcas] = useState([]);
+  const [proveedores, setProveedores] = useState([]);
+  const [usuarioActual, setUsuarioActual] = useState('');
   const [showCarterasModal, setShowCarterasModal] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
@@ -119,6 +121,7 @@ export default function ProductosPage() {
     sku: '',
     fecha: new Date().toISOString().split('T')[0],
     comprador: '',
+    proveedor: '',
     plataforma: '',
     categoria: '',
     marca: '',
@@ -191,19 +194,22 @@ export default function ProductosPage() {
     const cargarDatos = async () => {
       let pData = [], cData = [], sData = {};
 
-      // ✅ CONSULTA A SUPABASE RESTAURADA
+      // ✅ CONSULTA A SUPABASE RESTAURADA (ahora también proveedores)
       if (supabase) {
-        const [{ data: p, error: eP }, { data: c, error: eC }, { data: s, error: eS }] = await Promise.all([
+        const [{ data: p, error: eP }, { data: c, error: eC }, { data: s, error: eS }, { data: prv, error: ePrv }] = await Promise.all([
           supabase.from('productos').select('*'),
           supabase.from('carteras').select('*'),
-          supabase.from('settings').select('clave, valor')
+          supabase.from('settings').select('clave, valor'),
+          supabase.from('proveedores').select('*')
         ]);
         if (eP) console.error('❌ Error cargando productos:', eP.message);
         if (eC) console.error('❌ Error cargando carteras:', eC.message);
         if (eS) console.error('❌ Error cargando settings:', eS.message);
+        if (ePrv) console.error('❌ Error cargando proveedores:', ePrv.message);
         if (p) pData = p;
         if (c) cData = c;
         if (s) { s.forEach(item => { sData[item.clave] = item.valor; }); }
+        if (prv) setProveedores(prv);
       }
 
       if (pData.length === 0) {
@@ -287,6 +293,33 @@ export default function ProductosPage() {
     };
 
     cargarDatos();
+  }, []);
+
+  // ✅ DETECTA EL USUARIO LOGUEADO (comprador automático)
+  useEffect(() => {
+    const detectarUsuario = async () => {
+      let nombre = '';
+      try {
+        if (supabase && supabase.auth) {
+          const { data } = await supabase.auth.getSession();
+          const u = data?.session?.user;
+          if (u) {
+            nombre = u.user_metadata?.nombre || u.user_metadata?.name || u.user_metadata?.full_name || u.email || '';
+          }
+        }
+      } catch (e) {}
+      if (!nombre) {
+        try {
+          const raw = localStorage.getItem('voltech_usuario') || localStorage.getItem('usuario') || localStorage.getItem('voltech_user');
+          if (raw) {
+            const p = JSON.parse(raw);
+            nombre = p.nombre || p.name || p.email || raw;
+          }
+        } catch (e) {}
+      }
+      setUsuarioActual(nombre || 'Administrador');
+    };
+    detectarUsuario();
   }, []);
 
   const actualizarSKU = (index) => {
@@ -474,6 +507,8 @@ export default function ProductosPage() {
       plataforma: '',
       categoria: '',
       marca: '',
+      proveedor: '',
+      comprador: '',
       metodoPago: 'efectivo',
       cartera: '',
       monedaCompra: 'usd',
@@ -852,7 +887,10 @@ export default function ProductosPage() {
         preciobs: item.precioBs || 0,
         precioOferta: item.precioOferta || 0,
         precio_oferta: item.precioOferta || 0,
-        tipoOferta: item.tipoOferta || ''
+        tipoOferta: item.tipoOferta || '',
+        // ✅ DATOS DE COMPRA: proveedor (selector) + comprador (automático, solo lo ven admin/socio)
+        proveedor: item.proveedor || '',
+        comprador: item.comprador || usuarioActual || 'Administrador'
       };
 
       if (productoExistente) {
@@ -934,6 +972,7 @@ export default function ProductosPage() {
           sku: '',
           fecha: new Date().toISOString().split('T')[0],
           comprador: '',
+          proveedor: '',
           plataforma: '',
           categoria: '',
           marca: '',
@@ -1063,7 +1102,7 @@ export default function ProductosPage() {
 
   const generarPDFCatalogo = () => {
     const productosPublicados = productos.filter(p => p.publicado);
-    const contenido = `CATALOGO VOLTECH STORE\n======================\nFecha: ${new Date().toLocaleDateString()}\n\nTotal Productos: ${productosPublicados.length}\n\n${productosPublicados.map(p => `${p.plataforma} ${p.tipo === 'streaming' ? '(Streaming)' : ''} ${p.esCombo ? '(Combo)' : ''}\nSKU: ${p.sku}\nCategoría: ${p.categoria}\nEstado: ${p.estado || 'nuevo'}\nPrecio Detal: $${(p.precioDetal || p.precioMayor).toFixed(2)}\n${p.precioOferta > 0 ? `Precio Oferta: $${p.precioOferta.toFixed(2)}\n` : ''}(Bs ${p.precioBs.toFixed(2)})\nStock: ${p.cantidad} unidades\nDuración: ${p.duracion || 'N/A'}\nOferta: ${p.tipoOferta || 'N/A'}\nComisión: ${p.porcentaje_comision || 5}%\n---`).join('\n')}`;
+    const contenido = `CATALOGO VOLTECH STORE\n======================\nFecha: ${new Date().toLocaleDateString()}\n\nTotal Productos: ${productosPublicados.length}\n\n${productosPublicados.map(p => `${p.plataforma} ${p.tipo === 'streaming' ? '(Streaming)' : ''} ${p.esCombo ? '(Combo)' : ''}\nSKU: ${p.sku}\nCategoría: ${p.categoria}\nMarca: ${p.marca || 'N/A'}\nEstado: ${p.estado || 'nuevo'}\nPrecio Detal: $${(p.precioDetal || p.precioMayor).toFixed(2)}\n${p.precioOferta > 0 ? `Precio Oferta: $${p.precioOferta.toFixed(2)}\n` : ''}(Bs ${p.precioBs.toFixed(2)})\nStock: ${p.cantidad} unidades\nDuración: ${p.duracion || 'N/A'}\nOferta: ${p.tipoOferta || 'N/A'}\nComisión: ${p.porcentaje_comision || 5}%\n---`).join('\n')}`;
     const blob = new Blob([contenido], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1074,10 +1113,12 @@ export default function ProductosPage() {
     toast.success('Catálogo descargado');
   };
 
+  // ✅ BÚSQUEDA AMPLIADA: ahora también por MARCA
   const productosFiltrados = productos.filter(p =>
     p.plataforma?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.categoria?.toLowerCase().includes(searchTerm.toLowerCase())
+    p.categoria?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.marca?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalProductos = productos.length;
@@ -1137,6 +1178,12 @@ export default function ProductosPage() {
       : [];
     return [...new Set([...asociadas, ...marcas])];
   };
+
+  // ✅ OPCIONES DEL SELECTOR DE PROVEEDORES (compatibles con varios formatos de tabla)
+  const opcionesProveedores = proveedores
+    .map(pr => pr.nombre || pr.name || pr.razon_social || pr.proveedor || '')
+    .filter(Boolean)
+    .map(n => ({ value: n, label: n }));
 
   return (
     <div className="space-y-6">
@@ -1223,7 +1270,7 @@ export default function ProductosPage() {
 
       <AnimatePresence>
         {showCarterasModal && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-voltech-surface border border-voltech-border rounded-xl">
             <div className="p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-white">Mis Carteras</h3>
@@ -1343,7 +1390,7 @@ export default function ProductosPage() {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-bold text-white flex items-center gap-2"><Package className="w-5 h-5 text-voltech-cyan" />Nuevo Producto{items.length > 1 && `s (${items.length} items)`}</h2>
-                <button onClick={() => { setShowForm(false); setItems([{ id: crypto.randomUUID(), tipo: 'fisico', imagen: '', imagenFile: null, sku: '', fecha: new Date().toISOString().split('T')[0], comprador: '', plataforma: '', categoria: '', marca: '', cantidad: 1, metodoPago: 'efectivo', cartera: '', precioMayor: 0, precioDetal: 0, precioOferta: 0, estado: 'nuevo', precioBs: 0, total: 0, monedaCompra: 'usd', duracion: '', tipoOferta: '', esCombo: false, plataformasCombo: [], porcentaje_comision: 5, productos_kit: [], precio_costo_total: 0, precio_individual_total: 0, descripcion_detallada: '' }]); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"><X className="w-5 h-5" /></button>
+                <button onClick={() => { setShowForm(false); setItems([{ id: crypto.randomUUID(), tipo: 'fisico', imagen: '', imagenFile: null, sku: '', fecha: new Date().toISOString().split('T')[0], comprador: '', proveedor: '', plataforma: '', categoria: '', marca: '', cantidad: 1, metodoPago: 'efectivo', cartera: '', precioMayor: 0, precioDetal: 0, precioOferta: 0, estado: 'nuevo', precioBs: 0, total: 0, monedaCompra: 'usd', duracion: '', tipoOferta: '', esCombo: false, plataformasCombo: [], porcentaje_comision: 5, productos_kit: [], precio_costo_total: 0, precio_individual_total: 0, descripcion_detallada: '' }]); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"><X className="w-5 h-5" /></button>
               </div>
               <div className="space-y-6">
                 {items.map((item, itemIndex) => {
@@ -1517,8 +1564,8 @@ export default function ProductosPage() {
 
                       {item.tipo !== 'kit' && (
                         <>
-                          {item.tipo === 'fisico' && (<div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Mayor ($) <span className="text-voltech-warning">(Tu costo)</span></label><input type="number" step="0.01" value={item.precioMayor} onChange={(e) => handleChange(itemIndex, 'precioMayor', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>)}
-                          <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Detal ($) <span className="text-voltech-success">(Venta al público)</span></label><input type="number" step="0.01" value={item.precioDetal} onChange={(e) => handleChange(itemIndex, 'precioDetal', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Precio de venta" />{item.tipo === 'fisico' && item.precioMayor > 0 && item.precioDetal > 0 && (<p className="text-xs text-voltech-success mt-1">Ganancia: ${(item.precioDetal - item.precioMayor).toFixed(2)} ({((item.precioDetal - item.precioMayor) / item.precioMayor * 100).toFixed(0)}%)</p>)}</div>
+                          {item.tipo === 'fisico' && tienePermiso('puedeVerInventarioCompleto') && (<div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Mayor ($) <span className="text-voltech-warning">(Tu costo)</span></label><input type="number" step="0.01" value={item.precioMayor} onChange={(e) => handleChange(itemIndex, 'precioMayor', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>)}
+                          <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Detal ($) <span className="text-voltech-success">(Venta al público)</span></label><input type="number" step="0.01" value={item.precioDetal} onChange={(e) => handleChange(itemIndex, 'precioDetal', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Precio de venta" />{item.tipo === 'fisico' && tienePermiso('puedeVerInventarioCompleto') && item.precioMayor > 0 && item.precioDetal > 0 && (<p className="text-xs text-voltech-success mt-1">Ganancia: ${(item.precioDetal - item.precioMayor).toFixed(2)} ({((item.precioDetal - item.precioMayor) / item.precioMayor * 100).toFixed(0)}%)</p>)}</div>
                         </>
                       )}
                       
@@ -1565,6 +1612,25 @@ export default function ProductosPage() {
                           options={[{ value: '', label: '-- Selecciona --' }, ...carteras.map(c => ({ value: c.nombre, label: c.nombre }))]}
                         />
                       </div>
+
+                      {/* ✅ DATOS DE COMPRA (solo Admin/Socio): Proveedor selector + Comprador automático */}
+                      {tienePermiso('puedeVerInventarioCompleto') && (
+                        <div>
+                          <CustomSelect
+                            label="Proveedor (Compra)"
+                            value={item.proveedor}
+                            onChange={(value) => handleChange(itemIndex, 'proveedor', value)}
+                            options={[{ value: '', label: '-- Selecciona --' }, ...opcionesProveedores]}
+                          />
+                        </div>
+                      )}
+                      {tienePermiso('puedeVerInventarioCompleto') && (
+                        <div>
+                          <label className="block text-xs text-voltech-muted mb-1 ml-1">Comprador (automático)</label>
+                          <input type="text" value={usuarioActual || 'Administrador'} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed" />
+                        </div>
+                      )}
+
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">% Comisión por Venta</label><input type="number" step="0.01" value={item.porcentaje_comision} onChange={(e) => handleChange(itemIndex, 'porcentaje_comision', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                       
                       <div className="lg:col-span-3">
@@ -1611,7 +1677,7 @@ export default function ProductosPage() {
       <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
-          <input type="text" placeholder="Buscar productos por nombre, SKU o categoría..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-voltech w-full rounded-lg pl-10 pr-4 py-3 text-sm" />
+          <input type="text" placeholder="Buscar por nombre, SKU, categoría o marca..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-voltech w-full rounded-lg pl-10 pr-4 py-3 text-sm" />
         </div>
         <div className="flex gap-2">
           <button onClick={() => setVista('tabla')} className={`p-3 rounded-lg transition-colors ${vista === 'tabla' ? 'bg-voltech-cyan/20 text-voltech-cyan' : 'bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white'}`}><Table className="w-5 h-5" /></button>
@@ -1627,10 +1693,11 @@ export default function ProductosPage() {
                 <tr>
                   {tienePermiso('puedeVerInventarioCompleto') && (<th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted"><input type="checkbox" checked={selectedProducts.length === productosFiltrados.length && productosFiltrados.length > 0} onChange={selectAll} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" /></th>)}
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">SKU</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Plataforma</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Producto</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Tipo</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Estado</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Categoría</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Marca</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Stock</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Precio</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">% Comisión</th>
@@ -1640,7 +1707,7 @@ export default function ProductosPage() {
               </thead>
               <tbody>
                 {productosFiltrados.length === 0 ? (
-                  <tr><td colSpan={tienePermiso('puedeVerInventarioCompleto') ? 11 : 10} className="text-center py-12 text-voltech-muted"><Package className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>No hay productos registrados</p><p className="text-xs mt-1">Haz clic en "Nuevo Producto" para comenzar</p></td></tr>
+                  <tr><td colSpan={tienePermiso('puedeVerInventarioCompleto') ? 12 : 10} className="text-center py-12 text-voltech-muted"><Package className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>No hay productos registrados</p><p className="text-xs mt-1">Haz clic en "Nuevo Producto" para comenzar</p></td></tr>
                 ) : (
                   productosFiltrados.map((producto) => (
                     <tr key={producto.id} className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
@@ -1655,6 +1722,7 @@ export default function ProductosPage() {
                       <td className="px-4 py-3">{producto.tipo === 'streaming' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-purple/20 text-voltech-purple flex items-center gap-1 w-fit"><MonitorPlay className="w-3 h-3" />Streaming</span>) : producto.tipo === 'kit' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit"><Gift className="w-3 h-3" />Kit</span>) : (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit"><Package className="w-3 h-3" />Físico</span>)}</td>
                       <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full font-medium ${getEstadoBadge(producto.estado)}`}>{producto.estado ? producto.estado.charAt(0).toUpperCase() + producto.estado.slice(1) : 'Nuevo'}</span></td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{producto.categoria}</td>
+                      <td className="px-4 py-3 text-sm text-voltech-muted">{producto.marca || '—'}</td>
                       <td className="px-4 py-3"><span className={`text-sm font-medium ${producto.cantidad === 0 ? 'text-voltech-error' : producto.cantidad <= 2 ? 'text-voltech-warning' : 'text-voltech-success'}`}>{producto.cantidad}</span></td>
                       <td className="px-4 py-3">
                         {producto.precioOferta > 0 && producto.estado === 'oferta' ? (
@@ -1703,7 +1771,7 @@ export default function ProductosPage() {
                 </div>
                 <div className="p-4">
                   <h3 className="text-sm font-semibold text-white mb-1 truncate">{producto.plataforma}</h3>
-                  <p className="text-xs text-voltech-muted mb-2">{producto.categoria}</p>
+                  <p className="text-xs text-voltech-muted mb-2">{producto.categoria}{producto.marca ? ` • ${producto.marca}` : ''}</p>
                   {producto.duracion && (<p className="text-xs text-voltech-purple mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" /> {producto.duracion}</p>)}
                   {producto.tipoOferta && (<p className="text-xs text-voltech-warning mb-2 flex items-center gap-1"><Tag className="w-3 h-3" /> {producto.tipoOferta}</p>)}
                   <div className="flex items-center justify-between mb-3">
