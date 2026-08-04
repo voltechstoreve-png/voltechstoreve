@@ -164,27 +164,89 @@ export default function ProductosPage() {
 
   const [nuevaCartera, setNuevaCartera] = useState({ nombre: '', tipo: 'pago_movil', datos: '' });
 
+  // ✅ Funciones de SKU (definidas antes del useEffect)
+  const prefijoSKU = (texto) => {
+    const t = (texto || '').toString().trim().toUpperCase();
+    return (t.substring(0, 3) || 'XXX').padEnd(3, 'X');
+  };
+
+  // ✅ FORMATO UNIFICADO: siempre 4 segmentos PLAT-CAT-MAR-NUM
+  const generarSKU = (plataforma, categoria, marca, num) => {
+    return `${prefijoSKU(plataforma)}-${prefijoSKU(categoria)}-${prefijoSKU(marca)}-${String(num).padStart(3, '0')}`;
+  };
+
+  // ✅ Cuenta números usados POR BASE COMPLETA (plat-cat-mar), no solo por prefijo de plataforma
+  const obtenerSiguienteNumero = (plataforma, categoria, marca, lista) => {
+    const base = `${prefijoSKU(plataforma)}-${prefijoSKU(categoria)}-${prefijoSKU(marca)}`;
+    const usados = (lista && lista.length > 0 ? lista : productos)
+      .filter(p => p.sku && String(p.sku).startsWith(base + '-'))
+      .map(p => parseInt(String(p.sku).split('-').pop(), 10))
+      .filter(n => !isNaN(n));
+    let n = 1;
+    while (usados.includes(n)) n++;
+    return n;
+  };
+
   useEffect(() => {
     const cargarDatos = async () => {
       let pData = [], cData = [], sData = {};
 
-      if (!localStorage.getItem('sku_v2') && pData.length > 0) {
-        const orden = [...pData].sort((a, b) =>
-          (a.fechaCreacion || a.creado_en || '').localeCompare(b.fechaCreacion || b.creado_en || '')
-        );
-        const usadosPorPrefijo = {};
-        orden.forEach(p => {
-          const pref = prefijoSKU(p.plataforma);
-          usadosPorPrefijo[pref] = usadosPorPrefijo[pref] || [];
-          let n = 1;
-          while (usadosPorPrefijo[pref].includes(n)) n++;
-          p.sku = generarSKU(p.plataforma, p.categoria, p.marca, n);
-          usadosPorPrefijo[pref].push(n);
+      // ✅ CONSULTA A SUPABASE RESTAURADA
+      if (supabase) {
+        const [{ data: p, error: eP }, { data: c, error: eC }, { data: s, error: eS }] = await Promise.all([
+          supabase.from('productos').select('*'),
+          supabase.from('carteras').select('*'),
+          supabase.from('settings').select('clave, valor')
+        ]);
+        if (eP) console.error('❌ Error cargando productos:', eP.message);
+        if (eC) console.error('❌ Error cargando carteras:', eC.message);
+        if (eS) console.error('❌ Error cargando settings:', eS.message);
+        if (p) pData = p;
+        if (c) cData = c;
+        if (s) { s.forEach(item => { sData[item.clave] = item.valor; }); }
+      }
+
+      if (pData.length === 0) {
+        const productosGuardados = localStorage.getItem('voltech_productos');
+        if (productosGuardados) pData = JSON.parse(productosGuardados);
+      }
+      if (cData.length === 0) {
+        const carterasGuardadas = localStorage.getItem('voltech_carteras');
+        if (carterasGuardadas) cData = JSON.parse(carterasGuardadas);
+      }
+
+      // 🔢 CURADOR AUTOMÁTICO DE SKUs (cuenta por base completa para evitar duplicados)
+      if (pData.length > 0 && pData.some(p => !p.sku && p.plataforma)) {
+        const usadosPorBase = {};
+        pData.forEach(p => {
+          if (p.sku) {
+            const partes = String(p.sku).split('-');
+            const num = parseInt(partes.pop(), 10);
+            if (!isNaN(num)) {
+              const base = partes.join('-');
+              (usadosPorBase[base] = usadosPorBase[base] || []).push(num);
+            }
+          }
         });
-        pData = orden;
-        localStorage.setItem('sku_v2', '1');
-        localStorage.setItem('voltech_productos', JSON.stringify(orden));
-        if (supabase) supabase.from('productos').upsert(orden, { onConflict: 'id' }).then(({ error }) => { if (error) console.error('Error renumerando:', error); });
+        let cambio = false;
+        pData.forEach(p => {
+          if (!p.sku && p.plataforma) {
+            const base = `${prefijoSKU(p.plataforma)}-${prefijoSKU(p.categoria)}-${prefijoSKU(p.marca)}`;
+            const usados = usadosPorBase[base] || [];
+            let n = 1;
+            while (usados.includes(n)) n++;
+            p.sku = `${base}-${String(n).padStart(3, '0')}`;
+            usados.push(n);
+            cambio = true;
+          }
+        });
+        if (cambio) {
+          localStorage.setItem('voltech_productos', JSON.stringify(pData));
+          if (supabase) supabase.from('productos').upsert(pData, { onConflict: 'id' }).then(({ error }) => {
+            if (error) console.error('Error completando SKUs:', error);
+            else console.log('✅ SKUs completados y guardados en Supabase');
+          });
+        }
       }
 
       const equipoGuardado = localStorage.getItem('voltech_equipo');
@@ -221,31 +283,10 @@ export default function ProductosPage() {
     cargarDatos();
   }, []);
 
-  const prefijoSKU = (texto) => {
-    const t = (texto || '').toString().trim().toUpperCase();
-    return (t.substring(0, 3) || 'XXX').padEnd(3, 'X');
-  };
-
-  const generarSKU = (plataforma, categoria, marca, num) => {
-    if (categoria === 'KIT') return `KIT-${prefijoSKU(plataforma)}-${String(num).padStart(3, '0')}`;
-    return `${prefijoSKU(plataforma)}-${prefijoSKU(categoria)}-${prefijoSKU(marca)}-${String(num).padStart(3, '0')}`;
-  };
-
-  const obtenerSiguienteNumero = (plataforma) => {
-    const pref = prefijoSKU(plataforma);
-    const usados = productos
-      .filter(p => p.sku && p.sku.startsWith(`${pref}-`))
-      .map(p => parseInt(String(p.sku).split('-').pop(), 10))
-      .filter(n => !isNaN(n));
-    let n = 1;
-    while (usados.includes(n)) n++;
-    return n;
-  };
-
   const actualizarSKU = (index) => {
     const item = items[index];
     if (item.plataforma && item.categoria) {
-      const siguienteNum = obtenerSiguienteNumero(item.plataforma);
+      const siguienteNum = obtenerSiguienteNumero(item.plataforma, item.categoria, item.marca, productos);
       const nuevoSKU = generarSKU(item.plataforma, item.categoria, item.marca, siguienteNum);
       const nuevosItems = [...items];
       nuevosItems[index].sku = nuevoSKU;
@@ -253,10 +294,9 @@ export default function ProductosPage() {
     }
   };
   
-   const handleChange = (index, name, value) => {
+  const handleChange = (index, name, value) => {
     const nuevosItems = [...items];
     const item = nuevosItems[index];
-    console.log('🔍 DATOS:', productos.map(p => `${p.plataforma} | cat: ${p.categoria || 'VACÍA'} | marca: ${p.marca || 'VACÍA'}`).join('  //  '));
 
     if (name === 'tipo') {
       item.plataforma = '';
@@ -276,7 +316,7 @@ export default function ProductosPage() {
 
     // ✅ ASOCIACIÓN DE LOS 3 CAMPOS (solo físicos)
     if (item.tipo === 'fisico') {
-            // NOMBRE → trae categoría y marca (prefiere el registro que SÍ tiene datos)
+      // NOMBRE → trae categoría y marca (prefiere el registro que SÍ tiene datos)
       if (name === 'plataforma' && value) {
         const registros = productos.filter(p => p.tipo === 'fisico' && normalizarTexto(p.plataforma) === normalizarTexto(value));
         const prod = registros.find(p => p.categoria && p.marca) || registros[0];
@@ -327,7 +367,7 @@ export default function ProductosPage() {
         const itemActualizado = nuevosItems[index];
         if (itemActualizado.plataforma && itemActualizado.categoria) {
           const siguientesItems = [...nuevosItems];
-          const siguienteNum = obtenerSiguienteNumero(itemActualizado.plataforma);
+          const siguienteNum = obtenerSiguienteNumero(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca, productos);
           const nuevoSKU = generarSKU(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca, siguienteNum);
           siguientesItems[index].sku = nuevoSKU;
           setItems(siguientesItems);
@@ -485,13 +525,23 @@ export default function ProductosPage() {
         toast.error('Esta marca ya existe');
       }
     } else if (gestionTipo === 'plataforma') {
+      const catGestion = gestionSubtipo === 'streaming' ? 'STREAMING' : gestionSubtipo === 'kit' ? 'KIT' : '';
+      const marcaGestion = gestionSubtipo === 'streaming' || gestionSubtipo === 'kit' ? 'Voltech' : '';
+      const skuGenerado = generarSKU(
+        gestionValor,
+        catGestion,
+        marcaGestion,
+        obtenerSiguienteNumero(gestionValor, catGestion, marcaGestion, productos)
+      );
+
       const nuevoProducto = {
         id: crypto.randomUUID(),
         tipo: gestionSubtipo,
         plataforma: gestionValor,
         producto: gestionValor,
-        categoria: gestionSubtipo === 'streaming' ? 'STREAMING' : gestionSubtipo === 'kit' ? 'KIT' : '',
-        marca: gestionSubtipo === 'streaming' || gestionSubtipo === 'kit' ? 'Voltech' : '',
+        categoria: catGestion,
+        marca: marcaGestion,
+        sku: skuGenerado,
         cantidad: 0,
         precioDetal: 0,
         precioMayor: 0,
@@ -539,7 +589,7 @@ export default function ProductosPage() {
         setItems(nuevosItems);
       }
 
-      toast.success(`"${gestionValor}" creado y seleccionado`);
+      toast.success(`"${gestionValor}" creado con SKU ${skuGenerado}`);
     }
     
     setGestionValor('');
@@ -634,7 +684,7 @@ export default function ProductosPage() {
       publicado: false,
       estado: 'combo',
       fechaCreacion: new Date().toISOString(),
-      sku: generarSKU(comboNombre, 'COMBO', '', 0),
+      sku: generarSKU(comboNombre, 'COMBO', '', obtenerSiguienteNumero(comboNombre, 'COMBO', '', productos)),
       porcentaje_comision: 5,
     };
 
@@ -724,11 +774,16 @@ export default function ProductosPage() {
         return;
       }
 
-       const productoExistente = productos.find(p => 
+      const productoExistente = productos.find(p => 
         normalizarTexto(p.plataforma) === normalizarTexto(item.plataforma) &&
         (p.tipo || 'fisico') === (item.tipo || 'fisico') &&
         p.id !== item.id
       );
+
+      // 🔢 RED DE SEGURIDAD: asigna SKU si falta
+      if (!item.sku && item.plataforma) {
+        item.sku = generarSKU(item.plataforma, item.categoria, item.marca, obtenerSiguienteNumero(item.plataforma, item.categoria, item.marca, productos));
+      }
 
       const productoData = {
         tipo: item.tipo,
@@ -874,7 +929,7 @@ export default function ProductosPage() {
         }]);
         setShowForm(false);
       } catch (error) {
-        console.error(' Error guardando productos:', error);
+        console.error('Error guardando productos:', error);
         toast.error('Error: ' + error.message);
       }
     }
@@ -1019,11 +1074,10 @@ export default function ProductosPage() {
     return [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.marca).filter(Boolean))];
   }, [productos]);
 
-      const getProductosFisicosFiltrados = (categoria, marca) => {
+  const getProductosFisicosFiltrados = (categoria, marca) => {
     return productosFisicos.filter(nombre => {
       const registros = productos.filter(x => x.tipo === 'fisico' && normalizarTexto(x.plataforma) === normalizarTexto(nombre));
       if (registros.length === 0) return false;
-      // ✅ Un registro vacío (= sin clasificar) es compatible con cualquier filtro
       return registros.some(prod =>
         (!categoria || !prod.categoria || normalizarTexto(prod.categoria) === normalizarTexto(categoria)) &&
         (!marca || !prod.marca || normalizarTexto(prod.marca) === normalizarTexto(marca))
@@ -1032,7 +1086,7 @@ export default function ProductosPage() {
   };
 
   const getCategoriasFiltradas = (marca) => {
-    if (!marca) return categorias; // ✅ lista global: nunca queda vacío
+    if (!marca) return categorias;
     const filtradas = [...new Set(
       productos
         .filter(p => p.tipo === 'fisico' && normalizarTexto(p.marca) === normalizarTexto(marca))
@@ -1043,7 +1097,7 @@ export default function ProductosPage() {
   };
 
   const getMarcasFiltradas = (categoria) => {
-    if (!categoria) return marcas; // ✅ lista global: nunca queda vacío
+    if (!categoria) return marcas;
     const filtradas = [...new Set(
       productos
         .filter(p => p.tipo === 'fisico' && normalizarTexto(p.categoria) === normalizarTexto(categoria))
