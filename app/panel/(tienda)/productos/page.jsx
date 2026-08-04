@@ -249,105 +249,87 @@ export default function ProductosPage() {
     }
   };
 
- const handleChange = (index, name, value) => {
-  const nuevosItems = [...items];
-  const item = nuevosItems[index];
-  
-  // Normalización para búsquedas
-  const normalizar = (texto) => {
-    if (!texto) return '';
-    return texto.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+   const handleChange = (index, name, value) => {
+    const nuevosItems = [...items];
+    const item = nuevosItems[index];
+    console.log('🔍 DATOS:', productos.map(p => `${p.plataforma} | cat: ${p.categoria || 'VACÍA'} | marca: ${p.marca || 'VACÍA'}`).join('  //  '));
+
+    if (name === 'tipo') {
+      item.plataforma = '';
+      item.categoria = '';
+      item.marca = '';
+      item.sku = '';
+      if (value === 'streaming') {
+        item.categoria = 'STREAMING';
+        item.marca = 'Voltech';
+      } else if (value === 'kit') {
+        item.categoria = 'KIT';
+        item.marca = 'Voltech';
+      }
+    }
+
+    item[name] = value;
+
+    // ✅ ASOCIACIÓN DE LOS 3 CAMPOS (solo físicos)
+    if (item.tipo === 'fisico') {
+      // NOMBRE → trae categoría y marca
+      if (name === 'plataforma' && value) {
+        const prod = productos.find(p => p.tipo === 'fisico' && normalizarTexto(p.plataforma) === normalizarTexto(value));
+        if (prod) {
+          if (prod.categoria) item.categoria = prod.categoria;
+          if (prod.marca) item.marca = prod.marca;
+        }
+      }
+
+      // CATEGORÍA → trae nombre y marca
+      if (name === 'categoria' && value) {
+        let candidatos = productos.filter(p => p.tipo === 'fisico' && p.categoria && normalizarTexto(p.categoria) === normalizarTexto(value));
+        if (item.marca) candidatos = candidatos.filter(p => normalizarTexto(p.marca) === normalizarTexto(item.marca));
+        if (candidatos.length === 1) {
+          item.plataforma = candidatos[0].plataforma;
+          if (candidatos[0].marca) item.marca = candidatos[0].marca;
+        }
+      }
+
+      // MARCA → trae nombre y categoría
+      if (name === 'marca' && value) {
+        let candidatos = productos.filter(p => p.tipo === 'fisico' && p.marca && normalizarTexto(p.marca) === normalizarTexto(value));
+        if (item.categoria) candidatos = candidatos.filter(p => normalizarTexto(p.categoria) === normalizarTexto(item.categoria));
+        if (candidatos.length === 1) {
+          item.plataforma = candidatos[0].plataforma;
+          if (candidatos[0].categoria) item.categoria = candidatos[0].categoria;
+        }
+      }
+    }
+
+    const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
+    const qty = parseInt(item.cantidad) || 1;
+    let precioUnitario = 0;
+
+    if (item.tipo === 'kit') {
+      precioUnitario = parseFloat(item.precioDetal) || 0;
+    } else {
+      precioUnitario = (parseFloat(item.precioOferta) > 0) ? parseFloat(item.precioOferta) : (parseFloat(item.precioDetal) || 0);
+    }
+
+    item.total = precioUnitario * qty;
+    item.precioBs = precioUnitario * tasa;
+
+    setItems(nuevosItems);
+
+    if (['plataforma', 'categoria', 'marca', 'tipo'].includes(name)) {
+      setTimeout(() => {
+        const itemActualizado = nuevosItems[index];
+        if (itemActualizado.plataforma && itemActualizado.categoria) {
+          const siguientesItems = [...nuevosItems];
+          const siguienteNum = obtenerSiguienteNumero(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca);
+          const nuevoSKU = generarSKU(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca, siguienteNum);
+          siguientesItems[index].sku = nuevoSKU;
+          setItems(siguientesItems);
+        }
+      }, 100);
+    }
   };
-  
-  if (name === 'tipo') {
-    item.plataforma = '';
-    item.categoria = '';
-    item.marca = '';
-    item.sku = '';
-    if (value === 'streaming') {
-      item.categoria = 'STREAMING';
-      item.marca = 'Voltech';
-    } else if (value === 'kit') {
-      item.categoria = 'KIT';
-      item.marca = 'Voltech';
-    }
-  }
-  
-  item[name] = value;
-
-  // ✅ Cuando seleccionas PLATAFORMA (nombre del producto), trae categoría y marca
-  if (name === 'plataforma' && value) {
-    const prod = productos.find(p => 
-      normalizar(p.plataforma) === normalizar(value) && 
-      p.tipo === item.tipo
-    );
-    if (prod) {
-      item.categoria = prod.categoria || '';
-      item.marca = prod.marca || '';
-      if (prod.plataforma && !item.plataforma) {
-        item.plataforma = prod.plataforma;
-      }
-    }
-  }
-
-  // ✅ Cuando seleccionas CATEGORÍA, busca productos con esa categoría
-  if (name === 'categoria' && value && item.tipo === 'fisico') {
-    // Si ya hay marca seleccionada, busca producto específico
-    if (item.marca) {
-      const prod = productos.find(p => 
-        normalizar(p.categoria) === normalizar(value) && 
-        normalizar(p.marca) === normalizar(item.marca) &&
-        p.tipo === 'fisico'
-      );
-      if (prod) {
-        item.plataforma = prod.plataforma || '';
-      }
-    }
-  }
-
-  // ✅ Cuando seleccionas MARCA, busca productos con esa marca
-  if (name === 'marca' && value && item.tipo === 'fisico') {
-    // Si ya hay categoría seleccionada, busca producto específico
-    if (item.categoria) {
-      const prod = productos.find(p => 
-        normalizar(p.categoria) === normalizar(item.categoria) && 
-        normalizar(p.marca) === normalizar(value) &&
-        p.tipo === 'fisico'
-      );
-      if (prod) {
-        item.plataforma = prod.plataforma || '';
-      }
-    }
-  }
-
-  const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
-  const qty = parseInt(item.cantidad) || 1;
-  let precioUnitario = 0;
-
-  if (item.tipo === 'kit') {
-    precioUnitario = parseFloat(item.precioDetal) || 0;
-  } else {
-    precioUnitario = (parseFloat(item.precioOferta) > 0) ? parseFloat(item.precioOferta) : (parseFloat(item.precioDetal) || 0);
-  }
-
-  item.total = precioUnitario * qty;
-  item.precioBs = precioUnitario * tasa;
-  
-  setItems(nuevosItems);
-  
-  if (['plataforma', 'categoria', 'marca', 'tipo'].includes(name)) {
-    setTimeout(() => {
-      const itemActualizado = nuevosItems[index];
-      if (itemActualizado.plataforma && itemActualizado.categoria) {
-        const siguientesItems = [...nuevosItems];
-        const siguienteNum = obtenerSiguienteNumero(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca);
-        const nuevoSKU = generarSKU(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca, siguienteNum);
-        siguientesItems[index].sku = nuevoSKU;
-        setItems(siguientesItems);
-      }
-    }, 100);
-  }
-};
 
   const toggleProductoKit = (index, producto) => {
     const nuevosItems = [...items];
@@ -739,7 +721,6 @@ export default function ProductosPage() {
 
       const productoExistente = productos.find(p => 
         normalizarTexto(p.plataforma) === normalizarTexto(item.plataforma) &&
-        normalizarTexto(p.categoria) === normalizarTexto(item.categoria) &&
         (p.tipo || 'fisico') === (item.tipo || 'fisico') &&
         p.id !== item.id
       );
@@ -817,7 +798,6 @@ export default function ProductosPage() {
         nuevosProductos.forEach(p => {
           const index = productosFinales.findIndex(existing => 
             normalizarTexto(existing.plataforma) === normalizarTexto(p.plataforma) && 
-            normalizarTexto(existing.categoria) === normalizarTexto(p.categoria) &&
             (existing.tipo || 'fisico') === (p.tipo || 'fisico')
           );
           
@@ -1034,34 +1014,36 @@ export default function ProductosPage() {
     return [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.marca).filter(Boolean))];
   }, [productos]);
 
-  const getProductosFisicosFiltrados = (categoria, marca) => {
+    const getProductosFisicosFiltrados = (categoria, marca) => {
     return productosFisicos.filter(p => {
-      const prod = productos.find(x => x.plataforma === p && x.tipo === 'fisico');
+      const prod = productos.find(x => normalizarTexto(x.plataforma) === normalizarTexto(p) && x.tipo === 'fisico');
       if (!prod) return false;
-      if (categoria && prod.categoria !== categoria) return false;
-      if (marca && prod.marca !== marca) return false;
+      if (categoria && normalizarTexto(prod.categoria) !== normalizarTexto(categoria)) return false;
+      if (marca && normalizarTexto(prod.marca) !== normalizarTexto(marca)) return false;
       return true;
     });
   };
 
   const getCategoriasFiltradas = (marca) => {
-    if (!marca) return categoriasFisico;
-    return [...new Set(
+    if (!marca) return categorias; // ✅ lista global: nunca queda vacío
+    const filtradas = [...new Set(
       productos
-        .filter(p => p.tipo === 'fisico' && p.marca === marca)
+        .filter(p => p.tipo === 'fisico' && normalizarTexto(p.marca) === normalizarTexto(marca))
         .map(p => p.categoria)
         .filter(Boolean)
     )];
+    return filtradas.length > 0 ? filtradas : categorias;
   };
 
   const getMarcasFiltradas = (categoria) => {
-    if (!categoria) return marcasFisico;
-    return [...new Set(
+    if (!categoria) return marcas; // ✅ lista global: nunca queda vacío
+    const filtradas = [...new Set(
       productos
-        .filter(p => p.tipo === 'fisico' && p.categoria === categoria)
+        .filter(p => p.tipo === 'fisico' && normalizarTexto(p.categoria) === normalizarTexto(categoria))
         .map(p => p.marca)
         .filter(Boolean)
     )];
+    return filtradas.length > 0 ? filtradas : marcas;
   };
 
   return (
