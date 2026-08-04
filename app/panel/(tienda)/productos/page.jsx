@@ -256,11 +256,17 @@ export default function ProductosPage() {
       const marData = sData.marcas || (localStorage.getItem('voltech_marcas') ? JSON.parse(localStorage.getItem('voltech_marcas')) : []);
       const tasaData = sData.tasa_bcv || (localStorage.getItem('voltech_tasa_bcv') ? JSON.parse(localStorage.getItem('voltech_tasa_bcv')) : { tasa: 36.50, usarBCV: true, tasaPersonalizada: 36.50 });
 
+      // 🔧 SINCRONIZA LISTAS GLOBALES CON PRODUCTOS (ej: MOXON aparece aunque no esté en settings)
+      const catsBase = Array.isArray(catsData) ? catsData : [];
+      const marBase = Array.isArray(marData) ? marData : [];
+      const catsFinal = [...new Set([...catsBase, ...pData.map(p => p.categoria).filter(Boolean)])];
+      const marFinal = [...new Set([...marBase, ...pData.map(p => p.marca).filter(Boolean)])];
+
       setProductos(pData);
       setCarteras(cData);
       setEquipo(eqData);
-      setCategorias(Array.isArray(catsData) ? catsData : []);
-      setMarcas(Array.isArray(marData) ? marData : []);
+      setCategorias(catsFinal);
+      setMarcas(marFinal);
       setTasaBCV(tasaData.tasa || 36.50);
       setUsarTasaBCV(tasaData.usarBCV !== undefined ? tasaData.usarBCV : true);
       setTasaPersonalizada(tasaData.tasaPersonalizada || tasaData.tasa || 36.50);
@@ -1085,26 +1091,27 @@ export default function ProductosPage() {
     });
   };
 
+  // ✅ SIEMPRE MUESTRA TODAS: asociadas primero + globales después
   const getCategoriasFiltradas = (marca) => {
-    if (!marca) return categorias;
-    const filtradas = [...new Set(
-      productos
-        .filter(p => p.tipo === 'fisico' && normalizarTexto(p.marca) === normalizarTexto(marca))
-        .map(p => p.categoria)
-        .filter(Boolean)
-    )];
-    return filtradas.length > 0 ? filtradas : categorias;
+    const asociadas = marca
+      ? [...new Set(
+          productos
+            .filter(p => p.tipo === 'fisico' && p.categoria && normalizarTexto(p.marca) === normalizarTexto(marca))
+            .map(p => p.categoria)
+        )]
+      : [];
+    return [...new Set([...asociadas, ...categorias])];
   };
 
   const getMarcasFiltradas = (categoria) => {
-    if (!categoria) return marcas;
-    const filtradas = [...new Set(
-      productos
-        .filter(p => p.tipo === 'fisico' && normalizarTexto(p.categoria) === normalizarTexto(categoria))
-        .map(p => p.marca)
-        .filter(Boolean)
-    )];
-    return filtradas.length > 0 ? filtradas : marcas;
+    const asociadas = categoria
+      ? [...new Set(
+          productos
+            .filter(p => p.tipo === 'fisico' && p.marca && normalizarTexto(p.categoria) === normalizarTexto(categoria))
+            .map(p => p.marca)
+        )]
+      : [];
+    return [...new Set([...asociadas, ...marcas])];
   };
 
   return (
