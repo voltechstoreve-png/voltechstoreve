@@ -272,15 +272,16 @@ export default function ProductosPage() {
 
     // ✅ ASOCIACIÓN DE LOS 3 CAMPOS (solo físicos)
     if (item.tipo === 'fisico') {
-      // NOMBRE → trae categoría y marca
+            // NOMBRE → trae categoría y marca (prefiere el registro que SÍ tiene datos)
       if (name === 'plataforma' && value) {
-        const prod = productos.find(p => p.tipo === 'fisico' && normalizarTexto(p.plataforma) === normalizarTexto(value));
+        const registros = productos.filter(p => p.tipo === 'fisico' && normalizarTexto(p.plataforma) === normalizarTexto(value));
+        const prod = registros.find(p => p.categoria && p.marca) || registros[0];
         if (prod) {
           if (prod.categoria) item.categoria = prod.categoria;
           if (prod.marca) item.marca = prod.marca;
         }
       }
-
+      
       // CATEGORÍA → trae nombre y marca
       if (name === 'categoria' && value) {
         let candidatos = productos.filter(p => p.tipo === 'fisico' && p.categoria && normalizarTexto(p.categoria) === normalizarTexto(value));
@@ -719,7 +720,7 @@ export default function ProductosPage() {
         return;
       }
 
-      const productoExistente = productos.find(p => 
+       const productoExistente = productos.find(p => 
         normalizarTexto(p.plataforma) === normalizarTexto(item.plataforma) &&
         (p.tipo || 'fisico') === (item.tipo || 'fisico') &&
         p.id !== item.id
@@ -1014,13 +1015,15 @@ export default function ProductosPage() {
     return [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.marca).filter(Boolean))];
   }, [productos]);
 
-    const getProductosFisicosFiltrados = (categoria, marca) => {
-    return productosFisicos.filter(p => {
-      const prod = productos.find(x => normalizarTexto(x.plataforma) === normalizarTexto(p) && x.tipo === 'fisico');
-      if (!prod) return false;
-      if (categoria && normalizarTexto(prod.categoria) !== normalizarTexto(categoria)) return false;
-      if (marca && normalizarTexto(prod.marca) !== normalizarTexto(marca)) return false;
-      return true;
+      const getProductosFisicosFiltrados = (categoria, marca) => {
+    return productosFisicos.filter(nombre => {
+      const registros = productos.filter(x => x.tipo === 'fisico' && normalizarTexto(x.plataforma) === normalizarTexto(nombre));
+      if (registros.length === 0) return false;
+      // ✅ Un registro vacío (= sin clasificar) es compatible con cualquier filtro
+      return registros.some(prod =>
+        (!categoria || !prod.categoria || normalizarTexto(prod.categoria) === normalizarTexto(categoria)) &&
+        (!marca || !prod.marca || normalizarTexto(prod.marca) === normalizarTexto(marca))
+      );
     });
   };
 
