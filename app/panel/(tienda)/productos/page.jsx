@@ -88,8 +88,8 @@ export default function ProductosPage() {
   const [categorias, setCategorias] = useState([]);
   const [marcas, setMarcas] = useState([]);
   const [proveedores, setProveedores] = useState([]);
+  const [metodosPago, setMetodosPago] = useState([]);
   const [usuarioActual, setUsuarioActual] = useState('');
-  const [showCarterasModal, setShowCarterasModal] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [vista, setVista] = useState('tabla');
@@ -165,20 +165,16 @@ export default function ProductosPage() {
     precio_individual_total: 0
   });
 
-  const [nuevaCartera, setNuevaCartera] = useState({ nombre: '', tipo: 'pago_movil', datos: '' });
-
   // ✅ Funciones de SKU (definidas antes del useEffect)
   const prefijoSKU = (texto) => {
     const t = (texto || '').toString().trim().toUpperCase();
     return (t.substring(0, 3) || 'XXX').padEnd(3, 'X');
   };
 
-  // ✅ FORMATO UNIFICADO: siempre 4 segmentos PLAT-CAT-MAR-NUM
   const generarSKU = (plataforma, categoria, marca, num) => {
     return `${prefijoSKU(plataforma)}-${prefijoSKU(categoria)}-${prefijoSKU(marca)}-${String(num).padStart(3, '0')}`;
   };
 
-  // ✅ Cuenta números usados POR BASE COMPLETA (plat-cat-mar), no solo por prefijo de plataforma
   const obtenerSiguienteNumero = (plataforma, categoria, marca, lista) => {
     const base = `${prefijoSKU(plataforma)}-${prefijoSKU(categoria)}-${prefijoSKU(marca)}`;
     const usados = (lista && lista.length > 0 ? lista : productos)
@@ -194,7 +190,6 @@ export default function ProductosPage() {
     const cargarDatos = async () => {
       let pData = [], cData = [], sData = {};
 
-      // ✅ CONSULTA A SUPABASE RESTAURADA (ahora también proveedores)
       if (supabase) {
         const [{ data: p, error: eP }, { data: c, error: eC }, { data: s, error: eS }, { data: prv, error: ePrv }] = await Promise.all([
           supabase.from('productos').select('*'),
@@ -202,6 +197,7 @@ export default function ProductosPage() {
           supabase.from('settings').select('clave, valor'),
           supabase.from('proveedores').select('*')
         ]);
+       
         if (eP) console.error('❌ Error cargando productos:', eP.message);
         if (eC) console.error('❌ Error cargando carteras:', eC.message);
         if (eS) console.error('❌ Error cargando settings:', eS.message);
@@ -212,6 +208,12 @@ export default function ProductosPage() {
         if (prv) setProveedores(prv);
       }
 
+      // ✅ MÉTODOS DE PAGO sincronizados con AJUSTES (settings)
+      const metodosDeAjustes = Array.isArray(sData.metodos_pago)
+        ? sData.metodos_pago.filter(m => m.activo !== false)
+        : [];
+      setMetodosPago(metodosDeAjustes);
+
       if (pData.length === 0) {
         const productosGuardados = localStorage.getItem('voltech_productos');
         if (productosGuardados) pData = JSON.parse(productosGuardados);
@@ -221,7 +223,6 @@ export default function ProductosPage() {
         if (carterasGuardadas) cData = JSON.parse(carterasGuardadas);
       }
 
-      // 🔢 CURADOR AUTOMÁTICO DE SKUs (cuenta por base completa para evitar duplicados)
       if (pData.length > 0 && pData.some(p => !p.sku && p.plataforma)) {
         const usadosPorBase = {};
         pData.forEach(p => {
@@ -262,14 +263,19 @@ export default function ProductosPage() {
       const marData = sData.marcas || (localStorage.getItem('voltech_marcas') ? JSON.parse(localStorage.getItem('voltech_marcas')) : []);
       const tasaData = sData.tasa_bcv || (localStorage.getItem('voltech_tasa_bcv') ? JSON.parse(localStorage.getItem('voltech_tasa_bcv')) : { tasa: 36.50, usarBCV: true, tasaPersonalizada: 36.50 });
 
-      // 🔧 SINCRONIZA LISTAS GLOBALES CON PRODUCTOS (ej: MOXON aparece aunque no esté en settings)
       const catsBase = Array.isArray(catsData) ? catsData : [];
       const marBase = Array.isArray(marData) ? marData : [];
       const catsFinal = [...new Set([...catsBase, ...pData.map(p => p.categoria).filter(Boolean)])];
       const marFinal = [...new Set([...marBase, ...pData.map(p => p.marca).filter(Boolean)])];
 
+      // ✅ CARTERAS sincronizadas con AJUSTES: solo las ACTIVAS
+      const carterasDeAjustes = Array.isArray(sData.carteras)
+        ? sData.carteras.filter(ct => ct.activa !== false)
+        : [];
+      const carterasFinal = carterasDeAjustes.length > 0 ? carterasDeAjustes : cData;
+
       setProductos(pData);
-      setCarteras(cData);
+      setCarteras(carterasFinal);
       setEquipo(eqData);
       setCategorias(catsFinal);
       setMarcas(marFinal);
@@ -280,22 +286,11 @@ export default function ProductosPage() {
       if (!equipoGuardado) {
         localStorage.setItem('voltech_equipo', JSON.stringify(eqData));
       }
-      if (cData.length === 0 && !localStorage.getItem('voltech_carteras')) {
-        const carterasDefault = [
-          { id: crypto.randomUUID(), nombre: 'Pago Móvil Principal', tipo: 'pago_movil', datos: '0412-1234567 - 12345678 - 0102' },
-          { id: crypto.randomUUID(), nombre: 'Zelle', tipo: 'zelle', datos: 'voltech@email.com' },
-          { id: crypto.randomUUID(), nombre: 'Binance', tipo: 'cripto', datos: 'voltech@binance.com' },
-        ];
-        setCarteras(carterasDefault);
-        if (supabase) await supabase.from('carteras').insert(carterasDefault);
-        else localStorage.setItem('voltech_carteras', JSON.stringify(carterasDefault));
-      }
     };
 
     cargarDatos();
   }, []);
 
-  // ✅ DETECTA EL USUARIO LOGUEADO (comprador automático)
   useEffect(() => {
     const detectarUsuario = async () => {
       let nombre = '';
@@ -353,9 +348,7 @@ export default function ProductosPage() {
 
     item[name] = value;
 
-    // ✅ ASOCIACIÓN DE LOS 3 CAMPOS (solo físicos)
     if (item.tipo === 'fisico') {
-      // NOMBRE → trae categoría y marca (prefiere el registro que SÍ tiene datos)
       if (name === 'plataforma' && value) {
         const registros = productos.filter(p => p.tipo === 'fisico' && normalizarTexto(p.plataforma) === normalizarTexto(value));
         const prod = registros.find(p => p.categoria && p.marca) || registros[0];
@@ -365,7 +358,6 @@ export default function ProductosPage() {
         }
       }
       
-      // CATEGORÍA → trae nombre y marca
       if (name === 'categoria' && value) {
         let candidatos = productos.filter(p => p.tipo === 'fisico' && p.categoria && normalizarTexto(p.categoria) === normalizarTexto(value));
         if (item.marca) candidatos = candidatos.filter(p => normalizarTexto(p.marca) === normalizarTexto(item.marca));
@@ -375,7 +367,6 @@ export default function ProductosPage() {
         }
       }
 
-      // MARCA → trae nombre y categoría
       if (name === 'marca' && value) {
         let candidatos = productos.filter(p => p.tipo === 'fisico' && p.marca && normalizarTexto(p.marca) === normalizarTexto(value));
         if (item.categoria) candidatos = candidatos.filter(p => normalizarTexto(p.categoria) === normalizarTexto(item.categoria));
@@ -801,7 +792,6 @@ export default function ProductosPage() {
   };
 
   const guardarProductos = async () => {
-    // 🚫 VALIDACIÓN COMPLETA: si UN item está incompleto, NO se guarda NADA
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
       if (it.tipo === 'kit') {
@@ -830,7 +820,6 @@ export default function ProductosPage() {
     const nuevosProductos = [];
 
     items.forEach((item, index) => {
-      // ✅ 1) Combo EXACTO (nombre+cat+marca+tipo) → actualiza y suma stock
       const mismoCombo = productos.find(p =>
         normalizarTexto(p.plataforma) === normalizarTexto(item.plataforma) &&
         normalizarTexto(p.categoria || '') === normalizarTexto(item.categoria || '') &&
@@ -838,7 +827,6 @@ export default function ProductosPage() {
         (p.tipo || 'fisico') === (item.tipo || 'fisico') &&
         p.id !== item.id
       );
-      // ✅ 2) "Cascarón" (mismo nombre+tipo sin cat/marca) → lo completa, no duplica
       const cascaron = productos.find(p =>
         normalizarTexto(p.plataforma) === normalizarTexto(item.plataforma) &&
         (p.tipo || 'fisico') === (item.tipo || 'fisico') &&
@@ -847,7 +835,6 @@ export default function ProductosPage() {
       );
       const productoExistente = mismoCombo || cascaron;
 
-      // 🔢 SKU: regenera si falta o no coincide con el combo actual (corrige los XXX)
       const baseEsperada = `${prefijoSKU(item.plataforma)}-${prefijoSKU(item.categoria)}-${prefijoSKU(item.marca)}`;
       if (!item.sku || !String(item.sku).startsWith(baseEsperada + '-')) {
         item.sku = generarSKU(item.plataforma, item.categoria, item.marca, obtenerSiguienteNumero(item.plataforma, item.categoria, item.marca, productos));
@@ -888,7 +875,6 @@ export default function ProductosPage() {
         precioOferta: item.precioOferta || 0,
         precio_oferta: item.precioOferta || 0,
         tipoOferta: item.tipoOferta || '',
-        // ✅ DATOS DE COMPRA: proveedor (selector) + comprador (automático, solo lo ven admin/socio)
         proveedor: item.proveedor || '',
         comprador: item.comprador || usuarioActual || 'Administrador'
       };
@@ -1071,28 +1057,6 @@ export default function ProductosPage() {
     }
   };
 
-  const agregarCartera = async () => {
-    if (!nuevaCartera.nombre || !nuevaCartera.datos) {
-      toast.error('Completa todos los campos');
-      return;
-    }
-    const nueva = { ...nuevaCartera, id: crypto.randomUUID() };
-    if (supabase) await supabase.from('carteras').insert(nueva);
-    const carterasActualizadas = [...carteras, nueva];
-    setCarteras(carterasActualizadas);
-    localStorage.setItem('voltech_carteras', JSON.stringify(carterasActualizadas));
-    setNuevaCartera({ nombre: '', tipo: 'pago_movil', datos: '' });
-    toast.success('Cartera agregada');
-  };
-
-  const eliminarCartera = async (id) => {
-    if (supabase) await supabase.from('carteras').delete().eq('id', id);
-    const carterasActualizadas = carteras.filter(c => c.id !== id);
-    setCarteras(carterasActualizadas);
-    localStorage.setItem('voltech_carteras', JSON.stringify(carterasActualizadas));
-    toast.success('Cartera eliminada');
-  };
-
   const guardarTasa = async () => {
     const tasaData = { tasa: usarTasaBCV ? tasaBCV : tasaPersonalizada, usarBCV: usarTasaBCV, tasaPersonalizada };
     if (supabase) await supabase.from('settings').upsert({ clave: 'tasa_bcv', valor: tasaData }, { onConflict: 'clave' });
@@ -1113,7 +1077,6 @@ export default function ProductosPage() {
     toast.success('Catálogo descargado');
   };
 
-  // ✅ BÚSQUEDA AMPLIADA: ahora también por MARCA
   const productosFiltrados = productos.filter(p =>
     p.plataforma?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1156,7 +1119,6 @@ export default function ProductosPage() {
     });
   };
 
-  // ✅ SIEMPRE MUESTRA TODAS: asociadas primero + globales después
   const getCategoriasFiltradas = (marca) => {
     const asociadas = marca
       ? [...new Set(
@@ -1179,11 +1141,25 @@ export default function ProductosPage() {
     return [...new Set([...asociadas, ...marcas])];
   };
 
-  // ✅ OPCIONES DEL SELECTOR DE PROVEEDORES (compatibles con varios formatos de tabla)
   const opcionesProveedores = proveedores
     .map(pr => pr.nombre || pr.name || pr.razon_social || pr.proveedor || '')
     .filter(Boolean)
     .map(n => ({ value: n, label: n }));
+
+  // ✅ Opciones de Métodos de Pago sincronizadas con Ajustes
+  const opcionesMetodosPago = metodosPago.length > 0
+    ? metodosPago.map(m => ({
+        value: String(m.nombre || m.name || '').toLowerCase().replace(/\s+/g, '_'),
+        label: m.nombre || m.name || ''
+      }))
+    : [
+        { value: 'efectivo', label: 'Efectivo' },
+        { value: 'pago_movil', label: 'Pago Móvil' },
+        { value: 'transferencia', label: 'Transferencia' },
+        { value: 'zelle', label: 'Zelle' },
+        { value: 'binance', label: 'Binance' },
+        { value: 'otro', label: 'Otro' }
+      ];
 
   return (
     <div className="space-y-6">
@@ -1196,8 +1172,6 @@ export default function ProductosPage() {
         </div>
         <div className="flex gap-2">
           <button onClick={generarPDFCatalogo} className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2"><Download className="w-4 h-4" /> Catálogo</button>
-          <button onClick={() => setShowGestionModal(true)} className={`px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}><Filter className="w-4 h-4" /> Gestionar Cats/Marcas</button>
-          <button onClick={() => setShowCarterasModal(!showCarterasModal)} className={`px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}><DollarSign className="w-4 h-4" /> Carteras</button>
           <Link href="/panel/compras" className={`px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}><Database className="w-4 h-4" /> Compras</Link>
           {!showForm && tienePermiso('puedeVerInventarioCompleto') && (
             <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2"><Plus className="w-4 h-4" /> Nuevo Producto</button>
@@ -1264,49 +1238,6 @@ export default function ProductosPage() {
                 </div>
               </div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showCarterasModal && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-voltech-surface border border-voltech-border rounded-xl">
-            <div className="p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-white">Mis Carteras</h3>
-                <button onClick={() => setShowCarterasModal(false)} className="p-1 rounded hover:bg-voltech-border"><X className="w-4 h-4" /></button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {carteras.map((cartera) => (
-                  <div key={cartera.id} className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-3 flex items-center justify-between">
-                    <div><p className="text-sm font-medium text-white">{cartera.nombre}</p><p className="text-xs text-voltech-muted">{cartera.datos}</p></div>
-                    <button onClick={() => eliminarCartera(cartera.id)} className="p-2 rounded-lg hover:bg-voltech-error/10 text-voltech-muted hover:text-voltech-error transition-colors"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-                ))}
-              </div>
-              <div className="border-t border-voltech-border pt-4 space-y-3">
-                <h4 className="text-xs font-semibold text-voltech-muted">Agregar Nueva Cartera</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <input type="text" placeholder="Nombre" value={nuevaCartera.nombre} onChange={(e) => setNuevaCartera({ ...nuevaCartera, nombre: e.target.value })} className="input-voltech rounded-lg px-3 py-2 text-sm" />
-                  <CustomSelect
-                    label="Tipo"
-                    value={nuevaCartera.tipo}
-                    onChange={(value) => setNuevaCartera({ ...nuevaCartera, tipo: value })}
-                    options={[
-                      { value: 'pago_movil', label: 'Pago Móvil' },
-                      { value: 'transferencia', label: 'Transferencia' },
-                      { value: 'zelle', label: 'Zelle' },
-                      { value: 'binance', label: 'Binance' },
-                      { value: 'efectivo', label: 'Efectivo' }
-                    ]}
-                  />
-                  <div className="flex gap-2">
-                    <input type="text" placeholder="Datos" value={nuevaCartera.datos} onChange={(e) => setNuevaCartera({ ...nuevaCartera, datos: e.target.value })} className="input-voltech rounded-lg px-3 py-2 text-sm flex-1" />
-                    <button onClick={agregarCartera} className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors"><Plus className="w-4 h-4" /></button>
-                  </div>
-                </div>
-              </div>
-            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1433,7 +1364,6 @@ export default function ProductosPage() {
                       </div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">SKU (automático)</label><input type="text" value={item.sku} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-mono text-voltech-cyan bg-voltech-dark/50" /></div>
                       
-                      {/* ✅ ALINEACIÓN HORIZONTAL: NOMBRE DEL PRODUCTO */}
                       <div className="flex flex-col gap-1 w-full lg:col-span-2">
                         <label className="text-xs text-voltech-muted font-medium">
                           {item.tipo === 'streaming' ? 'Nombre Plataforma *' : item.tipo === 'kit' ? 'Nombre del Kit *' : 'Nombre del Producto *'}
@@ -1457,7 +1387,6 @@ export default function ProductosPage() {
                         </div>
                       </div>
                       
-                      {/* ✅ ALINEACIÓN HORIZONTAL: CATEGORÍA */}
                       {item.tipo === 'fisico' ? (
                         <div className="flex flex-col gap-1 w-full">
                           <label className="text-xs text-voltech-muted font-medium">Categoría *</label>
@@ -1486,7 +1415,6 @@ export default function ProductosPage() {
                         </div>
                       )}
 
-                      {/* ✅ ALINEACIÓN HORIZONTAL: MARCA */}
                       {item.tipo === 'fisico' && (
                         <div className="flex flex-col gap-1 w-full">
                           <label className="text-xs text-voltech-muted font-medium">Marca *</label>
@@ -1589,21 +1517,18 @@ export default function ProductosPage() {
 
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio (Bs)</label><input type="number" step="0.01" value={item.precioBs} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-cyan bg-voltech-dark/50" /></div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Total</label><input type="number" step="0.01" value={item.total} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-success bg-voltech-dark/50" /></div>
+                      
+                      {/* ✅ MÉTODO DE PAGO sincronizado con Ajustes */}
                       <div>
                         <CustomSelect
                           label="Método de Pago"
                           value={item.metodoPago}
                           onChange={(value) => handleChange(itemIndex, 'metodoPago', value)}
-                          options={[
-                            { value: 'efectivo', label: 'Efectivo' },
-                            { value: 'pago_movil', label: 'Pago Móvil' },
-                            { value: 'transferencia', label: 'Transferencia' },
-                            { value: 'zelle', label: 'Zelle' },
-                            { value: 'binance', label: 'Binance' },
-                            { value: 'otro', label: 'Otro' }
-                          ]}
+                          options={opcionesMetodosPago}
                         />
                       </div>
+                      
+                      {/* ✅ CARTERA sincronizada con Ajustes */}
                       <div>
                         <CustomSelect
                           label="Cartera"
@@ -1613,7 +1538,6 @@ export default function ProductosPage() {
                         />
                       </div>
 
-                      {/* ✅ DATOS DE COMPRA (solo Admin/Socio): Proveedor selector + Comprador automático */}
                       {tienePermiso('puedeVerInventarioCompleto') && (
                         <div>
                           <CustomSelect
