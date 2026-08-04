@@ -217,12 +217,15 @@ export default function ProductosPage() {
         if (prv) setProveedores(prv);
       }
 
-      // 🔧 FIX: aceptar varios nombres de clave por si Ajustes guarda distinto
-      const metodosRaw = sData.pagos || sData.metodos_pago || sData.metodosPago || sData.metodos_de_pago || [];
-      const metodosDeAjustes = Array.isArray(metodosRaw)
-        ? metodosRaw.filter(m => m.activo !== false)
-        : [];
-      setMetodosPago(metodosDeAjustes);
+      // ✅ MÉTODOS DE PAGO: Ajustes los guarda como OBJETO en 'pagos' { efectivo: {...}, ... }
+      const metodosRaw = sData.pagos || sData.metodos_pago || sData.metodosPago || {};
+      let metodosLista = [];
+      if (Array.isArray(metodosRaw)) {
+        metodosLista = metodosRaw;
+      } else if (metodosRaw && typeof metodosRaw === 'object') {
+        metodosLista = Object.entries(metodosRaw).map(([key, m]) => ({ id: key, ...(m || {}) }));
+      }
+      setMetodosPago(metodosLista.filter(m => m.activo !== false && m.activa !== false));
 
       if (pData.length === 0) {
         const productosGuardados = localStorage.getItem('voltech_productos');
@@ -281,7 +284,7 @@ export default function ProductosPage() {
       // 🔧 FIX: aceptar varios nombres de clave
       const carterasRaw = sData.carteras || sData.carteras_config || sData.carterasAjustes || [];
       const carterasDeAjustes = Array.isArray(carterasRaw)
-        ? carterasRaw.filter(ct => ct.activa !== false)
+        ? carterasRaw.filter(ct => ct.activo !== false && ct.activa !== false)
         : [];
       const carterasFinal = carterasDeAjustes.length > 0 ? carterasDeAjustes : cData;
 
@@ -1160,8 +1163,8 @@ export default function ProductosPage() {
   // ✅ Opciones de Métodos de Pago sincronizadas con Ajustes
   const opcionesMetodosPago = metodosPago.length > 0
     ? metodosPago.map(m => ({
-        value: String(m.nombre || m.name || '').toLowerCase().replace(/\s+/g, '_'),
-        label: m.nombre || m.name || ''
+        value: m.id || String(m.nombre || '').toLowerCase().replace(/\s+/g, '_'),
+        label: m.nombre || m.id || ''
       }))
     : [
         { value: 'efectivo', label: 'Efectivo' },
