@@ -253,6 +253,12 @@ export default function ProductosPage() {
   const nuevosItems = [...items];
   const item = nuevosItems[index];
   
+  // Normalización para búsquedas
+  const normalizar = (texto) => {
+    if (!texto) return '';
+    return texto.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  };
+  
   if (name === 'tipo') {
     item.plataforma = '';
     item.categoria = '';
@@ -269,17 +275,50 @@ export default function ProductosPage() {
   
   item[name] = value;
 
-  // ✅ SOLO autocompletar si seleccionamos un producto específico
+  // ✅ Cuando seleccionas PLATAFORMA (nombre del producto), trae categoría y marca
   if (name === 'plataforma' && value) {
-    const prod = productos.find(p => p.plataforma === value && p.tipo === item.tipo);
+    const prod = productos.find(p => 
+      normalizar(p.plataforma) === normalizar(value) && 
+      p.tipo === item.tipo
+    );
     if (prod) {
-      item.categoria = prod.categoria;
-      item.marca = prod.marca;
+      item.categoria = prod.categoria || '';
+      item.marca = prod.marca || '';
+      if (prod.plataforma && !item.plataforma) {
+        item.plataforma = prod.plataforma;
+      }
     }
   }
 
-  // ❌ ELIMINAR: Ya NO limpiamos plataforma al cambiar categoría/marca
-  // Esto causaba que se borrara todo
+  // ✅ Cuando seleccionas CATEGORÍA, busca productos con esa categoría
+  if (name === 'categoria' && value && item.tipo === 'fisico') {
+    // Si ya hay marca seleccionada, busca producto específico
+    if (item.marca) {
+      const prod = productos.find(p => 
+        normalizar(p.categoria) === normalizar(value) && 
+        normalizar(p.marca) === normalizar(item.marca) &&
+        p.tipo === 'fisico'
+      );
+      if (prod) {
+        item.plataforma = prod.plataforma || '';
+      }
+    }
+  }
+
+  // ✅ Cuando seleccionas MARCA, busca productos con esa marca
+  if (name === 'marca' && value && item.tipo === 'fisico') {
+    // Si ya hay categoría seleccionada, busca producto específico
+    if (item.categoria) {
+      const prod = productos.find(p => 
+        normalizar(p.categoria) === normalizar(item.categoria) && 
+        normalizar(p.marca) === normalizar(value) &&
+        p.tipo === 'fisico'
+      );
+      if (prod) {
+        item.plataforma = prod.plataforma || '';
+      }
+    }
+  }
 
   const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
   const qty = parseInt(item.cantidad) || 1;
