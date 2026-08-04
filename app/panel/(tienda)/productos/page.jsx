@@ -204,13 +204,23 @@ export default function ProductosPage() {
         if (ePrv) console.error('❌ Error cargando proveedores:', ePrv.message);
         if (p) pData = p;
         if (c) cData = c;
-        if (s) { s.forEach(item => { sData[item.clave] = item.valor; }); }
+        // 🔧 FIX: parsear JSON aunque venga como string
+        if (s) {
+          s.forEach(item => {
+            let v = item.valor;
+            if (typeof v === 'string') {
+              try { v = JSON.parse(v); } catch (e) {}
+            }
+            sData[item.clave] = v;
+          });
+        }
         if (prv) setProveedores(prv);
       }
 
-      // ✅ MÉTODOS DE PAGO sincronizados con AJUSTES (settings)
-      const metodosDeAjustes = Array.isArray(sData.metodos_pago)
-        ? sData.metodos_pago.filter(m => m.activo !== false)
+      // 🔧 FIX: aceptar varios nombres de clave por si Ajustes guarda distinto
+      const metodosRaw = sData.pagos || sData.metodos_pago || sData.metodosPago || sData.metodos_de_pago || [];
+      const metodosDeAjustes = Array.isArray(metodosRaw)
+        ? metodosRaw.filter(m => m.activo !== false)
         : [];
       setMetodosPago(metodosDeAjustes);
 
@@ -268,9 +278,10 @@ export default function ProductosPage() {
       const catsFinal = [...new Set([...catsBase, ...pData.map(p => p.categoria).filter(Boolean)])];
       const marFinal = [...new Set([...marBase, ...pData.map(p => p.marca).filter(Boolean)])];
 
-      // ✅ CARTERAS sincronizadas con AJUSTES: solo las ACTIVAS
-      const carterasDeAjustes = Array.isArray(sData.carteras)
-        ? sData.carteras.filter(ct => ct.activa !== false)
+      // 🔧 FIX: aceptar varios nombres de clave
+      const carterasRaw = sData.carteras || sData.carteras_config || sData.carterasAjustes || [];
+      const carterasDeAjustes = Array.isArray(carterasRaw)
+        ? carterasRaw.filter(ct => ct.activa !== false)
         : [];
       const carterasFinal = carterasDeAjustes.length > 0 ? carterasDeAjustes : cData;
 
@@ -1156,9 +1167,7 @@ export default function ProductosPage() {
         { value: 'efectivo', label: 'Efectivo' },
         { value: 'pago_movil', label: 'Pago Móvil' },
         { value: 'transferencia', label: 'Transferencia' },
-        { value: 'zelle', label: 'Zelle' },
         { value: 'binance', label: 'Binance' },
-        { value: 'otro', label: 'Otro' }
       ];
 
   return (
@@ -1518,41 +1527,42 @@ export default function ProductosPage() {
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio (Bs)</label><input type="number" step="0.01" value={item.precioBs} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-cyan bg-voltech-dark/50" /></div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Total</label><input type="number" step="0.01" value={item.total} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-success bg-voltech-dark/50" /></div>
                       
-                      {/* ✅ MÉTODO DE PAGO sincronizado con Ajustes */}
-                      <div>
-                        <CustomSelect
-                          label="Método de Pago"
-                          value={item.metodoPago}
-                          onChange={(value) => handleChange(itemIndex, 'metodoPago', value)}
-                          options={opcionesMetodosPago}
-                        />
-                      </div>
-                      
-                      {/* ✅ CARTERA sincronizada con Ajustes */}
-                      <div>
-                        <CustomSelect
-                          label="Cartera"
-                          value={item.cartera}
-                          onChange={(value) => handleChange(itemIndex, 'cartera', value)}
-                          options={[{ value: '', label: '-- Selecciona --' }, ...carteras.map(c => ({ value: c.nombre, label: c.nombre }))]}
-                        />
-                      </div>
-
-                      {tienePermiso('puedeVerInventarioCompleto') && (
-                        <div>
-                          <CustomSelect
-                            label="Proveedor (Compra)"
-                            value={item.proveedor}
-                            onChange={(value) => handleChange(itemIndex, 'proveedor', value)}
-                            options={[{ value: '', label: '-- Selecciona --' }, ...opcionesProveedores]}
-                          />
-                        </div>
-                      )}
-                      {tienePermiso('puedeVerInventarioCompleto') && (
-                        <div>
-                          <label className="block text-xs text-voltech-muted mb-1 ml-1">Comprador (automático)</label>
-                          <input type="text" value={usuarioActual || 'Administrador'} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed" />
-                        </div>
+                      {/* ✅ DATOS DE COMPRA: NO aplican en Kits (se arman con inventario existente) */}
+                      {item.tipo !== 'kit' && (
+                        <>
+                          <div>
+                            <CustomSelect
+                              label="Método de Pago"
+                              value={item.metodoPago}
+                              onChange={(value) => handleChange(itemIndex, 'metodoPago', value)}
+                              options={opcionesMetodosPago}
+                            />
+                          </div>
+                          <div>
+                            <CustomSelect
+                              label="Cartera"
+                              value={item.cartera}
+                              onChange={(value) => handleChange(itemIndex, 'cartera', value)}
+                              options={[{ value: '', label: '-- Selecciona --' }, ...carteras.map(c => ({ value: c.nombre, label: c.nombre }))]}
+                            />
+                          </div>
+                          {tienePermiso('puedeVerInventarioCompleto') && (
+                            <div>
+                              <CustomSelect
+                                label="Proveedor (Compra)"
+                                value={item.proveedor}
+                                onChange={(value) => handleChange(itemIndex, 'proveedor', value)}
+                                options={[{ value: '', label: '-- Selecciona --' }, ...opcionesProveedores]}
+                              />
+                            </div>
+                          )}
+                          {tienePermiso('puedeVerInventarioCompleto') && (
+                            <div>
+                              <label className="block text-xs text-voltech-muted mb-1 ml-1">Comprador (automático)</label>
+                              <input type="text" value={usuarioActual || 'Administrador'} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed" />
+                            </div>
+                          )}
+                        </>
                       )}
 
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">% Comisión por Venta</label><input type="number" step="0.01" value={item.porcentaje_comision} onChange={(e) => handleChange(itemIndex, 'porcentaje_comision', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
