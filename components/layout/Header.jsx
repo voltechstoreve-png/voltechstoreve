@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
+import { supabase } from '@/lib/supabase';
 import { 
   Menu, 
   Search,
@@ -42,7 +42,6 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
 
   const { notificaciones } = useNotificaciones();
 
-  // ✅ ACTUALIZADO: Obtiene datos de Supabase con fallback a localStorage
   useEffect(() => {
     const fetchUserDataAndStats = async () => {
       let user = null;
@@ -51,7 +50,6 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
       if (userLoggedStr) {
         const localUser = JSON.parse(userLoggedStr);
         
-        // Intentar obtener datos frescos de Supabase si tenemos el ID
         if (supabase && localUser.id) {
           const { data, error } = await supabase
             .from('usuarios')
@@ -62,7 +60,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
           if (!error && data) {
             user = data;
           } else {
-            user = localUser; // Fallback a local si falla
+            user = localUser;
           }
         } else {
           user = localUser;
@@ -89,7 +87,6 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
         };
         const nombreNormalizado = normalizarNombre(nombreVendedor);
 
-        // Función de respaldo para calcular desde localStorage
         const calcularDesdeLocalStorage = () => {
           const ventasProductos = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
           const ventasStreaming = JSON.parse(localStorage.getItem('voltech_ventas_streaming') || '[]');
@@ -118,7 +115,6 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
           });
         };
 
-        // Intentar calcular desde Supabase
         if (supabase) {
           const { data: ventasData, error } = await supabase
             .from('ventas')
@@ -148,7 +144,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
               }
             });
           } else {
-            calcularDesdeLocalStorage(); // Fallback si la consulta falla
+            calcularDesdeLocalStorage();
           }
         } else {
           calcularDesdeLocalStorage();
@@ -214,15 +210,24 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
 
   return (
     <>
-      <header className="bg-voltech-surface border-b border-voltech-border px-4 py-3">
+      <header className="bg-voltech-surface border-b border-voltech-border px-3 sm:px-4 py-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors"
               title={sidebarOpen ? 'Contraer menú' : 'Expandir menú'}
             >
               <Menu className="w-5 h-5" />
+            </button>
+
+            {/* ✅ Búsqueda visible en móvil */}
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="md:hidden p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors"
+              title="Buscar"
+            >
+              <Search className="w-5 h-5" />
             </button>
 
             <button
@@ -237,7 +242,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
             </button>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1 sm:gap-4">
             <NotificationBell />
 
             <div className="relative">
@@ -258,7 +263,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="absolute right-0 mt-2 w-80 bg-voltech-surface border border-voltech-border rounded-lg shadow-xl z-50"
+                    className="absolute right-0 mt-2 w-72 sm:w-80 max-w-[calc(100vw-1.5rem)] bg-voltech-surface border border-voltech-border rounded-lg shadow-xl z-50"
                   >
                     <div className="p-3 border-b border-voltech-border">
                       <h3 className="font-semibold text-white flex items-center gap-2">
@@ -334,7 +339,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="absolute right-0 mt-2 w-56 bg-voltech-surface border border-voltech-border rounded-lg shadow-xl z-50 overflow-hidden"
+                    className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1.5rem)] bg-voltech-surface border border-voltech-border rounded-lg shadow-xl z-50 overflow-hidden"
                   >
                     <div className="p-3 border-b border-voltech-border">
                       <p className="text-sm font-semibold text-white">{userData.nombre}</p>
@@ -387,7 +392,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 z-[60] flex items-start justify-center pt-[20vh]"
+            className="fixed inset-0 bg-black/80 z-[60] flex items-start justify-center pt-[20vh] px-4"
             onClick={() => setSearchOpen(false)}
           >
             <motion.div
@@ -418,7 +423,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
                   </button>
                 </div>
               </form>
-              <div className="p-4 text-xs text-voltech-muted">
+              <div className="p-4 text-xs text-voltech-muted hidden sm:block">
                 <p>Presiona <kbd className="px-2 py-1 bg-voltech-dark rounded">Ctrl Shift K</kbd> para buscar</p>
               </div>
             </motion.div>
