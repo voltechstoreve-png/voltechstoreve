@@ -168,24 +168,23 @@ export default function ProductosPage() {
     const cargarDatos = async () => {
       let pData = [], cData = [], sData = {};
 
-      if (supabase) {
-        const [{ data: p }, { data: c }, { data: s }] = await Promise.all([
-          supabase.from('productos').select('*'),
-          supabase.from('carteras').select('*'),
-          supabase.from('settings').select('clave, valor')
-        ]);
-        if (p) pData = p;
-        if (c) cData = c;
-        if (s) { s.forEach(item => { sData[item.clave] = item.valor; }); }
-      }
-
-      if (pData.length === 0) {
-        const productosGuardados = localStorage.getItem('voltech_productos');
-        if (productosGuardados) pData = JSON.parse(productosGuardados);
-      }
-      if (cData.length === 0) {
-        const carterasGuardadas = localStorage.getItem('voltech_carteras');
-        if (carterasGuardadas) cData = JSON.parse(carterasGuardadas);
+      if (!localStorage.getItem('sku_v2') && pData.length > 0) {
+        const orden = [...pData].sort((a, b) =>
+          (a.fechaCreacion || a.creado_en || '').localeCompare(b.fechaCreacion || b.creado_en || '')
+        );
+        const usadosPorPrefijo = {};
+        orden.forEach(p => {
+          const pref = prefijoSKU(p.plataforma);
+          usadosPorPrefijo[pref] = usadosPorPrefijo[pref] || [];
+          let n = 1;
+          while (usadosPorPrefijo[pref].includes(n)) n++;
+          p.sku = generarSKU(p.plataforma, p.categoria, p.marca, n);
+          usadosPorPrefijo[pref].push(n);
+        });
+        pData = orden;
+        localStorage.setItem('sku_v2', '1');
+        localStorage.setItem('voltech_productos', JSON.stringify(orden));
+        if (supabase) supabase.from('productos').upsert(orden, { onConflict: 'id' }).then(({ error }) => { if (error) console.error('Error renumerando:', error); });
       }
 
       const equipoGuardado = localStorage.getItem('voltech_equipo');
@@ -222,33 +221,38 @@ export default function ProductosPage() {
     cargarDatos();
   }, []);
 
-  const generarSKU = (plataforma, categoria, marca, existente = 0) => {
-    if (categoria === 'KIT') return `KIT-${(plataforma || 'KIT').substring(0, 3).toUpperCase()}-${String(existente).padStart(3, '0')}`;
-    const plat = (plataforma || '').substring(0, 3).toUpperCase();
-    const cat = (categoria || '').substring(0, 3).toUpperCase();
-    const mar = marca ? marca.substring(0, 3).toUpperCase() : 'STR';
-    const num = String(existente).padStart(3, '0');
-    return `${plat}-${cat}-${mar}-${num}`;
+  const prefijoSKU = (texto) => {
+    const t = (texto || '').toString().trim().toUpperCase();
+    return (t.substring(0, 3) || 'XXX').padEnd(3, 'X');
   };
 
-  const obtenerSiguienteNumero = (plataforma, categoria, marca) => {
-    if (!plataforma || !categoria) return 0;
-    const base = categoria === 'KIT' ? `KIT-${(plataforma || 'KIT').substring(0, 3).toUpperCase()}` : `${plataforma.substring(0, 3).toUpperCase()}-${categoria.substring(0, 3).toUpperCase()}-${marca ? marca.substring(0, 3).toUpperCase() : 'STR'}`;
-    const existentes = productos.filter(p => p.sku && p.sku.startsWith(base));
-    return existentes.length;
+  const generarSKU = (plataforma, categoria, marca, num) => {
+    if (categoria === 'KIT') return `KIT-${prefijoSKU(plataforma)}-${String(num).padStart(3, '0')}`;
+    return `${prefijoSKU(plataforma)}-${prefijoSKU(categoria)}-${prefijoSKU(marca)}-${String(num).padStart(3, '0')}`;
+  };
+
+  const obtenerSiguienteNumero = (plataforma) => {
+    const pref = prefijoSKU(plataforma);
+    const usados = productos
+      .filter(p => p.sku && p.sku.startsWith(`${pref}-`))
+      .map(p => parseInt(String(p.sku).split('-').pop(), 10))
+      .filter(n => !isNaN(n));
+    let n = 1;
+    while (usados.includes(n)) n++;
+    return n;
   };
 
   const actualizarSKU = (index) => {
     const item = items[index];
     if (item.plataforma && item.categoria) {
-      const siguienteNum = obtenerSiguienteNumero(item.plataforma, item.categoria, item.marca);
+      const siguienteNum = obtenerSiguienteNumero(item.plataforma);
       const nuevoSKU = generarSKU(item.plataforma, item.categoria, item.marca, siguienteNum);
       const nuevosItems = [...items];
       nuevosItems[index].sku = nuevoSKU;
       setItems(nuevosItems);
     }
   };
-
+  
    const handleChange = (index, name, value) => {
     const nuevosItems = [...items];
     const item = nuevosItems[index];
@@ -323,7 +327,7 @@ export default function ProductosPage() {
         const itemActualizado = nuevosItems[index];
         if (itemActualizado.plataforma && itemActualizado.categoria) {
           const siguientesItems = [...nuevosItems];
-          const siguienteNum = obtenerSiguienteNumero(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca);
+          const siguienteNum = obtenerSiguienteNumero(itemActualizado.plataforma);
           const nuevoSKU = generarSKU(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca, siguienteNum);
           siguientesItems[index].sku = nuevoSKU;
           setItems(siguientesItems);
