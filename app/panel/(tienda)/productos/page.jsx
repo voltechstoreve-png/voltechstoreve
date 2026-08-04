@@ -766,28 +766,55 @@ export default function ProductosPage() {
   };
 
   const guardarProductos = async () => {
+    // 🚫 VALIDACIÓN COMPLETA: si UN item está incompleto, NO se guarda NADA
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (it.tipo === 'kit') {
+        if (!it.plataforma || (it.productos_kit || []).length === 0) {
+          toast.error(`El Kit ${i + 1} debe tener un nombre y al menos 1 producto del inventario`);
+          return;
+        }
+      } else {
+        if (!it.plataforma || !it.categoria || (it.tipo === 'fisico' && !it.marca)) {
+          toast.error(`El item ${i + 1} está incompleto: nombre, categoría y marca son obligatorios`);
+          return;
+        }
+        if (!(parseFloat(it.cantidad) > 0)) {
+          toast.error(`El item ${i + 1} debe tener una cantidad mayor a 0`);
+          return;
+        }
+        if (!((parseFloat(it.precioDetal) > 0) || (parseFloat(it.precioOferta) > 0))) {
+          toast.error(`El item ${i + 1} debe tener un precio de venta (Detal u Oferta)`);
+          return;
+        }
+      }
+    }
+
     let productosGuardados = 0;
     let productosActualizados = 0;
     const nuevosProductos = [];
 
     items.forEach((item, index) => {
-      if (item.tipo !== 'kit' && (!item.plataforma || !item.categoria || (item.tipo === 'fisico' && !item.marca))) {
-        toast.error(`El item ${index + 1} tiene campos obligatorios vacíos`);
-        return;
-      }
-      if (item.tipo === 'kit' && (!item.plataforma || (item.productos_kit || []).length === 0)) {
-        toast.error(`El Kit ${index + 1} debe tener un nombre y al menos 1 producto`);
-        return;
-      }
-
-      const productoExistente = productos.find(p => 
+      // ✅ 1) Combo EXACTO (nombre+cat+marca+tipo) → actualiza y suma stock
+      const mismoCombo = productos.find(p =>
         normalizarTexto(p.plataforma) === normalizarTexto(item.plataforma) &&
+        normalizarTexto(p.categoria || '') === normalizarTexto(item.categoria || '') &&
+        normalizarTexto(p.marca || '') === normalizarTexto(item.marca || '') &&
         (p.tipo || 'fisico') === (item.tipo || 'fisico') &&
         p.id !== item.id
       );
+      // ✅ 2) "Cascarón" (mismo nombre+tipo sin cat/marca) → lo completa, no duplica
+      const cascaron = productos.find(p =>
+        normalizarTexto(p.plataforma) === normalizarTexto(item.plataforma) &&
+        (p.tipo || 'fisico') === (item.tipo || 'fisico') &&
+        !p.categoria && !p.marca &&
+        p.id !== item.id
+      );
+      const productoExistente = mismoCombo || cascaron;
 
-      // 🔢 RED DE SEGURIDAD: asigna SKU si falta
-      if (!item.sku && item.plataforma) {
+      // 🔢 SKU: regenera si falta o no coincide con el combo actual (corrige los XXX)
+      const baseEsperada = `${prefijoSKU(item.plataforma)}-${prefijoSKU(item.categoria)}-${prefijoSKU(item.marca)}`;
+      if (!item.sku || !String(item.sku).startsWith(baseEsperada + '-')) {
         item.sku = generarSKU(item.plataforma, item.categoria, item.marca, obtenerSiguienteNumero(item.plataforma, item.categoria, item.marca, productos));
       }
 
@@ -832,7 +859,8 @@ export default function ProductosPage() {
         const productoActualizado = {
           ...productoExistente,
           ...productoData,
-          cantidad: item.tipo !== 'kit' ? productoExistente.cantidad + item.cantidad : item.cantidad,
+          id: productoExistente.id,
+          cantidad: item.tipo !== 'kit' ? (productoExistente.cantidad || 0) + item.cantidad : item.cantidad,
         };
         nuevosProductos.push(productoActualizado);
         productosActualizados++;
@@ -862,11 +890,7 @@ export default function ProductosPage() {
 
         let productosFinales = [...productos];
         nuevosProductos.forEach(p => {
-          const index = productosFinales.findIndex(existing => 
-            normalizarTexto(existing.plataforma) === normalizarTexto(p.plataforma) && 
-            (existing.tipo || 'fisico') === (p.tipo || 'fisico')
-          );
-          
+          const index = productosFinales.findIndex(existing => existing.id === p.id);
           if (index !== -1) {
             productosFinales[index] = p;
           } else {
@@ -940,7 +964,7 @@ export default function ProductosPage() {
       }
     }
   };
-
+  
   const abrirEdicion = (producto) => {
     setEditandoId(producto.id);
     setEditData({
