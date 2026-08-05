@@ -24,7 +24,7 @@ const generarUUID = () => {
 function ClientesContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { esVendedor, usuarioActual, tienePermiso } = usePermissions();
+  const { esVendedor, esAdmin, esSocio, usuarioActual, tienePermiso } = usePermissions();
   
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'clientes');
   const [clientes, setClientes] = useState([]);
@@ -39,7 +39,7 @@ function ClientesContent() {
   const [showNivelForm, setShowNivelForm] = useState(false);
   
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [filterEtiqueta, setFilterEtiqueta] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [nuevaEtiqueta, setNuevaEtiqueta] = useState({ nombre: '', color: '#00d4ff' });
@@ -89,11 +89,24 @@ function ClientesContent() {
         if (nivelesGuardados) nivelesData = JSON.parse(nivelesGuardados);
       }
 
-      const ventasGuardadas = localStorage.getItem('voltech_ventas');
-      const equipoGuardado = localStorage.getItem('voltech_equipo');
-      
-      let vts = ventasGuardadas ? JSON.parse(ventasGuardadas) : [];
-      const eqp = equipoGuardado ? JSON.parse(equipoGuardado) : [];
+      // ✅ EQUIPO y VENTAS desde Supabase (adiós clientes zombi del localStorage)
+      let vts = [], eqp = [];
+      if (supabase) {
+        const [{ data: vData }, { data: eqData }] = await Promise.all([
+          supabase.from('ventas').select('*'),
+          supabase.from('usuarios').select('*').eq('activo', true)
+        ]);
+        if (vData && vData.length > 0) vts = vData;
+        if (eqData && eqData.length > 0) eqp = eqData;
+      }
+      if (vts.length === 0) {
+        const ventasGuardadas = localStorage.getItem('voltech_ventas');
+        vts = ventasGuardadas ? JSON.parse(ventasGuardadas) : [];
+      }
+      if (eqp.length === 0) {
+        const equipoGuardado = localStorage.getItem('voltech_equipo');
+        eqp = equipoGuardado ? JSON.parse(equipoGuardado) : [];
+      }
 
       if (esVendedor && usuarioActual?.nombre) {
         vts = vts.filter(v => v.vendedor?.toLowerCase() === usuarioActual.nombre.toLowerCase());
@@ -161,7 +174,7 @@ function ClientesContent() {
 
   const obtenerVendedorConMenosVentas = () => {
     const ventasPorVendedor = {};
-    equipo.forEach(e => { if (e.rol === 'vendedor' || e.rol === 'admin') ventasPorVendedor[e.nombre] = 0; });
+    equipo.forEach(e => { if (['vendedor', 'admin', 'socio'].includes((e.rol || '').toLowerCase())) ventasPorVendedor[e.nombre] = 0; });
     ventas.forEach(v => { if (ventasPorVendedor[v.vendedor] !== undefined) ventasPorVendedor[v.vendedor]++; });
     let minVentas = Infinity, vendedorMenosVentas = '';
     for (const [vendedor, count] of Object.entries(ventasPorVendedor)) {
@@ -419,9 +432,19 @@ function ClientesContent() {
           <button className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'referidos' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`} onClick={() => setActiveTab('referidos')}>
             <Gift className="w-4 h-4" /> Programa de Referidos
           </button>
-          <button className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'notificaciones' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`} onClick={() => setActiveTab('notificaciones')}>
-            <Users className="w-4 h-4" /> Notificaciones
-          </button>
+        {activeTab === 'notificaciones' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-white">Notificaciones</h3>
+                <p className="text-sm text-voltech-muted">Recibe alertas de actividad importante</p>
+              </div>
+            </div>
+            <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
+              <p className="text-center text-voltech-muted py-8">Sistema de notificaciones activo. (Integrado con el contexto global)</p>
+            </div>
+          </div>
+        )}
         </div>
       </div>
 
@@ -450,7 +473,7 @@ function ClientesContent() {
                         ) : (
                           <select name="registradoPor" value={formData.registradoPor} onChange={handleInputChange} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
                             <option value="">-- Selecciona --</option>
-                            {equipo.filter(e => e.rol === 'vendedor' || e.rol === 'admin').map(e => (<option key={e.id} value={e.nombre}>{e.nombre} ({e.rol})</option>))}
+                            {equipo.filter(e => ['vendedor', 'admin', 'socio'].includes((e.rol || '').toLowerCase())).map(e => (<option key={e.id} value={e.nombre}>{e.nombre} ({e.rol})</option>))}
                           </select>
                         )}
                       </div>
@@ -586,8 +609,10 @@ function ClientesContent() {
                           <td className="px-4 py-3 text-sm font-bold text-voltech-success">${(cliente.totalGastado || 0).toFixed(2)}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-1">
-                              <button onClick={() => editarCliente(cliente)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors" title="Editar"><Edit3 className="w-4 h-4" /></button>
-                              <button onClick={() => eliminarCliente(cliente.id)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
+                              {(esAdmin || esSocio || (cliente.registradoPor || '').toLowerCase() === (usuarioActual?.nombre || '').toLowerCase()) && (<>
+                                <button onClick={() => editarCliente(cliente)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors" title="Editar"><Edit3 className="w-4 h-4" /></button>
+                                <button onClick={() => eliminarCliente(cliente.id)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
+                              </>)}
                             </div>
                           </td>
                         </tr>

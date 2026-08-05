@@ -25,7 +25,8 @@ import {
   Target,        
   DollarSign,
   Truck,
-  CreditCard // ✅ CAMBIADO: Wallet por CreditCard
+  CreditCard,
+  Bell
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -56,6 +57,7 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }
         { name: 'Ventas Productos', icon: ShoppingCart, path: '/panel/ventas-productos', siempreVisible: true },
         { name: 'Ventas Streaming', icon: PlayCircle, path: '/panel/ventas-streaming', siempreVisible: true },
         { name: 'Clientes', icon: Users, path: '/panel/clientes', siempreVisible: true },
+        { name: 'Alertas', icon: Bell, path: '/panel/alertas', siempreVisible: true },
       ]
     },
     {
