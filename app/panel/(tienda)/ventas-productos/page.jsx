@@ -81,8 +81,8 @@ export default function VentasProductosPage() {
       try {
         if (supabase) {
           console.log('🔄 Cargando desde Supabase...');
-          const [{ data: d1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }, { data: d6 }, { data: d7 }] = await Promise.all([
-            supabase.from('ventas').select('*').order('fechaRegistro', { ascending: false }),
+          const [{ data: d1, error: err1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }, { data: d6 }, { data: d7 }] = await Promise.all([
+            supabase.from('ventas').select('*'),
             supabase.from('productos').select('*'),
             supabase.from('clientes').select('*'),
             supabase.from('usuarios').select('*').eq('activo', true),
@@ -91,7 +91,8 @@ export default function VentasProductosPage() {
             supabase.from('kits').select('*').eq('activo', true)
           ]);
           
-          if (d1) vts = d1;
+          if (err1) console.error('❌ Error cargando ventas:', err1.message);
+          if (d1) vts = [...d1].sort((a, b) => String(b.fechaRegistro || b.fecha || '').localeCompare(String(a.fechaRegistro || a.fecha || '')));
           if (d2) prods = d2;
           if (d3) clts = d3;
           if (d4) eqp = d4;
@@ -568,8 +569,10 @@ export default function VentasProductosPage() {
       let cuponesActualizados = [...cupones];
       
       if (supabase) {
-        await supabase.from('ventas').upsert(nuevaVenta, { onConflict: 'id' });
-        await supabase.from('clientes').upsert(nuevoCliente, { onConflict: 'id' });
+        const rVenta = await supabase.from('ventas').upsert(nuevaVenta, { onConflict: 'id' });
+        if (rVenta.error) console.error('❌ Error guardando venta:', rVenta.error.message);
+        const rCliente = await supabase.from('clientes').upsert(nuevoCliente, { onConflict: 'id' });
+        if (rCliente.error) console.error('❌ Error guardando cliente:', rCliente.error.message);
         
         for (const prodActualizado of productosActualizados) {
           await supabase.from('productos').update({ cantidad: prodActualizado.cantidad }).eq('id', prodActualizado.id);
@@ -859,6 +862,11 @@ export default function VentasProductosPage() {
 
     doc.save(`Nota_Entrega_${venta.numeroOrden || 'Venta'}.pdf`);
     toast.success('PDF generado correctamente');
+  };
+
+  const calcularDiasAtraso = (venta) => {
+    if (venta.estado !== 'pendiente' || !venta.fechaPago) return 0;
+    return Math.floor((new Date() - new Date(venta.fechaPago)) / (1000 * 60 * 60 * 24));
   };
 
   // ✅ 2.2 COMISIÓN por venta (usa el % de cada producto, default 5%)
