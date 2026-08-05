@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
@@ -861,9 +861,13 @@ export default function VentasProductosPage() {
     toast.success('PDF generado correctamente');
   };
 
-  const calcularDiasAtraso = (venta) => {
-    if (venta.estado !== 'pendiente' || !venta.fechaPago) return 0;
-    return Math.floor((new Date() - new Date(venta.fechaPago)) / (1000 * 60 * 60 * 24));
+  // ✅ 2.2 COMISIÓN por venta (usa el % de cada producto, default 5%)
+  const getComisionVenta = (venta) => {
+    return (venta.productos || []).reduce((acc, p) => {
+      const prod = productos.find(x => String(x.id) === String(p.productoId));
+      const pct = Number(prod?.porcentaje_comision ?? 5);
+      return acc + (Number(p.total || 0) * pct) / 100;
+    }, 0);
   };
 
   const enviarWhatsapp = (venta) => {
@@ -1141,7 +1145,7 @@ export default function VentasProductosPage() {
 
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-voltech-cyan mb-3 flex items-center gap-2"><Tag className="w-4 h-4" /> Cupón de Descuento</h4>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <input 
                     type="text" 
                     value={cuponInput} 
@@ -1259,6 +1263,7 @@ export default function VentasProductosPage() {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Cliente</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Productos</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Total</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Comisión</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Fecha Pago</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Días Atraso</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Método de Pago</th>
@@ -1279,6 +1284,7 @@ export default function VentasProductosPage() {
                       <td className="px-4 py-3"><p className="text-sm font-medium text-white">{venta.cliente}</p><p className="text-xs text-voltech-muted">{venta.telefono}</p></td>
                       <td className="px-4 py-3"><p className="text-sm text-white">{venta.productos[0]?.nombre}{venta.productos[0]?.esKit && <span className="text-xs text-voltech-purple ml-1">(KIT)</span>}{venta.productos.length > 1 && (<span className="text-xs text-voltech-muted ml-1">(+{venta.productos.length - 1} más)</span>)}</p><button onClick={() => setExpandedId(expandedId === venta.id ? null : venta.id)} className="text-xs text-voltech-cyan hover:underline flex items-center gap-1 mt-1"><ChevronDown className={`w-3 h-3 transition-transform ${expandedId === venta.id ? 'rotate-180' : ''}`} /> Ver detalle</button></td>
                       <td className="px-4 py-3 text-sm font-bold text-voltech-success">${Number(venta.total || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-voltech-purple">${Number(getComisionVenta(venta)).toFixed(2)}</td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{venta.fechaPago || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-voltech-warning">{calcularDiasAtraso(venta) > 0 ? `+${calcularDiasAtraso(venta)}` : '0'}</td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{(venta.metodoPago || '').replace('_', ' ')}</td>
@@ -1351,8 +1357,8 @@ export default function VentasProductosPage() {
                                     </tr>
                                   )}
                                   <tr>
-                                    <td colSpan="6" className="px-3 py-2 text-right font-bold text-lg text-white">TOTAL:</td>
-                                    <td className="px-3 py-2 text-right font-bold text-lg text-voltech-success">${Number(venta.total || 0).toFixed(2)}</td>
+                                    <td colSpan="6" className="px-3 py-2 text-right text-voltech-muted">Comisión estimada:</td>
+                                    <td className="px-3 py-2 text-right font-semibold text-voltech-purple">${Number(getComisionVenta(venta)).toFixed(2)}</td>
                                   </tr>
                                 </tfoot>
                               </table>
