@@ -487,8 +487,8 @@ export default function VentasProductosPage() {
       const clienteExistente = clientes.find(c => c.nombre.toLowerCase() === formData.cliente.toLowerCase() || c.telefono === formData.telefono);
       let clientesActualizados = [...clientes];
       const nuevoCliente = clienteExistente ? 
-        { ...clienteExistente, nombre: formData.cliente, telefono: formData.telefono, ultimaCompra: new Date().toISOString() } :
-        { id: crypto.randomUUID(), nombre: formData.cliente, telefono: formData.telefono, email: '', fechaRegistro: new Date().toISOString(), ultimaCompra: new Date().toISOString(), totalCompras: 0 };
+        { ...clienteExistente, nombre: formData.cliente, telefono: formData.telefono, ultimaCompra: new Date().toISOString(), registradoPor: vendedorNombre } :
+        { id: crypto.randomUUID(), nombre: formData.cliente, telefono: formData.telefono, email: '', fechaRegistro: new Date().toISOString(), ultimaCompra: new Date().toISOString(), totalCompras: 0, registradoPor: vendedorNombre };
 
       if (clienteExistente) {
         clientesActualizados = clientes.map(c => String(c.id) === String(clienteExistente.id) ? nuevoCliente : c);
