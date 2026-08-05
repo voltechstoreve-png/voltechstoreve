@@ -60,7 +60,7 @@ export default function PagosEquiposPage() {
       if (supabase) {
         console.log('🔄 Cargando Finanzas desde Supabase...');
         const [{ data: d1, error: e1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }] = await Promise.all([
-          supabase.from('movimientos_equipo').select('*').order('fechaRegistro', { ascending: false }),
+          supabase.from('movimientos_equipo').select('*').order('fecharegistro', { ascending: false }),
           supabase.from('usuarios').select('id, nombre, rol, activo, telefono').eq('activo', true),
           supabase.from('settings').select('clave, valor').eq('clave', 'carteras'),
           supabase.from('comisiones_pendientes').select('*').order('fecha_venta', { ascending: false }),

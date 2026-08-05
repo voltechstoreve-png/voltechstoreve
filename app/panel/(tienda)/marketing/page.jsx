@@ -15,15 +15,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function MarketingPage() {
-  const { esAdmin, usuarioActual } = usePermissions();
+  // ✅ ROLES: admin gestiona todo, socio gestiona, vendedor solo usa/ve
+  const { esAdmin, esSocio, esVendedor, usuarioActual } = usePermissions();
+  const puedeGestionar = esAdmin || esSocio;
   const [activeTab, setActiveTab] = useState('plantillas');
   
   const [masVendidosOpen, setMasVendidosOpen] = useState(false);
   const [whatsappOpen, setWhatsappOpen] = useState(false);
   const [marketplaceOpen, setMarketplaceOpen] = useState(false);
   const [cuponesOpen, setCuponesOpen] = useState(false);
-  const [calendarioMes, setCalendarioMes] = useState(new Date().getMonth());
-  const [calendarioAnio, setCalendarioAnio] = useState(new Date().getFullYear());
+  // ❌ ELIMINADO: calendarioMes y calendarioAnio (vive en Alertas)
 
   const [plantillas, setPlantillas] = useState([]);
   const [showPlantillaForm, setShowPlantillaForm] = useState(false);
@@ -37,7 +38,6 @@ export default function MarketingPage() {
   const [clientes, setClientes] = useState([]);
   const [etiquetas, setEtiquetas] = useState([]);
   
-  // WhatsApp States
   const [productoSeleccionado, setProductoSeleccionado] = useState(null);
   const [precioPromocion, setPrecioPromocion] = useState('');
   const [plantillaWhatsappSeleccionada, setPlantillaWhatsappSeleccionada] = useState('');
@@ -49,7 +49,6 @@ export default function MarketingPage() {
   const [historialEnvios, setHistorialEnvios] = useState({});
   const [historialDetallado, setHistorialDetallado] = useState([]);
 
-  // Marketplace States (SIN IA)
   const [productoMarketplace, setProductoMarketplace] = useState(null);
   const [precioPromocionMarketplace, setPrecioPromocionMarketplace] = useState('');
   const [plantillaMarketplaceSeleccionada, setPlantillaMarketplaceSeleccionada] = useState('');
@@ -100,7 +99,7 @@ export default function MarketingPage() {
     descripcion_2: '️ Garantía de 3 días en todos nuestros productos'
   });
 
-  const [campanasCalendario, setCampanasCalendario] = useState([]);
+  // ❌ ELIMINADO: campanasCalendario state
   const [alertasVencimiento, setAlertasVencimiento] = useState([]);
 
   // ✅ CÁLCULO AUTOMÁTICO DE FECHA DE VENCIMIENTO
@@ -152,16 +151,10 @@ export default function MarketingPage() {
     }
   }, [formDataPublicidad.fecha_inicio, formDataPublicidad.duracion_dias]);
 
+  // ✅ ALERTAS DE VENCIMIENTO: solo cupones (publicidad se movió a Alertas)
   useEffect(() => {
     const alertas = [];
     const hoy = new Date();
-    publicidad.forEach(pub => {
-      if (pub.estado === 'activo' && pub.fecha_fin) {
-        const fin = new Date(pub.fecha_fin);
-        const dias = Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24));
-        if (dias <= 3 && dias >= 0) alertas.push({ tipo: 'Publicidad', titulo: pub.titulo, dias, fecha: pub.fecha_fin });
-      }
-    });
     cupones.forEach(cupon => {
       if (cupon.estado === 'activo' && cupon.fecha_vencimiento) {
         const fin = new Date(cupon.fecha_vencimiento);
@@ -170,7 +163,7 @@ export default function MarketingPage() {
       }
     });
     setAlertasVencimiento(alertas);
-  }, [publicidad, cupones]);
+  }, [cupones]);
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -183,7 +176,7 @@ export default function MarketingPage() {
           supabase.from('marketing_config').select('valor').eq('clave', 'mas_vendidos').single()
         ]);
         if (pData) plts = pData; if (cData) cpons = cData; if (puData) pubs = puData;
-        if (prData) prods = prods; if (clData) clts = clData; if (etData?.valor) etqs = etData.valor;
+        if (prData) prods = prData; if (clData) clts = clData; if (etData?.valor) etqs = etData.valor;
         if (mvData?.valor) mvConfig = mvData.valor;
       }
       if (plts.length === 0) { const d = localStorage.getItem('voltech_plantillas'); if (d) plts = JSON.parse(d); }
@@ -196,24 +189,19 @@ export default function MarketingPage() {
 
       if (Object.keys(mvConfig).length > 0) setMasVendidosConfig(mvConfig);
 
+      // ✅ VENDEDOR solo ve SUS clientes; admin/socio ven todos
       let clientesFiltrados = clts;
-      if (!esAdmin && usuarioActual?.nombre) {
+      if (!esAdmin && !esSocio && usuarioActual?.nombre) {
         clientesFiltrados = clts.filter(c => c.registradoPor === usuarioActual.nombre);
       }
 
       setPlantillas(plts); setCupones(cpons); setPublicidad(pubs);
       setProductos(prods); setClientes(clientesFiltrados); setEtiquetas(etqs);
-
-      const campanas = [];
-      pubs.forEach(pub => campanas.push({ id: pub.id, tipo: 'Publicidad', titulo: pub.titulo, inicio: pub.fecha_inicio, fin: pub.fecha_fin, estado: pub.estado }));
-      cpons.forEach(cupon => campanas.push({ id: cupon.id, tipo: 'Cupón', titulo: cupon.titulo, inicio: cupon.fecha_inicio, fin: cupon.fecha_vencimiento, estado: cupon.estado }));
-      campanas.sort((a, b) => new Date(a.inicio) - new Date(b.inicio));
-      setCampanasCalendario(campanas);
+      // ❌ ELIMINADO: construcción de campanasCalendario
     };
     cargarDatos();
-  }, [esAdmin, usuarioActual]);
+  }, [esAdmin, esSocio, usuarioActual]);
 
-  // ✅ WHATSAPP: Generar mensaje con orden correcto
   useEffect(() => {
     if (!productoSeleccionado || clientesSeleccionados.length === 0) {
       setMensajePersonalizadoWa('');
@@ -227,7 +215,6 @@ export default function MarketingPage() {
     
     let mensaje = `¡Hola ${nombreCliente}! \n\n`;
     
-    // 2. Título de la Promoción (si hay plantilla seleccionada)
     if (plantillaWhatsappSeleccionada) {
       const plantilla = plantillas.find(p => String(p.id) === String(plantillaWhatsappSeleccionada));
       if (plantilla && plantilla.nombre) {
@@ -235,11 +222,9 @@ export default function MarketingPage() {
       }
     }
     
-    // 3. Detalles del Producto
     mensaje += ` *Producto:* ${nombreProducto}\n`;
     mensaje += `💰 *Precio Especial:* $${precioProducto}\n\n`;
     
-    // 4. Texto/Oferta de la Promoción (contenido de la plantilla)
     if (plantillaWhatsappSeleccionada) {
       const plantilla = plantillas.find(p => String(p.id) === String(plantillaWhatsappSeleccionada));
       if (plantilla && plantilla.contenido && plantilla.contenido.trim() !== '' && plantilla.contenido.trim() !== 'Sin plantilla') {
@@ -247,7 +232,6 @@ export default function MarketingPage() {
       }
     }
     
-    // 5. Plantilla de Contacto (Footer)
     mensaje += `---\n`;
     if (plantillaContactoWaSeleccionada) {
       const plantilla = plantillas.find(p => String(p.id) === String(plantillaContactoWaSeleccionada));
@@ -261,7 +245,6 @@ export default function MarketingPage() {
     setMensajePersonalizadoWa(mensaje.trim());
   }, [productoSeleccionado, precioPromocion, plantillaWhatsappSeleccionada, plantillaContactoWaSeleccionada, clientesSeleccionados, clientes, plantillas]);
 
-  // ✅ MARKETPLACE: Generar texto con orden correcto (SIN IA)
   useEffect(() => {
     if (!productoMarketplace) {
       setTextoMarketplace('');
@@ -273,7 +256,6 @@ export default function MarketingPage() {
     
     let mensaje = '';
     
-    // 1. Título de la Promoción
     if (plantillaMarketplaceSeleccionada) {
       const plantilla = plantillas.find(p => String(p.id) === String(plantillaMarketplaceSeleccionada));
       if (plantilla && plantilla.nombre) {
@@ -281,11 +263,9 @@ export default function MarketingPage() {
       }
     }
     
-    // 2. Producto y Precio
     mensaje += ` ${nombreProducto.toUpperCase()} 🔥\n`;
     mensaje += ` PRECIO: $${precioProducto}\n\n`;
     
-    // 3. Texto/Oferta de la Promoción (contenido de la plantilla)
     if (plantillaMarketplaceSeleccionada) {
       const plantilla = plantillas.find(p => String(p.id) === String(plantillaMarketplaceSeleccionada));
       if (plantilla && plantilla.contenido && plantilla.contenido.trim() !== '' && plantilla.contenido.trim() !== 'Sin plantilla') {
@@ -293,7 +273,6 @@ export default function MarketingPage() {
       }
     }
     
-    // 4. Plantilla de Contacto
     mensaje += `📍 ENTREGAS Y CONTACTO:\n`;
     if (plantillaContactoMpSeleccionada) {
       const plantilla = plantillas.find(p => String(p.id) === String(plantillaContactoMpSeleccionada));
@@ -331,7 +310,7 @@ export default function MarketingPage() {
   };
 
   const guardarCupon = async () => {
-    if (!esAdmin) return toast.error('Solo el administrador puede crear cupones');
+    if (!puedeGestionar) return toast.error('Solo admin/socio pueden crear cupones');
     if (!formDataCupon.titulo || !formDataCupon.descripcion || !formDataCupon.fecha_inicio || !formDataCupon.fecha_vencimiento) {
       return toast.error('Completa los campos obligatorios (Título, Descripción, Fechas)');
     }
@@ -361,7 +340,7 @@ export default function MarketingPage() {
       usos: cuponEditando?.usos || 0,
       descuento_total: cuponEditando?.descuento_total || 0,
       fecha_creacion: cuponEditando?.fecha_creacion || new Date().toISOString(),
-      creado_por: usuarioActual?.nombre || 'Admin'
+      creado_por: cuponEditando?.creado_por || usuarioActual?.nombre || 'Admin'
     };
 
     if (supabase) {
@@ -399,8 +378,9 @@ export default function MarketingPage() {
   };
 
   const guardarPlantilla = async () => {
+    if (!puedeGestionar) return toast.error('Solo admin/socio pueden crear plantillas');
     if (!formDataPlantilla.nombre || !formDataPlantilla.contenido) return toast.error('Nombre y contenido son obligatorios');
-    const nuevaPlantilla = { id: Date.now().toString(), ...formDataPlantilla, creadoPor: usuarioActual?.nombre || 'Desconocido', fechaCreacion: new Date().toISOString() };
+    const nuevaPlantilla = { id: plantillaEditando ? plantillaEditando.id : Date.now().toString(), ...formDataPlantilla, creadoPor: usuarioActual?.nombre || 'Desconocido', fechaCreacion: new Date().toISOString() };
     if (supabase) await supabase.from('plantillas').upsert(nuevaPlantilla, { onConflict: 'id' });
     const actualizadas = plantillaEditando ? plantillas.map(p => p.id === plantillaEditando.id ? nuevaPlantilla : p) : [...plantillas, nuevaPlantilla];
     setPlantillas(actualizadas); localStorage.setItem('voltech_plantillas', JSON.stringify(actualizadas));
@@ -409,6 +389,7 @@ export default function MarketingPage() {
   };
 
   const eliminarPlantilla = async (id) => {
+    if (!puedeGestionar) return toast.error('Solo admin/socio pueden eliminar plantillas');
     if (!confirm('¿Eliminar esta plantilla?')) return;
     if (supabase) await supabase.from('plantillas').delete().eq('id', id);
     const actualizadas = plantillas.filter(p => p.id !== id);
@@ -417,6 +398,7 @@ export default function MarketingPage() {
   };
 
   const editarCupon = (cupon) => {
+    if (!puedeGestionar) return toast.error('Solo admin/socio pueden editar cupones');
     setCuponEditando(cupon);
     setFormDataCupon({
       titulo: cupon.titulo,
@@ -441,6 +423,7 @@ export default function MarketingPage() {
   };
 
   const eliminarCupon = async (id) => {
+    if (!puedeGestionar) return toast.error('Solo admin/socio pueden eliminar cupones');
     if (!confirm('¿Estás seguro de eliminar este cupón?')) return;
     if (supabase) await supabase.from('cupones').delete().eq('id', id);
     const actualizados = cupones.filter(c => c.id !== id);
@@ -450,6 +433,7 @@ export default function MarketingPage() {
   };
 
   const toggleEstadoCupon = async (cupon) => {
+    if (!puedeGestionar) return toast.error('Solo admin/socio pueden activar/desactivar cupones');
     const nuevoEstado = cupon.estado === 'activo' ? 'inactivo' : 'activo';
     if (supabase) {
       await supabase.from('cupones').update({ estado: nuevoEstado }).eq('id', cupon.id);
@@ -542,24 +526,26 @@ export default function MarketingPage() {
   const plantillasFiltradas = filtroTipoPlantilla === 'todas' ? plantillas : plantillas.filter(p => p.tipo === filtroTipoPlantilla);
   const plantillasInfoContacto = plantillas.filter(p => p.tipo === 'info_contacto');
 
-  const diasDelMes = new Date(calendarioAnio, calendarioMes + 1, 0).getDate();
-  const primerDiaSemana = new Date(calendarioAnio, calendarioMes, 1).getDay();
-  const diasArray = Array.from({ length: diasDelMes }, (_, i) => i + 1);
-  const diasVacios = Array.from({ length: primerDiaSemana }, (_, i) => i);
+  // ❌ ELIMINADO: diasDelMes, primerDiaSemana, diasArray, diasVacios (del calendario)
 
-  const urlDestinoType = formDataPublicidad.url_destino.startsWith('/producto/') ? 'producto' : 'manual';
+  const urlDestinoType = (formDataPublicidad.url_destino || '').startsWith('/producto/') ? 'producto' : 'manual';
 
   const productosParaCupon = productos.filter(p => 
     (p.plataforma || p.nombre || '').toLowerCase().includes(busquedaProductoCupon.toLowerCase()) ||
     (p.marca || '').toLowerCase().includes(busquedaProductoCupon.toLowerCase())
   );
 
-  const estadisticasCupones = {
-    total: cupones.length,
-    activos: cupones.filter(c => c.estado === 'activo').length,
-    usados: cupones.reduce((acc, c) => acc + (c.usos || 0), 0),
-    descuentoTotal: cupones.reduce((acc, c) => acc + (c.descuento_total || 0), 0)
-  };
+  // ✅ TABS POR ROL: vendedor SIN Publicidad ni Más Vendidos; Calendario ELIMINADO
+  const tabsDisponibles = [
+    { id: 'plantillas', icon: MessageSquare, label: 'Plantillas' },
+    { id: 'whatsapp', icon: Send, label: 'WhatsApp' },
+    { id: 'marketplace', icon: FileText, label: 'Marketplace' },
+    { id: 'cupones', icon: Ticket, label: 'Cupones' },
+    ...((esAdmin || esSocio) ? [
+      { id: 'publicidad', icon: Megaphone, label: 'Publicidad' },
+      { id: 'mas-vendidos', icon: TrendingUp, label: 'Más Vendidos' },
+    ] : []),
+  ];
 
   return (
     <div className="space-y-6">
@@ -572,7 +558,7 @@ export default function MarketingPage() {
             {alertasVencimiento.map((alerta, idx) => (
               <div key={idx} className="flex items-center justify-between bg-voltech-dark/50 rounded-lg p-3">
                 <div className="flex items-center gap-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${alerta.tipo === 'Publicidad' ? 'bg-voltech-cyan/20 text-voltech-cyan' : 'bg-voltech-purple/20 text-voltech-purple'}`}>{alerta.tipo}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-voltech-purple/20 text-voltech-purple">{alerta.tipo}</span>
                   <p className="text-sm text-white font-medium">{alerta.titulo}</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -591,15 +577,7 @@ export default function MarketingPage() {
 
       <div className="border-b border-voltech-border">
         <div className="flex gap-6 overflow-x-auto pb-1">
-          {[
-            { id: 'plantillas', icon: MessageSquare, label: 'Plantillas' },
-            { id: 'whatsapp', icon: Send, label: 'WhatsApp' },
-            { id: 'marketplace', icon: FileText, label: 'Marketplace' },
-            { id: 'cupones', icon: Ticket, label: 'Cupones' },
-            { id: 'publicidad', icon: Megaphone, label: 'Publicidad' },
-            { id: 'mas-vendidos', icon: TrendingUp, label: 'Más Vendidos' },
-            { id: 'calendario', icon: Calendar, label: 'Calendario' }
-          ].map(tab => (
+          {tabsDisponibles.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>
               <tab.icon className="w-4 h-4" /> {tab.label}
             </button>
@@ -612,9 +590,11 @@ export default function MarketingPage() {
           <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
             <div className="flex items-center justify-between p-6">
               <div className="flex items-center gap-2"><div className="p-2 rounded-lg bg-voltech-cyan/20"><MessageSquare className="w-5 h-5 text-voltech-cyan" /></div><div><h3 className="text-lg font-bold text-white">Plantillas de Mensajes</h3><p className="text-xs text-voltech-muted">Crea y guarda mensajes personalizados</p></div></div>
-              <button onClick={() => setShowPlantillaForm(true)} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"><Plus className="w-4 h-4" /> Nueva Plantilla</button>
+              {puedeGestionar && (
+                <button onClick={() => setShowPlantillaForm(true)} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"><Plus className="w-4 h-4" /> Nueva Plantilla</button>
+              )}
             </div>
-            {showPlantillaForm && (
+            {showPlantillaForm && puedeGestionar && (
               <div className="border-t border-voltech-border p-6 bg-voltech-dark/50 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div><label className="block text-xs text-voltech-muted mb-1">Nombre</label><input type="text" value={formDataPlantilla.nombre} onChange={(e) => setFormDataPlantilla({...formDataPlantilla, nombre: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
@@ -640,11 +620,13 @@ export default function MarketingPage() {
                 {plantillasFiltradas.map((plantilla) => (
                   <div key={plantilla.id} className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4">
                     <div className="flex items-start justify-between mb-2">
-                      <div><h4 className="text-sm font-semibold text-white">{plantilla.nombre}</h4><p className="text-[10px] text-voltech-muted mt-1">Creado por: {plantilla.creadoPor || 'Desconocido'}</p></div>
-                      <div className="flex gap-1">
-                        <button onClick={() => { setFormDataPlantilla(plantilla); setPlantillaEditando(plantilla); setShowPlantillaForm(true); }} className="p-1 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit3 className="w-3 h-3" /></button>
-                        <button onClick={() => eliminarPlantilla(plantilla.id)} className="p-1 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-3 h-3" /></button>
-                      </div>
+                      <div><h4 className="text-sm font-semibold text-white">{plantilla.nombre}</h4><p className="text-[10px] text-voltech-muted mt-1">👤 Creado por: {plantilla.creadoPor || 'Desconocido'}</p></div>
+                      {puedeGestionar && (
+                        <div className="flex gap-1">
+                          <button onClick={() => { setFormDataPlantilla(plantilla); setPlantillaEditando(plantilla); setShowPlantillaForm(true); }} className="p-1 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit3 className="w-3 h-3" /></button>
+                          <button onClick={() => eliminarPlantilla(plantilla.id)} className="p-1 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-3 h-3" /></button>
+                        </div>
+                      )}
                     </div>
                     <p className="text-xs text-voltech-muted mb-3 line-clamp-2">{plantilla.contenido}</p>
                     {plantilla.tipo === 'info_contacto' && (
@@ -866,14 +848,14 @@ export default function MarketingPage() {
         {activeTab === 'cupones' && (
           <div className="space-y-6">
             <div className="flex justify-end">
-              {esAdmin && (
+              {puedeGestionar && (
                 <button onClick={() => { setCuponEditando(null); setShowCuponForm(true); setCuponesOpen(true); }} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2">
                   <Plus className="w-4 h-4" /> Crear Nuevo Cupón
                 </button>
               )}
             </div>
 
-            {showCuponForm && esAdmin && (
+            {showCuponForm && puedeGestionar && (
               <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xl font-bold text-white flex items-center gap-2">
@@ -886,7 +868,6 @@ export default function MarketingPage() {
                 </div>
 
                 <div className="space-y-6">
-                  {/* A. INFORMACIÓN DEL CUPÓN */}
                   <div>
                     <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
                       <MessageSquare className="w-4 h-4 text-voltech-cyan" /> 
@@ -925,7 +906,6 @@ export default function MarketingPage() {
                     </div>
                   </div>
 
-                  {/* B. CONFIGURACIÓN DEL DESCUENTO */}
                   <div>
                     <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
                       <Percent className="w-4 h-4 text-voltech-success" /> 
@@ -936,52 +916,28 @@ export default function MarketingPage() {
                       <label className="block text-xs text-voltech-muted mb-2">Tipo de Cupón (Aplicación)</label>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formDataCupon.tipo_aplicacion === 'todos' ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'}`}>
-                          <input 
-                            type="radio" 
-                            name="tipo_aplicacion" 
-                            checked={formDataCupon.tipo_aplicacion === 'todos'} 
-                            onChange={() => handleTipoAplicacionChange('todos')} 
-                            className="w-4 h-4 text-voltech-cyan" 
-                          />
+                          <input type="radio" name="tipo_aplicacion" checked={formDataCupon.tipo_aplicacion === 'todos'} onChange={() => handleTipoAplicacionChange('todos')} className="w-4 h-4 text-voltech-cyan" />
                           <div>
                             <span className="text-sm text-white font-medium">Todos los productos</span>
                             <p className="text-[10px] text-voltech-muted">Válido para cualquier artículo del carrito</p>
                           </div>
                         </label>
                         <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formDataCupon.tipo_aplicacion === 'producto_especifico' ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'}`}>
-                          <input 
-                            type="radio" 
-                            name="tipo_aplicacion" 
-                            checked={formDataCupon.tipo_aplicacion === 'producto_especifico'} 
-                            onChange={() => handleTipoAplicacionChange('producto_especifico')} 
-                            className="w-4 h-4 text-voltech-cyan" 
-                          />
+                          <input type="radio" name="tipo_aplicacion" checked={formDataCupon.tipo_aplicacion === 'producto_especifico'} onChange={() => handleTipoAplicacionChange('producto_especifico')} className="w-4 h-4 text-voltech-cyan" />
                           <div>
                             <span className="text-sm text-white font-medium">1 Producto específico</span>
                             <p className="text-[10px] text-voltech-muted">Válido solo para un producto seleccionado</p>
                           </div>
                         </label>
                         <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formDataCupon.tipo_aplicacion === 'varios_productos' ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'}`}>
-                          <input 
-                            type="radio" 
-                            name="tipo_aplicacion" 
-                            checked={formDataCupon.tipo_aplicacion === 'varios_productos'} 
-                            onChange={() => handleTipoAplicacionChange('varios_productos')} 
-                            className="w-4 h-4 text-voltech-cyan" 
-                          />
+                          <input type="radio" name="tipo_aplicacion" checked={formDataCupon.tipo_aplicacion === 'varios_productos'} onChange={() => handleTipoAplicacionChange('varios_productos')} className="w-4 h-4 text-voltech-cyan" />
                           <div>
                             <span className="text-sm text-white font-medium">Varios productos</span>
                             <p className="text-[10px] text-voltech-muted">Válido para una lista de productos seleccionados</p>
                           </div>
                         </label>
                         <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${formDataCupon.tipo_aplicacion === 'producto_gratis' ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'}`}>
-                          <input 
-                            type="radio" 
-                            name="tipo_aplicacion" 
-                            checked={formDataCupon.tipo_aplicacion === 'producto_gratis'} 
-                            onChange={() => handleTipoAplicacionChange('producto_gratis')} 
-                            className="w-4 h-4 text-voltech-cyan" 
-                          />
+                          <input type="radio" name="tipo_aplicacion" checked={formDataCupon.tipo_aplicacion === 'producto_gratis'} onChange={() => handleTipoAplicacionChange('producto_gratis')} className="w-4 h-4 text-voltech-cyan" />
                           <div>
                             <span className="text-sm text-white font-medium">Producto 100% Gratis</span>
                             <p className="text-[10px] text-voltech-muted">Hace que el producto seleccionado sea gratis</p>
@@ -1011,13 +967,7 @@ export default function MarketingPage() {
                             const isSingle = formDataCupon.tipo_aplicacion === 'producto_especifico' || formDataCupon.tipo_aplicacion === 'producto_gratis';
                             return (
                               <label key={prod.id} className={`flex items-center gap-3 p-2 rounded cursor-pointer transition-colors ${isSelected ? 'bg-voltech-cyan/10 border border-voltech-cyan/30' : 'hover:bg-voltech-dark/50'}`}>
-                                <input 
-                                  type={isSingle ? 'radio' : 'checkbox'} 
-                                  name="producto_seleccionado" 
-                                  checked={isSelected} 
-                                  onChange={() => toggleProductoCupon(prod.id, isSingle)} 
-                                  className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" 
-                                />
+                                <input type={isSingle ? 'radio' : 'checkbox'} name="producto_seleccionado" checked={isSelected} onChange={() => toggleProductoCupon(prod.id, isSingle)} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" />
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm text-white truncate">{prod.plataforma || prod.nombre || 'Sin nombre'}</p>
                                   <p className="text-xs text-voltech-muted">${Number(prod.precioDetal || prod.precioMayor || 0).toFixed(2)} • {prod.marca || 'Sin marca'}</p>
@@ -1078,7 +1028,6 @@ export default function MarketingPage() {
                     </div>
                   </div>
 
-                  {/* C. VALIDEZ Y LÍMITES */}
                   <div>
                     <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-voltech-warning" /> 
@@ -1159,7 +1108,6 @@ export default function MarketingPage() {
               </div>
             )}
 
-            {/* LISTADO DE CUPONES CREADOS */}
             <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
               <div className="p-6 border-b border-voltech-border">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -1196,7 +1144,6 @@ export default function MarketingPage() {
                     
                     return (
                       <div key={cupon.id} className="p-6 hover:bg-voltech-dark/30 transition-colors">
-                        {/* Header */}
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2 flex-wrap">
@@ -1210,7 +1157,8 @@ export default function MarketingPage() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm text-voltech-muted mb-3">{cupon.descripcion}</p>
+                            <p className="text-sm text-voltech-muted mb-2">{cupon.descripcion}</p>
+                            {cupon.creado_por && <p className="text-[10px] text-voltech-muted mb-3">👤 Creado por: {cupon.creado_por}</p>}
                             <div className="flex flex-wrap gap-4 text-sm">
                               <div className="flex items-center gap-2">
                                 <Ticket className="w-4 h-4 text-voltech-cyan" />
@@ -1235,32 +1183,33 @@ export default function MarketingPage() {
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 ml-4">
-                            <button 
-                              onClick={() => toggleEstadoCupon(cupon)} 
-                              className={`p-2 rounded-lg transition-colors ${cupon.estado === 'activo' ? 'hover:bg-voltech-warning/20 text-voltech-warning' : 'hover:bg-voltech-success/20 text-voltech-success'}`} 
-                              title={cupon.estado === 'activo' ? 'Desactivar' : 'Activar'}
-                            >
-                              {cupon.estado === 'activo' ? <X className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
-                            </button>
-                            <button 
-                              onClick={() => editarCupon(cupon)} 
-                              className="p-2 hover:bg-voltech-cyan/20 rounded-lg transition-colors text-voltech-cyan" 
-                              title="Editar"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-                            <button 
-                              onClick={() => eliminarCupon(cupon.id)} 
-                              className="p-2 hover:bg-voltech-error/20 rounded-lg transition-colors text-voltech-error" 
-                              title="Eliminar"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                          {puedeGestionar && (
+                            <div className="flex items-center gap-2 ml-4">
+                              <button 
+                                onClick={() => toggleEstadoCupon(cupon)} 
+                                className={`p-2 rounded-lg transition-colors ${cupon.estado === 'activo' ? 'hover:bg-voltech-warning/20 text-voltech-warning' : 'hover:bg-voltech-success/20 text-voltech-success'}`} 
+                                title={cupon.estado === 'activo' ? 'Desactivar' : 'Activar'}
+                              >
+                                {cupon.estado === 'activo' ? <X className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                              </button>
+                              <button 
+                                onClick={() => editarCupon(cupon)} 
+                                className="p-2 hover:bg-voltech-cyan/20 rounded-lg transition-colors text-voltech-cyan" 
+                                title="Editar"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => eliminarCupon(cupon.id)} 
+                                className="p-2 hover:bg-voltech-error/20 rounded-lg transition-colors text-voltech-error" 
+                                title="Eliminar"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                         
-                        {/* Métricas */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-voltech-border">
                           <div>
                             <p className="text-xs text-voltech-muted mb-1">Veces Usado</p>
@@ -1295,8 +1244,8 @@ export default function MarketingPage() {
           </div>
         )}
 
-        {activeTab === 'publicidad' && (
-          <div className="space-y-6">
+        {activeTab === 'publicidad' && (esAdmin || esSocio) && (
+                    <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-white">Gestión de Publicidad</h2>
@@ -1380,33 +1329,43 @@ export default function MarketingPage() {
                 <h3 className="text-lg font-bold text-white">Publicidades Creadas</h3>
               </div>
               <div className="divide-y divide-voltech-border">
-                {publicidad.map(pub => (
-                  <div key={pub.id} className="p-6 hover:bg-voltech-dark/30 transition-colors">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h4 className="text-lg font-bold text-white">{pub.titulo}</h4>
-                        <div className="flex gap-4 mt-2 text-sm">
-                          <span className={pub.estado === 'activo' ? 'text-voltech-success' : 'text-voltech-muted'}>{pub.estado === 'activo' ? 'Activo' : 'Inactivo'}</span>
-                          <span className="text-voltech-muted">{new Date(pub.fecha_inicio).toLocaleDateString('es-VE')} - {new Date(pub.fecha_fin).toLocaleDateString('es-VE')}</span>
+                {publicidad.length === 0 ? (
+                  <div className="p-12 text-center">
+                    <Megaphone className="w-16 h-16 text-voltech-muted mx-auto mb-4 opacity-30" />
+                    <h3 className="text-lg font-semibold text-white mb-2">No hay publicidades</h3>
+                    <p className="text-voltech-muted text-sm">Crea tu primera campaña publicitaria</p>
+                  </div>
+                ) : (
+                  publicidad.map(pub => (
+                    <div key={pub.id} className="p-6 hover:bg-voltech-dark/30 transition-colors">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h4 className="text-lg font-bold text-white">{pub.titulo}</h4>
+                          <div className="flex gap-4 mt-2 text-sm flex-wrap">
+                            <span className={pub.estado === 'activo' ? 'text-voltech-success' : 'text-voltech-muted'}>{pub.estado === 'activo' ? 'Activo' : 'Inactivo'}</span>
+                            <span className="text-voltech-muted">{new Date(pub.fecha_inicio).toLocaleDateString('es-VE')} - {new Date(pub.fecha_fin).toLocaleDateString('es-VE')}</span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => { setPublicidadEditando(pub); setShowPublicidadForm(true); }} className="p-2 hover:bg-voltech-cyan/20 rounded-lg text-voltech-cyan">
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button onClick={async () => { if(confirm('¿Eliminar?')) { if(supabase) await supabase.from('publicidad').delete().eq('id', pub.id); setPublicidad(publicidad.filter(p => p.id !== pub.id)); } }} className="p-2 hover:bg-voltech-error/20 rounded-lg text-voltech-error">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {esAdmin && (
+                          <div className="flex gap-2">
+                            <button onClick={() => { setPublicidadEditando(pub); setShowPublicidadForm(true); }} className="p-2 hover:bg-voltech-cyan/20 rounded-lg text-voltech-cyan">
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button onClick={async () => { if(confirm('¿Eliminar?')) { if(supabase) await supabase.from('publicidad').delete().eq('id', pub.id); setPublicidad(publicidad.filter(p => p.id !== pub.id)); } }} className="p-2 hover:bg-voltech-error/20 rounded-lg text-voltech-error">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {activeTab === 'mas-vendidos' && (
+        {activeTab === 'mas-vendidos' && (esAdmin || esSocio) && (
           <div className="space-y-4">
             <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
               <button onClick={() => setMasVendidosOpen(!masVendidosOpen)} className="w-full flex items-center justify-between p-4 bg-voltech-dark/30 hover:bg-voltech-dark/50 transition-colors">
@@ -1479,85 +1438,7 @@ export default function MarketingPage() {
             </div>
           </div>
         )}
-
-        {activeTab === 'calendario' && (
-          <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
-            <div className="p-6 border-b border-voltech-border">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-voltech-purple" /> Calendario de Campañas
-                </h3>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => { if(calendarioMes === 0) { setCalendarioMes(11); setCalendarioAnio(calendarioAnio - 1); } else setCalendarioMes(calendarioMes - 1); }} className="p-2 hover:bg-voltech-border rounded">
-                    <ChevronDown className="w-5 h-5 rotate-90" />
-                  </button>
-                  <span className="text-sm font-medium text-white w-32 text-center">
-                    {new Date(calendarioAnio, calendarioMes).toLocaleDateString('es-VE', { month: 'long', year: 'numeric' })}
-                  </span>
-                  <button onClick={() => { if(calendarioMes === 11) { setCalendarioMes(0); setCalendarioAnio(calendarioAnio + 1); } else setCalendarioMes(calendarioMes + 1); }} className="p-2 hover:bg-voltech-border rounded">
-                    <ChevronDown className="w-5 h-5 -rotate-90" />
-                  </button>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-7 gap-1 mb-6">
-                {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => (
-                  <div key={d} className="text-center text-[10px] text-voltech-muted font-medium py-1">{d}</div>
-                ))}
-                {diasVacios.map((_, i) => <div key={`empty-${i}`} />)}
-                {diasArray.map(dia => {
-                  const fechaStr = `${calendarioAnio}-${String(calendarioMes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-                  const campanasDelDia = campanasCalendario.filter(c => c.inicio?.startsWith(fechaStr) || c.fin?.startsWith(fechaStr));
-                  const tieneActiva = campanasDelDia.some(c => c.estado === 'activo');
-                  return (
-                    <div key={dia} className={`h-8 flex flex-col items-center justify-center rounded text-xs relative ${tieneActiva ? 'bg-voltech-cyan/20 text-voltech-cyan font-bold' : 'text-voltech-muted hover:bg-voltech-dark/50'}`}>
-                      {dia}
-                      {tieneActiva && <div className="w-1.5 h-1.5 bg-voltech-cyan rounded-full mt-0.5" />}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-white mb-2">Campañas Programadas</h4>
-                {campanasCalendario.length === 0 ? (
-                  <p className="text-sm text-voltech-muted text-center py-4">No hay campañas programadas</p>
-                ) : (
-                  campanasCalendario.map((campana) => {
-                    const hoy = new Date();
-                    const fin = new Date(campana.fin);
-                    const diasRestantes = Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24));
-                    let estadoVisual = '🟢';
-                    if (diasRestantes < 0) estadoVisual = '🔴';
-                    else if (diasRestantes <= 3) estadoVisual = '';
-                    return (
-                      <div key={campana.id} className="flex items-center justify-between p-4 bg-voltech-dark/30 border border-voltech-border rounded-lg">
-                        <div className="flex items-center gap-4">
-                          <span className="text-2xl">{estadoVisual}</span>
-                          <div>
-                            <h4 className="text-sm font-bold text-white">{campana.titulo}</h4>
-                            <div className="flex items-center gap-3 mt-1">
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${campana.estado === 'activo' ? 'bg-voltech-success/20 text-voltech-success' : 'bg-voltech-muted/20 text-voltech-muted'}`}>
-                                {campana.estado === 'activo' ? 'Activo' : 'Inactivo'}
-                              </span>
-                              <span className="text-xs text-voltech-muted flex items-center gap-1">
-                                <Calendar className="w-3 h-3" /> {new Date(campana.inicio).toLocaleDateString('es-VE')} - {new Date(campana.fin).toLocaleDateString('es-VE')}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-voltech-muted">Tipo</p>
-                          <p className="text-sm font-semibold text-white">{campana.tipo}</p>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        {/* ❌ ELIMINADO: todo el tab 'calendario' (vive ahora en /panel/alertas) */}
       </div>
     </div>
   );

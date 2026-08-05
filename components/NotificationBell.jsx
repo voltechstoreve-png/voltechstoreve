@@ -1,9 +1,10 @@
 'use client';
 
-// ✅ SE ELIMINARON LAS LÍNEAS 'export const dynamic...' PORQUE ROMPEN LOS CLIENT COMPONENTS
-
 import { useState } from 'react';
-import { Bell, CheckCircle, Users, Gift, Trophy, ShoppingCart, AlertTriangle, Trash2, X } from 'lucide-react';
+import { 
+  Bell, CheckCircle, Users, Gift, Trophy, ShoppingCart, AlertTriangle, 
+  Trash2, X, MonitorPlay, RefreshCw, Link as LinkIcon, Clock, Ticket, Megaphone 
+} from 'lucide-react';
 import { useNotificaciones } from '@/app/context/NotificationContext';
 import { useRouter } from 'next/navigation';
 
@@ -20,26 +21,49 @@ export default function NotificationBell() {
       case 'referido': return <Gift className="w-4 h-4 text-voltech-cyan" />;
       case 'nivel': return <Trophy className="w-4 h-4 text-voltech-warning" />;
       case 'sorteo': return <Users className="w-4 h-4 text-voltech-purple" />;
-      case 'venta': return <ShoppingCart className="w-4 h-4 text-voltech-success" />;
+      case 'venta':
+      case 'nueva_venta': return <ShoppingCart className="w-4 h-4 text-voltech-success" />;
+      case 'nueva_venta_streaming': return <MonitorPlay className="w-4 h-4 text-voltech-purple" />;
+      case 'vencimiento_streaming': return <Clock className="w-4 h-4 text-voltech-warning" />;
+      case 'cuenta_nueva': return <MonitorPlay className="w-4 h-4 text-voltech-cyan" />;
+      case 'cuenta_modificada':
+      case 'cuenta_reemplazada': return <RefreshCw className="w-4 h-4 text-voltech-purple" />;
+      case 'plataforma_nueva':
+      case 'plataforma_eliminada': return <LinkIcon className="w-4 h-4 text-voltech-cyan" />;
+      case 'cupon': return <Ticket className="w-4 h-4 text-voltech-success" />;
+      case 'publicidad': return <Megaphone className="w-4 h-4 text-voltech-warning" />;
       case 'stock': return <AlertTriangle className="w-4 h-4 text-voltech-error" />;
       case 'cliente': return <Users className="w-4 h-4 text-voltech-success" />;
       default: return <Bell className="w-4 h-4 text-voltech-muted" />;
     }
   };
 
+  // ✅ RUTAS ACTUALIZADAS: todo lo de streaming va a ventas-streaming; "ver todas" va a Alertas
   const getRuta = (notificacion) => {
     switch (notificacion.tipo) {
       case 'referido':
       case 'nivel':
       case 'sorteo':
       case 'cliente':
-        return '/panel/clientes?tab=notificaciones';
+        return '/panel/clientes';
       case 'venta':
+      case 'nueva_venta':
         return '/panel/ventas-productos';
+      case 'nueva_venta_streaming':
+      case 'vencimiento_streaming':
+      case 'cuenta_nueva':
+      case 'cuenta_modificada':
+      case 'cuenta_reemplazada':
+      case 'plataforma_nueva':
+      case 'plataforma_eliminada':
+        return '/panel/ventas-streaming';
+      case 'cupon':
+      case 'publicidad':
+        return '/panel/marketing';
       case 'stock':
         return '/panel/productos';
       default:
-        return '/panel/clientes?tab=notificaciones';
+        return '/panel/alertas';
     }
   };
 
@@ -95,9 +119,9 @@ export default function NotificationBell() {
             {ultimas.length === 0 ? (
               <p className="text-center text-voltech-muted py-8 text-sm">No hay notificaciones</p>
             ) : (
-              ultimas.map(notificacion => (
+              ultimas.map((notificacion, idx) => (
                 <div
-                  key={notificacion.id}
+                  key={notificacion.id || idx}
                   className={`p-4 border-b border-voltech-border hover:bg-voltech-dark/30 transition-colors ${
                     !notificacion.leida ? 'bg-voltech-cyan/5' : ''
                   }`}
@@ -126,7 +150,6 @@ export default function NotificationBell() {
                             {notificacion.mensaje}
                           </p>
                           <p className="text-[10px] text-voltech-muted mt-1">
-                            {/* ✅ COMPATIBLE CON SUPABASE (created_at) Y LOCALSTORAGE (hora) */}
                             {new Date(notificacion.created_at || notificacion.hora).toLocaleString('es-VE')}
                           </p>
                         </div>
@@ -148,7 +171,7 @@ export default function NotificationBell() {
           <div className="p-3 border-t border-voltech-border">
             <button
               onClick={() => {
-                router.push('/panel/clientes?tab=notificaciones');
+                router.push('/panel/alertas');
                 setShowDropdown(false);
               }}
               className="w-full text-center text-xs text-voltech-cyan hover:text-voltech-cyan/70"

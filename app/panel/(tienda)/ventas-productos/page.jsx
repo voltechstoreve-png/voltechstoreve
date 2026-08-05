@@ -71,7 +71,7 @@ export default function VentasProductosPage() {
       filtroCategoria: '', filtroMarca: '', esKit: false, productosIncluidos: []
     }],
     delivery: false, montoDelivery: 0, enCuotas: false, montoAbonado: 0, fechaPago: '',
-    metodoPago: 'efectivo', carteraId: '', referencia: '',
+    metodoPago: 'efectivo', carteraId: '', referencia: '', porcentaje_comision: 5,
   });
 
   useEffect(() => {
@@ -533,6 +533,7 @@ export default function VentasProductosPage() {
         metodoPago: formData.metodoPago,
         carteraId: formData.carteraId, 
         referencia: formData.referencia,
+        porcentaje_comision: formData.porcentaje_comision,
         estado: formData.enCuotas && montoPendiente > 0 ? 'pendiente' : 'pagado',
         fechaRegistro: new Date().toISOString(),
         tipo: 'producto'
@@ -638,7 +639,8 @@ export default function VentasProductosPage() {
       fechaPago: '',
       metodoPago: 'efectivo', 
       carteraId: '', 
-      referencia: '',
+      referencia: '', 
+      porcentaje_comision: 5,
     });
     setClienteSearch(''); 
     setCuponInput('');
@@ -869,11 +871,14 @@ export default function VentasProductosPage() {
     return Math.floor((new Date() - new Date(venta.fechaPago)) / (1000 * 60 * 60 * 24));
   };
 
-  // ✅ 2.2 COMISIÓN por venta (usa el % de cada producto, default 5%)
   const getComisionVenta = (venta) => {
+    // ✅ Si la venta tiene % definido, se aplica a TODO el total (ej: 3 productos al 7%)
+    if (venta.porcentaje_comision !== undefined && venta.porcentaje_comision !== null && venta.porcentaje_comision !== '') {
+      return (Number(venta.total || 0) * Number(venta.porcentaje_comision)) / 100;
+    }
+    // Si no, suma el % de cada producto (default 5%)
     return (venta.productos || []).reduce((acc, p) => {
-      const prod = productos.find(x => String(x.id) === String(p.productoId));
-      const pct = Number(prod?.porcentaje_comision ?? 5);
+      const pct = Number(p.porcentaje_comision || 5);
       return acc + (Number(p.total || 0) * pct) / 100;
     }, 0);
   };
@@ -982,8 +987,12 @@ export default function VentasProductosPage() {
                     <label className="block text-xs text-voltech-muted mb-1 ml-1">Cartera *</label>
                     <select value={formData.carteraId} onChange={(e) => setFormData({ ...formData, carteraId: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
                       <option value="">-- Selecciona --</option>
-                      {carterasActivas.length > 0 ? carterasActivas.map(c => (<option key={c.id} value={c.id}>{c.nombre}</option>)) : <option disabled>No hay carteras configuradas</option>}
+                      {carterasActivas.map(c => (<option key={c.id} value={c.id}>{c.nombre}</option>))}
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-voltech-muted mb-1 ml-1">% Comisión</label>
+                    <input type="number" step="0.5" min="0" max="100" value={formData.porcentaje_comision} onChange={(e) => setFormData({ ...formData, porcentaje_comision: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
                   </div>
                 </div>
               </div>

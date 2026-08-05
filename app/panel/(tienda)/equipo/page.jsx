@@ -33,7 +33,7 @@ export default function EquipoPage() {
       const { data, error } = await supabase
         .from('usuarios')
         .select('*')
-        .order('fechaRegistro', { ascending: false });
+        .order('fecharegistro', { ascending: false });
       
       if (!error && data) {
         setEquipo(data);

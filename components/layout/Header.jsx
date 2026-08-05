@@ -118,11 +118,32 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
           });
         };
 
-        // Intentar calcular desde Supabase
+        // Intentar calcular desde Supabase (✅ ahora incluye ventas streaming)
         if (supabase) {
-          const { data: ventasData, error } = await supabase
-            .from('ventas')
-            .select('*');
+          const [{ data: ventasData, error }, { data: streamData, error: errStream }] = await Promise.all([
+            supabase.from('ventas').select('*'),
+            supabase.from('ventas_streaming').select('*')
+          ]);
+
+                    // ✅ SUMAR VENTAS STREAMING (comisión real por plataforma, default 5%)
+          if (!errStream && streamData) {
+            streamData.forEach(venta => {
+              const vendedorVenta = normalizarNombre(
+                venta.vendedor || venta.vendedorNombre || venta.usuario || venta.user || venta.empleado || venta.nombreVendedor || ''
+              );
+              const coincide =
+                vendedorVenta === nombreNormalizado ||
+                vendedorVenta.includes(nombreNormalizado) ||
+                nombreNormalizado.includes(vendedorVenta);
+
+              if (coincide) {
+                ventasCount += 1;
+                const comisionStream = (venta.plataformas || []).reduce((acc, p) =>
+                  acc + (Number(p.precioDetal || 0) * Number(p.porcentaje_comision || 5)) / 100, 0);
+                comisionesTotal += comisionStream || Number(venta.total || 0) * 0.05;
+              }
+            });
+          }
           
           if (!error && ventasData) {
             ventasData.forEach(venta => {
@@ -144,7 +165,8 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
               if (coincide) {
                 ventasCount += 1;
                 const total = venta.total || 0;
-                comisionesTotal += total * 0.10;
+                const pct = Number(venta.porcentaje_comision || 5);
+                comisionesTotal += (total * pct) / 100;
               }
             });
           } else {

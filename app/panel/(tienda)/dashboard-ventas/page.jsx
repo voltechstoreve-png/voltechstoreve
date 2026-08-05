@@ -45,8 +45,8 @@ export default function DashboardVentasPage() {
         if (supabase) {
           console.log('🔄 Cargando desde Supabase...');
           const [{ data: vData, error: vError }, { data: vsData, error: vsError }, { data: cData }, { data: uData }, { data: comData }] = await Promise.all([
-            supabase.from('ventas').select('*').order('fechaRegistro', { ascending: false }),
-            supabase.from('ventas_streaming').select('*').order('fechaRegistro', { ascending: false }),
+            supabase.from('ventas').select('*').order('fecharegistro', { ascending: false }),
+            supabase.from('ventas_streaming').select('*').order('fecharegistro', { ascending: false }),
             supabase.from('clientes').select('*'),
             supabase.from('usuarios').select('*'),
             supabase.from('comisiones_pendientes').select('*')
