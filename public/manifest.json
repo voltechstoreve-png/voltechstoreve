@@ -1,22 +1,23 @@
 {
-  "name": "Voltech Store",
+  "name": "VoltechStoreve",
   "short_name": "Voltech",
-  "description": "Sistema de gestión Voltech Store",
+  "description": "La mejor tecnología y entretenimientos digital al alcance de un clic.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0f",
+  "background_color": "#0a0a12",
   "theme_color": "#00d4ff",
-  "orientation": "portrait",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/voltechstore.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/voltechstore.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

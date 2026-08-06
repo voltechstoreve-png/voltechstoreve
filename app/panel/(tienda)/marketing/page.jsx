@@ -14,11 +14,75 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 
+// ✅ Abre WhatsApp en la app (móvil) o WhatsApp Web (PC)
+function abrirWhatsApp(numero, texto) {
+  const limpio = (numero || '').replace(/\D/g, '');
+  const cod = encodeURIComponent(texto);
+  const esMovil = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
+  const url = esMovil
+    ? `https://wa.me/58${limpio}?text=${cod}`
+    : `https://web.whatsapp.com/send?phone=58${limpio}&text=${cod}`;
+  window.open(url, '_blank');
+}
+
+// ✅ Interpreta *negrita* y _cursiva_
+function formatearWA(texto) {
+  return (texto || '').split('\n').map((linea, i) => (
+    <p key={i} className="min-h-[1em] whitespace-pre-wrap break-words">
+      {linea.split(/(\*[^*]+\*|_[^_]+_)/g).map((seg, j) => {
+        if (seg.length > 2 && seg.startsWith('*') && seg.endsWith('*')) return <strong key={j}>{seg.slice(1, -1)}</strong>;
+        if (seg.length > 2 && seg.startsWith('_') && seg.endsWith('_')) return <em key={j}>{seg.slice(1, -1)}</em>;
+        return seg;
+      })}
+    </p>
+  ));
+}
+
+// ✅ Burbuja estilo WhatsApp (verde)
+function BurbujaWA({ texto, nombre }) {
+  return (
+    <div className="rounded-xl overflow-hidden border border-voltech-border">
+      <div className="bg-[#202c33] px-4 py-2.5 flex items-center gap-3">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-voltech-cyan to-voltech-purple flex items-center justify-center text-white text-xs font-bold">{(nombre || 'C').charAt(0)}</div>
+        <div><p className="text-sm font-semibold text-[#25D366]">{nombre || 'Cliente'}</p><p className="text-[10px] text-emerald-400">en línea</p></div>
+      </div>
+      <div className="bg-[#0b141a] p-3">
+        <div className="flex justify-end">
+          <div className="bg-[#005c4b] rounded-lg rounded-tr-none p-3 text-[13px] text-gray-100 shadow w-fit max-w-[95%]">
+            {formatearWA(texto)}
+            <p className="text-[9px] text-gray-400 text-right mt-1"><span className="text-[#53bdeb]">{'\u2713\u2713'}</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BurbujaMessenger({ texto, nombre }) {
+  return (
+    <div className="rounded-xl overflow-hidden border border-voltech-border bg-[#242526]">
+      <div className="px-4 py-2.5 flex items-center gap-3 border-b border-voltech-border">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0084FF] to-[#A033FF] flex items-center justify-center text-white text-xs font-bold">{(nombre || 'V').charAt(0)}</div>
+        <div><p className="text-sm font-semibold text-white">{nombre || 'Voltech'}</p><p className="text-[10px] text-[#0084FF]">Activo ahora</p></div>
+      </div>
+      <div className="p-3">
+        <div className="flex justify-end">
+          <div className="bg-gradient-to-br from-[#0084FF] to-[#0068CF] rounded-2xl rounded-tr-sm p-3 text-[13px] text-white shadow w-fit max-w-[95%]">
+            {formatearWA(texto)}
+            <p className="text-[9px] text-blue-200 text-right mt-1">Visto 👍</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MarketingPage() {
+  
   // ✅ ROLES: admin gestiona todo, socio gestiona, vendedor solo usa/ve
   const { esAdmin, esSocio, esVendedor, usuarioActual } = usePermissions();
   const puedeGestionar = esAdmin || esSocio;
-  const [activeTab, setActiveTab] = useState('plantillas');
+  const [activeTab, setActiveTab] = useState('whatsapp');
   
   const [masVendidosOpen, setMasVendidosOpen] = useState(false);
   const [whatsappOpen, setWhatsappOpen] = useState(false);
@@ -31,7 +95,7 @@ export default function MarketingPage() {
   const [plantillaEditando, setPlantillaEditando] = useState(null);
   const [filtroTipoPlantilla, setFiltroTipoPlantilla] = useState('todas');
   const [formDataPlantilla, setFormDataPlantilla] = useState({
-    nombre: '', tipo: 'whatsapp', categoria: 'mensaje', contenido: '',
+    nombre: '', tipo: 'whatsapp', categoria: 'mensaje', contenido: '', esGlobal: false,
   });
 
   const [productos, setProductos] = useState([]);
@@ -46,6 +110,9 @@ export default function MarketingPage() {
   const [filtroEtiqueta, setFiltroEtiqueta] = useState('');
   const [busquedaClientes, setBusquedaClientes] = useState('');
   const [mensajePersonalizadoWa, setMensajePersonalizadoWa] = useState('');
+  const [destinatariosOpenWa, setDestinatariosOpenWa] = useState(false);
+  const [managerOpenWa, setManagerOpenWa] = useState(false);
+  const [managerOpenMp, setManagerOpenMp] = useState(false);
   const [historialEnvios, setHistorialEnvios] = useState({});
   const [historialDetallado, setHistorialDetallado] = useState([]);
 
@@ -232,7 +299,6 @@ export default function MarketingPage() {
       }
     }
     
-    mensaje += `---\n`;
     if (plantillaContactoWaSeleccionada) {
       const plantilla = plantillas.find(p => String(p.id) === String(plantillaContactoWaSeleccionada));
       if (plantilla && plantilla.contenido && plantilla.contenido.trim() !== '' && plantilla.contenido.trim() !== 'Sin plantilla') {
@@ -380,7 +446,7 @@ export default function MarketingPage() {
   const guardarPlantilla = async () => {
     if (!puedeGestionar) return toast.error('Solo admin/socio pueden crear plantillas');
     if (!formDataPlantilla.nombre || !formDataPlantilla.contenido) return toast.error('Nombre y contenido son obligatorios');
-    const nuevaPlantilla = { id: plantillaEditando ? plantillaEditando.id : Date.now().toString(), ...formDataPlantilla, creadoPor: usuarioActual?.nombre || 'Desconocido', fechaCreacion: new Date().toISOString() };
+    const nuevaPlantilla = { id: plantillaEditando ? plantillaEditando.id : Date.now().toString(), ...formDataPlantilla, esGlobal: !!(formDataPlantilla.esGlobal && esAdmin), creadoPor: usuarioActual?.nombre || 'Desconocido', fechaCreacion: new Date().toISOString() };
     if (supabase) await supabase.from('plantillas').upsert(nuevaPlantilla, { onConflict: 'id' });
     const actualizadas = plantillaEditando ? plantillas.map(p => p.id === plantillaEditando.id ? nuevaPlantilla : p) : [...plantillas, nuevaPlantilla];
     setPlantillas(actualizadas); localStorage.setItem('voltech_plantillas', JSON.stringify(actualizadas));
@@ -511,9 +577,7 @@ export default function MarketingPage() {
     
     const primerCliente = clientes.find(c => String(c.id) === String(clientesSeleccionados[0]));
     if (primerCliente) {
-      const telefonoLimpio = primerCliente.telefono?.replace(/\D/g, '') || '';
-      const url = `https://wa.me/58${telefonoLimpio}?text=${encodeURIComponent(mensajePersonalizadoWa)}`;
-      window.open(url, '_blank');
+      abrirWhatsApp(primerCliente.telefono, mensajePersonalizadoWa);
       
       for (const clienteId of clientesSeleccionados) {
         await registrarEnvio(clienteId, 'whatsapp', productoSeleccionado?.id, plantillaWhatsappSeleccionada);
@@ -537,7 +601,6 @@ export default function MarketingPage() {
 
   // ✅ TABS POR ROL: vendedor SIN Publicidad ni Más Vendidos; Calendario ELIMINADO
   const tabsDisponibles = [
-    { id: 'plantillas', icon: MessageSquare, label: 'Plantillas' },
     { id: 'whatsapp', icon: Send, label: 'WhatsApp' },
     { id: 'marketplace', icon: FileText, label: 'Marketplace' },
     { id: 'cupones', icon: Ticket, label: 'Cupones' },
@@ -584,66 +647,34 @@ export default function MarketingPage() {
           ))}
         </div>
       </div>
-
       <div>
-        {activeTab === 'plantillas' && (
-          <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
-            <div className="flex items-center justify-between p-6">
-              <div className="flex items-center gap-2"><div className="p-2 rounded-lg bg-voltech-cyan/20"><MessageSquare className="w-5 h-5 text-voltech-cyan" /></div><div><h3 className="text-lg font-bold text-white">Plantillas de Mensajes</h3><p className="text-xs text-voltech-muted">Crea y guarda mensajes personalizados</p></div></div>
-              {puedeGestionar && (
-                <button onClick={() => setShowPlantillaForm(true)} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"><Plus className="w-4 h-4" /> Nueva Plantilla</button>
-              )}
+        
+        {activeTab === 'whatsapp' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div><h2 className="text-xl font-bold text-white">Gestión de WhatsApp</h2><p className="text-sm text-voltech-muted mt-1">Crea y envía mensajes por WhatsApp</p></div>
+              <div className="flex gap-2">
+                <button onClick={() => setWhatsappOpen(true)} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"><Plus className="w-4 h-4" /> Nueva Difusión</button>
+                {puedeGestionar && (<button onClick={() => { setFormDataPlantilla({ ...formDataPlantilla, tipo: 'whatsapp' }); setShowPlantillaForm(true); }} className="px-4 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg text-sm hover:bg-voltech-purple/30 transition-colors flex items-center gap-2"><Plus className="w-4 h-4" /> Plantilla WhatsApp</button>)}
+              </div>
             </div>
+
             {showPlantillaForm && puedeGestionar && (
-              <div className="border-t border-voltech-border p-6 bg-voltech-dark/50 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div><label className="block text-xs text-voltech-muted mb-1">Nombre</label><input type="text" value={formDataPlantilla.nombre} onChange={(e) => setFormDataPlantilla({...formDataPlantilla, nombre: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
-                  <div><label className="block text-xs text-voltech-muted mb-1">Tipo</label><select value={formDataPlantilla.tipo} onChange={(e) => setFormDataPlantilla({...formDataPlantilla, tipo: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="whatsapp">WhatsApp</option><option value="marketplace">Marketplace</option><option value="info_contacto">Info Contacto</option></select></div>
-                  <div><label className="block text-xs text-voltech-muted mb-1">Categoría</label><select value={formDataPlantilla.categoria} onChange={(e) => setFormDataPlantilla({...formDataPlantilla, categoria: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="mensaje">Mensaje</option><option value="oferta">Oferta</option><option value="contacto">Contacto</option></select></div>
+              <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6 space-y-3 relative">
+                <button onClick={() => { setShowPlantillaForm(false); setPlantillaEditando(null); }} className="absolute top-4 right-4 p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors" title="Cerrar"><X className="w-5 h-5" /></button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input type="text" value={formDataPlantilla.nombre} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, nombre: e.target.value, tipo: 'whatsapp' })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Nombre del texto" />
+                  <select value={formDataPlantilla.categoria} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, categoria: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="mensaje">Mensaje</option><option value="oferta">Oferta</option><option value="contacto">Contacto</option></select>
                 </div>
-                <div><label className="block text-xs text-voltech-muted mb-1">Contenido</label><textarea value={formDataPlantilla.contenido} onChange={(e) => setFormDataPlantilla({...formDataPlantilla, contenido: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-32 resize-none" /></div>
+                <textarea value={formDataPlantilla.contenido} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, contenido: e.target.value, tipo: 'whatsapp' })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-24 resize-none" placeholder="Contenido del mensaje..." />
+                {esAdmin && (<label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={formDataPlantilla.esGlobal} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, esGlobal: e.target.checked })} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" /><span className="text-xs text-voltech-muted">⭐ Plantilla Global / Oficial</span></label>)}
                 <div className="flex gap-2">
-                  <button onClick={guardarPlantilla} className="px-4 py-2 bg-voltech-success/20 text-voltech-success rounded-lg text-sm hover:bg-voltech-success/30 transition-colors flex items-center gap-2"><Save className="w-4 h-4" /> Guardar</button>
-                  <button onClick={() => { setShowPlantillaForm(false); setPlantillaEditando(null); }} className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white transition-colors flex items-center gap-2"><X className="w-4 h-4" /> Cancelar</button>
+                  <button onClick={guardarPlantilla} className="px-4 py-2 bg-voltech-success/20 text-voltech-success rounded-lg text-sm hover:bg-voltech-success/30 flex items-center gap-2"><Save className="w-4 h-4" /> Guardar</button>
+                  <button onClick={() => { setShowPlantillaForm(false); setPlantillaEditando(null); }} className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white flex items-center gap-2"><X className="w-4 h-4" /> Cancelar</button>
                 </div>
               </div>
             )}
-            <div className="p-6 border-t border-voltech-border">
-              <div className="flex gap-4 mb-6">
-                {['todas', 'whatsapp', 'marketplace', 'info_contacto'].map(tipo => (
-                  <button key={tipo} onClick={() => setFiltroTipoPlantilla(tipo)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filtroTipoPlantilla === tipo ? 'bg-voltech-cyan text-white' : 'bg-voltech-dark/30 text-voltech-muted hover:text-white'}`}>
-                    {tipo === 'todas' ? 'Todas' : tipo === 'info_contacto' ? '📌 Info Contacto' : tipo === 'whatsapp' ? '📱 WhatsApp' : '📄 Marketplace'}
-                  </button>
-                ))}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {plantillasFiltradas.map((plantilla) => (
-                  <div key={plantilla.id} className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div><h4 className="text-sm font-semibold text-white">{plantilla.nombre}</h4><p className="text-[10px] text-voltech-muted mt-1">👤 Creado por: {plantilla.creadoPor || 'Desconocido'}</p></div>
-                      {puedeGestionar && (
-                        <div className="flex gap-1">
-                          <button onClick={() => { setFormDataPlantilla(plantilla); setPlantillaEditando(plantilla); setShowPlantillaForm(true); }} className="p-1 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit3 className="w-3 h-3" /></button>
-                          <button onClick={() => eliminarPlantilla(plantilla.id)} className="p-1 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-3 h-3" /></button>
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-xs text-voltech-muted mb-3 line-clamp-2">{plantilla.contenido}</p>
-                    {plantilla.tipo === 'info_contacto' && (
-                      <div className="flex gap-2">
-                        <button onClick={() => { setPlantillaContactoWaSeleccionada(plantilla.id); toast.success('Agregada a WhatsApp'); }} className="flex-1 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded text-xs hover:bg-voltech-cyan/30 transition-colors">Usar en WhatsApp</button>
-                        <button onClick={() => { setPlantillaContactoMpSeleccionada(plantilla.id); toast.success('Agregada a Marketplace'); }} className="flex-1 py-2 bg-voltech-purple/20 text-voltech-purple rounded text-xs hover:bg-voltech-purple/30 transition-colors">Usar en MP</button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
 
-        {activeTab === 'whatsapp' && (
-          <div className="space-y-4">
             <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
               <button onClick={() => setWhatsappOpen(!whatsappOpen)} className="w-full flex items-center justify-between p-4 bg-voltech-dark/30 hover:bg-voltech-dark/50 transition-colors">
                 <div className="flex items-center gap-3"><Send className="w-5 h-5 text-voltech-cyan" /><h3 className="text-lg font-bold text-white">Nueva Difusión por WhatsApp</h3></div>
@@ -653,100 +684,167 @@ export default function MarketingPage() {
                 {whatsappOpen && (
                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                     <div className="p-6 border-t border-voltech-border">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="space-y-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        {/* ===== CONTROLES (más ancho) ===== */}
+                        <div className="lg:col-span-7 space-y-4">
+                          {/* PASO 1 */}
                           <div>
                             <label className="block text-sm font-medium text-voltech-muted mb-2">1. Seleccionar Producto</label>
                             <select value={productoSeleccionado ? String(productoSeleccionado.id) : ''} onChange={(e) => { const prod = productos.find(p => String(p.id) === String(e.target.value)); setProductoSeleccionado(prod || null); setPrecioPromocion(''); }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
                               <option value="">Buscar producto...</option>
-                              {productos.filter(p => p.cantidad > 0).map(p => (<option key={p.id} value={String(p.id)}>{p.plataforma || p.nombre} - ${Number(p.precioDetal || 0).toFixed(2)}</option>))}
+                              {productos.filter(p => p.cantidad > 0).map(p => (<option key={p.id} value={String(p.id)}>{p.plataforma || p.producto || p.nombre || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>))}
                             </select>
-                            {productoSeleccionado && (
-                              <div className="mt-2">
+                          </div>
+
+                          {/* PASO 2 (aparece con producto) */}
+                          {productoSeleccionado && (
+                            <>
+                              <div>
                                 <label className="text-xs text-voltech-muted block mb-1">💰 Precio para esta promoción (opcional):</label>
                                 <input type="number" step="0.01" placeholder={Number(productoSeleccionado.precioDetal || 0).toFixed(2)} value={precioPromocion} onChange={(e) => setPrecioPromocion(e.target.value)} className="input-voltech w-full rounded px-3 py-1.5 text-xs" />
                               </div>
-                            )}
-                          </div>
-                          
-                          <div>
-                            <label className="block text-sm font-medium text-voltech-muted mb-2">2. Plantilla WhatsApp (Opcional)</label>
-                            <select value={plantillaWhatsappSeleccionada} onChange={(e) => setPlantillaWhatsappSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                              <option value="">Sin plantilla</option>
-                              {plantillas.filter(p => p.tipo === 'whatsapp').map(p => (<option key={p.id} value={String(p.id)}>{p.nombre}</option>))}
-                            </select>
-                          </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-sm font-medium text-voltech-muted mb-2">2. Plantilla WhatsApp (Opcional)</label>
+                                  <select value={plantillaWhatsappSeleccionada} onChange={(e) => setPlantillaWhatsappSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                                    <option value="">Sin plantilla</option>
+                                    {plantillas.filter(p => p.tipo === 'whatsapp').map(p => (<option key={p.id} value={String(p.id)}>{p.nombre}{p.esGlobal ? ' ⭐' : ''}</option>))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-voltech-muted mb-2">3. Plantilla de Contacto (Opcional)</label>
+                                  <select value={plantillaContactoWaSeleccionada} onChange={(e) => setPlantillaContactoWaSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                                    <option value="">Sin plantilla</option>
+                                    {plantillasInfoContacto.map(p => (<option key={p.id} value={String(p.id)}>{p.nombre}{p.esGlobal ? ' ⭐' : ''}</option>))}
+                                  </select>
+                                </div>
+                              </div>
 
-                          <div>
-                            <label className="block text-sm font-medium text-voltech-muted mb-2">3. Plantilla de Contacto (Opcional)</label>
-                            <select value={plantillaContactoWaSeleccionada} onChange={(e) => setPlantillaContactoWaSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                              <option value="">Sin plantilla</option>
-                              {plantillasInfoContacto.map(p => (<option key={p.id} value={String(p.id)}>{p.nombre}</option>))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-voltech-muted mb-2">4. Seleccionar Destinatarios</label>
-                            <div className="relative mb-2">
-                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
-                              <input type="text" placeholder="Buscar por nombre o teléfono..." value={busquedaClientes} onChange={(e) => setBusquedaClientes(e.target.value)} className="input-voltech w-full rounded-lg pl-10 pr-4 py-2 text-sm" />
-                            </div>
-                            <div className="max-h-48 overflow-y-auto space-y-2 border border-voltech-border rounded-lg p-2 bg-voltech-dark/30">
-                              {filtrarClientes().map(cliente => {
-                                const enviosHoy = historialEnvios[cliente.id] || 0;
-                                const puedeEnviar = enviosHoy < 2;
-                                return (
-                                  <label key={cliente.id} className={`flex items-start gap-3 p-2 rounded transition-colors ${!puedeEnviar ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-voltech-dark/50'} ${clientesSeleccionados.includes(cliente.id) ? 'bg-voltech-cyan/10' : ''}`}>
-                                    <input type="checkbox" checked={clientesSeleccionados.includes(cliente.id)} disabled={!puedeEnviar} onChange={() => toggleClienteSeleccion(cliente.id)} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan mt-1" />
-                                    <div className="flex-1">
-                                      <div className="flex items-center justify-between">
-                                        <p className="text-sm text-white font-medium">{cliente.nombre}</p>
-                                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${puedeEnviar ? 'bg-voltech-success/20 text-voltech-success' : 'bg-voltech-error/20 text-voltech-error'}`}>
-                                          {puedeEnviar ? `${enviosHoy}/2 envíos` : 'Límite alcanzado'}
-                                        </span>
+                              {/* PASO 3: Acordeón Destinatarios */}
+                              <div className="border border-voltech-border rounded-lg overflow-hidden">
+                                <button onClick={() => setDestinatariosOpenWa(!destinatariosOpenWa)} className="w-full flex items-center justify-between p-3 bg-voltech-dark/30 hover:bg-voltech-dark/50 transition-colors">
+                                  <span className="text-sm font-medium text-white flex items-center gap-2"><Users className="w-4 h-4 text-voltech-cyan" /> Seleccionar Destinatarios ({clientesSeleccionados.length} elegidos)</span>
+                                  <ChevronDown className={`w-4 h-4 text-voltech-muted transition-transform ${destinatariosOpenWa ? 'rotate-180' : ''}`} />
+                                </button>
+                                <AnimatePresence>
+                                  {destinatariosOpenWa && (
+                                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                                      <div className="p-3 space-y-2 border-t border-voltech-border">
+                                        <div className="relative">
+                                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
+                                          <input type="text" placeholder="Buscar por nombre o teléfono..." value={busquedaClientes} onChange={(e) => setBusquedaClientes(e.target.value)} className="input-voltech w-full rounded-lg pl-10 pr-4 py-2 text-sm" />
+                                        </div>
+                                        <label className="flex items-center gap-2 p-2 rounded bg-voltech-dark/50 cursor-pointer hover:bg-voltech-dark/70">
+                                          <input type="checkbox" className="w-4 h-4 rounded border-voltech-border text-voltech-cyan"
+                                            checked={filtrarClientes().length > 0 && filtrarClientes().every(c => clientesSeleccionados.includes(c.id))}
+                                            onChange={(e) => {
+                                              const elegibles = filtrarClientes().filter(c => (historialEnvios[c.id] || 0) < 2);
+                                              setClientesSeleccionados(e.target.checked ? [...new Set([...clientesSeleccionados, ...elegibles.map(c => c.id)])] : clientesSeleccionados.filter(id => !filtrarClientes().some(c => c.id === id)));
+                                            }} />
+                                          <span className="text-xs text-voltech-muted">Seleccionar Todos</span>
+                                        </label>
+                                        <div className="max-h-48 overflow-y-auto space-y-2">
+                                          {filtrarClientes().map(cliente => {
+                                            const enviosHoy = historialEnvios[cliente.id] || 0;
+                                            const puedeEnviar = enviosHoy < 2;
+                                            return (
+                                              <label key={cliente.id} className={`flex items-start gap-3 p-2 rounded transition-colors ${!puedeEnviar ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-voltech-dark/50'} ${clientesSeleccionados.includes(cliente.id) ? 'bg-voltech-cyan/10' : ''}`}>
+                                                <input type="checkbox" checked={clientesSeleccionados.includes(cliente.id)} disabled={!puedeEnviar} onChange={() => toggleClienteSeleccion(cliente.id)} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan mt-1" />
+                                                <div className="flex-1">
+                                                  <div className="flex items-center justify-between">
+                                                    <p className="text-sm text-white font-medium">{cliente.nombre}</p>
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${puedeEnviar ? 'bg-voltech-success/20 text-voltech-success' : 'bg-voltech-error/20 text-voltech-error'}`}>{puedeEnviar ? `${enviosHoy}/2 envíos` : 'Límite'}</span>
+                                                  </div>
+                                                  <p className="text-xs text-voltech-muted">📱 {cliente.telefono}</p>
+                                                </div>
+                                              </label>
+                                            );
+                                          })}
+                                        </div>
                                       </div>
-                                      <p className="text-xs text-voltech-muted">📱 {cliente.telefono}</p>
-                                    </div>
-                                  </label>
-                                );
-                              })}
-                            </div>
-                            <p className="text-xs text-voltech-muted mt-2 text-right">{clientesSeleccionados.length} cliente(s) seleccionado(s)</p>
-                          </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            </>
+                          )}
                         </div>
 
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-sm font-medium text-voltech-muted mb-2">Vista Previa del Mensaje</label>
-                            <textarea 
-                              value={mensajePersonalizadoWa} 
-                              onChange={(e) => setMensajePersonalizadoWa(e.target.value)} 
-                              className="w-full h-64 bg-voltech-surface border border-voltech-border rounded-lg p-3 text-sm text-white whitespace-pre-wrap focus:outline-none focus:ring-2 focus:ring-voltech-cyan" 
-                              placeholder="Selecciona un producto y clientes para generar el mensaje..."
-                            />
-                          </div>
-                          <div className="flex gap-3 pt-4">
-                            <button 
-                              onClick={() => { navigator.clipboard.writeText(mensajePersonalizadoWa); toast.success('Mensaje copiado'); }} 
-                              disabled={!mensajePersonalizadoWa}
-                              className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-voltech-muted hover:text-white disabled:opacity-50"
-                            >
-                               Copiar
-                            </button>
-                            <button 
-                              onClick={lanzarDifusion} 
-                              disabled={clientesSeleccionados.length === 0 || !mensajePersonalizadoWa} 
-                              className="flex-1 py-2 bg-green-500 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                              <Send className="w-4 h-4" /> Lanzar Difusión ({clientesSeleccionados.length})
-                            </button>
-                          </div>
+                        {/* ===== PREVIEW (compacta) ===== */}
+                        <div className="lg:col-span-5 space-y-3">
+                          {productoSeleccionado ? (
+                            <>
+                              <label className="block text-sm font-medium text-voltech-muted">Vista Previa del Mensaje</label>
+                              <BurbujaWA texto={mensajePersonalizadoWa} nombre={clientes.find(c => String(c.id) === String(clientesSeleccionados[0]))?.nombre || 'Cliente'} />
+                              <div className="flex gap-3">
+                                <button onClick={() => { navigator.clipboard.writeText(mensajePersonalizadoWa); toast.success('Mensaje copiado'); }} disabled={!mensajePersonalizadoWa} className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-voltech-muted hover:text-white disabled:opacity-50">Copiar</button>
+                                <button onClick={lanzarDifusion} disabled={clientesSeleccionados.length === 0 || !mensajePersonalizadoWa} className="flex-1 py-2 bg-green-500 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"><Send className="w-4 h-4" /> Lanzar Difusión ({clientesSeleccionados.length})</button>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="p-6 text-center text-sm text-voltech-muted bg-voltech-dark/30 border border-voltech-border rounded-lg">Selecciona un producto para ver la vista previa.</div>
+                          )}
                         </div>
+                      </div>
+
+                      {/* ===== GESTOR DE PLANTILLAS (al final) ===== */}
+                      <div className="mt-6 pt-4 border-t border-voltech-border">
+                        <button onClick={() => setManagerOpenWa(!managerOpenWa)} className="w-full flex items-center justify-between p-3 bg-voltech-dark/30 rounded-lg hover:bg-voltech-dark/50 transition-colors">
+                          <span className="text-sm font-semibold text-voltech-cyan flex items-center gap-2"><MessageSquare className="w-4 h-4" /> + Crear Nueva Plantilla de WhatsApp</span>
+                          {managerOpenWa ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </button>
+                        <AnimatePresence>
+                          {managerOpenWa && (
+                            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                              <div className="p-4 space-y-3">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <input type="text" value={formDataPlantilla.nombre} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, nombre: e.target.value, tipo: 'whatsapp' })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Nombre de la plantilla" />
+                                  <select value={formDataPlantilla.categoria} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, categoria: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="mensaje">Mensaje</option><option value="oferta">Oferta</option><option value="contacto">Contacto</option></select>
+                                </div>
+                                <textarea value={formDataPlantilla.contenido} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, contenido: e.target.value, tipo: 'whatsapp' })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-24 resize-none" placeholder="Contenido del mensaje..." />
+                                {esAdmin && (
+                                  <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" checked={formDataPlantilla.esGlobal} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, esGlobal: e.target.checked })} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" />
+                                    <span className="text-xs text-voltech-muted">⭐ Plantilla Global / Oficial (Fija para el equipo)</span>
+                                  </label>
+                                )}
+                                <button onClick={() => guardarPlantilla()} className="px-4 py-2 bg-voltech-success/20 text-voltech-success rounded-lg text-sm hover:bg-voltech-success/30 flex items-center gap-2"><Save className="w-4 h-4" /> Guardar Plantilla</button>
+                                <div className="space-y-2 pt-2">
+                                  {plantillas.filter(p => p.tipo === 'whatsapp').map(p => (
+                                    <div key={p.id} className="flex items-center justify-between p-2 bg-voltech-dark/50 border border-voltech-border rounded-lg">
+                                      <div><p className="text-sm text-white">{p.nombre} {p.esGlobal && <span className="text-voltech-warning">⭐</span>}</p><p className="text-[10px] text-voltech-muted">👤 {p.creadoPor || 'Desconocido'}</p></div>
+                                      <div className="flex gap-1">
+                                        <button onClick={() => { setFormDataPlantilla(p); setPlantillaEditando(p); }} className="p-1 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit3 className="w-3 h-3" /></button>
+                                        <button onClick={() => eliminarPlantilla(p.id)} className="p-1 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-3 h-3" /></button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
+            </div>
+          
+            <div className="bg-voltech-surface border border-voltech-border rounded-xl">
+              <div className="p-6 border-b border-voltech-border"><h3 className="text-lg font-bold text-white flex items-center gap-2"><MessageSquare className="w-5 h-5 text-voltech-cyan" /> Mensajes Creados</h3></div>
+              {plantillas.filter(p => p.tipo === 'whatsapp').length === 0 ? (
+                <div className="p-12 text-center"><MessageSquare className="w-16 h-16 text-voltech-muted mx-auto mb-4 opacity-30" /><h3 className="text-lg font-semibold text-white mb-2">No hay mensajes</h3><p className="text-voltech-muted text-sm">Crea tu primer texto para WhatsApp</p></div>
+              ) : (
+                <div className="divide-y divide-voltech-border">
+                  {plantillas.filter(p => p.tipo === 'whatsapp').map(p => (
+                    <div key={p.id} className="p-4 flex items-center justify-between hover:bg-voltech-dark/30">
+                      <div><p className="text-sm font-medium text-white">{p.nombre} {p.esGlobal && <span className="text-voltech-warning">⭐</span>}</p><p className="text-xs text-voltech-muted line-clamp-1">{p.contenido}</p><p className="text-[10px] text-voltech-muted">👤 {p.creadoPor || 'Desconocido'}</p></div>
+                      {puedeGestionar && (<div className="flex gap-1"><button onClick={() => { setFormDataPlantilla(p); setPlantillaEditando(p); setShowPlantillaForm(true); }} className="p-2 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit3 className="w-4 h-4" /></button><button onClick={() => eliminarPlantilla(p.id)} className="p-2 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-4 h-4" /></button></div>)}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="bg-voltech-surface border border-voltech-border rounded-xl">
@@ -779,7 +877,31 @@ export default function MarketingPage() {
         )}
 
         {activeTab === 'marketplace' && (
-          <div className="space-y-4">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div><h2 className="text-xl font-bold text-white">Gestión de Marketplace</h2><p className="text-sm text-voltech-muted mt-1">Genera textos listos para publicar</p></div>
+              <div className="flex gap-2">
+                <button onClick={() => setMarketplaceOpen(true)} className="px-4 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg text-sm hover:bg-voltech-purple/30 transition-colors flex items-center gap-2"><Plus className="w-4 h-4" /> Crear Publicación</button>
+                {puedeGestionar && (<button onClick={() => { setFormDataPlantilla({ ...formDataPlantilla, tipo: 'marketplace' }); setShowPlantillaForm(true); }} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"><Plus className="w-4 h-4" /> Plantilla Marketplace</button>)}
+              </div>
+            </div>
+
+            {showPlantillaForm && puedeGestionar && (
+              <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6 space-y-3 relative">
+                <button onClick={() => { setShowPlantillaForm(false); setPlantillaEditando(null); }} className="absolute top-4 right-4 p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors" title="Cerrar"><X className="w-5 h-5" /></button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input type="text" value={formDataPlantilla.nombre} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, nombre: e.target.value, tipo: 'marketplace' })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Nombre del texto" />
+                  <select value={formDataPlantilla.categoria} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, categoria: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="mensaje">Mensaje</option><option value="oferta">Oferta</option><option value="contacto">Contacto</option></select>
+                </div>
+                <textarea value={formDataPlantilla.contenido} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, contenido: e.target.value, tipo: 'marketplace' })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-24 resize-none" placeholder="Contenido del texto..." />
+                {esAdmin && (<label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={formDataPlantilla.esGlobal} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, esGlobal: e.target.checked })} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" /><span className="text-xs text-voltech-muted">⭐ Plantilla Global / Oficial</span></label>)}
+                <div className="flex gap-2">
+                  <button onClick={guardarPlantilla} className="px-4 py-2 bg-voltech-success/20 text-voltech-success rounded-lg text-sm hover:bg-voltech-success/30 flex items-center gap-2"><Save className="w-4 h-4" /> Guardar</button>
+                  <button onClick={() => { setShowPlantillaForm(false); setPlantillaEditando(null); }} className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white flex items-center gap-2"><X className="w-4 h-4" /> Cancelar</button>
+                </div>
+              </div>
+            )}
+
             <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
               <button onClick={() => setMarketplaceOpen(!marketplaceOpen)} className="w-full flex items-center justify-between p-4 bg-voltech-dark/30 hover:bg-voltech-dark/50 transition-colors">
                 <div className="flex items-center gap-3"><FileText className="w-5 h-5 text-voltech-purple" /><h3 className="text-lg font-bold text-white">Generador de Textos para Marketplace</h3></div>
@@ -789,65 +911,125 @@ export default function MarketingPage() {
                 {marketplaceOpen && (
                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                     <div className="p-6 border-t border-voltech-border">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="space-y-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        {/* ===== CONTROLES (más ancho) ===== */}
+                        <div className="lg:col-span-7 space-y-4">
                           <div>
                             <label className="block text-sm font-medium text-voltech-muted mb-2">1. Seleccionar Producto</label>
                             <select value={productoMarketplace ? String(productoMarketplace.id) : ''} onChange={(e) => { const prod = productos.find(p => String(p.id) === String(e.target.value)); setProductoMarketplace(prod || null); setPrecioPromocionMarketplace(''); }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
                               <option value="">Buscar producto...</option>
-                              {productos.map(p => (<option key={p.id} value={String(p.id)}>{p.plataforma || p.nombre} - ${Number(p.precioDetal || 0).toFixed(2)}</option>))}
+                              {productos.map(p => (<option key={p.id} value={String(p.id)}>{p.plataforma || p.producto || p.nombre || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>))}
                             </select>
-                            {productoMarketplace && (
-                              <div className="mt-2">
-                                <label className="text-xs text-voltech-muted block mb-1"> Precio para esta promoción (opcional):</label>
+                          </div>
+
+                          {productoMarketplace && (
+                            <>
+                              <div>
+                                <label className="text-xs text-voltech-muted block mb-1">💰 Precio para esta promoción (opcional):</label>
                                 <input type="number" step="0.01" placeholder={Number(productoMarketplace.precioDetal || 0).toFixed(2)} value={precioPromocionMarketplace} onChange={(e) => setPrecioPromocionMarketplace(e.target.value)} className="input-voltech w-full rounded px-3 py-1.5 text-xs" />
                               </div>
-                            )}
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-voltech-muted mb-2">2. Plantilla Marketplace (Opcional)</label>
-                            <select value={plantillaMarketplaceSeleccionada} onChange={(e) => setPlantillaMarketplaceSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                              <option value="">Sin plantilla</option>
-                              {plantillas.filter(p => p.tipo === 'marketplace').map(p => (<option key={p.id} value={String(p.id)}>{p.nombre}</option>))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-voltech-muted mb-2">3. Plantilla de Contacto (Opcional)</label>
-                            <select value={plantillaContactoMpSeleccionada} onChange={(e) => setPlantillaContactoMpSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                              <option value="">Sin plantilla</option>
-                              {plantillasInfoContacto.map(p => (<option key={p.id} value={String(p.id)}>{p.nombre}</option>))}
-                            </select>
-                          </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-sm font-medium text-voltech-muted mb-2">2. Plantilla Marketplace (Opcional)</label>
+                                  <select value={plantillaMarketplaceSeleccionada} onChange={(e) => setPlantillaMarketplaceSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                                    <option value="">Sin plantilla</option>
+                                    {plantillas.filter(p => p.tipo === 'marketplace').map(p => (<option key={p.id} value={String(p.id)}>{p.nombre}{p.esGlobal ? ' ⭐' : ''}</option>))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-voltech-muted mb-2">3. Plantilla de Contacto (Opcional)</label>
+                                  <select value={plantillaContactoMpSeleccionada} onChange={(e) => setPlantillaContactoMpSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                                    <option value="">Sin plantilla</option>
+                                    {plantillasInfoContacto.map(p => (<option key={p.id} value={String(p.id)}>{p.nombre}{p.esGlobal ? ' ⭐' : ''}</option>))}
+                                  </select>
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
 
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-sm font-medium text-voltech-muted mb-2">Texto Final (Editable)</label>
-                            <textarea 
-                              value={textoMarketplace} 
-                              onChange={(e) => setTextoMarketplace(e.target.value)} 
-                              className="w-full h-64 bg-voltech-surface border border-voltech-border rounded-lg p-3 text-sm text-white whitespace-pre-wrap focus:outline-none focus:ring-2 focus:ring-voltech-purple" 
-                              placeholder="Selecciona un producto para generar el texto..."
-                            />
-                            <button onClick={() => { navigator.clipboard.writeText(textoMarketplace); toast.success('Copiado'); }} disabled={!textoMarketplace} className="mt-2 px-4 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg text-sm hover:bg-voltech-purple/30 transition-colors flex items-center gap-1 disabled:opacity-50">
-                              <Copy className="w-4 h-4" /> Copiar Texto
-                            </button>
-                          </div>
+                        {/* ===== PREVIEW (compacta) ===== */}
+                        <div className="lg:col-span-5 space-y-3">
+                          {productoMarketplace ? (
+                            <>
+                              <label className="block text-sm font-medium text-voltech-muted">Vista Previa (Messenger)</label>
+                              <BurbujaMessenger texto={textoMarketplace} nombre="Voltech" />
+                              <button onClick={() => { navigator.clipboard.writeText(textoMarketplace); toast.success('Copiado'); }} disabled={!textoMarketplace} className="w-full h-12 px-4 py-2 bg-voltech-purple/20 text-voltech-purple rounded-xl text-sm font-medium hover:bg-voltech-purple/30 transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
+                                <Copy className="w-4 h-4" /> Copiar Texto
+                              </button>
+                            </>
+                          ) : (
+                            <div className="p-6 text-center text-sm text-voltech-muted bg-voltech-dark/30 border border-voltech-border rounded-lg">Selecciona un producto para ver la vista previa.</div>
+                          )}
                         </div>
+                      </div>
+
+                      {/* ===== GESTOR DE PLANTILLAS (al final) ===== */}
+                      <div className="mt-6 pt-4 border-t border-voltech-border">
+                        <button onClick={() => setManagerOpenMp(!managerOpenMp)} className="w-full flex items-center justify-between p-3 bg-voltech-dark/30 rounded-lg hover:bg-voltech-dark/50 transition-colors">
+                          <span className="text-sm font-semibold text-voltech-purple flex items-center gap-2"><FileText className="w-4 h-4" /> + Crear Nueva Plantilla de Marketplace</span>
+                          {managerOpenMp ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </button>
+                        <AnimatePresence>
+                          {managerOpenMp && (
+                            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                              <div className="p-4 space-y-3">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <input type="text" value={formDataPlantilla.nombre} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, nombre: e.target.value, tipo: 'marketplace' })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Nombre de la plantilla" />
+                                  <select value={formDataPlantilla.categoria} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, categoria: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="mensaje">Mensaje</option><option value="oferta">Oferta</option><option value="contacto">Contacto</option></select>
+                                </div>
+                                <textarea value={formDataPlantilla.contenido} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, contenido: e.target.value, tipo: 'marketplace' })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-24 resize-none" placeholder="Contenido del mensaje..." />
+                                {esAdmin && (
+                                  <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" checked={formDataPlantilla.esGlobal} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, esGlobal: e.target.checked })} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" />
+                                    <span className="text-xs text-voltech-muted">⭐ Plantilla Global / Oficial (Fija para el equipo)</span>
+                                  </label>
+                                )}
+                                <button onClick={() => guardarPlantilla()} className="px-4 py-2 bg-voltech-success/20 text-voltech-success rounded-lg text-sm hover:bg-voltech-success/30 flex items-center gap-2"><Save className="w-4 h-4" /> Guardar Plantilla</button>
+                                <div className="space-y-2 pt-2">
+                                  {plantillas.filter(p => p.tipo === 'marketplace').map(p => (
+                                    <div key={p.id} className="flex items-center justify-between p-2 bg-voltech-dark/50 border border-voltech-border rounded-lg">
+                                      <div><p className="text-sm text-white">{p.nombre} {p.esGlobal && <span className="text-voltech-warning">⭐</span>}</p><p className="text-[10px] text-voltech-muted">👤 {p.creadoPor || 'Desconocido'}</p></div>
+                                      <div className="flex gap-1">
+                                        <button onClick={() => { setFormDataPlantilla(p); setPlantillaEditando(p); }} className="p-1 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit3 className="w-3 h-3" /></button>
+                                        <button onClick={() => eliminarPlantilla(p.id)} className="p-1 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-3 h-3" /></button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
+
+            <div className="bg-voltech-surface border border-voltech-border rounded-xl">
+              <div className="p-6 border-b border-voltech-border"><h3 className="text-lg font-bold text-white flex items-center gap-2"><FileText className="w-5 h-5 text-voltech-purple" /> Textos Creados</h3></div>
+              {plantillas.filter(p => p.tipo === 'marketplace').length === 0 ? (
+                <div className="p-12 text-center"><FileText className="w-16 h-16 text-voltech-muted mx-auto mb-4 opacity-30" /><h3 className="text-lg font-semibold text-white mb-2">No hay textos</h3><p className="text-voltech-muted text-sm">Crea tu primer texto para Marketplace</p></div>
+              ) : (
+                <div className="divide-y divide-voltech-border">
+                  {plantillas.filter(p => p.tipo === 'marketplace').map(p => (
+                    <div key={p.id} className="p-4 flex items-center justify-between hover:bg-voltech-dark/30">
+                      <div><p className="text-sm font-medium text-white">{p.nombre} {p.esGlobal && <span className="text-voltech-warning">⭐</span>}</p><p className="text-xs text-voltech-muted line-clamp-1">{p.contenido}</p><p className="text-[10px] text-voltech-muted">👤 {p.creadoPor || 'Desconocido'}</p></div>
+                      {puedeGestionar && (<div className="flex gap-1"><button onClick={() => { setFormDataPlantilla(p); setPlantillaEditando(p); setShowPlantillaForm(true); }} className="p-2 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit3 className="w-4 h-4" /></button><button onClick={() => eliminarPlantilla(p.id)} className="p-2 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-4 h-4" /></button></div>)}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {activeTab === 'cupones' && (
           <div className="space-y-6">
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between">
+              <div><h2 className="text-xl font-bold text-white">Gestión de Cupones</h2><p className="text-sm text-voltech-muted mt-1">Crea y gestiona cupones de descuento</p></div>
               {puedeGestionar && (
                 <button onClick={() => { setCuponEditando(null); setShowCuponForm(true); setCuponesOpen(true); }} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2">
                   <Plus className="w-4 h-4" /> Crear Nuevo Cupón
@@ -1287,7 +1469,7 @@ export default function MarketingPage() {
                       {urlDestinoType === 'producto' ? (
                         <select value={formDataPublicidad.url_destino} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, url_destino: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
                           <option value="/producto/">Seleccionar producto...</option>
-                          {productos.map(p => (<option key={p.id} value={`/producto/${p.id}`}>{p.plataforma || p.nombre} - ${Number(p.precioDetal || 0).toFixed(2)}</option>))}
+{productos.map(p => (<option key={p.id} value={`/producto/${p.id}`}>{p.plataforma || p.producto || p.nombre || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>))}
                         </select>
                       ) : (
                         <input type="text" value={formDataPublicidad.url_destino} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, url_destino: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="https://..." />

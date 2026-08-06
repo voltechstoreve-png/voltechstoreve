@@ -164,7 +164,23 @@ export default function VentasStreamingPage() {
             }
             setVentas(ventasData);
           }
-          if (c) setCuentas(c);
+          if (c) {
+            // ✅ SINCRONIZACIÓN: cuentas usadas en ventas quedan ocupadas y con el perfil del cliente
+            const ventasRef = v || [];
+            c.forEach(cuenta => {
+              if (cuenta.estado === 'reemplazada') return;
+              const ventaRef = ventasRef.find(vt =>
+                (vt.plataformas || []).some(p => p.cuentaAsignadaId === cuenta.id || p.cuentaAsignada?.id === cuenta.id) ||
+                vt.cuentaasignada?.id === cuenta.id || vt.cuentaAsignada?.id === cuenta.id
+              );
+              if (ventaRef) {
+                cuenta.estado = 'ocupada';
+                cuenta.nombrePerfil = ventaRef.cliente || cuenta.nombrePerfil;
+                cuenta.ventaId = ventaRef.id;
+              }
+            });
+            setCuentas(c);
+          }
           if (i) setInventario(i);
           if (p?.valor) setPlataformas(p.valor);
           if (cp) setCupones(cp);
@@ -684,21 +700,16 @@ export default function VentasStreamingPage() {
   };
 
   const generarRecordatorio = (venta, plataformaIdx = 0) => {
-    const plataforma = venta.plataformas?.[plataformaIdx] || venta.plataformas?.[0];
-    const monto = plataforma?.precioDetal || 0;
-    const textoDefault = `¡Buen día, ${venta.cliente}!
-
-Te escribimos de parte de *Voltechstore.ve* para recordarte que tu servicio está disponible *solo hasta el día de mañana*
-
-${plataforma?.plataforma || ''}
-Monto ${monto}$
-
-Por favor, realiza el pago pendiente para evitar la suspensión del servicio.
-
-Si ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!
-
-Que tengas un excelente día,
-El equipo de Voltechstore.ve`;
+    const plat = venta.plataformas?.[plataformaIdx] || venta.plataformas?.[0];
+    let store = {};
+    try { store = JSON.parse(localStorage.getItem('voltech_plantillas_whatsapp') || '{}'); } catch {}
+    const usuario = (() => { try { return JSON.parse(localStorage.getItem('voltech_user') || 'null'); } catch { return null; } })();
+    const textoDefault = rellenarVariables(resolverPlantillaWa(store, usuario, 'recordatorio_streaming'), {
+      nombre: venta.cliente || '',
+      plataforma: plat?.plataforma || '',
+      monto: Number(plat?.precioDetal || 0).toFixed(2),
+      fecha_vence: plat?.fechaVencimiento || '',
+    });
     setRecordatorioText(textoDefault);
     setSelectedVenta(venta);
     setShowRecordatorioModal(true);

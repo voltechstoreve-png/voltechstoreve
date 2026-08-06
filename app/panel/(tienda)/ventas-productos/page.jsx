@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import ModalWhatsApp from '@/components/ModalWhatsApp';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
@@ -883,15 +884,26 @@ export default function VentasProductosPage() {
     }, 0);
   };
 
+    // ✅ Construye el mensaje con la plantilla guardada + datos REALES de la venta
+  const construirMensaje = (venta, modo) => {
+    let store = {};
+    try { store = JSON.parse(localStorage.getItem('voltech_plantillas_whatsapp') || '{}'); } catch {}
+    const usuario = (() => { try { return JSON.parse(localStorage.getItem('voltech_user') || 'null'); } catch { return null; } })();
+    const clave = modo === 'gracias' ? 'gracias_productos' : 'recordatorio_productos';
+    const plantilla = resolverPlantillaWa(store, usuario, clave);
+    const productosTexto = (venta.productos || []).map(p => `\u2022 ${p.nombre} x${p.cantidad} = $${Number(p.total || 0).toFixed(2)}`).join('\n');
+    return rellenarVariables(plantilla, {
+      nombre: venta.cliente || '',
+      productos: productosTexto,
+      monto: Number(venta.total || 0).toFixed(2),
+    });
+  };
+
   const enviarWhatsapp = (venta) => {
-    const totalBs = (Number(venta.total || 0) * tasaBCV).toFixed(2);
-    const productosTexto = venta.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${Number(p.total || 0).toFixed(2)}`).join('\n');
-    const mensaje = whatsappMode === 'gracias' 
-      ? `Gracias por su compra ❤️\n\nRecuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos \n\n Instagram @Voltechstore.ve\n Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos\n\n${productosTexto}\n\n Total: $${Number(venta.total || 0).toFixed(2)} (Bs ${totalBs})\n\n¡Gracias por tu compra!\n${settings.tienda?.nombre || 'VOLTECH STORE'}`
-      : `¡Buen día, ${venta.cliente}!\n\nTe escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto \n\n${productosTexto}\nMonto: $${Number(venta.montoPendiente || 0).toFixed(2)}\n\nSi ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!\n\nQue tengas un excelente día,\nEl equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}\n\n Instagram @Voltechstore.ve\n Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos`;
-    const telefonoLimpio = venta.telefono.replace(/\D/g, '');
-    window.open(`https://wa.me/58${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`, '_blank');
-    setShowWhatsappModal(null);
+      const mensaje = construirMensaje(venta, whatsappMode);
+      const telefonoLimpio = (venta.telefono || '').replace(/\D/g, '');
+      window.open(`https://wa.me/58${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`, '_blank');
+      setShowWhatsappModal(null);
   };
 
   const ventasHoy = ventas.filter(v => v.fecha === new Date().toISOString().split('T')[0]);
@@ -1435,33 +1447,17 @@ export default function VentasProductosPage() {
         </div>
       </div>
 
-      <AnimatePresence>
-        {showWhatsappModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-voltech-surface border border-voltech-border rounded-2xl w-full max-w-md">
-              <div className="border-b border-voltech-border p-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2"><MessageCircle className="w-5 h-5 text-voltech-success" />{whatsappMode === 'gracias' ? 'Mensaje de Gracias' : 'Recordatorio de Pago'}</h2>
-                <button onClick={() => setShowWhatsappModal(null)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted"><X className="w-5 h-5" /></button>
-              </div>
-              <div className="p-6">
-                <p className="text-sm text-voltech-muted mb-4">Se enviará un mensaje a <strong className="text-white">{showWhatsappModal.telefono}</strong> con el detalle de la venta.</p>
-                <div className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-3 mb-4 max-h-48 overflow-y-auto">
-                  <p className="text-xs text-white whitespace-pre-wrap">
-                    {whatsappMode === 'gracias' ? `Gracias por su compra ❤️\n\nRecuerda guardar nuestro WhatsApp así como seguirnos en las redes sociales para mantenerte al día sobre nuestros productos \n\n📸 Instagram @Voltechstore.ve\n🎵 Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos\n\n${showWhatsappModal.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${Number(p.total || 0).toFixed(2)}`).join('\n')}\n\n Total: $${Number(showWhatsappModal.total || 0).toFixed(2)} (Bs ${(Number(showWhatsappModal.total || 0) * tasaBCV).toFixed(2)})\n\n¡Gracias por tu compra!\n${settings.tienda?.nombre || 'VOLTECH STORE'}` : `¡Buen día, ${showWhatsappModal.cliente}!\n\nTe escribimos de parte de *${settings.tienda?.nombre || 'Voltechstore.ve'}* para recordarte que tu tienes un pago pendiente del producto \n\n${showWhatsappModal.productos.map(p => `• ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${Number(p.total || 0).toFixed(2)}`).join('\n')}\nMonto: $${Number(showWhatsappModal.montoPendiente || 0).toFixed(2)}\n\nSi ya realizaste tu pago, ignora este mensaje y ¡gracias por tu puntualidad!\n\nQue tengas un excelente día,\nEl equipo de ${settings.tienda?.nombre || 'voltechstore.ve'}\n\n📸 Instagram @Voltechstore.ve\n Titok @Voltechstore.ve\n\nNuestro Catálogo 👇\n${settings.tienda?.urlCatalogo || 'https://voltechstore.ve'}\n\nPor cada cliente que refieras tendrás descuentos exclusivos`}
-                  </p>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex gap-2">
-                    <button onClick={() => setWhatsappMode('gracias')} className={`px-3 py-1 text-sm rounded-lg ${whatsappMode === 'gracias' ? 'bg-voltech-success/20 text-voltech-success' : 'bg-voltech-dark/50 text-voltech-muted'}`}>Gracias por su compra</button>
-                    <button onClick={() => setWhatsappMode('recordatorio')} className={`px-3 py-1 text-sm rounded-lg ${whatsappMode === 'recordatorio' ? 'bg-voltech-warning/20 text-voltech-warning' : 'bg-voltech-dark/50 text-voltech-muted'}`}>Recordatorio de pago</button>
-                  </div>
-                  <button onClick={() => enviarWhatsapp(showWhatsappModal)} className="px-4 py-2 bg-voltech-success/20 text-voltech-success rounded-lg hover:bg-voltech-success/30 transition-colors flex items-center gap-2"><MessageCircle className="w-4 h-4" /> Enviar mensaje</button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+      <ModalWhatsApp
+        abierto={!!showWhatsappModal}
+        clave={whatsappMode === 'gracias' ? 'gracias_productos' : 'recordatorio_productos'}
+        titulo={whatsappMode === 'gracias' ? 'Mensaje de Gracias' : 'Recordatorio de Pago'}
+        telefono={showWhatsappModal?.telefono || ''}
+        vars={{
+          nombre: showWhatsappModal?.cliente || '',
+          productos: (showWhatsappModal?.productos || []).map(p => `\u2022 ${p.nombre}${p.esKit ? ' (KIT)' : ''} x${p.cantidad} = $${Number(p.total || 0).toFixed(2)}`).join('\n'),
+          monto: Number(whatsappMode === 'gracias' ? (showWhatsappModal?.total || 0) : (showWhatsappModal?.montoPendiente || showWhatsappModal?.total || 0)).toFixed(2),
+        }}
+        onClose={() => setShowWhatsappModal(null)}
+      />    </div>
   );
 }

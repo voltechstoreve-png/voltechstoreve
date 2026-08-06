@@ -29,6 +29,8 @@ export default function RootLayout({ children }) {
     <html lang="es" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" type="image/png" href="/voltechstore.png" />
+        <link rel="apple-touch-icon" href="/voltechstore.png" />
         <meta name="theme-color" content="#00d4ff" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
