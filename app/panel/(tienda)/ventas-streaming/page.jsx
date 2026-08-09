@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
+import ModalWhatsApp from '@/components/ModalWhatsApp';
+import { resolverPlantillaWa, rellenarVariables } from '@/components/EmojiTextarea';
 
 export default function VentasStreamingPage() {
   const { usuarioActual, esVendedor, esAdmin, esSocio } = usePermissions();
@@ -59,6 +61,7 @@ export default function VentasStreamingPage() {
 
   const [showRecordatorioModal, setShowRecordatorioModal] = useState(false);
   const [recordatorioText, setRecordatorioText] = useState('');
+  const [recordatorioPlatIdx, setRecordatorioPlatIdx] = useState(0);
   
   const [showEnviarCuentaModal, setShowEnviarCuentaModal] = useState(false);
   const [cuentaText, setCuentaText] = useState('');
@@ -700,18 +703,8 @@ export default function VentasStreamingPage() {
   };
 
   const generarRecordatorio = (venta, plataformaIdx = 0) => {
-    const plat = venta.plataformas?.[plataformaIdx] || venta.plataformas?.[0];
-    let store = {};
-    try { store = JSON.parse(localStorage.getItem('voltech_plantillas_whatsapp') || '{}'); } catch {}
-    const usuario = (() => { try { return JSON.parse(localStorage.getItem('voltech_user') || 'null'); } catch { return null; } })();
-    const textoDefault = rellenarVariables(resolverPlantillaWa(store, usuario, 'recordatorio_streaming'), {
-      nombre: venta.cliente || '',
-      plataforma: plat?.plataforma || '',
-      monto: Number(plat?.precioDetal || 0).toFixed(2),
-      fecha_vence: plat?.fechaVencimiento || '',
-    });
-    setRecordatorioText(textoDefault);
     setSelectedVenta(venta);
+    setRecordatorioPlatIdx(plataformaIdx);
     setShowRecordatorioModal(true);
   };
 
@@ -1422,65 +1415,38 @@ export default function VentasStreamingPage() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {showRecordatorioModal && selectedVenta && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-50 flex items-start justify-center pt-[15vh] p-4" onClick={() => setShowRecordatorioModal(false)}>
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-voltech-surface border border-voltech-border rounded-xl w-full max-w-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="border-b border-voltech-border p-5 flex items-center justify-between">
-                <div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-voltech-success/20"><MessageCircle className="w-5 h-5 text-voltech-success" /></div><div><h2 className="text-lg font-bold text-white">Enviar Recordatorio</h2><p className="text-xs text-voltech-muted">{selectedVenta.cliente}</p></div></div>
-                <button onClick={() => setShowRecordatorioModal(false)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted"><X className="w-5 h-5" /></button>
-              </div>
-              <div className="p-6">
-                <textarea value={recordatorioText} onChange={(e) => setRecordatorioText(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm h-64 resize-none font-mono" />
-                <div className="flex gap-3 mt-4">
-                  <button onClick={copiarRecordatorio} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 flex items-center gap-2"><Copy className="w-4 h-4" /> Copiar</button>
-                  <button onClick={enviarRecordatorioWhatsApp} className="flex-1 btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"><Send className="w-4 h-4" /> Enviar por WhatsApp</button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ModalWhatsApp
+        abierto={showRecordatorioModal && !!selectedVenta}
+        clave="recordatorio_streaming"
+        titulo="Enviar Recordatorio"
+        telefono={selectedVenta?.telefono || ''}
+        nombreCliente={selectedVenta?.cliente || ''}
+        vars={{
+          nombre: selectedVenta?.cliente || '',
+          plataforma: (selectedVenta?.plataformas?.[recordatorioPlatIdx] || selectedVenta?.plataformas?.[0])?.plataforma || '',
+          monto: Number((selectedVenta?.plataformas?.[recordatorioPlatIdx] || selectedVenta?.plataformas?.[0])?.precioDetal || 0).toFixed(2),
+          fecha_vence: (selectedVenta?.plataformas?.[recordatorioPlatIdx] || selectedVenta?.plataformas?.[0])?.fechaVencimiento || '',
+        }}
+        onClose={() => setShowRecordatorioModal(false)}
+      />
 
-      <AnimatePresence>
-        {showEnviarCuentaModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-50 flex items-start justify-center pt-[15vh] p-4" onClick={() => setShowEnviarCuentaModal(false)}>
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-voltech-surface border border-voltech-border rounded-xl w-full max-w-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="border-b border-voltech-border p-5 flex items-center justify-between">
-                <div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-voltech-cyan/20"><Mail className="w-5 h-5 text-voltech-cyan" /></div><div><h2 className="text-lg font-bold text-white">Enviar Cuenta</h2><p className="text-xs text-voltech-muted">Credenciales</p></div></div>
-                <button onClick={() => setShowEnviarCuentaModal(false)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted"><X className="w-5 h-5" /></button>
-              </div>
-              <div className="p-6">
-                <textarea value={cuentaText} onChange={(e) => setCuentaText(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm h-64 resize-none font-mono" />
-                <div className="flex gap-3 mt-4">
-                  <button onClick={copiarCuenta} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 flex items-center gap-2"><Copy className="w-4 h-4" /> Copiar</button>
-                  <button onClick={enviarCuentaWhatsApp} className="flex-1 btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"><Send className="w-4 h-4" /> Enviar por WhatsApp</button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ModalWhatsApp
+        abierto={showEnviarCuentaModal && !!selectedVenta}
+        textoFijo={cuentaText}
+        titulo="Enviar Cuenta"
+        telefono={selectedVenta?.telefono || ''}
+        nombreCliente={selectedVenta?.cliente || ''}
+        onClose={() => setShowEnviarCuentaModal(false)}
+      />
 
-      <AnimatePresence>
-        {showReemplazoModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-50 flex items-start justify-center pt-[15vh] p-4" onClick={() => setShowReemplazoModal(false)}>
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-voltech-surface border border-voltech-border rounded-xl w-full max-w-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="border-b border-voltech-border p-5 flex items-center justify-between">
-                <div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-voltech-purple/20"><RefreshCw className="w-5 h-5 text-voltech-purple" /></div><div><h2 className="text-lg font-bold text-white">Enviar Reemplazo</h2><p className="text-xs text-voltech-muted">Nuevas credenciales</p></div></div>
-                <button onClick={() => setShowReemplazoModal(false)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted"><X className="w-5 h-5" /></button>
-              </div>
-              <div className="p-6">
-                <textarea value={reemplazoText} onChange={(e) => setReemplazoText(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm h-64 resize-none font-mono" />
-                <div className="flex gap-3 mt-4">
-                  <button onClick={copiarReemplazo} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 flex items-center gap-2"><Copy className="w-4 h-4" /> Copiar</button>
-                  <button onClick={enviarReemplazoWhatsApp} className="flex-1 btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"><Send className="w-4 h-4" /> Enviar por WhatsApp</button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ModalWhatsApp
+        abierto={showReemplazoModal && !!selectedVenta}
+        textoFijo={reemplazoText}
+        titulo="Enviar Reemplazo"
+        telefono={selectedVenta?.telefono || ''}
+        nombreCliente={selectedVenta?.cliente || ''}
+        onClose={() => setShowReemplazoModal(false)}
+      />
 
       <AnimatePresence>
         {showReemplazoCuentaModal && (
