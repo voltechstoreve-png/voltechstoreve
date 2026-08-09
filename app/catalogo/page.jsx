@@ -613,7 +613,7 @@ export default function CatalogoPage() {
           <img 
             src={pub.url_imagen} 
             alt={pub.titulo} 
-            className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300" 
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-voltech-muted">
@@ -752,7 +752,7 @@ export default function CatalogoPage() {
                     productosFiltrados.map(p => {
                       const precioInfo = getPrecioMostrar(p);
                       return (
-                        <div key={p.id} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col cursor-pointer group`}>
+                        <div key={p.id} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between cursor-pointer group`}>
                           <div className="aspect-square bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center overflow-hidden relative">
                             {p.imagen ? (
                               <img src={p.imagen} alt={p.producto} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} />
@@ -798,38 +798,45 @@ export default function CatalogoPage() {
             {activeSection === 'streaming' && (
               <div>
                 <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Streaming</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {streamingFiltrados.map(p => {
-                    const precioInfo = getPrecioMostrar(p);
-                    return (
-                      <div key={p.id} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-lg transition-all duration-300 h-52 flex cursor-pointer group`}>
-                        <div className="w-1/2 bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 relative overflow-hidden flex items-center justify-center">
-                          {p.imagen ? <img src={p.imagen} alt={p.plataforma} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <div className="text-center px-3"><Play className="w-8 h-8 text-white/90 mx-auto mb-1" /><span className="text-white text-sm font-bold tracking-wider block truncate">{p.plataforma?.substring(0, 12).toUpperCase()}</span></div>}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                          {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">OFERTA</div>}
-                        </div>
-                        <div className="w-1/2 p-3 flex flex-col justify-between">
-                          <div>
-                            <h3 className={`font-bold text-sm mb-1 line-clamp-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.plataforma}</h3>
-                            <div className="mb-2">
-                              {precioInfo.tieneOferta && <p className="text-[10px] text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)}</p>}
-                              <p className={`text-lg font-bold ${precioInfo.tieneOferta ? 'text-red-600' : darkMode ? 'text-white' : 'text-slate-900'}`}>${precioInfo.precioPrincipal}</p>
-                              <p className={`text-xs font-medium ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
-                            </div>
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <button onClick={(e) => { e.stopPropagation(); comprarRapido(p); }} className="w-full bg-green-500 text-white py-1.5 rounded-lg text-[11px] font-semibold hover:bg-green-600 transition-colors flex items-center justify-center gap-1">
-                              <MessageCircle className="w-3 h-3 flex-shrink-0" /> Comprar
-                            </button>
-                            <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="w-full bg-purple-600 text-white py-1.5 rounded-lg text-[11px] font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-1">
-                              <ShoppingCart className="w-3 h-3 flex-shrink-0" /> Carrito
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {streamingFiltrados.length === 0 && <div className={`text-center py-20 col-span-2 ${mutedText}`}><Play className="w-16 h-16 mx-auto mb-3 opacity-30" /><p className="text-lg">No hay plataformas disponibles</p></div>}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
+{streamingFiltrados.map(p => {
+  const precioInfo = getPrecioMostrar(p);
+  return (
+    <div key={p.id} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col cursor-pointer group`}>
+      {/* BANNER a ancho completo */}
+      <div className="relative w-full h-48 bg-black overflow-hidden">
+        {p.imagen ? (
+          <img src={p.imagen} alt={p.plataforma} className="w-full h-full object-cover rounded-t-xl group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Play className="w-10 h-10 text-white/80" />
+          </div>
+        )}
+        {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">OFERTA</div>}
+      </div>
+      {/* Nombre + precio + botones ABAJO (igual que productos) */}
+      <div className="p-3 flex flex-col flex-1">
+        <h3 className={`font-semibold text-sm mb-2 line-clamp-2 leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.plataforma}</h3>
+        <div className="mt-auto space-y-2">
+          <div>
+            {precioInfo.tieneOferta && <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)}</p>}
+            <p className={`text-xl font-bold ${precioInfo.tieneOferta ? 'text-red-600' : darkMode ? 'text-white' : 'text-slate-900'}`}>${precioInfo.precioPrincipal}</p>
+            <p className={`text-xs font-medium ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
+          </div>
+          <div className="flex gap-1.5 pt-1">
+            <button onClick={(e) => { e.stopPropagation(); comprarRapido(p); }} className="flex-1 bg-green-500 text-white py-2 rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors flex items-center justify-center gap-1">
+              <MessageCircle className="w-3 h-3 flex-shrink-0" /> Comprar
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="flex-1 bg-purple-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-1">
+              <ShoppingCart className="w-3 h-3 flex-shrink-0" /> Carrito
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+})}
+                  {streamingFiltrados.length === 0 && <div className={`text-center py-20 col-span-full ${mutedText}`}><Play className="w-16 h-16 mx-auto mb-3 opacity-30" /><p className="text-lg">No hay plataformas disponibles</p></div>}
                 </div>
               </div>
             )}
@@ -844,7 +851,7 @@ export default function CatalogoPage() {
                       return (
                         <div key={p.id} onClick={() => setSelectedProduct(p)} className={`${darkMode ? 'bg-gradient-to-br from-orange-900/30 to-red-900/30 border-red-800' : 'bg-gradient-to-br from-orange-50 to-red-50 border-red-200'} rounded-xl shadow-md border-2 overflow-hidden flex flex-col relative hover:shadow-lg transition-all cursor-pointer group`}>
                           <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md z-10">OFERTA</div>
-                          <div className="aspect-square bg-slate-100 flex items-center justify-center overflow-hidden">
+                          <div className="aspect-video bg-black flex items-center justify-center overflow-hidden">
                             {p.imagen ? <img src={p.imagen} alt={p.producto || p.plataforma} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-12 h-12 text-slate-300" />}
                           </div>
                           <div className="p-3 flex flex-col flex-1">
@@ -1035,7 +1042,7 @@ export default function CatalogoPage() {
                                 if (!prod) return <p className={mutedText}>Producto no disponible</p>;
                                 return (
                                   <div className="flex flex-col md:flex-row gap-6">
-                                    <div className="w-full md:w-1/2 aspect-square bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center overflow-hidden">{prod.imagen ? <img src={prod.imagen} alt={prod.producto} className="w-full h-full object-contain p-4" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Gift className="w-24 h-24 text-slate-300" />}</div>
+                                    <div className="w-full md:w-1/2 aspect-square bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center overflow-hidden">{prod.imagen ? <img src={prod.imagen} alt={prod.producto} className="w-full h-full object-cover" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Gift className="w-24 h-24 text-slate-300" />}</div>
                                     <div className="flex-1">
                                       <p className={`text-xs font-medium uppercase tracking-wide ${mutedText} mb-2`}>{prod.marca} • {prod.categoria}</p>
                                       <h3 className={`text-2xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{prod.producto}</h3>
@@ -1318,12 +1325,12 @@ export default function CatalogoPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
                 <div className="space-y-4">
-                  <div className="aspect-square bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden flex items-center justify-center relative">
+                  <div className="aspect-video bg-black rounded-xl overflow-hidden relative">
                     {selectedProduct.imagen ? (
                       <img 
                         src={selectedProduct.imagen} 
                         alt={selectedProduct.producto || selectedProduct.plataforma} 
-                        className="w-full h-full object-contain p-4"
+                        className="w-full h-full object-cover"
                         onError={(e) => {
                           e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iIzFhMWUyOSIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2MzY2ZjEiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5TaW4gSW1hZ2VuPC90ZXh0Pjwvc3ZnPg==';
                         }}

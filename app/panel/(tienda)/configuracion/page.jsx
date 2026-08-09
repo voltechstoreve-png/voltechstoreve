@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
   Bell, Clock, MessageSquare, ShieldCheck, Save, Check, Copy, Mail, BellRing,
-  MailCheck, Calendar, Smartphone, Info, RotateCcw, Lock, Eye, EyeOff, Send
+  MailCheck, Calendar, Smartphone, Info, RotateCcw, Lock, Eye, EyeOff, Send, Trash2
 } from 'lucide-react';
 import EmojiTextarea, { PLANTILLAS_WA_DEFAULT, rellenarVariables } from '@/components/EmojiTextarea';
 import toast, { Toaster } from 'react-hot-toast';
