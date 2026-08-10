@@ -138,8 +138,8 @@ export default function AlertasPage() {
 
       // ✅ Notificaciones desde la BD (misma fuente que la campana → sync real)
       (rNotis.data || []).forEach(n => {
-        const cat = (n.tipo === 'modificacion_socio') ? 'modificacion_socio' : 'sistema';
-        push({ id: `noti-${n.id}`, category: cat, title: n.titulo, description: n.mensaje || n.detalle || '', date: aISO(n.fecha || n.created_at), status: n.leida ? 'completado' : 'pendiente', metadata: { notiId: n.id } });
+        const cat = n.categoria || ((n.tipo === 'modificacion_socio') ? 'modificacion_socio' : (['solicitud_pago','pago_completado','cobro_solicitado'].includes(n.tipo) ? 'pagos_equipo' : 'sistema'));
+        push({ id: `noti-${n.id}`, category: cat, title: n.titulo, description: n.mensaje || n.detalle || '', date: aISO(n.fecha || n.created_at), status: n.leida ? 'completado' : 'pendiente', metadata: { notiId: n.id, miembro: n.miembro } });
       });
       setNotisDB(rNotis.data || []);
 
@@ -240,7 +240,7 @@ export default function AlertasPage() {
         <button onClick={(e) => { e.stopPropagation(); eliminarNotificacion(a); }} className="text-xs px-2 py-1 rounded bg-red-600/60 text-white hover:bg-red-600" title="Eliminar"><Trash2 className="w-3 h-3" /></button>
       </div>
     );
-    return <button onClick={(e) => { e.stopPropagation(); router.push(RUTAS[a.category]); }} className="text-xs px-2 py-1 rounded bg-voltech-cyan/20 text-voltech-cyan hover:bg-voltech-cyan/30 flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Ver</button>;
+    return <button onClick={(e) => { e.stopPropagation(); router.push(RUTAS[a.category] + (a.metadata?.miembro ? `?miembro=${encodeURIComponent(a.metadata.miembro)}` : '')); }} className="text-xs px-2 py-1 rounded bg-voltech-cyan/20 text-voltech-cyan hover:bg-voltech-cyan/30 flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Ver</button>;
   };
 
   return (
@@ -362,7 +362,7 @@ export default function AlertasPage() {
             </div>
             <div className="flex gap-2">
               {accionRapida(detalle)}
-              <button onClick={() => { router.push(RUTAS[detalle.category]); setDetalle(null); }} className="flex-1 text-sm px-3 py-2 rounded-lg bg-voltech-purple/20 text-voltech-purple hover:bg-voltech-purple/30">Ir al módulo</button>
+              <button onClick={() => { router.push(RUTAS[detalle.category] + (detalle.metadata?.miembro ? `?miembro=${encodeURIComponent(detalle.metadata.miembro)}` : '')); setDetalle(null); }} className="flex-1 text-sm px-3 py-2 rounded-lg bg-voltech-purple/20 text-voltech-purple hover:bg-voltech-purple/30">Ir al módulo</button>
             </div>
           </div>
         </div>

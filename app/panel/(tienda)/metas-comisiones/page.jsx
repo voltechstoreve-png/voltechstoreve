@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
 import { useNotificaciones } from '@/app/context/NotificationContext';
 import { 
   DollarSign, BarChart, Target, MessageCircle, CheckCircle, 
-  User, Save, Trash2, Plus, Calendar, Bell, X, TrendingUp, 
-  Award, Download, AlertCircle
+  User, Users, Save, Trash2, Plus, Calendar, Bell, X, TrendingUp, ChevronDown, 
+  Award, Download, AlertCircle, ExternalLink, ShoppingCart
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -20,6 +20,8 @@ export default function MetasYComisionesPage() {
   const puedeGestionar = esAdmin || esSocio;
 
   const [mostrarFormMetas, setMostrarFormMetas] = useState(false);
+  const [mostrarReferidos, setMostrarReferidos] = useState(false);
+  const [tabMetas, setTabMetas] = useState('rendimiento');
   const [metas, setMetas] = useState([]);
   const [metasTemp, setMetasTemp] = useState([]);
   
@@ -31,6 +33,18 @@ export default function MetasYComisionesPage() {
 
   const [nuevoComentario, setNuevoComentario] = useState('');
   const [comentarios, setComentarios] = useState([]);
+    const [escalaReferidos, setEscalaReferidos] = useState([
+    { referidos: 1, porcentaje: 2 },
+    { referidos: 3, porcentaje: 3 },
+    { referidos: 5, porcentaje: 5 },
+    { referidos: 10, porcentaje: 7 },
+  ]);
+  const [referidosEquipo, setReferidosEquipo] = useState([]);
+  const [miembroExpandido, setMiembroExpandido] = useState(null);
+  const [clientesTodos, setClientesTodos] = useState([]);
+  const [ventasTodas, setVentasTodas] = useState([]);
+  const [miembroSeleccionado, setMiembroSeleccionado] = useState(null);
+  const [cuponesTodos, setCuponesTodos] = useState([]);
 
   useEffect(() => {
   const cargarDatos = async () => {
@@ -60,8 +74,9 @@ export default function MetasYComisionesPage() {
         setComentarios(savedData.comentarios || []);
       }
 
-      await cargarDatosReales();
+      await cargarDatosReales(savedData?.metas || []);
       await verificarBonosAutomaticamente();
+      await cargarReferidosEquipo();
     } catch (error) {
       console.error('Error cargando metas:', error);
     }
@@ -77,7 +92,8 @@ export default function MetasYComisionesPage() {
   };
 }, []);
 
-  const cargarDatosReales = async () => {
+  const cargarDatosReales = async (metasOverride) => {
+    const metasUsar = Array.isArray(metasOverride) && metasOverride.length ? metasOverride : metas;
     let ventasProd = [], ventasStream = [], equipo = [];
     
     if (supabase) {
@@ -110,11 +126,34 @@ export default function MetasYComisionesPage() {
       ventasPorVendedor[vendedor] += 1;
     });
 
+    // Cargar datos de referidos para enriquecer el ranking
+    let clientesRef = [];
+    try {
+      if (supabase) {
+        const { data } = await supabase.from('clientes').select('*');
+        clientesRef = data || [];
+      } else {
+        clientesRef = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
+      }
+    } catch {}
+    const escalaRef = JSON.parse(localStorage.getItem('voltech_escala_referidos') || 'null') || [
+      { referidos: 1, porcentaje: 2 }, { referidos: 3, porcentaje: 3 },
+      { referidos: 5, porcentaje: 5 }, { referidos: 10, porcentaje: 7 }
+    ];
+
     let rankingCalculado = equipo.map(miembro => {
       const ventasCount = ventasPorVendedor[miembro.nombre] || 0;
-      const metasOrdenadas = [...metas].sort((a, b) => a.ventas - b.ventas);
+      const metasOrdenadas = [...metasUsar].sort((a, b) => a.ventas - b.ventas);
       const proximaMeta = metasOrdenadas.find(m => m.ventas > ventasCount) || metasOrdenadas[metasOrdenadas.length - 1];
       const progreso = proximaMeta ? Math.min((ventasCount / proximaMeta.ventas) * 100, 100) : 100;
+
+      // Referidos del miembro
+      const clientesDelMiembro = clientesRef.filter(c => (c.registradoPor || c.registrado_por) === miembro.nombre);
+      const cantidadRef = clientesDelMiembro.length;
+      const nivelRef = [...escalaRef].sort((a, b) => a.referidos - b.referidos).filter(e => cantidadRef >= e.referidos).pop();
+      const porcentajeRef = nivelRef?.porcentaje || 0;
+      const totalGastadoRef = clientesDelMiembro.reduce((s, c) => s + Number(c.totalGastado || 0), 0);
+      const comisionRef = totalGastadoRef * (porcentajeRef / 100);
 
       return {
         nombre: miembro.nombre,
@@ -122,7 +161,11 @@ export default function MetasYComisionesPage() {
         ventas: ventasCount,
         proximaMeta: proximaMeta?.ventas || 0,
         porcentajeComision: proximaMeta?.porcentaje || 0,
-        progreso: progreso
+        progreso: progreso,
+        montoPromedio: 50, // promedio estimado por venta
+        porcentajeReferidos: porcentajeRef,
+        comisionReferidos: comisionRef,
+        cantidadReferidos: cantidadRef,
       };
     }).sort((a, b) => b.ventas - a.ventas);
 
@@ -136,7 +179,7 @@ export default function MetasYComisionesPage() {
       ? (ventasPorVendedor[usuarioActual.nombre] || 0) 
       : ventasDelMes.length;
       
-    const metaObj = metas?.find(m => m.activo) || metas?.[metas.length - 1];
+    const metaObj = metasUsar?.find(m => m.activo) || metasUsar?.[metasUsar.length - 1];
     
     setStatsReales({
       ventasMes: totalVentasMes,
@@ -167,6 +210,7 @@ export default function MetasYComisionesPage() {
         equipo = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
         bonosExistentes = JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]').filter(b => b.tipo === 'bono_meta' && b.periodo === periodoActual);
       }
+      
 
       const todasLasVentas = [...ventasProd, ...ventasStream];
       const ventasDelMes = todasLasVentas.filter(v => {
@@ -262,6 +306,75 @@ export default function MetasYComisionesPage() {
     }
   };
 
+    const cargarReferidosEquipo = async () => {
+    try {
+      let clientes = [], equipo = [], vts = [];
+      if (supabase) {
+        const [{ data: cl }, { data: eq }, { data: vp }, { data: vs }] = await Promise.all([
+          supabase.from('clientes').select('*'),
+          supabase.from('usuarios').select('*'),
+          supabase.from('ventas').select('*'),
+          supabase.from('ventas_streaming').select('*')
+        ]);
+        clientes = cl || [];
+        equipo = eq || [];
+        vts = [...(vp || []), ...(vs || [])];
+      } else {
+        clientes = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
+        equipo = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
+        vts = [...JSON.parse(localStorage.getItem('voltech_ventas') || '[]'), ...JSON.parse(localStorage.getItem('voltech_ventas_streaming') || '[]')];
+      }
+      setClientesTodos(clientes);
+      setVentasTodas(vts);
+
+      const escalaGuardada = localStorage.getItem('voltech_escala_referidos');
+      if (escalaGuardada) setEscalaReferidos(JSON.parse(escalaGuardada));
+
+      const conteo = {};
+      clientes.forEach(c => {
+        const regPor = c.registradoPor || c.registrado_por;
+        if (regPor) conteo[regPor] = (conteo[regPor] || 0) + 1;
+      });
+
+      const lista = equipo.map(m => {
+        const cantidad = conteo[m.nombre] || 0;
+        const escalaOrdenada = [...escalaReferidos].sort((a, b) => a.referidos - b.referidos);
+        const nivel = escalaOrdenada.filter(e => cantidad >= e.referidos).pop();
+        const porcentaje = nivel?.porcentaje || 0;
+        const totalGastado = clientes
+          .filter(c => (c.registradoPor || c.registrado_por) === m.nombre)
+          .reduce((sum, c) => sum + Number(c.totalGastado || 0), 0);
+        const comision = totalGastado * (porcentaje / 100);
+        return { nombre: m.nombre, rol: m.rol, referidos: cantidad, porcentaje, totalGastado, comision };
+      }).sort((a, b) => b.referidos - a.referidos);
+
+      if (esVendedor && usuarioActual?.nombre) {
+        setReferidosEquipo(lista.filter(r => r.nombre === usuarioActual.nombre));
+      } else {
+        setReferidosEquipo(lista);
+      }
+    } catch (e) {
+      console.error('Error cargando referidos:', e);
+    }
+  };
+
+  const agregarEscala = () => {
+    const ultima = escalaReferidos[escalaReferidos.length - 1];
+    setEscalaReferidos([...escalaReferidos, { referidos: (ultima?.referidos || 0) + 5, porcentaje: (ultima?.porcentaje || 0) + 1 }]);
+  };
+
+  const eliminarEscala = (idx) => setEscalaReferidos(escalaReferidos.filter((_, i) => i !== idx));
+
+  const actualizarEscala = (idx, campo, valor) => {
+    setEscalaReferidos(escalaReferidos.map((e, i) => i === idx ? { ...e, [campo]: valor } : e));
+  };
+
+  const guardarEscala = () => {
+    localStorage.setItem('voltech_escala_referidos', JSON.stringify(escalaReferidos));
+    toast.success('Escala de referidos guardada');
+    cargarReferidosEquipo();
+  };
+
   const guardarEnSupabaseYLocal = async (nuevosDatos) => {
     if (supabase) {
       await supabase.from('settings').upsert({ clave: 'metas_comisiones', valor: nuevosDatos }, { onConflict: 'clave' });
@@ -296,6 +409,16 @@ export default function MetasYComisionesPage() {
     setComentarios(nuevosDatos.comentarios);
     setNuevoComentario('');
     toast.success('Sugerencia enviada. El admin la revisará.');
+
+    if (agregarNotificacion) {
+      agregarNotificacion({
+        tipo: 'nueva_sugerencia',
+        titulo: '💬 Nueva sugerencia del equipo',
+        mensaje: `${comentario.usuario}: "${comentario.texto.substring(0, 40)}..."`,
+        detalle: 'Revisa y aprueba en Metas y Comisiones → Configuraciones',
+        usuario_id: 'admin'
+      });
+    }
   };
 
   const aprobarComentario = async (comentario) => {
@@ -357,7 +480,7 @@ export default function MetasYComisionesPage() {
     const nuevosDatos = { metas: [...metasTemp], comentarios };
     await guardarEnSupabaseYLocal(nuevosDatos);
     setMetas(metasTemp);
-    await cargarDatosReales();
+    await cargarDatosReales(metasTemp);
     toast.success('Metas actualizadas y guardadas correctamente');
     setMostrarFormMetas(false);
   };
@@ -397,8 +520,29 @@ export default function MetasYComisionesPage() {
     toast.success('Reporte generado.');
   };
 
+  const pedirPagoVenta = async (v, r, monto) => {
+    const sol = { id: String(Date.now()), miembro_nombre: r.nombre, venta_id: v.id, monto, fecha: new Date().toISOString(), estado: 'pendiente', sync: false };
+    const sols = JSON.parse(localStorage.getItem('voltech_solicitudes_pago') || '[]');
+    localStorage.setItem('voltech_solicitudes_pago', JSON.stringify([sol, ...sols]));
+    if (supabase) { try { await supabase.from('solicitudes_pago').upsert({ ...sol, sync: true }, { onConflict: 'id' }); } catch {} }
+    if (agregarNotificacion) agregarNotificacion({ tipo: 'solicitud_pago', categoria: 'pagos_equipo', titulo: '💰 Solicitud de pago', mensaje: `${r.nombre} solicita el pago de $${monto.toFixed(2)} (Orden ${v.numeroOrden || ''})`, detalle: 'Venta específica', usuario_id: 'admin', miembro: r.nombre });
+    window.dispatchEvent(new Event('voltech-data-updated'));
+    toast.success('Solicitud de pago enviada');
+  };
+
+  const comisionDe = (v, pctFallback) => {
+    const directo = Number(v.comision ?? v.comisionVendedor ?? v.montoComision ?? v.monto_comision ?? v.comision_venta ?? 0);
+    if (directo > 0) return directo;
+    const pct = Number(v.porcentajeComision ?? v.porcentaje_comision ?? 0);
+    const total = Number(v.total || 0);
+    const p = pct > 0 ? pct : (pctFallback || 0);
+    return total * p / 100;
+  };
   const comentariosNoLeidos = comentarios?.filter(c => !c.leido).length || 0;
   const comisionActual = metas?.[metas.length - 1]?.porcentaje || 0;
+  const miNombre = usuarioActual?.nombre || '';
+  const miRank = ranking.find(r => r.nombre === miNombre);
+  const misRef = referidosEquipo.find(r => r.nombre === miNombre);
 
   return (
     <div className="space-y-6">
@@ -418,15 +562,6 @@ export default function MetasYComisionesPage() {
         <div className="flex gap-3">
           {puedeGestionar && (
             <button
-              onClick={verificarBonosAutomaticamente}
-              disabled={loadingBonos}
-              className="px-4 py-2 bg-voltech-success/20 text-voltech-success border border-voltech-success/30 rounded-lg text-sm font-medium hover:bg-voltech-success/30 transition-all flex items-center gap-2 disabled:opacity-50"
-            >
-              {loadingBonos ? 'Verificando...' : <><CheckCircle className="w-4 h-4" /> Verificar y Generar Bonos</>}
-            </button>
-          )}
-          {puedeGestionar && (
-            <button
               onClick={generarReporteSocio}
               className="px-4 py-2 bg-voltech-surface border border-voltech-border text-voltech-cyan rounded-lg text-sm font-medium hover:bg-voltech-cyan/10 transition-all flex items-center gap-2"
             >
@@ -441,46 +576,61 @@ export default function MetasYComisionesPage() {
           </button>
         </div>
       </div>
+          
+      <div className="flex gap-2 border-b border-voltech-border">
+        <button onClick={() => setTabMetas('rendimiento')} className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${tabMetas === 'rendimiento' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>📊 Mi Rendimiento</button>
+        {puedeGestionar && (
+          <button onClick={() => setTabMetas('config')} className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${tabMetas === 'config' ? 'text-voltech-purple border-voltech-purple' : 'text-voltech-muted border-transparent hover:text-white'}`}>⚙️ Configuraciones</button>
+        )}
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-cyan/20"><DollarSign className="w-5 h-5 text-voltech-cyan" /></div>
-            <div>
-              <p className="text-xs text-voltech-muted">Comisión máxima actual</p>
-              <p className="text-lg font-bold text-white">{comisionActual}%</p>
-            </div>
+      {tabMetas === 'rendimiento' && (<>
+      {/* 👤 MI RENDIMIENTO (vista personal) */}
+      <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
+        <div className="flex items-center gap-2 mb-6">
+          <div className="p-2 rounded-lg bg-voltech-cyan/20"><User className="w-5 h-5 text-voltech-cyan" /></div>
+          <div>
+            <h3 className="text-lg font-bold text-white">Mi Rendimiento</h3>
+            <p className="text-xs text-voltech-muted">Tu progreso personal del mes</p>
           </div>
         </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-purple/20"><BarChart className="w-5 h-5 text-voltech-purple" /></div>
-            <div>
-              <p className="text-xs text-voltech-muted">Ventas este mes</p>
-              <p className="text-lg font-bold text-white">{statsReales.ventasMes}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-voltech-dark/50 border border-voltech-border rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-voltech-cyan/20"><TrendingUp className="w-5 h-5 text-voltech-cyan" /></div>
+              <div>
+                <p className="text-xs text-voltech-muted">Mis Ventas</p>
+                <p className="text-xl font-bold text-white">{miRank?.ventas || 0}</p>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-success/20"><Target className="w-5 h-5 text-voltech-success" /></div>
-            <div>
-              <p className="text-xs text-voltech-muted">Meta global actual</p>
-              <p className="text-lg font-bold text-white">{statsReales.metaActual} ventas</p>
+          <div className="bg-voltech-dark/50 border border-voltech-border rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-voltech-success/20"><DollarSign className="w-5 h-5 text-voltech-success" /></div>
+              <div>
+                <p className="text-xs text-voltech-muted">Mi Comisión</p>
+                <p className="text-xl font-bold text-voltech-success">{miRank?.porcentajeComision || 0}%</p>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-warning/20"><Bell className="w-5 h-5 text-voltech-warning" /></div>
-            <div>
-              <p className="text-xs text-voltech-muted">Sugerencias pendientes</p>
-              <p className="text-lg font-bold text-white">{comentariosNoLeidos}</p>
+          <div className="bg-voltech-dark/50 border border-voltech-border rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-voltech-purple/20"><Users className="w-5 h-5 text-voltech-purple" /></div>
+              <div>
+                <p className="text-xs text-voltech-muted">Mis Referidos</p>
+                <p className="text-xl font-bold text-white">{misRef?.referidos || 0} <span className="text-xs text-voltech-purple">({misRef?.porcentaje || 0}%)</span></p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-voltech-dark/50 border border-voltech-border rounded-xl p-4">
+            <p className="text-xs text-voltech-muted mb-1">Mi Próxima Meta</p>
+            <p className="text-xl font-bold text-white">{miRank?.ventas || 0}/{miRank?.proximaMeta || 0}</p>
+            <div className="w-full h-2 bg-voltech-border rounded-full mt-2 overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-voltech-cyan to-voltech-purple" style={{ width: `${miRank?.progreso || 0}%` }}></div>
             </div>
           </div>
         </div>
       </div>
-
       <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
@@ -493,8 +643,8 @@ export default function MetasYComisionesPage() {
         </div>
         
         {bonosPendientes.length === 0 ? (
-          <div className="text-center py-8 bg-voltech-dark/30 rounded-lg border border-dashed border-voltech-border">
-            <Award className="w-12 h-12 mx-auto mb-3 opacity-50 text-voltech-muted" />
+          <div className="text-center py-6 bg-voltech-dark/30 rounded-lg border border-dashed border-voltech-border">
+            <Award className="w-8 h-8 mx-auto mb-2 opacity-50 text-voltech-muted" />
             <p className="text-sm text-voltech-muted">No hay bonos por metas pendientes de pago este período.</p>
             {puedeGestionar && <p className="text-xs text-voltech-muted mt-1">Haz clic en "Verificar y Generar Bonos" para revisar el progreso del equipo.</p>}
           </div>
@@ -520,9 +670,38 @@ export default function MetasYComisionesPage() {
                     <td className="px-4 py-3 text-sm text-voltech-muted">{bono.periodo}</td>
                     <td className="px-4 py-3 text-sm font-bold text-voltech-success text-right">${Number(bono.monto_comision).toFixed(2)}</td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`text-xs px-2 py-1 rounded-full ${bono.estado === 'pagada' ? 'bg-voltech-success/20 text-voltech-success' : 'bg-voltech-warning/20 text-voltech-warning'}`}>
-                        {bono.estado === 'pagada' ? 'Pagado' : 'Pendiente'}
-                      </span>
+                      {bono.estado === 'pagada' ? (
+                        <span className="text-xs px-2 py-1 rounded-full bg-voltech-success/20 text-voltech-success">Pagado</span>
+                      ) : bono.estado === 'solicitado' ? (
+                        <span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan">⏳ Solicitado</span>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-xs px-2 py-1 rounded-full bg-voltech-warning/20 text-voltech-warning">Pendiente</span>
+                          {bono.miembro_nombre === (usuarioActual?.nombre || '') && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  if (supabase) await supabase.from('comisiones_pendientes').update({ estado: 'solicitado' }).eq('id', bono.id);
+                                  setBonosPendientes(bonosPendientes.map(b => b.id === bono.id ? { ...b, estado: 'solicitado' } : b));
+                                  if (agregarNotificacion) {
+                                    agregarNotificacion({
+                                      tipo: 'cobro_solicitado',
+                                      titulo: '💰 Solicitud de cobro de bono',
+                                      mensaje: `${bono.miembro_nombre} solicita el cobro de $${Number(bono.monto_comision).toFixed(2)}`,
+                                      detalle: `${bono.producto_nombre} - Período ${bono.periodo}`,
+                                      usuario_id: 'admin'
+                                    });
+                                  }
+                                  toast.success('Solicitud enviada al administrador');
+                                } catch (e) { toast.error('Error al enviar solicitud'); }
+                              }}
+                              className="px-2 py-1 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors flex items-center gap-1"
+                            >
+                              <Send className="w-3 h-3" /> Pedir Cobro
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -532,57 +711,200 @@ export default function MetasYComisionesPage() {
         )}
       </div>
 
-      <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
-        <div className="flex items-center gap-2 mb-6">
-          <div className="p-2 rounded-lg bg-voltech-warning/20"><Award className="w-5 h-5 text-voltech-warning" /></div>
+      {/* 👥 RENDIMIENTO DEL EQUIPO */}
+      <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
+        <div className="p-6 border-b border-voltech-border flex items-center gap-2">
+          <div className="p-2 rounded-lg bg-voltech-purple/20"><Users className="w-5 h-5 text-voltech-purple" /></div>
           <div>
-            <h3 className="text-lg font-bold text-white">
-              {esVendedor ? 'Tu Progreso del Mes' : 'Ranking de Ventas del Mes'}
-            </h3>
-            <p className="text-xs text-voltech-muted">Progreso hacia la siguiente meta</p>
+            <h3 className="text-lg font-bold text-white">Rendimiento del Equipo</h3>
+            <p className="text-xs text-voltech-muted">Ventas propias = comisión de venta · Compras de referidos = comisión de referido</p>
           </div>
         </div>
-        
-        <div className="space-y-4">
-          {ranking.length === 0 ? (
-            <p className="text-center text-voltech-muted py-4">Aún no hay ventas registradas este mes.</p>
-          ) : (
-            ranking.map((r, index) => (
-              <div key={r.nombre} className="bg-voltech-dark/50 border border-voltech-border rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    {!esVendedor && (
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                        index === 0 ? 'bg-yellow-500/20 text-yellow-500' : 
-                        index === 1 ? 'bg-gray-400/20 text-gray-400' : 
-                        'bg-orange-700/20 text-orange-700'
-                      }`}>
-                        #{index + 1}
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-sm font-medium text-white">{r.nombre}</p>
-                      <p className="text-xs text-voltech-muted">{r.ventas} ventas realizadas</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-voltech-cyan">{r.porcentajeComision}% Comisión</p>
-                    <p className="text-xs text-voltech-muted">Meta: {r.proximaMeta} vtas</p>
-                  </div>
-                </div>
-                <div className="w-full h-2 bg-voltech-border rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-voltech-cyan to-voltech-purple transition-all duration-500"
-                    style={{ width: `${r.progreso}%` }}
-                  ></div>
-                </div>
-                <p className="text-xs text-voltech-muted mt-1 text-right">{r.progreso.toFixed(0)}% completado</p>
-              </div>
-            ))
-          )}
+
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-voltech-dark border-b border-voltech-border">
+              <tr>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">#</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Vendedor</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">Ventas</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">% Ventas</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">% Referidos</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">Cupones</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {referidosEquipo.length === 0 ? (
+                <tr><td colSpan="7" className="text-center py-8 text-voltech-muted">Aún no hay miembros en el equipo.</td></tr>
+              ) : (
+                referidosEquipo.map((r, index) => {
+                  const rank = ranking.find(x => x.nombre === r.nombre) || {};
+                  const isSel = miembroSeleccionado === r.nombre;
+                  const susClientes = clientesTodos.filter(c => (c.registradoPor || c.registrado_por) === r.nombre);
+                  const susVentas = ventasTodas.filter(v => v.vendedor === r.nombre);
+                  const ventasReferidas = ventasTodas.filter(v => v.vendedor !== r.nombre && susClientes.some(c => c.nombre === (v.clienteNombre || v.cliente || '')));
+                  const ventasDetalle = [
+                    ...susVentas.map(v => ({ ...v, _propia: true })),
+                    ...ventasReferidas.map(v => ({ ...v, _propia: false })),
+                  ];
+                  const cuponesUsados = susVentas.filter(v => v.cuponCodigo || v.cupon).length;
+                  const comisionVentasReal = susVentas.reduce((s, v) => s + comisionDe(v, rank.porcentajeComision), 0);
+                  const comisionTotal = comisionVentasReal + (r.comision || 0);
+                  return (
+                    <Fragment key={r.nombre}>
+                      <tr className={`border-b border-voltech-border transition-colors ${isSel ? 'bg-voltech-cyan/5' : 'hover:bg-voltech-border/30'}`}>
+                        <td className="px-4 py-3">
+                          <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                            index === 0 ? 'bg-yellow-500/20 text-yellow-500' :
+                            index === 1 ? 'bg-gray-400/20 text-gray-400' :
+                            index === 2 ? 'bg-orange-700/20 text-orange-700' :
+                            'bg-voltech-muted/20 text-voltech-muted'
+                          }`}>#{index + 1}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-voltech-cyan to-voltech-purple flex items-center justify-center text-white font-bold flex-shrink-0">{r.nombre?.charAt(0) || '?'}</div>
+                            <div>
+                              <p className="text-sm font-bold text-white">{r.nombre}</p>
+                              <p className="text-xs text-voltech-muted capitalize">{r.rol}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm font-bold text-white">{rank.ventas || 0}</td>
+                        <td className="px-4 py-3 text-center text-sm font-bold text-voltech-success">{rank.porcentajeComision || 0}%</td>
+                        <td className="px-4 py-3 text-center text-sm font-bold text-voltech-purple">{r.porcentaje}%</td>
+                        <td className="px-4 py-3 text-center text-sm font-bold text-voltech-cyan">{cuponesUsados}</td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => {
+                                const sol = { id: String(Date.now()), miembro_nombre: r.nombre, monto: comisionTotal, fecha: new Date().toISOString(), estado: 'pendiente', sync: false };
+                                const sols = JSON.parse(localStorage.getItem('voltech_solicitudes_pago') || '[]');
+                                localStorage.setItem('voltech_solicitudes_pago', JSON.stringify([sol, ...sols]));
+                                if (agregarNotificacion) {
+                                  agregarNotificacion({ tipo: 'solicitud_pago', categoria: 'pagos_equipo', titulo: '💰 Solicitud de pago', mensaje: `${r.nombre} solicita el pago de $${comisionTotal.toFixed(2)}`, detalle: `Ventas: ${rank.ventas || 0} | Referidos: ${r.referidos}`, usuario_id: 'admin', miembro: r.nombre });
+                                }
+                                window.dispatchEvent(new Event('voltech-data-updated'));
+                                toast.success('Solicitud de pago enviada al administrador');
+                              }}
+                              className="px-3 py-1.5 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors flex items-center gap-1"
+                            >
+                              <DollarSign className="w-3 h-3" /> Pedir Pago
+                            </button>
+                            <button onClick={() => setMiembroSeleccionado(isSel ? null : r.nombre)} className="px-3 py-1.5 bg-voltech-surface border border-voltech-border rounded-lg text-xs text-voltech-muted hover:text-white flex items-center gap-1">
+                              Ver detalle <ChevronDown className={`w-3 h-3 transition-transform ${isSel ? 'rotate-180' : ''}`} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {isSel && (
+                        <tr className="bg-voltech-dark/50 border-b border-voltech-border">
+                          <td colSpan="7" className="px-4 py-4">
+                            <div className="bg-voltech-surface border border-voltech-border rounded-lg p-4">
+                              <div className="flex items-center gap-2 mb-3">
+                                <Users className="w-4 h-4 text-voltech-cyan" />
+                                <h5 className="text-xs font-bold text-voltech-muted uppercase">Detalle de Ventas - {r.nombre}</h5>
+                              </div>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-xs min-w-[700px]">
+                                  <thead className="border-b border-voltech-border">
+                                    <tr>
+                                      <th className="text-left py-2 px-2 text-voltech-muted">N° Orden</th>
+                                      <th className="text-left py-2 px-2 text-voltech-muted">Fecha</th>
+                                      <th className="text-left py-2 px-2 text-voltech-muted">Tipo</th>
+                                      <th className="text-right py-2 px-2 text-voltech-muted">% Ventas</th>
+                                      <th className="text-right py-2 px-2 text-voltech-muted">Comisión Ventas</th>
+                                      <th className="text-right py-2 px-2 text-voltech-muted">% Referido</th>
+                                      <th className="text-right py-2 px-2 text-voltech-muted">Comisión Referido</th>
+                                      <th className="text-center py-2 px-2 text-voltech-muted">Cupón</th>
+                                      <th className="text-center py-2 px-2 text-voltech-muted">Pago</th>
+                                      <th className="text-center py-2 px-2 text-voltech-muted">Acción</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {ventasDetalle.length === 0 ? (
+                                      <tr><td colSpan="10" className="text-center py-4 text-voltech-muted">Sin ventas este período.</td></tr>
+                                    ) : (
+                                      ventasDetalle.map((v, i) => {
+                                        const esPropia = v._propia;
+                                        const esStream = !!v.plataformas;
+                                        const esKit = v.esKit || (v.productos || []).some(p => p.tipo === 'kit');
+                                        const tipo = esStream ? 'Streaming' : esKit ? 'Kit' : 'Producto';
+                                        const tipoColor = esStream ? 'bg-voltech-purple/20 text-voltech-purple' : esKit ? 'bg-orange-500/20 text-orange-500' : 'bg-voltech-success/20 text-voltech-success';
+                                        const total = Number(v.total || 0);
+                                        const comVenta = esPropia ? comisionDe(v, rank.porcentajeComision) : 0;
+                                        const pctVenta = total > 0 ? (comisionDe(v, rank.porcentajeComision) / total) * 100 : 0;
+                                        const comRef = !esPropia ? total * (r.porcentaje || 0) / 100 : 0;
+                                        const cupon = v.cuponCodigo || v.cupon;
+                                        const esCuotas = v.pagoEnCuotas || v.cuotas;
+                                        return (
+                                          <tr key={i} className="border-b border-voltech-border/50 last:border-0 hover:bg-voltech-dark/50">
+                                            <td className="py-2 px-2 text-voltech-cyan font-mono">{v.numeroOrden || v.id?.slice(-6) || 'N/A'}</td>
+                                            <td className="py-2 px-2 text-voltech-muted">{v.fecha || (v.fechaRegistro || '').split('T')[0]}</td>
+                                            <td className="py-2 px-2"><span className={`text-[10px] px-2 py-0.5 rounded-full ${tipoColor}`}>{tipo}</span></td>
+                                            <td className="py-2 px-2 text-right text-voltech-success">{esPropia ? `${pctVenta.toFixed(1)}%` : '-'}</td>
+                                            <td className="py-2 px-2 text-right text-voltech-success font-bold">{esPropia ? `$${comVenta.toFixed(2)}` : '-'}</td>
+                                            <td className="py-2 px-2 text-right text-voltech-purple">{!esPropia ? `${r.porcentaje}%` : '-'}</td>
+                                            <td className="py-2 px-2 text-right text-voltech-purple font-bold">{!esPropia ? `$${comRef.toFixed(2)}` : '-'}</td>
+                                            <td className="py-2 px-2 text-center">{cupon ? <span className="text-voltech-warning">{cupon}</span> : <span className="text-voltech-muted">-</span>}</td>
+                                            <td className="py-2 px-2 text-center"><span className={`text-[10px] px-2 py-0.5 rounded-full ${esCuotas ? 'bg-voltech-cyan/20 text-voltech-cyan' : 'bg-voltech-muted/20 text-voltech-muted'}`}>{esCuotas ? 'Cuotas' : 'Contado'}</span></td>
+                                            <td className="py-2 px-2 text-center">
+                                              {esPropia ? (
+                                                <button onClick={() => pedirPagoVenta(v, r, comVenta)} className="text-[10px] px-2 py-1 bg-voltech-cyan/20 text-voltech-cyan rounded hover:bg-voltech-cyan/30">Pedir pago</button>
+                                              ) : <span className="text-voltech-muted">-</span>}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
+      {/* 💬 SUGERENCIAS (se envían desde Mi Rendimiento) */}
+      <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
+        <div className="flex items-center gap-2 mb-6">
+          <div className="p-2 rounded-lg bg-voltech-cyan/20"><MessageCircle className="w-5 h-5 text-voltech-cyan" /></div>
+          <div>
+            <h3 className="text-lg font-bold text-white">Sugerencias y Comentarios</h3>
+            <p className="text-xs text-voltech-muted">Envía tu propuesta al administrador</p>
+          </div>
+        </div>
+        <div className="mb-6">
+          <textarea value={nuevoComentario} onChange={(e) => setNuevoComentario(e.target.value)} placeholder="Ej: ¿Podemos aumentar la comisión al 7% si llego a 20 ventas este mes?" className="input-voltech w-full rounded-lg px-4 py-3 text-sm h-24 resize-none mb-2" />
+          <button onClick={agregarComentario} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"><MessageCircle className="w-4 h-4" /> Enviar sugerencia</button>
+        </div>
+        {comentarios.filter(c => c.usuario === (usuarioActual?.nombre || '')).length > 0 && (
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold text-white">Mis sugerencias</h4>
+            {comentarios.filter(c => c.usuario === (usuarioActual?.nombre || '')).map(c => (
+              <div key={c.id} className={`p-3 rounded-lg border text-sm ${c.aprobado ? 'bg-voltech-success/10 border-voltech-success' : c.rechazado ? 'bg-voltech-error/10 border-voltech-error' : 'bg-voltech-dark/30 border-voltech-border'}`}>
+                <p className="text-voltech-muted">{c.texto}</p>
+                <p className="text-xs mt-1">{c.aprobado ? '✅ Aprobada' : c.rechazado ? '❌ Rechazada' : '⏳ Pendiente'}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      </>)}
+
+      {tabMetas === 'config' && puedeGestionar && (<>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
       {puedeGestionar && (
         <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
           <button 
@@ -710,7 +1032,58 @@ export default function MetasYComisionesPage() {
           </AnimatePresence>
         </div>
       )}
+      {/* 🎁 REFERIDOS DEL EQUIPO */}
+      <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
+        <button onClick={() => setMostrarReferidos(!mostrarReferidos)} className="w-full p-6 flex items-center justify-between hover:bg-voltech-dark/30 transition-colors">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-voltech-success/20"><Users className="w-5 h-5 text-voltech-success" /></div>
+            <div className="text-left">
+              <h3 className="text-lg font-bold text-white">Referidos del Equipo</h3>
+              <p className="text-xs text-voltech-muted">
+                {mostrarReferidos ? 'Ocultar configuración' : 'Clic para gestionar escala y comisiones por referidos'}
+              </p>
+            </div>
+          </div>
+          <motion.div animate={{ rotate: mostrarReferidos ? 180 : 0 }} transition={{ duration: 0.2 }}>
+            <Plus className="w-5 h-5 text-voltech-muted" />
+          </motion.div>
+        </button>
+        {mostrarReferidos && (<>
+        <div className="p-6 pt-0">
 
+        {puedeGestionar && (
+          <div className="mb-6 bg-voltech-dark/30 border border-voltech-border rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-semibold text-white">📊 Escala de Comisiones por Referidos</h4>
+              <div className="flex gap-2">
+                <button onClick={agregarEscala} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"><Plus className="w-4 h-4" /> Agregar Nivel</button>
+                <button onClick={guardarEscala} className="px-4 py-2 bg-voltech-success/20 text-voltech-success rounded-lg text-sm hover:bg-voltech-success/30 transition-colors flex items-center gap-2"><Save className="w-4 h-4" /> Guardar Escala</button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {escalaReferidos.map((nivel, idx) => (
+                <div key={idx} className="flex items-center gap-3 bg-voltech-dark/50 border border-voltech-border rounded-xl p-4">
+                  <div className="flex-1">
+                    <label className="block text-xs text-voltech-muted mb-2">Referidos</label>
+                    <input type="number" min="1" value={nivel.referidos} onChange={(e) => actualizarEscala(idx, 'referidos', parseInt(e.target.value) || 0)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" />
+                  </div>
+                  <span className="text-voltech-muted text-sm mt-6">→</span>
+                  <div className="flex-1">
+                    <label className="block text-xs text-voltech-muted mb-2">Comisión (%)</label>
+                    <input type="number" min="0" max="100" step="0.5" value={nivel.porcentaje} onChange={(e) => actualizarEscala(idx, 'porcentaje', parseFloat(e.target.value) || 0)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" />
+                  </div>
+                  <button onClick={() => eliminarEscala(idx)} className="p-2 text-voltech-error hover:bg-voltech-error/10 rounded-lg mt-6"><X className="w-4 h-4" /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        </div>
+        </>)}
+      </div>
+        </div>
+        <div className="space-y-6">
       <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
@@ -788,6 +1161,9 @@ export default function MetasYComisionesPage() {
           </div>
         )}
       </div>
+        </div>
+      </div>
+      </>)}
     </div>
   );
 }

@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
+import { useNotificaciones } from '@/app/context/NotificationContext';
 import { 
   DollarSign, TrendingUp, TrendingDown, Wallet, Plus, X, Save, Search,
   Calendar, CreditCard, Users, FileText, Trash2, Edit3, ArrowUpRight, 
   ArrowDownRight, Calculator, CheckCircle, Clock, Download, MessageCircle,
-  ChevronDown, ChevronUp, Briefcase, PieChart, Printer, Send
+  ChevronDown, ChevronUp, Briefcase, PieChart, Printer, Send, Eye, EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -15,7 +16,9 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 export default function PagosEquiposPage() {
-  const { usuarioActual } = usePermissions();
+  const { usuarioActual, esAdmin, esSocio } = usePermissions();
+  const { agregarNotificacion } = useNotificaciones();
+  const puedeGestionar = esAdmin || esSocio;
   
   // Estados Principales
   const [activeTab, setActiveTab] = useState('pagos'); // 'pagos' | 'inversiones'
@@ -30,6 +33,21 @@ export default function PagosEquiposPage() {
   const [expandedRowId, setExpandedRowId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [selectedMiembro, setSelectedMiembro] = useState(null);
+  const [miembroExpandido, setMiembroExpandido] = useState(null);
+  const [verSoloMi, setVerSoloMi] = useState(false);
+  const [filtroRol, setFiltroRol] = useState('todos');
+  const [filtroPendiente, setFiltroPendiente] = useState('todos');
+  const [filtroNombreEquipo, setFiltroNombreEquipo] = useState('');
+  const [solicitudes, setSolicitudes] = useState([]);
+  const [equipoColapsado, setEquipoColapsado] = useState(false);
+  const [metasGlobales, setMetasGlobales] = useState([]);
+  const [metodosPago, setMetodosPago] = useState([
+    { id: 'efectivo', nombre: 'Efectivo' },
+    { id: 'pago_movil', nombre: 'Pago Móvil' },
+    { id: 'transferencia', nombre: 'Transferencia' },
+    { id: 'zelle', nombre: 'Zelle' },
+    { id: 'binance', nombre: 'Binance' },
+  ]);
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -38,15 +56,20 @@ export default function PagosEquiposPage() {
   // Formulario
   const [formData, setFormData] = useState({
     tipo: 'pago',
+    subtipo: 'inyeccion', // inyeccion | retorno | rendimiento
     miembroId: '',
     miembroNombre: '',
     monto: '',
+    porcentajeRetorno: 10,
     fecha: new Date().toISOString().split('T')[0],
+    fechaVencimiento: '',
     periodo: new Date().toISOString().slice(0, 7),
     descripcion: '',
     metodoPago: 'efectivo',
     carteraId: '',
     estado: 'pagado',
+    estadoInversion: 'activa', // activa | rendimiento_pagado | liquidada
+    capitalAsociadoId: null,
   });
 
   // Selección de comisiones para pagar
@@ -59,12 +82,13 @@ export default function PagosEquiposPage() {
     try {
       if (supabase) {
         console.log('🔄 Cargando Finanzas desde Supabase...');
-        const [{ data: d1, error: e1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }] = await Promise.all([
+        const [{ data: d1, error: e1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }, { data: d6 }] = await Promise.all([
           supabase.from('movimientos_equipo').select('*').order('fecharegistro', { ascending: false }),
           supabase.from('usuarios').select('id, nombre, rol, activo, telefono').eq('activo', true),
-          supabase.from('settings').select('clave, valor').eq('clave', 'carteras'),
+          supabase.from('settings').select('clave, valor').in('clave', ['carteras', 'metodos_pago', 'metas_comisiones']),
           supabase.from('comisiones_pendientes').select('*').order('fecha_venta', { ascending: false }),
-          supabase.from('ventas').select('*')
+          supabase.from('ventas').select('*'),
+          supabase.from('ventas_streaming').select('*')
         ]);
         
         if (e1) {
@@ -77,15 +101,28 @@ export default function PagosEquiposPage() {
         } else {
           movs = d1 || [];
           eqp = d2 || [];
-          crt = (d3 && d3[0]?.valor) || [];
+          const settingsList = d3 || [];
+          const normLista = (val) => {
+            if (Array.isArray(val)) return val.filter(x => x && x.activo !== false && x.activa !== false).map(x => ({ id: x.id || String(x.nombre).toLowerCase().replace(/\s+/g, '_'), nombre: x.nombre }));
+            if (val && typeof val === 'object') return Object.entries(val).filter(([k, v]) => v && v.activo !== false).map(([k, v]) => ({ id: k, nombre: v?.nombre || k }));
+            return [];
+          };
+          const metasVal = settingsList.find(s => s.clave === 'metas_comisiones')?.valor;
+          if (metasVal && metasVal.metas) setMetasGlobales(metasVal.metas);
+          const cartNorm = normLista(settingsList.find(s => s.clave === 'carteras')?.valor);
+          if (cartNorm.length) crt = cartNorm;
+          const mpNorm = normLista(settingsList.find(s => s.clave === 'metodos_pago')?.valor || settingsList.find(s => s.clave === 'pagos')?.valor);
+          if (mpNorm.length) setMetodosPago(mpNorm);
           coms = d4 || [];
-          vts = d5 || [];
+          vts = [...(d5 || []), ...(d6 || [])];
           console.log('✅ Finanzas cargadas desde Supabase');
         }
       } else {
         movs = JSON.parse(localStorage.getItem('voltech_movimientos_equipo') || '[]');
         eqp = JSON.parse(localStorage.getItem('voltech_equipo') || '[]').filter(m => m.activo);
         crt = JSON.parse(localStorage.getItem('voltech_carteras') || '[]');
+        const mpLocal = localStorage.getItem('voltech_metodos_pago');
+        if (mpLocal) try { setMetodosPago(JSON.parse(mpLocal)); } catch {}
         coms = JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]');
         vts = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
       }
@@ -95,6 +132,18 @@ export default function PagosEquiposPage() {
       setCarteras(crt);
       setComisionesPendientes(coms);
       setVentas(vts);
+      try {
+        let sols = JSON.parse(localStorage.getItem('voltech_solicitudes_pago') || '[]');
+        if (supabase) {
+          const { data } = await supabase.from('solicitudes_pago').select('*');
+          if (data && data.length) {
+            const map = {};
+            [...data, ...sols].forEach(s => { map[s.id] = s; });
+            sols = Object.values(map);
+          }
+        }
+        setSolicitudes(sols);
+      } catch {}
     } catch (error) {
       console.error('Error cargando finanzas:', error);
     }
@@ -110,40 +159,199 @@ export default function PagosEquiposPage() {
   };
 }, []);
 
+useEffect(() => {
+  const m = new URLSearchParams(window.location.search).get('miembro');
+  if (m) setFiltroNombreEquipo(m);
+}, []);
+
   // Cálculos para las tarjetas
   const totalInvertido = movimientos.filter(m => m.tipo === 'inversion').reduce((acc, m) => acc + Number(m.monto), 0);
+  const totalRetornos = movimientos.filter(m => m.tipo === 'inversion').reduce((acc, m) => acc + (Number(m.monto) * (Number(m.porcentajeRetorno) || 0) / 100), 0);
   const totalPagado = movimientos.filter(m => m.tipo === 'pago').reduce((acc, m) => acc + Number(m.monto), 0);
   const totalPendienteComisiones = comisionesPendientes.filter(c => c.estado === 'pendiente').reduce((acc, c) => acc + Number(c.monto_comision), 0);
   const balance = totalInvertido - totalPagado;
 
-  // Calcular estadísticas de un miembro
-  const getMiembroStats = (miembroId) => {
-    const miembroComisiones = comisionesPendientes.filter(c => c.miembroId === miembroId);
-    const ventasPagadas = miembroComisiones.filter(c => c.estado === 'pagada');
-    const ventasPendientes = miembroComisiones.filter(c => c.estado === 'pendiente');
-    
-    const totalVentas = miembroComisiones.length;
-    const totalPagadas = ventasPagadas.length;
-    const totalPendientes = ventasPendientes.length;
-    const montoTotalVentas = miembroComisiones.reduce((acc, c) => acc + Number(c.monto_venta), 0);
-    const montoTotalComisiones = miembroComisiones.reduce((acc, c) => acc + Number(c.monto_comision), 0);
-    const montoPagado = ventasPagadas.reduce((acc, c) => acc + Number(c.monto_comision), 0);
-    const montoPendiente = ventasPendientes.reduce((acc, c) => acc + Number(c.monto_comision), 0);
-    
-    const porcentajePromedio = totalVentas > 0 
-      ? (miembroComisiones.reduce((acc, c) => acc + Number(c.porcentaje_comision), 0) / totalVentas).toFixed(1)
-      : 0;
+  // KPIs financieros de inversiones
+  const inversionesActivas = movimientos.filter(m => m.tipo === 'inversion' && (m.subtipo === 'inyeccion' || !m.subtipo) && (m.estadoInversion !== 'liquidada'));
+  const totalInvertidoActivo = inversionesActivas.reduce((s, m) => s + Number(m.monto), 0);
+  const rendimientosPorPagar = inversionesActivas
+    .filter(m => m.estadoInversion !== 'rendimiento_pagado')
+    .reduce((s, m) => s + (Number(m.monto) * (Number(m.porcentajeRetorno) || 0) / 100), 0);
+  const totalRetornado = movimientos
+    .filter(m => m.tipo === 'inversion' && (m.subtipo === 'retorno' || m.subtipo === 'rendimiento'))
+    .reduce((s, m) => s + Number(m.monto), 0);
 
-    return {
-      totalVentas,
-      totalPagadas,
-      totalPendientes,
-      montoTotalVentas,
-      montoTotalComisiones,
-      montoPagado,
-      montoPendiente,
-      porcentajePromedio
+  const registrarMovimientoInv = async (mov) => {
+    if (supabase) {
+      const { error } = await supabase.from('movimientos_equipo').upsert(mov, { onConflict: 'id' });
+      if (error) { toast.error('Error: ' + error.message); return false; }
+    }
+    setMovimientos(prev => [mov, ...prev]);
+    localStorage.setItem('voltech_movimientos_equipo', JSON.stringify([mov, ...movimientos]));
+    window.dispatchEvent(new Event('voltech-data-updated'));
+    return true;
+  };
+
+  const actualizarEstadoInversion = async (id, nuevoEstado) => {
+    if (supabase) {
+      await supabase.from('movimientos_equipo').update({ estadoInversion: nuevoEstado }).eq('id', id);
+    }
+    setMovimientos(prev => prev.map(m => m.id === id ? { ...m, estadoInversion: nuevoEstado } : m));
+    const movsAct = movimientos.map(m => m.id === id ? { ...m, estadoInversion: nuevoEstado } : m);
+    localStorage.setItem('voltech_movimientos_equipo', JSON.stringify(movsAct));
+    window.dispatchEvent(new Event('voltech-data-updated'));
+  };
+
+  const pagarRendimiento = async (inv) => {
+    const rendimiento = Number(inv.monto) * (Number(inv.porcentajeRetorno) || 0) / 100;
+    const confirmado = confirm(`¿Confirmas el pago de rendimiento de $${rendimiento.toFixed(2)} a ${inv.miembroNombre}? (El capital de $${Number(inv.monto).toFixed(2)} sigue activo)`);
+    if (!confirmado) return;
+    const mov = {
+      id: Date.now().toString(), tipo: 'inversion', subtipo: 'rendimiento',
+      miembroId: inv.miembroId, miembroNombre: inv.miembroNombre,
+      monto: rendimiento, fecha: new Date().toISOString().split('T')[0],
+      periodo: new Date().toISOString().slice(0, 7),
+      descripcion: `Pago de rendimiento (${inv.porcentajeRetorno}%) de inversión`,
+      metodoPago: 'efectivo', carteraId: '', estado: 'pagado',
+      porcentajeRetorno: 0, estadoInversion: null, capitalAsociadoId: inv.id,
+      registradoPor: usuarioActual?.nombre || 'Sistema', fechaRegistro: new Date().toISOString(),
     };
+    const ok = await registrarMovimientoInv(mov);
+    if (ok) {
+      await actualizarEstadoInversion(inv.id, 'rendimiento_pagado');
+      if (agregarNotificacion) agregarNotificacion({ tipo: 'rendimiento_pagado', titulo: '💰 Rendimiento pagado', mensaje: `Se pagó $${rendimiento.toFixed(2)} de rendimiento a ${inv.miembroNombre}`, detalle: `Capital: $${Number(inv.monto).toFixed(2)} activo`, usuario_id: inv.miembroId });
+      toast.success(`Rendimiento de $${rendimiento.toFixed(2)} pagado. Capital sigue activo.`);
+    }
+  };
+
+  const liquidarInversion = async (inv) => {
+    const capital = Number(inv.monto);
+    const rendimiento = capital * (Number(inv.porcentajeRetorno) || 0) / 100;
+    const total = capital + rendimiento;
+    const confirmado = confirm(`¿Confirmas LIQUIDAR la inversión de ${inv.miembroNombre}?\n\n• Capital: $${capital.toFixed(2)}\n• Rendimiento (${inv.porcentajeRetorno}%): $${rendimiento.toFixed(2)}\n• TOTAL A PAGAR: $${total.toFixed(2)}\n\nLa inversión pasará a estado "Liquidada".`);
+    if (!confirmado) return;
+    const mov = {
+      id: Date.now().toString(), tipo: 'inversion', subtipo: 'retorno',
+      miembroId: inv.miembroId, miembroNombre: inv.miembroNombre,
+      monto: total, fecha: new Date().toISOString().split('T')[0],
+      periodo: new Date().toISOString().slice(0, 7),
+      descripcion: `Liquidación: Capital $${capital.toFixed(2)} + Rendimiento $${rendimiento.toFixed(2)}`,
+      metodoPago: 'efectivo', carteraId: '', estado: 'pagado',
+      porcentajeRetorno: 0, estadoInversion: null, capitalAsociadoId: inv.id,
+      registradoPor: usuarioActual?.nombre || 'Sistema', fechaRegistro: new Date().toISOString(),
+    };
+    const ok = await registrarMovimientoInv(mov);
+    if (ok) {
+      await actualizarEstadoInversion(inv.id, 'liquidada');
+      if (agregarNotificacion) agregarNotificacion({ tipo: 'inversion_liquidada', titulo: '🏁 Inversión liquidada', mensaje: `Se devolvió $${total.toFixed(2)} a ${inv.miembroNombre}`, detalle: `Capital $${capital.toFixed(2)} + Rendimiento $${rendimiento.toFixed(2)}`, usuario_id: inv.miembroId });
+      toast.success(`Inversión liquidada. Total devuelto: $${total.toFixed(2)}`);
+    }
+  };
+
+  // Helper: calcular % de comisión de un miembro según sus ventas del mes
+  const pctMiembro = (nombre) => {
+    const mes = new Date().toISOString().slice(0, 7);
+    const count = ventas.filter(v => v.vendedor === nombre && (v.fechaRegistro || v.fecha || '').startsWith(mes)).length;
+    const orden = [...metasGlobales].sort((a, b) => a.ventas - b.ventas);
+    const proxima = orden.find(m => m.ventas > count) || orden[orden.length - 1];
+    return proxima?.porcentaje || 0;
+  };
+
+  // Calcular estadísticas de un miembro (usa ventas REALES, no comisiones_pendientes)
+  const getMiembroStats = (miembroId) => {
+    const nombre = equipo.find(e => e.id === miembroId)?.nombre;
+    const pagadasIds = new Set(comisionesPendientes.filter(c => c.estado === 'pagada').map(c => c.venta_id));
+    const ventasMiembro = ventas.filter(v => v.vendedor === nombre);
+    const ventasPagadas = ventasMiembro.filter(v => pagadasIds.has(v.id));
+    const ventasPendientes = ventasMiembro.filter(v => !pagadasIds.has(v.id));
+    const comDe = (v) => Number(v.comision ?? (Number(v.total || 0) * (Number(v.porcentajeComision ?? pctMiembro(nombre)) || 0) / 100));
+    return {
+      totalVentas: ventasMiembro.length,
+      totalPagadas: ventasPagadas.length,
+      totalPendientes: ventasPendientes.length,
+      montoTotalVentas: ventasMiembro.reduce((s, v) => s + Number(v.total || 0), 0),
+      montoTotalComisiones: ventasMiembro.reduce((s, v) => s + comDe(v), 0),
+      montoPagado: ventasPagadas.reduce((s, v) => s + comDe(v), 0),
+      montoPendiente: ventasPendientes.reduce((s, v) => s + comDe(v), 0),
+      porcentajePromedio: ventasMiembro.length ? (ventasMiembro.reduce((s, v) => s + (Number(v.porcentajeComision ?? pctMiembro(nombre)) || 0), 0) / ventasMiembro.length).toFixed(1) : 0,
+    };
+  };
+
+  const marcarSolicitudesPagadas = (miembroNombre) => {
+    const act = solicitudes.map(s => s.miembro_nombre === miembroNombre && s.estado === 'pendiente' ? { ...s, estado: 'pagada' } : s);
+    setSolicitudes(act);
+    localStorage.setItem('voltech_solicitudes_pago', JSON.stringify(act));
+  };
+
+  const pagarSeleccionadas = async (miembro) => {
+    if (selectedComisiones.length === 0) {
+      toast.error('Selecciona al menos una venta a pagar');
+      return;
+    }
+    const total = selectedComisiones.reduce((s, c) => s + Number(c.monto_comision), 0);
+    const confirmado = confirm(`¿Confirmas el pago de ${selectedComisiones.length} venta(s) por un total de $${total.toFixed(2)} a ${miembro.nombre}?`);
+    if (!confirmado) return;
+
+    const nuevoMovimiento = {
+      id: Date.now().toString(),
+      tipo: 'pago',
+      miembroId: miembro.id,
+      miembroNombre: miembro.nombre,
+      monto: total,
+      fecha: new Date().toISOString().split('T')[0],
+      periodo: new Date().toISOString().slice(0, 7),
+      descripcion: `Pago de ${selectedComisiones.length} venta(s)`,
+      metodoPago: formData.metodoPago,
+      carteraId: formData.carteraId,
+      estado: 'pagado',
+      registradoPor: usuarioActual?.nombre || 'Sistema',
+      fechaRegistro: new Date().toISOString(),
+    };
+
+    if (supabase) {
+      const { error } = await supabase.from('movimientos_equipo').upsert(nuevoMovimiento, { onConflict: 'id' });
+      if (error) { toast.error('Error: ' + error.message); return; }
+    }
+    setMovimientos([nuevoMovimiento, ...movimientos]);
+    localStorage.setItem('voltech_movimientos_equipo', JSON.stringify([nuevoMovimiento, ...movimientos]));
+
+    const nuevasComisiones = selectedComisiones.filter(sc => sc._venta).map(sc => ({
+      id: Date.now().toString() + Math.random().toString(16).slice(2),
+      venta_id: sc.venta_id,
+      venta_numero_orden: sc.venta_numero_orden,
+      miembro_id: miembro.id,
+      miembro_nombre: miembro.nombre,
+      producto_nombre: sc.producto_nombre,
+      monto_venta: sc.monto_venta,
+      porcentaje_comision: sc.porcentaje_comision,
+      monto_comision: sc.monto_comision,
+      fecha_venta: sc.fecha_venta,
+      estado: 'pagada',
+      movimiento_pago_id: nuevoMovimiento.id,
+      fecha_pago: nuevoMovimiento.fecha,
+      tipo: 'comision_venta',
+    }));
+    const comisionesActualizadas = [...comisionesPendientes, ...nuevasComisiones];
+    setComisionesPendientes(comisionesActualizadas);
+    localStorage.setItem('voltech_comisiones_pendientes', JSON.stringify(comisionesActualizadas));
+    if (supabase) {
+      if (nuevasComisiones.length) await supabase.from('comisiones_pendientes').insert(nuevasComisiones);
+    }
+
+    if (agregarNotificacion) {
+      agregarNotificacion({
+        tipo: 'pago_completado', categoria: 'pagos_equipos', titulo: '💰 Pago recibido',
+        mensaje: `Se pagó $${total.toFixed(2)} por ${selectedComisiones.length} venta(s)`,
+        detalle: miembro.nombre, usuario_id: miembro.id, miembro: miembro.nombre,
+        enlace: '/panel/finanzas/pagos-equipos',
+      });
+    }
+
+    marcarSolicitudesPagadas(miembro.nombre);
+    toast.success(`Pago de $${total.toFixed(2)} registrado`);
+    setSelectedComisiones([]);
+    setMiembroExpandido(null);
+    window.dispatchEvent(new Event('voltech-data-updated'));
   };
 
   const toggleComision = (comision) => {
@@ -172,15 +380,20 @@ export default function PagosEquiposPage() {
     const nuevoMovimiento = {
       id: editingId || Date.now().toString(),
       tipo: formData.tipo,
+      subtipo: formData.tipo === 'inversion' ? formData.subtipo : 'pago',
       miembroId: formData.miembroId,
       miembroNombre: miembro?.nombre || 'Desconocido',
       monto: Number(formData.monto),
       fecha: formData.fecha,
+      fechaVencimiento: formData.fechaVencimiento || null,
       periodo: formData.periodo,
       descripcion: formData.descripcion,
       metodoPago: formData.metodoPago,
       carteraId: formData.carteraId,
       estado: formData.estado,
+      porcentajeRetorno: Number(formData.porcentajeRetorno) || 0,
+      estadoInversion: formData.tipo === 'inversion' ? formData.estadoInversion : null,
+      capitalAsociadoId: formData.capitalAsociadoId,
       registradoPor: usuarioActual?.nombre || 'Sistema',
       fechaRegistro: new Date().toISOString(),
     };
@@ -216,6 +429,7 @@ export default function PagosEquiposPage() {
       }
     }
 
+    if (formData.tipo === 'pago') marcarSolicitudesPagadas(formData.miembroNombre);
     toast.success(editingId ? 'Movimiento actualizado' : 'Pago registrado exitosamente');
     resetForm();
     // ✅ SINCRONIZACIÓN: Avisar a otros paneles si es necesario
@@ -226,15 +440,20 @@ export default function PagosEquiposPage() {
     setEditingId(movimiento.id);
     setFormData({
       tipo: movimiento.tipo,
+      subtipo: movimiento.subtipo || (movimiento.tipo === 'inversion' ? 'inyeccion' : 'pago'),
       miembroId: movimiento.miembroId,
       miembroNombre: movimiento.miembroNombre,
       monto: movimiento.monto.toString(),
+      porcentajeRetorno: movimiento.porcentajeRetorno || 10,
       fecha: movimiento.fecha,
+      fechaVencimiento: movimiento.fechaVencimiento || '',
       periodo: movimiento.periodo,
       descripcion: movimiento.descripcion || '',
       metodoPago: movimiento.metodoPago,
       carteraId: movimiento.carteraId,
       estado: movimiento.estado,
+      estadoInversion: movimiento.estadoInversion || 'activa',
+      capitalAsociadoId: movimiento.capitalAsociadoId || null,
     });
     setShowForm(true);
   };
@@ -400,18 +619,46 @@ export default function PagosEquiposPage() {
   const resetForm = () => {
     setFormData({
       tipo: activeTab === 'inversiones' ? 'inversion' : 'pago',
-      miembroId: '', miembroNombre: '', monto: '',
-      fecha: new Date().toISOString().split('T')[0], periodo: new Date().toISOString().slice(0, 7),
+      subtipo: 'inyeccion',
+      miembroId: '', miembroNombre: '', monto: '', porcentajeRetorno: 10,
+      fecha: new Date().toISOString().split('T')[0],
+      fechaVencimiento: '',
+      periodo: new Date().toISOString().slice(0, 7),
       descripcion: '', metodoPago: 'efectivo', carteraId: '', estado: 'pagado',
+      estadoInversion: 'activa', capitalAsociadoId: null,
     });
     setSelectedComisiones([]);
     setShowForm(false);
     setEditingId(null);
   };
 
-  const comisionesDelMiembro = comisionesPendientes.filter(c => 
-    c.miembroId === formData.miembroId && c.estado === 'pendiente'
-  );
+  const miembroForm = equipo.find(e => e.id === formData.miembroId);
+  const ventasPagadasIds = new Set(comisionesPendientes.filter(c => c.estado === 'pagada').map(c => c.venta_id));
+  const comisionesDelMiembro = ventas
+    .filter(v => v.vendedor === miembroForm?.nombre && !ventasPagadasIds.has(v.id))
+    .map(v => ({
+      id: 'v-' + v.id,
+      venta_id: v.id,
+      venta_numero_orden: v.numeroOrden || String(v.id).slice(-6),
+      producto_nombre: (v.productos || []).map(p => p.producto || p.nombre).join(', ') || (v.plataformas || []).map(p => p.plataforma).join(', ') || 'Venta',
+      fecha_venta: v.fecha || (v.fechaRegistro || '').split('T')[0],
+      monto_venta: Number(v.total || 0),
+      porcentaje_comision: Number(v.porcentajeComision ?? (pctMiembro(miembroForm?.nombre) || 0)),
+      monto_comision: Number(v.comision ?? (Number(v.total || 0) * (Number(v.porcentajeComision ?? pctMiembro(miembroForm?.nombre)) || 0) / 100)),
+      estado: 'pendiente',
+      _venta: v,
+    }));
+
+  const equipoFiltrado = equipo.filter(e => {
+    if (verSoloMi && e.nombre !== usuarioActual?.nombre) return false;
+    if (filtroRol !== 'todos' && (e.rol || '').toLowerCase() !== filtroRol) return false;
+    if (filtroNombreEquipo && !e.nombre.toLowerCase().includes(filtroNombreEquipo.toLowerCase())) return false;
+    const st = getMiembroStats(e.id);
+    const solPend = solicitudes.some(s => s.miembro_nombre === e.nombre && s.estado === 'pendiente');
+    if (filtroPendiente === 'pendiente' && st.montoPendiente <= 0) return false;
+    if (filtroPendiente === 'solicitado' && !solPend) return false;
+    return true;
+  });
 
   const movimientosFiltrados = movimientos.filter(m => {
     const matchSearch = m.miembroNombre.toLowerCase().includes(searchTerm.toLowerCase()) || m.descripcion?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -424,22 +671,47 @@ export default function PagosEquiposPage() {
     return comisionesPendientes.filter(c => c.movimiento_pago_id === movId);
   };
 
+  const depurarPagos = async () => {
+    const limite = new Date(); limite.setDate(limite.getDate() - 30);
+    const antiguos = movimientos.filter(m => m.tipo === 'pago' && new Date(m.fecha) < limite);
+    if (!antiguos.length) { toast.error('No hay pagos mayores a 30 días para depurar'); return; }
+    if (!confirm(`¿Eliminar ${antiguos.length} pago(s) mayores a 30 días? Esta acción no se puede deshacer.`)) return;
+    const ids = antiguos.map(m => m.id);
+    if (supabase) await supabase.from('movimientos_equipo').delete().in('id', ids);
+    const restantes = movimientos.filter(m => !ids.includes(m.id));
+    setMovimientos(restantes);
+    localStorage.setItem('voltech_movimientos_equipo', JSON.stringify(restantes));
+    toast.success(`${ids.length} pago(s) depurados`);
+    window.dispatchEvent(new Event('voltech-data-updated'));
+  };
+
   return (
     <div className="space-y-6">
       <Toaster position="top-right" />
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Finanzas del Equipo</h1>
           <p className="text-sm text-voltech-muted mt-1">Gestiona pagos a vendedores e inversiones de socios</p>
         </div>
-        <button
-          onClick={() => { resetForm(); setShowForm(true); }}
-          className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Nuevo Movimiento
-        </button>
+        <div className="flex gap-3 items-center">
+          {puedeGestionar && (
+            <button
+              onClick={() => setVerSoloMi(!verSoloMi)}
+              className={`px-3 py-2 rounded-lg text-xs flex items-center gap-2 transition-colors ${verSoloMi ? 'bg-voltech-purple/20 text-voltech-purple border border-voltech-purple/30' : 'bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white'}`}
+            >
+              {verSoloMi ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+              {verSoloMi ? 'Ver lo mío' : 'Ver todo'}
+            </button>
+          )}
+          <button
+            onClick={() => { resetForm(); setShowForm(true); }}
+            className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo Movimiento
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-4 border-b border-voltech-border">
@@ -474,17 +746,25 @@ export default function PagosEquiposPage() {
             </div>
           </>
         ) : (
-          <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-voltech-success/20"><TrendingUp className="w-5 h-5 text-voltech-success" /></div>
-              <div><p className="text-xs text-voltech-muted">Total Invertido</p><p className="text-xl font-bold text-voltech-success">${totalInvertido.toFixed(2)}</p></div>
+          <>
+            <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-voltech-success/20"><TrendingUp className="w-5 h-5 text-voltech-success" /></div>
+                <div><p className="text-xs text-voltech-muted">Total Invertido (Activo)</p><p className="text-xl font-bold text-voltech-success">${totalInvertidoActivo.toFixed(2)}</p></div>
+              </div>
             </div>
-          </div>
+            <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-voltech-warning/20"><Clock className="w-5 h-5 text-voltech-warning" /></div>
+                <div><p className="text-xs text-voltech-muted">Rendimientos por Pagar</p><p className="text-xl font-bold text-voltech-warning">${rendimientosPorPagar.toFixed(2)}</p></div>
+              </div>
+            </div>
+          </>
         )}
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-voltech-cyan/20"><Wallet className="w-5 h-5 text-voltech-cyan" /></div>
-            <div><p className="text-xs text-voltech-muted">Balance Neto</p><p className={`text-xl font-bold ${balance >= 0 ? 'text-voltech-cyan' : 'text-voltech-error'}`}>${balance.toFixed(2)}</p></div>
+            <div><p className="text-xs text-voltech-muted">{activeTab === 'inversiones' ? 'Total Retornado' : 'Balance Neto'}</p><p className={`text-xl font-bold ${balance >= 0 ? 'text-voltech-cyan' : 'text-voltech-error'}`}>${(activeTab === 'inversiones' ? totalRetornado : balance).toFixed(2)}</p></div>
           </div>
         </div>
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
@@ -496,61 +776,94 @@ export default function PagosEquiposPage() {
       </div>
 
       {activeTab === 'pagos' && (
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="w-5 h-5 text-voltech-cyan" />
-            <h3 className="text-lg font-bold text-white">Seleccionar Miembro del Equipo</h3>
+        <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
+          <div className="p-6 border-b border-voltech-border flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <button onClick={() => setEquipoColapsado(!equipoColapsado)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted">
+                {equipoColapsado ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+              </button>
+              <div className="p-2 rounded-lg bg-voltech-cyan/20"><Users className="w-5 h-5 text-voltech-cyan" /></div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Equipo - Comisiones</h3>
+                <p className="text-xs text-voltech-muted">Haz clic en "Pagar" para registrar el pago de ventas pendientes</p>
+              </div>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <input type="text" placeholder="Buscar vendedor..." value={filtroNombreEquipo} onChange={(e) => setFiltroNombreEquipo(e.target.value)} className="input-voltech rounded-lg px-3 py-2 text-sm" />
+              <select value={filtroRol} onChange={(e) => setFiltroRol(e.target.value)} className="input-voltech rounded-lg px-3 py-2 text-sm">
+                <option value="todos">Todos los roles</option>
+                <option value="admin">Admin</option>
+                <option value="vendedor">Vendedor</option>
+                <option value="socio">Socio</option>
+              </select>
+              <select value={filtroPendiente} onChange={(e) => setFiltroPendiente(e.target.value)} className="input-voltech rounded-lg px-3 py-2 text-sm">
+                <option value="todos">Todos</option>
+                <option value="pendiente">Con pendiente</option>
+                <option value="solicitado">Con solicitud</option>
+              </select>
+            </div>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {equipo.map(miembro => {
-              const stats = getMiembroStats(miembro.id);
-              const isSelected = selectedMiembro?.id === miembro.id;
-              
-              return (
-                <button
-                  key={miembro.id}
-                  onClick={() => setSelectedMiembro(isSelected ? null : miembro)}
-                  className={`p-4 rounded-xl border text-left transition-all ${
-                    isSelected 
-                      ? 'bg-voltech-cyan/10 border-voltech-cyan ring-2 ring-voltech-cyan/50' 
-                      : 'bg-voltech-dark/30 border-voltech-border hover:border-voltech-cyan/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                      isSelected ? 'bg-voltech-cyan text-white' : 'bg-voltech-purple/20 text-voltech-purple'
-                    }`}>
-                      {miembro.nombre.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-white">{miembro.nombre}</p>
-                      <p className="text-xs text-voltech-muted capitalize">{miembro.rol}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-1 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-voltech-muted">Ventas:</span>
-                      <span className="text-white font-bold">{stats.totalVentas}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-voltech-muted">Pagadas:</span>
-                      <span className="text-voltech-success font-bold">{stats.totalPagadas}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-voltech-muted">Pendientes:</span>
-                      <span className="text-voltech-warning font-bold">{stats.totalPendientes}</span>
-                    </div>
-                    <div className="flex justify-between pt-2 border-t border-voltech-border">
-                      <span className="text-voltech-muted">Comisión:</span>
-                      <span className="text-voltech-cyan font-bold">{stats.porcentajePromedio}%</span>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+          {!equipoColapsado && (<div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-voltech-dark border-b border-voltech-border">
+                <tr>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">#</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Miembro</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">Ventas</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">Pagadas</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">Pendientes</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Pendiente $</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">Solicitud</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {equipoFiltrado.length === 0 ? (
+                  <tr><td colSpan="8" className="text-center py-8 text-voltech-muted">No hay miembros.</td></tr>
+                ) : (
+                  equipoFiltrado.map((miembro, index) => {
+                    const stats = getMiembroStats(miembro.id);
+                    const solPend = solicitudes.some(s => s.miembro_nombre === miembro.nombre && s.estado === 'pendiente');
+                    return (
+                      <tr key={miembro.id} className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
+                        <td className="px-4 py-3">
+                          <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${index === 0 ? 'bg-yellow-500/20 text-yellow-500' : index === 1 ? 'bg-gray-400/20 text-gray-400' : 'bg-voltech-muted/20 text-voltech-muted'}`}>#{index + 1}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-voltech-cyan to-voltech-purple flex items-center justify-center text-white font-bold">{miembro.nombre?.charAt(0) || '?'}</div>
+                            <div>
+                              <p className="text-sm font-bold text-white">{miembro.nombre}</p>
+                              <p className="text-xs text-voltech-muted capitalize">{miembro.rol}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm font-bold text-white">{stats.totalVentas}</td>
+                        <td className="px-4 py-3 text-center text-sm font-bold text-voltech-success">{stats.totalPagadas}</td>
+                        <td className="px-4 py-3 text-center text-sm font-bold text-voltech-warning">{stats.totalPendientes}</td>
+                        <td className="px-4 py-3 text-right text-sm font-bold text-voltech-warning">${stats.montoPendiente.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-center">
+                          {solPend ? <span className="text-xs px-2 py-1 rounded-full bg-voltech-warning/20 text-voltech-warning">💰 Solicitado</span> : <span className="text-xs text-voltech-muted">-</span>}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => {
+                              setFormData({ ...formData, tipo: 'pago', miembroId: miembro.id, miembroNombre: miembro.nombre });
+                              setSelectedComisiones([]);
+                              setShowForm(true);
+                            }}
+                            className="px-3 py-1.5 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors ml-auto flex items-center gap-1"
+                          >
+                            <Send className="w-3 h-3" /> Pagar
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>)}
         </div>
       )}
 
@@ -684,11 +997,20 @@ export default function PagosEquiposPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <div>
                   <label className="block text-xs text-voltech-muted mb-1 ml-1">Tipo</label>
-                  <select value={formData.tipo} onChange={(e) => setFormData({ ...formData, tipo: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                    <option value="pago"> Pago a Vendedor</option>
-                    <option value="inversion">💰 Inversión de Socio</option>
+                  <select value={formData.tipo} disabled className="input-voltech w-full rounded-lg px-4 py-2 text-sm opacity-70">
+                    {activeTab === 'inversiones' ? (<option value="inversion">💰 Inversión de Socio</option>) : (<option value="pago">💵 Pago a Vendedor</option>)}
                   </select>
                 </div>
+                {formData.tipo === 'inversion' && (
+                  <div>
+                    <label className="block text-xs text-voltech-muted mb-1 ml-1">Tipo de Movimiento *</label>
+                    <select value={formData.subtipo} onChange={(e) => setFormData({ ...formData, subtipo: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                      <option value="inyeccion">💚 Inyección de Capital</option>
+                      <option value="retorno">🔴 Retorno de Capital</option>
+                      <option value="rendimiento">🟡 Pago de Rendimiento</option>
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs text-voltech-muted mb-1 ml-1">Miembro *</label>
                   <select value={formData.miembroId} onChange={(e) => {
@@ -703,10 +1025,34 @@ export default function PagosEquiposPage() {
                   <label className="block text-xs text-voltech-muted mb-1 ml-1">Monto ($) *</label>
                   <input type="number" step="0.01" value={formData.monto} onChange={(e) => setFormData({ ...formData, monto: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="0.00" />
                 </div>
+                {formData.tipo === 'inversion' && (
+                  <div>
+                    <label className="block text-xs text-voltech-muted mb-1 ml-1">% Retorno</label>
+                    <input type="number" step="0.1" value={formData.porcentajeRetorno} onChange={(e) => setFormData({ ...formData, porcentajeRetorno: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+                    {formData.monto && <p className="text-xs text-voltech-success mt-1">Retorno estimado: ${(Number(formData.monto) * Number(formData.porcentajeRetorno) / 100).toFixed(2)}</p>}
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs text-voltech-muted mb-1 ml-1">Fecha *</label>
                   <input type="date" value={formData.fecha} onChange={(e) => setFormData({ ...formData, fecha: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
                 </div>
+                {formData.tipo === 'inversion' && formData.subtipo === 'inyeccion' && (
+                  <>
+                    <div>
+                      <label className="block text-xs text-voltech-muted mb-1 ml-1">Plazo (días)</label>
+                      <input type="number" min="0" placeholder="Ej: 30" onChange={(e) => {
+                        const dias = Number(e.target.value) || 0;
+                        const f = new Date(formData.fecha);
+                        f.setDate(f.getDate() + dias);
+                        setFormData({ ...formData, fechaVencimiento: f.toISOString().split('T')[0] });
+                      }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-voltech-muted mb-1 ml-1">Fecha Vencimiento</label>
+                      <input type="date" value={formData.fechaVencimiento} onChange={(e) => setFormData({ ...formData, fechaVencimiento: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+                    </div>
+                  </>
+                )}
                 <div>
                   <label className="block text-xs text-voltech-muted mb-1 ml-1">Período</label>
                   <input type="text" value={formData.periodo} onChange={(e) => setFormData({ ...formData, periodo: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Ej: 2024-06" />
@@ -721,11 +1067,8 @@ export default function PagosEquiposPage() {
                 <div>
                   <label className="block text-xs text-voltech-muted mb-1 ml-1">Método de Pago</label>
                   <select value={formData.metodoPago} onChange={(e) => setFormData({ ...formData, metodoPago: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                    <option value="efectivo">Efectivo</option>
-                    <option value="pago_movil">Pago Móvil</option>
-                    <option value="transferencia">Transferencia</option>
-                    <option value="zelle">Zelle</option>
-                    <option value="binance">Binance</option>
+                    <option value="">-- Sin especificar --</option>
+                    {metodosPago.map(m => (<option key={m.id} value={m.id}>{m.nombre}</option>))}
                   </select>
                 </div>
                 <div>
@@ -765,7 +1108,7 @@ export default function PagosEquiposPage() {
                                 {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
                               </div>
                               <div>
-                                <p className="text-sm text-white font-medium">{com.producto_nombre}</p>
+                                <p className="text-sm text-white font-medium">{com.producto_nombre} {solicitudes.some(s => s.venta_id === com.venta_id && s.estado === 'pendiente') && <span className="ml-1 text-[10px] px-2 py-0.5 rounded-full bg-voltech-warning/20 text-voltech-warning">💰 Solicitada</span>}</p>
                                 <p className="text-xs text-voltech-muted">Venta #{com.venta_numero_orden} • {com.fecha_venta}</p>
                               </div>
                             </div>
@@ -797,7 +1140,10 @@ export default function PagosEquiposPage() {
       <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
         <div className="p-4 border-b border-voltech-border flex flex-col md:flex-row items-center justify-between gap-4">
           <h3 className="text-lg font-bold text-white">Historial de {activeTab === 'pagos' ? 'Pagos' : 'Inversiones'}</h3>
-          <div className="flex gap-2 w-full md:w-auto">
+          <div className="flex gap-2 w-full md:w-auto items-center">
+            {activeTab === 'pagos' && (
+              <button onClick={depurarPagos} className="px-3 py-2 bg-voltech-error/20 text-voltech-error rounded-lg text-xs hover:bg-voltech-error/30 flex items-center gap-1"><Trash2 className="w-3 h-3" /> Depurar</button>
+            )}
             <select value={filtroMiembro} onChange={(e) => setFiltroMiembro(e.target.value)} className="input-voltech rounded-lg px-3 py-2 text-sm">
               <option value="todos">Todos los miembros</option>
               {equipo.map(e => (<option key={e.id} value={e.id}>{e.nombre}</option>))}
@@ -815,15 +1161,19 @@ export default function PagosEquiposPage() {
               <tr>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Fecha</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Miembro</th>
+                {activeTab === 'inversiones' && <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">Tipo</th>}
                 <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Descripción</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Método</th>
+                {activeTab === 'inversiones' && <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">% ROI</th>}
+                {activeTab === 'inversiones' && <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">Vence</th>}
+                {activeTab === 'inversiones' && <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">Estado</th>}
                 <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Monto</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {movimientosFiltrados.length === 0 ? (
-                <tr><td colSpan="6" className="text-center py-12 text-voltech-muted"><FileText className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>No hay registros</p></td></tr>
+                <tr><td colSpan="11" className="text-center py-12 text-voltech-muted"><FileText className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>No hay registros</p></td></tr>
               ) : (
                 movimientosFiltrados.map((mov) => {
                   const detalles = getDetallesMovimiento(mov.id);
@@ -835,10 +1185,30 @@ export default function PagosEquiposPage() {
                         <td className="px-4 py-3 text-sm text-voltech-muted flex items-center gap-2"><Calendar className="w-3 h-3" /> {mov.fecha}</td>
                         <td className="px-4 py-3"><p className="text-sm font-medium text-white">{mov.miembroNombre}</p></td>
                         <td className="px-4 py-3 text-sm text-voltech-muted max-w-xs truncate">{mov.descripcion || (mov.tipo === 'pago' ? 'Pago de comisiones' : 'Aporte de capital')}</td>
+                        {activeTab === 'inversiones' && (
+                          <td className="px-4 py-3 text-center">
+                            {(() => {
+                              const st = mov.subtipo || (mov.tipo === 'inversion' ? 'inyeccion' : 'pago');
+                              const cfg = { inyeccion: { color: 'bg-voltech-success/20 text-voltech-success', label: '💚 Inyección' }, retorno: { color: 'bg-voltech-error/20 text-voltech-error', label: '🔴 Retorno' }, rendimiento: { color: 'bg-voltech-warning/20 text-voltech-warning', label: '🟡 Rendimiento' }, pago: { color: 'bg-voltech-cyan/20 text-voltech-cyan', label: '💵 Pago' } }[st] || { color: 'bg-voltech-muted/20 text-voltech-muted', label: st };
+                              return <span className={`text-[10px] px-2 py-1 rounded-full font-semibold ${cfg.color}`}>{cfg.label}</span>;
+                            })()}
+                          </td>
+                        )}
                         <td className="px-4 py-3 text-sm text-voltech-muted capitalize">{mov.metodoPago?.replace('_', ' ')}</td>
+                        {activeTab === 'inversiones' && <td className="px-4 py-3 text-center text-sm font-bold text-voltech-success">{mov.porcentajeRetorno || 0}%</td>}
+                        {activeTab === 'inversiones' && <td className="px-4 py-3 text-center text-xs text-voltech-muted">{mov.fechaVencimiento || '-'}</td>}
+                        {activeTab === 'inversiones' && (
+                          <td className="px-4 py-3 text-center">
+                            {(() => {
+                              const ei = mov.estadoInversion || (mov.subtipo === 'inyeccion' || !mov.subtipo ? 'activa' : 'n/a');
+                              const cfg = { activa: { color: 'bg-voltech-success/20 text-voltech-success', label: '🟢 Activa' }, rendimiento_pagado: { color: 'bg-voltech-cyan/20 text-voltech-cyan', label: '🔵 Rend. Pagado' }, liquidada: { color: 'bg-voltech-purple/20 text-voltech-purple', label: '🟣 Liquidada' }, 'n/a': { color: 'bg-voltech-muted/20 text-voltech-muted', label: '-' } }[ei];
+                              return <span className={`text-[10px] px-2 py-1 rounded-full font-semibold ${cfg.color}`}>{cfg.label}</span>;
+                            })()}
+                          </td>
+                        )}
                         <td className="px-4 py-3 text-right">
-                          <span className={`text-sm font-bold ${mov.tipo === 'inversion' ? 'text-voltech-success' : 'text-voltech-error'}`}>
-                            {mov.tipo === 'inversion' ? '+' : '-'}${Number(mov.monto).toFixed(2)}
+                          <span className={`text-sm font-bold ${mov.tipo === 'inversion' && mov.subtipo === 'inyeccion' ? 'text-voltech-success' : mov.tipo === 'inversion' ? 'text-voltech-error' : mov.tipo === 'pago' ? 'text-voltech-error' : 'text-voltech-success'}`}>
+                            {mov.tipo === 'inversion' && mov.subtipo === 'inyeccion' ? '+' : '-'}${Number(mov.monto).toFixed(2)}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -850,6 +1220,26 @@ export default function PagosEquiposPage() {
                               >
                                 {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                               </button>
+                            )}
+                            {activeTab === 'inversiones' && (mov.subtipo === 'inyeccion' || !mov.subtipo) && mov.estadoInversion !== 'liquidada' && (
+                              <>
+                                {mov.estadoInversion !== 'rendimiento_pagado' && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); pagarRendimiento(mov); }}
+                                    className="px-2 py-1 bg-voltech-warning/20 text-voltech-warning rounded-lg text-xs hover:bg-voltech-warning/30 transition-colors"
+                                    title="Pagar solo el rendimiento"
+                                  >
+                                    💰 Rend.
+                                  </button>
+                                )}
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); liquidarInversion(mov); }}
+                                  className="px-2 py-1 bg-voltech-purple/20 text-voltech-purple rounded-lg text-xs hover:bg-voltech-purple/30 transition-colors"
+                                  title="Devolver capital + rendimiento"
+                                >
+                                  🏁 Liquidar
+                                </button>
+                              </>
                             )}
                             <button 
                               onClick={(e) => { e.stopPropagation(); handleEdit(mov); }} 

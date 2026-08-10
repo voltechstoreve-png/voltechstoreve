@@ -35,6 +35,7 @@ export default function DashboardVentasPage() {
   const [equipo, setEquipo] = useState([]);
   const [comisiones, setComisiones] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [referidosResumen, setReferidosResumen] = useState({ total: 0, top: null });  
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -306,6 +307,19 @@ export default function DashboardVentasPage() {
             </div>
             <div className="p-2 rounded-lg bg-voltech-success/20">
               <Package className="w-5 h-5 text-voltech-success" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-voltech-muted">Referidos Equipo</p>
+              <p className="text-xl font-bold text-white">{referidosResumen.total}</p>
+              {referidosResumen.top && <p className="text-[10px] text-voltech-cyan mt-0.5">🏆 {referidosResumen.top.nombre} ({referidosResumen.top.cantidad})</p>}
+            </div>
+            <div className="p-2 rounded-lg bg-voltech-purple/20">
+              <Users className="w-5 h-5 text-voltech-purple" />
             </div>
           </div>
         </div>
