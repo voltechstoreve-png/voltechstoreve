@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
+import { useNotificaciones } from '@/app/context/NotificationContext';
+import ModalWhatsApp from '@/components/ModalWhatsApp';
 import { 
   MessageSquare, Send, Users, Gift, Copy, Plus, Search, Trash2, 
   Edit3, Save, X, CheckCircle, ShoppingCart, Tag, FileText, 
@@ -81,6 +83,7 @@ export default function MarketingPage() {
   
   // ✅ ROLES: admin gestiona todo, socio gestiona, vendedor solo usa/ve
   const { esAdmin, esSocio, esVendedor, usuarioActual } = usePermissions();
+  const { agregarNotificacion } = useNotificaciones();
   const puedeGestionar = esAdmin || esSocio;
   const [activeTab, setActiveTab] = useState('whatsapp');
   
@@ -148,13 +151,15 @@ export default function MarketingPage() {
 
   const [publicidad, setPublicidad] = useState([]);
   const [showPublicidadForm, setShowPublicidadForm] = useState(false);
+  const [resumenData, setResumenData] = useState({ abierto: false, texto: '', telefono: '', titulo: '', cliente: '' });
   const [publicidadEditando, setPublicidadEditando] = useState(null);
   const [imagenPreview, setImagenPreview] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef(null);
   
   const [formDataPublicidad, setFormDataPublicidad] = useState({
-    titulo: '', descripcion: '', url_destino: '', url_imagen: '', lado: 'izquierdo', posicion: 'sidebar',
+    titulo: '', descripcion: '', url_destino: '', url_imagen: '', url_video: '', texto_boton: 'Ver Oferta', lado: 'izquierdo', posicion: 'sidebar',
+    anunciante: '', costo_por_click: 0.10, telefono_anunciante: '',
     fecha_inicio: '', duracion_dias: 30, fecha_fin: '', hora_inicio: '00:00', hora_fin: '23:59', prioridad: 'normal',
     mostrar_en: { inicio: true, catalogo: true, streaming: false, ofertas: false },
     dispositivos: { desktop: true, movil: true, tablet: true }, rotacion: 5, estado: 'activo'
@@ -373,6 +378,34 @@ export default function MarketingPage() {
     const actualizadas = publicidadEditando ? publicidad.map(p => p.id === publicidadEditando.id ? nuevaPublicidad : p) : [...publicidad, nuevaPublicidad];
     setPublicidad(actualizadas); localStorage.setItem('voltech_publicidad', JSON.stringify(actualizadas));
     toast.success('Publicidad guardada'); setShowPublicidadForm(false); setPublicidadEditando(null);
+  };
+
+    const construirResumen = (pub) => {
+    const clicks = pub.clicks || 0;
+    const monto = clicks * (pub.costo_por_click || 0);
+    return `📊 *RESUMEN DE PUBLICIDAD*\n\n*🏢 Anunciante:* ${pub.anunciante || pub.titulo}\n*📢 Campaña:* ${pub.titulo}\n\n👆 *Clicks:* ${clicks}\n💵 *Costo por click:* $${Number(pub.costo_por_click || 0).toFixed(2)}\n💰 *Total a pagar:* $${monto.toFixed(2)}\n\n📅 ${new Date().toLocaleDateString('es-VE')}\n\n¡Gracias por confiar en VOLTECH STOREVE!`;
+  };
+
+  const enviarResumenPub = (pub) => {
+    setResumenData({ abierto: true, texto: construirResumen(pub), telefono: pub.telefono_anunciante || '', titulo: 'Resumen de Publicidad', cliente: pub.anunciante || pub.titulo });
+  };
+
+  const enviarResumenDiario = () => {
+    const activas = publicidad.filter(p => p.estado === 'activo');
+    if (activas.length === 0) { toast.error('No hay publicidades activas'); return; }
+    let total = 0;
+    let msg = `📊 *RESUMEN DIARIO DE PUBLICIDAD*\n📅 ${new Date().toLocaleDateString('es-VE')}\n\n`;
+    activas.forEach(p => { const c = p.clicks || 0; const m = c * (p.costo_por_click || 0); total += m; msg += `• *${p.titulo}*${p.anunciante ? ` (${p.anunciante})` : ''}: ${c} clicks = $${m.toFixed(2)}\n`; });
+    msg += `\n💰 *TOTAL DEL DÍA:* $${total.toFixed(2)}`;
+    setResumenData({ abierto: true, texto: msg, telefono: '', titulo: 'Resumen Diario de Publicidad', cliente: 'VOLTECH STOREVE' });
+    if (agregarNotificacion) agregarNotificacion({ tipo: 'resumen_publicidad', titulo: '📊 Resumen diario generado', mensaje: `Total del día: $${total.toFixed(2)} en ${activas.length} campañas`, detalle: 'Resumen copiado al portapapeles', usuario_id: 'admin' });
+  };
+
+  const programarRecordatorio = () => {
+    if (agregarNotificacion) {
+      agregarNotificacion({ tipo: 'recordatorio_resumen', titulo: '⏰ Recordatorio: enviar resumen diario', mensaje: 'No olvides enviar el resumen de clicks a tus anunciantes', detalle: 'Publicidad → Resumen Diario', usuario_id: 'admin' });
+      toast.success('Recordatorio creado');
+    }
   };
 
   const guardarCupon = async () => {
@@ -613,6 +646,7 @@ export default function MarketingPage() {
   return (
     <div className="space-y-6">
       <Toaster position="top-right" toastOptions={{ style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' } }} />
+      
 
       {alertasVencimiento.length > 0 && (
         <div className="bg-gradient-to-r from-voltech-warning/20 to-voltech-error/20 border border-voltech-warning/50 rounded-xl p-4 animate-pulse">
@@ -1336,9 +1370,7 @@ export default function MarketingPage() {
                 <h2 className="text-xl font-bold text-white">Gestión de Publicidad</h2>
               </div>
               {esAdmin && (
-                <button onClick={() => { setPublicidadEditando(null); setShowPublicidadForm(true); }} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2">
-                  <Plus className="w-4 h-4" />Nueva Publicidad
-                </button>
+                <button onClick={() => { setPublicidadEditando(null); setShowPublicidadForm(true); }} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"><Plus className="w-4 h-4" /> Nueva Publicidad</button>
               )}
             </div>
             {showPublicidadForm && esAdmin && (
@@ -1372,7 +1404,7 @@ export default function MarketingPage() {
                       {urlDestinoType === 'producto' ? (
                         <select value={formDataPublicidad.url_destino} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, url_destino: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
                           <option value="/producto/">Seleccionar producto...</option>
-{productos.map(p => (<option key={p.id} value={`/producto/${p.id}`}>{p.plataforma || p.producto || p.nombre || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>))}
+                      {productos.map(p => (<option key={p.id} value={`/producto/${p.id}`}>{p.plataforma || p.producto || p.nombre || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>))}
                         </select>
                       ) : (
                         <input type="text" value={formDataPublicidad.url_destino} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, url_destino: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="https://..." />
@@ -1400,6 +1432,36 @@ export default function MarketingPage() {
                     <div>
                       <label className="block text-sm font-medium text-voltech-muted mb-2">Fecha Fin (Auto)</label>
                       <input type="date" value={formDataPublicidad.fecha_fin} readOnly className="input-voltech w-full rounded-lg px-4 py-2 bg-voltech-dark/50" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-voltech-muted mb-2">Video (URL, opcional)</label>
+                      <input type="text" value={formDataPublicidad.url_video} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, url_video: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="https://.../video.mp4" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-voltech-muted mb-2">Texto del Botón</label>
+                      <input type="text" value={formDataPublicidad.texto_boton} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, texto_boton: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="Ver Oferta / Ir a la tienda / Conseguir descuento" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-voltech-muted mb-2">Ubicación en el catálogo</label>
+                      <select value={formDataPublicidad.lado} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, lado: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                        <option value="izquierdo">Izquierda</option>
+                        <option value="derecho">Derecha</option>
+                        <option value="ambos">Ambos lados</option>
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-voltech-muted mb-2">Anunciante (cliente)</label>
+                        <input type="text" value={formDataPublicidad.anunciante} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, anunciante: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="Nombre del cliente" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-voltech-muted mb-2">Costo por click ($)</label>
+                        <input type="number" step="0.01" value={formDataPublicidad.costo_por_click} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, costo_por_click: parseFloat(e.target.value) || 0})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="0.10" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-voltech-muted mb-2">Teléfono del anunciante</label>
+                      <input type="tel" value={formDataPublicidad.telefono_anunciante} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, telefono_anunciante: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="0412-1234567" />
                     </div>
                     <div className="flex gap-3 pt-4">
                       <button onClick={guardarPublicidad} className="flex-1 px-4 py-2 bg-voltech-cyan text-white rounded-lg">Guardar</button>
@@ -1429,14 +1491,35 @@ export default function MarketingPage() {
                           <div className="flex gap-4 mt-2 text-sm flex-wrap">
                             <span className={pub.estado === 'activo' ? 'text-voltech-success' : 'text-voltech-muted'}>{pub.estado === 'activo' ? 'Activo' : 'Inactivo'}</span>
                             <span className="text-voltech-muted">{new Date(pub.fecha_inicio).toLocaleDateString('es-VE')} - {new Date(pub.fecha_fin).toLocaleDateString('es-VE')}</span>
+                            <span className="text-voltech-cyan font-semibold">👆 {pub.clicks || 0} clicks</span>
+                            <span className="text-voltech-success font-bold">💵 ${((pub.clicks || 0) * (pub.costo_por_click || 0)).toFixed(2)}</span>
+                            {pub.anunciante && <span className="text-voltech-purple">🏢 {pub.anunciante}</span>}
                           </div>
                         </div>
                         {esAdmin && (
                           <div className="flex gap-2">
+                            <button onClick={() => enviarResumenPub(pub)} className="p-2 hover:bg-voltech-success/20 rounded-lg text-voltech-success" title="Enviar resumen al anunciante">
+                              <Send className="w-4 h-4" />
+                            </button>
                             <button onClick={() => { setPublicidadEditando(pub); setShowPublicidadForm(true); }} className="p-2 hover:bg-voltech-cyan/20 rounded-lg text-voltech-cyan">
                               <Edit3 className="w-4 h-4" />
                             </button>
-                            <button onClick={async () => { if(confirm('¿Eliminar?')) { if(supabase) await supabase.from('publicidad').delete().eq('id', pub.id); setPublicidad(publicidad.filter(p => p.id !== pub.id)); } }} className="p-2 hover:bg-voltech-error/20 rounded-lg text-voltech-error">
+                            <button onClick={async () => { 
+                              if(!confirm('¿Eliminar esta publicidad?')) return;
+                              try {
+                                if (supabase) {
+                                  const { error } = await supabase.from('publicidad').delete().eq('id', pub.id);
+                                  if (error) throw error;
+                                }
+                                const nuevas = publicidad.filter(p => p.id !== pub.id);
+                                setPublicidad(nuevas);
+                                localStorage.setItem('voltech_publicidad', JSON.stringify(nuevas));
+                                toast.success('Publicidad eliminada');
+                              } catch (err) {
+                                console.error('Error al eliminar:', err);
+                                toast.error('Error al eliminar: ' + (err.message || 'intenta de nuevo'));
+                              }
+                            }} className="p-2 hover:bg-voltech-error/20 rounded-lg text-voltech-error" title="Eliminar">
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>

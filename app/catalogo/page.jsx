@@ -601,22 +601,33 @@ export default function CatalogoPage() {
   const headerBg = darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-slate-200';
   const totalVotos = productosVotacion.reduce((sum, p) => sum + (p.votos || 0), 0);
 
+  const registrarClickPub = async (pub) => {
+    try {
+      const nuevosClicks = (pub.clicks || 0) + 1;
+      setPublicidad(prev => prev.map(p => p.id === pub.id ? { ...p, clicks: nuevosClicks } : p));
+      if (supabase) await supabase.from('publicidad').update({ clicks: nuevosClicks }).eq('id', pub.id);
+    } catch (e) { console.error('Error registrando click:', e); }
+  };
+
   const renderPubCard = (pub) => (
     <a 
       key={pub.id} 
       href={pub.url_destino || '#'} 
       target={pub.url_destino ? '_blank' : '_self'}
-      className={`block ${cardBg} border ${cardBorder} rounded-xl overflow-hidden hover:border-voltech-cyan/50 transition-all group`}
+      onClick={() => registrarClickPub(pub)}
+      className={`block ${cardBg} border ${cardBorder} rounded-xl overflow-hidden hover:border-voltech-cyan/50 transition-all grHoup`}
     >
-      <div className="aspect-video bg-voltech-dark relative flex items-center justify-center">
-        {pub.url_imagen ? (
+      <div className="bg-voltech-dark relative overflow-hidden">
+        {pub.url_video ? (
+          <video src={pub.url_video} className="w-full aspect-video object-cover" autoPlay muted loop playsInline />
+        ) : pub.url_imagen ? (
           <img 
             src={pub.url_imagen} 
             alt={pub.titulo} 
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+            className="w-full h-auto object-contain group-hover:scale-105 transition-transform duration-300" 
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-voltech-muted">
+          <div className="w-full aspect-video flex items-center justify-center text-voltech-muted">
             <ImageIcon className="w-12 h-12 opacity-50" />
           </div>
         )}
@@ -625,7 +636,7 @@ export default function CatalogoPage() {
         <p className="text-sm font-bold text-white truncate">{pub.titulo}</p>
         {pub.descripcion && <p className="text-xs text-voltech-muted mt-1 line-clamp-2">{pub.descripcion}</p>}
         <button className="mt-2 w-full bg-voltech-cyan/20 text-voltech-cyan text-xs font-semibold py-1.5 rounded hover:bg-voltech-cyan/30 transition-colors">
-          Ver Oferta
+          {pub.texto_boton || 'Ver Oferta'}
         </button>
       </div>
     </a>
@@ -633,6 +644,8 @@ export default function CatalogoPage() {
 
   const pubsIzquierda = publicidad.filter(p => p.lado === 'izquierdo' || p.lado === 'ambos');
   const pubsDerecha = publicidad.filter(p => p.lado === 'derecho' || p.lado === 'ambos');
+  const hayMasVendidos = masVendidosConfig?.activo && productosMasVendidos.length > 0;
+  const haySidebarIzq = productos.length > 0 && (pubsIzquierda.length > 0 || hayMasVendidos);
 
   return (    <div className={`min-h-screen ${bg} ${text} flex flex-col transition-colors duration-300`}>
       <Toaster position="top-right" toastOptions={{ style: { background: darkMode ? '#1e293b' : '#fff', color: darkMode ? '#fff' : '#000', border: `1px solid ${darkMode ? '#334155' : '#e2e8f0'}` } }} />
@@ -737,15 +750,42 @@ export default function CatalogoPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
           
           {/* ✅ SIDEBAR IZQUIERDO: SOLO si hay publicidad activa */}
-          {productos.length > 0 && pubsIzquierda.length > 0 && (
+          {haySidebarIzq && (
             <aside className="col-span-1 lg:col-span-2 space-y-4 order-2 lg:order-1">
+              {hayMasVendidos && (
+                <div className={`${cardBg} border ${cardBorder} rounded-xl p-3`}>
+                  <h3 className={`text-sm font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{masVendidosConfig.titulo}</h3>
+                  <div className="space-y-2">
+                    {productosMasVendidos.slice(0, masVendidosConfig.cantidad_maxima || 3).map(p => {
+                      const precioInfo = getPrecioMostrar(p);
+                      return (
+                        <div key={p.id} onClick={() => setSelectedProduct(p)} className={`flex items-center gap-2 p-1.5 rounded-lg border ${cardBorder} hover:border-voltech-cyan/50 cursor-pointer transition-all`}>
+                          <div className="w-10 h-10 rounded bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                            {p.imagen ? <img src={p.imagen} alt={p.producto} className="w-full h-full object-contain" /> : <Package className="w-5 h-5 text-slate-300" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-xs font-semibold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto}</p>
+                            <p className={`text-[10px] ${mutedText}`}>${precioInfo.precioPrincipal?.toFixed(2)}</p>
+                          </div>
+                          <Trophy className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className={`mt-2 space-y-0.5 text-[10px] ${mutedText}`}>
+                    {masVendidosConfig.descripcion_1 && <p>{masVendidosConfig.descripcion_1}</p>}
+                    {masVendidosConfig.descripcion_2 && <p>{masVendidosConfig.descripcion_2}</p>}
+                  </div>
+                </div>
+              )}
               {pubsIzquierda.map(renderPubCard)}
             </aside>
           )}
 
-          <div className={`${(productos.length === 0 || pubsIzquierda.length === 0) ? 'col-span-full' : 'col-span-1 lg:col-span-8 xl:col-span-8'} order-1 lg:order-2`}>
+          <div className={`${!haySidebarIzq ? 'col-span-full' : 'col-span-1 lg:col-span-8 xl:col-span-8'} order-1 lg:order-2`}>
             {activeSection === 'productos' && (
               <div>
+
                 <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Productos</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
                   {productosFiltrados.length > 0 ? (
@@ -1325,12 +1365,12 @@ export default function CatalogoPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
                 <div className="space-y-4">
-                  <div className="aspect-video bg-black rounded-xl overflow-hidden relative">
+                  <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative ${selectedProduct.tipo === 'streaming' ? 'bg-black' : 'bg-white'}`}>
                     {selectedProduct.imagen ? (
                       <img 
                         src={selectedProduct.imagen} 
                         alt={selectedProduct.producto || selectedProduct.plataforma} 
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain max-h-[280px]"
                         onError={(e) => {
                           e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iIzFhMWUyOSIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2MzY2ZjEiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5TaW4gSW1hZ2VuPC90ZXh0Pjwvc3ZnPg==';
                         }}
@@ -1415,8 +1455,10 @@ export default function CatalogoPage() {
                       onClick={() => { comprarRapido(selectedProduct); setSelectedProduct(null); }} 
                       className="flex-1 bg-green-500 text-white py-3 rounded-xl font-semibold hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
                     >
-                      <MessageCircle className="w-5 h-5" /> 
-                      <span>Comprar por WhatsApp</span>
+                      <span className="flex items-center justify-center gap-2">
+                        <MessageCircle className="w-5 h-5 shrink-0" />
+                        <span>Comprar por WhatsApp</span>
+                      </span>
                     </button>
                     <button 
                       onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }} 
