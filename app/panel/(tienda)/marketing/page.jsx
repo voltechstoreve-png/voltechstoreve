@@ -625,7 +625,7 @@ export default function MarketingPage() {
 
   // ❌ ELIMINADO: diasDelMes, primerDiaSemana, diasArray, diasVacios (del calendario)
 
-  const urlDestinoType = (formDataPublicidad.url_destino || '').startsWith('/producto/') ? 'producto' : 'manual';
+  const urlDestinoType = ((formDataPublicidad.url_destino || '').startsWith('/producto/') || (formDataPublicidad.url_destino || '').startsWith('/catalogo?producto=')) ? 'producto' : 'manual';
 
   const productosParaCupon = productos.filter(p => 
     (p.plataforma || p.nombre || '').toLowerCase().includes(busquedaProductoCupon.toLowerCase()) ||
@@ -1398,13 +1398,23 @@ export default function MarketingPage() {
                           <input type="radio" checked={urlDestinoType === 'manual'} onChange={() => setFormDataPublicidad({...formDataPublicidad, url_destino: ''})} /> URL Manual
                         </label>
                         <label className="flex items-center gap-2 text-xs cursor-pointer">
-                          <input type="radio" checked={urlDestinoType === 'producto'} onChange={() => setFormDataPublicidad({...formDataPublicidad, url_destino: '/producto/'})} /> Seleccionar producto
+                          <input type="radio" checked={urlDestinoType === 'producto'} onChange={() => setFormDataPublicidad({...formDataPublicidad, url_destino: '/catalogo?producto='})} /> Seleccionar producto
                         </label>
                       </div>
                       {urlDestinoType === 'producto' ? (
-                        <select value={formDataPublicidad.url_destino} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, url_destino: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                          <option value="/producto/">Seleccionar producto...</option>
-                      {productos.map(p => (<option key={p.id} value={`/producto/${p.id}`}>{p.plataforma || p.producto || p.nombre || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>))}
+                        <select value={formDataPublicidad.url_destino} onChange={(e) => {
+                          const val = e.target.value;
+                          const prod = productos.find(p => `/catalogo?producto=${p.id}` === val);
+                          setFormDataPublicidad(prev => ({
+                            ...prev,
+                            url_destino: val,
+                            url_imagen: prod?.imagen || prev.url_imagen,
+                            titulo: prev.titulo || (prod?.producto || prod?.plataforma || prev.titulo),
+                          }));
+                          if (prod?.imagen) setImagenPreview(prod.imagen);
+                        }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                          <option value="/catalogo?producto=">Seleccionar producto...</option>
+                          {productos.filter(p => p.publicado !== false).map(p => (<option key={p.id} value={`/catalogo?producto=${p.id}`}>{p.plataforma || p.producto || p.nombre || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>))}
                         </select>
                       ) : (
                         <input type="text" value={formDataPublicidad.url_destino} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, url_destino: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="https://..." />

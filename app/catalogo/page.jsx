@@ -183,6 +183,17 @@ export default function CatalogoPage() {
   useEffect(() => { 
     localStorage.setItem('voltech_cart', JSON.stringify(cart)); 
   }, [cart]);
+    useEffect(() => {
+    if (productos.length === 0) return;
+    const prodId = new URLSearchParams(window.location.search).get('producto');
+    if (prodId) {
+      const prod = productos.find(p => String(p.id) === String(prodId));
+      if (prod) {
+        setActiveSection(prod.tipo === 'streaming' ? 'streaming' : 'productos');
+        setSelectedProduct(prod);
+      }
+    }
+  }, [productos]);
 
   useEffect(() => {
     if (!sorteoActivo) return;
