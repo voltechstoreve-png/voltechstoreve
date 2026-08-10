@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Mail, Phone, Lock, CheckCircle, ArrowLeft, Key } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,8 +15,6 @@ export default function RecuperarPage() {
   
   const [formData, setFormData] = useState({
     email: '',
-    metodo: 'email',
-    codigo: '',
     nuevaPassword: '',
     confirmarPassword: '',
   });
@@ -26,36 +24,40 @@ export default function RecuperarPage() {
     setFormData({ ...formData, [name]: value });
   };
 
-  // ✅ Paso 1: Verificar usuario en Supabase y "enviar" código
+  // ✅ Detectar cuando el usuario abre el link del correo
+  useEffect(() => {
+    if (!supabase) return;
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' && session) {
+        setFormData(prev => ({ ...prev, email: session.user.email || prev.email }));
+        setStep(2);
+      }
+    });
+    return () => listener?.subscription?.unsubscribe();
+  }, []);
+
+  // ✅ Paso 1: Enviar link REAL de recuperación por correo
   const handleEnviarCodigo = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    // 1. Verificar si el usuario existe en la base de datos
     if (supabase) {
-      const campo = formData.metodo === 'email' ? 'email' : 'telefono';
-      const { data, error } = await supabase
-        .from('usuarios')
-        .select('id')
-        .eq(campo, formData.email)
-        .single();
+      // 1. Verificar que el usuario existe
+      const { data } = await supabase.from('usuarios').select('id').eq('email', formData.email).single();
+      if (!data) { toast.error('No se encontró una cuenta con ese correo'); setLoading(false); return; }
 
-      if (error || !data) {
-        toast.error('No se encontró una cuenta registrada con ese dato');
-        setLoading(false);
-        return;
-      }
+      // 2. Enviar link real de recuperación
+      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+        redirectTo: window.location.origin + '/recuperar'
+      });
+      if (error) { toast.error('No se pudo enviar el correo: ' + error.message); setLoading(false); return; }
     }
 
-    // 2. Simular envío de código (Aquí iría la integración real con Email/SMS)
-    setTimeout(() => {
-      setLoading(false);
-      toast.success(`Código enviado a tu ${formData.metodo === 'email' ? 'correo' : 'WhatsApp'}`);
-      setStep(2);
-    }, 1500);
+    setLoading(false);
+    toast.success('📧 Link enviado a tu correo. Revisa tu bandeja (y spam).');
   };
 
-  // ✅ Paso 2: Actualizar contraseña en Supabase
+  // ✅ Paso 2: Actualizar contraseña en Auth + tabla usuarios
   const handleCambiarPassword = async (e) => {
     e.preventDefault();
     
@@ -71,27 +73,17 @@ export default function RecuperarPage() {
 
     setLoading(true);
 
-    // 1. Actualizar la contraseña en la base de datos
     if (supabase) {
-      const campo = formData.metodo === 'email' ? 'email' : 'telefono';
-      const { error } = await supabase
-        .from('usuarios')
-        .update({ password: formData.nuevaPassword })
-        .eq(campo, formData.email);
-
-      if (error) {
-        toast.error('Error al cambiar la contraseña en la base de datos');
-        setLoading(false);
-        return;
-      }
+      // 1. Actualizar en Auth (Supabase)
+      const { error: authError } = await supabase.auth.updateUser({ password: formData.nuevaPassword });
+      // 2. Actualizar en la tabla usuarios
+      const { error: dbError } = await supabase.from('usuarios').update({ password: formData.nuevaPassword }).eq('email', formData.email);
+      if (authError && dbError) { toast.error('Error al cambiar la contraseña'); setLoading(false); return; }
     }
 
-    // 2. Éxito y redirección
     setLoading(false);
     toast.success('Contraseña cambiada exitosamente');
-    setTimeout(() => {
-      window.location.href = '/login';
-    }, 1500);
+    setTimeout(() => { window.location.href = '/login'; }, 1500);
   };
 
   return (
@@ -150,62 +142,17 @@ export default function RecuperarPage() {
             >
               <div>
                 <label className="block text-xs text-voltech-muted mb-1 ml-1">
-                  ¿Cómo quieres recuperar tu cuenta?
-                </label>
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <label className={`cursor-pointer border rounded-lg p-3 flex items-center justify-center gap-2 transition-all ${
-                    formData.metodo === 'email' 
-                      ? 'border-voltech-cyan bg-voltech-cyan/10 text-voltech-cyan' 
-                      : 'border-voltech-border text-voltech-muted hover:border-voltech-muted'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="metodo"
-                      value="email"
-                      checked={formData.metodo === 'email'}
-                      onChange={handleChange}
-                      className="hidden"
-                    />
-                    <Mail className="w-4 h-4" />
-                    <span className="text-xs font-medium">Email</span>
-                  </label>
-                  
-                  <label className={`cursor-pointer border rounded-lg p-3 flex items-center justify-center gap-2 transition-all ${
-                    formData.metodo === 'whatsapp' 
-                      ? 'border-voltech-cyan bg-voltech-cyan/10 text-voltech-cyan' 
-                      : 'border-voltech-border text-voltech-muted hover:border-voltech-muted'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="metodo"
-                      value="whatsapp"
-                      checked={formData.metodo === 'whatsapp'}
-                      onChange={handleChange}
-                      className="hidden"
-                    />
-                    <Phone className="w-4 h-4" />
-                    <span className="text-xs font-medium">WhatsApp</span>
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs text-voltech-muted mb-1 ml-1">
-                  {formData.metodo === 'email' ? 'Correo electrónico' : 'Número de WhatsApp'}
+                  Correo electrónico
                 </label>
                 <div className="relative">
-                  {formData.metodo === 'email' ? (
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
-                  ) : (
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
-                  )}
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
                   <input
-                    type={formData.metodo === 'email' ? 'email' : 'tel'}
+                    type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
                     className="input-voltech w-full rounded-lg pl-10 pr-4 py-3 text-sm"
-                    placeholder={formData.metodo === 'email' ? 'tu@email.com' : '0412-1234567'}
+                    placeholder="tu@email.com"
                     required
                   />
                 </div>
@@ -213,7 +160,7 @@ export default function RecuperarPage() {
 
               <div className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-3">
                 <p className="text-[11px] text-voltech-muted">
-                  Te enviaremos un código de 6 dígitos a tu {formData.metodo === 'email' ? 'correo' : 'WhatsApp'} para verificar tu identidad.
+                  📧 Te enviaremos un <span className="text-voltech-cyan">link de recuperación</span> a tu correo. Al abrirlo podrás crear una nueva contraseña.
                 </p>
               </div>
 
@@ -225,12 +172,12 @@ export default function RecuperarPage() {
                 {loading ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Enviando código...
+                    Enviando link...
                   </>
                 ) : (
                   <>
                     <Key className="w-4 h-4" />
-                    Enviar código de verificación
+                    Enviar link de recuperación
                   </>
                 )}
               </button>
@@ -248,29 +195,13 @@ export default function RecuperarPage() {
               onSubmit={handleCambiarPassword}
               className="space-y-4"
             >
-              <div>
-                <label className="block text-xs text-voltech-muted mb-1 ml-1">
-                  Código de verificación
-                </label>
-                <div className="relative">
-                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
-                  <input
-                    type="text"
-                    name="codigo"
-                    value={formData.codigo}
-                    onChange={handleChange}
-                    className="input-voltech w-full rounded-lg pl-10 pr-4 py-3 text-sm text-center tracking-widest text-lg font-mono"
-                    placeholder="000000"
-                    maxLength={6}
-                    required
-                  />
-                </div>
-                <p className="text-[10px] text-voltech-muted mt-1 text-center">
-                  Ingresa el código de 6 dígitos que te enviamos
+              <div className="bg-voltech-cyan/10 border border-voltech-cyan/30 rounded-lg p-3 mb-4">
+                <p className="text-[11px] text-voltech-cyan">
+                  🔓 Identidad verificada{formData.email ? ` para ${formData.email}` : ''}. Crea tu nueva contraseña.
                 </p>
               </div>
 
-              <div className="border-t border-voltech-border pt-4">
+              <div>
                 <label className="block text-xs text-voltech-muted mb-1 ml-1">
                   Nueva contraseña
                 </label>
