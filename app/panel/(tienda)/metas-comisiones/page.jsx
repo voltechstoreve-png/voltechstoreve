@@ -45,7 +45,8 @@ export default function MetasYComisionesPage() {
   const [ventasTodas, setVentasTodas] = useState([]);
   const [miembroSeleccionado, setMiembroSeleccionado] = useState(null);
   const [cuponesTodos, setCuponesTodos] = useState([]);
-
+  const [comisionesTodas, setComisionesTodas] = useState([]);
+  
   useEffect(() => {
   const cargarDatos = async () => {
     let savedData = null;
@@ -306,26 +307,30 @@ export default function MetasYComisionesPage() {
     }
   };
 
-    const cargarReferidosEquipo = async () => {
+  const cargarReferidosEquipo = async () => {
     try {
-      let clientes = [], equipo = [], vts = [];
+      let clientes = [], equipo = [], vts = [], comps = [];
       if (supabase) {
-        const [{ data: cl }, { data: eq }, { data: vp }, { data: vs }] = await Promise.all([
+        const [{ data: cl }, { data: eq }, { data: vp }, { data: vs }, { data: cp }] = await Promise.all([
           supabase.from('clientes').select('*'),
           supabase.from('usuarios').select('*'),
           supabase.from('ventas').select('*'),
-          supabase.from('ventas_streaming').select('*')
+          supabase.from('ventas_streaming').select('*'),
+          supabase.from('comisiones_pendientes').select('*')
         ]);
         clientes = cl || [];
         equipo = eq || [];
         vts = [...(vp || []), ...(vs || [])];
+        comps = cp || [];
       } else {
         clientes = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
         equipo = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
         vts = [...JSON.parse(localStorage.getItem('voltech_ventas') || '[]'), ...JSON.parse(localStorage.getItem('voltech_ventas_streaming') || '[]')];
+        comps = JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]');
       }
       setClientesTodos(clientes);
       setVentasTodas(vts);
+      setComisionesTodas(comps);
 
       const escalaGuardada = localStorage.getItem('voltech_escala_referidos');
       if (escalaGuardada) setEscalaReferidos(JSON.parse(escalaGuardada));
@@ -356,7 +361,7 @@ export default function MetasYComisionesPage() {
     } catch (e) {
       console.error('Error cargando referidos:', e);
     }
-  };
+  };    
 
   const agregarEscala = () => {
     const ultima = escalaReferidos[escalaReferidos.length - 1];
@@ -749,6 +754,7 @@ export default function MetasYComisionesPage() {
                     ...ventasReferidas.map(v => ({ ...v, _propia: false })),
                   ];
                   const cuponesUsados = susVentas.filter(v => v.cuponCodigo || v.cupon).length;
+                  const pagadasSet = new Set(comisionesTodas.filter(c => c.estado === 'pagada').map(c => c.venta_id));
                   const comisionVentasReal = susVentas.reduce((s, v) => s + comisionDe(v, rank.porcentajeComision), 0);
                   const comisionTotal = comisionVentasReal + (r.comision || 0);
                   return (

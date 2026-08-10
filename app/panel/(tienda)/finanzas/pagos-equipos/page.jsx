@@ -410,26 +410,38 @@ useEffect(() => {
     localStorage.setItem('voltech_movimientos_equipo', JSON.stringify(movsActualizados));
 
     if (formData.tipo === 'pago' && selectedComisiones.length > 0) {
-      const comisionesActualizadas = comisionesPendientes.map(c => {
-        if (selectedComisiones.find(sc => sc.id === c.id)) {
-          return { ...c, estado: 'pagada', movimiento_pago_id: nuevoMovimiento.id, fecha_pago: formData.fecha };
-        }
-        return c;
-      });
+      const nuevas = selectedComisiones.filter(sc => sc._venta).map(sc => ({
+        id: Date.now().toString() + Math.random().toString(16).slice(2),
+        venta_id: sc.venta_id, venta_numero_orden: sc.venta_numero_orden,
+        miembro_id: formData.miembroId, miembro_nombre: formData.miembroNombre,
+        producto_nombre: sc.producto_nombre, monto_venta: sc.monto_venta,
+        porcentaje_comision: sc.porcentaje_comision, monto_comision: sc.monto_comision,
+        fecha_venta: sc.fecha_venta, estado: 'pagada', movimiento_pago_id: nuevoMovimiento.id,
+        fecha_pago: formData.fecha, tipo: 'comision_venta',
+      }));
+      const existentes = selectedComisiones.filter(sc => !sc._venta);
+      const comisionesActualizadas = [...comisionesPendientes, ...nuevas].map(c =>
+        existentes.find(sc => sc.id === c.id) ? { ...c, estado: 'pagada', movimiento_pago_id: nuevoMovimiento.id, fecha_pago: formData.fecha } : c
+      );
       setComisionesPendientes(comisionesActualizadas);
       localStorage.setItem('voltech_comisiones_pendientes', JSON.stringify(comisionesActualizadas));
-      
       if (supabase) {
-        const idsToUpdate = selectedComisiones.map(c => c.id);
-        await supabase.from('comisiones_pendientes').update({ 
-          estado: 'pagada', 
-          movimiento_pago_id: nuevoMovimiento.id, 
-          fecha_pago: formData.fecha 
-        }).in('id', idsToUpdate);
+        if (nuevas.length) await supabase.from('comisiones_pendientes').insert(nuevas);
+        if (existentes.length) await supabase.from('comisiones_pendientes').update({ estado: 'pagada', movimiento_pago_id: nuevoMovimiento.id, fecha_pago: formData.fecha }).in('id', existentes.map(c => c.id));
       }
     }
 
-    if (formData.tipo === 'pago') marcarSolicitudesPagadas(formData.miembroNombre);
+    if (formData.tipo === 'pago') {
+      marcarSolicitudesPagadas(formData.miembroNombre);
+      if (agregarNotificacion) {
+        agregarNotificacion({
+          tipo: 'pago_completado', categoria: 'pagos_equipo', titulo: '💰 Pago recibido',
+          mensaje: `Se pagó $${Number(formData.monto).toFixed(2)} a ${formData.miembroNombre}`,
+          detalle: formData.descripcion || 'Pago de comisiones', usuario_id: formData.miembroId, miembro: formData.miembroNombre,
+          enlace: '/panel/finanzas/pagos-equipos',
+        });
+      }
+    }
     toast.success(editingId ? 'Movimiento actualizado' : 'Pago registrado exitosamente');
     resetForm();
     // ✅ SINCRONIZACIÓN: Avisar a otros paneles si es necesario
@@ -663,7 +675,7 @@ useEffect(() => {
   const movimientosFiltrados = movimientos.filter(m => {
     const matchSearch = m.miembroNombre.toLowerCase().includes(searchTerm.toLowerCase()) || m.descripcion?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchMiembro = filtroMiembro === 'todos' || m.miembroId === filtroMiembro;
-    const matchTipo = m.tipo === activeTab;
+    const matchTipo = activeTab === 'pagos' ? m.tipo === 'pago' : m.tipo === 'inversion';
     return matchSearch && matchMiembro && matchTipo;
   });
 
@@ -704,13 +716,15 @@ useEffect(() => {
               {verSoloMi ? 'Ver lo mío' : 'Ver todo'}
             </button>
           )}
-          <button
-            onClick={() => { resetForm(); setShowForm(true); }}
-            className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Nuevo Movimiento
-          </button>
+          {activeTab === 'inversiones' && (
+            <button
+              onClick={() => { resetForm(); setShowForm(true); }}
+              className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Nueva Inversión
+            </button>
+          )}
         </div>
       </div>
 
