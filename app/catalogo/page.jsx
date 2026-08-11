@@ -799,35 +799,7 @@ export default function CatalogoPage() {
               <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
               <input type="text" placeholder={activeSection === 'productos' ? 'Buscar productos...' : activeSection === 'streaming' ? 'Buscar plataformas...' : 'Buscar...'} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${inputBg}`} />
             </div>
-            
-            {activeSection === 'productos' && (
-              <div>
-                <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Productos</h2>
-                {productosFiltrados.length > 0 ? (
-                  <div className="space-y-10">
-                    {productosAgrupados.map(([cat, items]) => (
-                      <div key={cat}>
-                        <div className="flex items-center gap-3 mb-4">
-                          <h3 className={`text-sm font-bold uppercase tracking-widest ${darkMode ? 'text-voltech-cyan' : 'text-purple-700'}`}>{cat}</h3>
-                          <div className={`h-px flex-1 ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}></div>
-                          <span className={`text-xs ${mutedText}`}>{items.length} {items.length === 1 ? 'producto' : 'productos'}</span>
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
-                          {items.map(renderProductCard)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-20">
-                    <Package className={`w-16 h-16 mx-auto mb-3 opacity-30 ${mutedText}`} />
-                    <p className={`text-lg ${mutedText}`}>No hay productos disponibles</p>
-                    <p className={`text-sm ${mutedText} mt-2`}>Total en sistema: {(productos || []).length}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
+          
             {activeSection === 'streaming' && (
               <select value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)} className={`w-full md:w-auto px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors ${inputBg}`}>
                 <option value="">Todas las plataformas</option>
@@ -843,7 +815,7 @@ export default function CatalogoPage() {
           
           {/* ✅ SIDEBAR IZQUIERDO: SOLO si hay publicidad activa */}
           {haySidebarIzq && (
-            <aside className="col-span-1 lg:col-span-2 space-y-4 order-2 lg:order-1">
+            <aside className="hidden lg:block col-span-1 lg:col-span-2 space-y-4 order-2 lg:order-1">
               {hayMasVendidos && (
                 <div className={`${cardBg} border ${cardBorder} rounded-xl p-3`}>
                   <h3 className={`text-sm font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{masVendidosConfig.titulo}</h3>
@@ -938,7 +910,7 @@ export default function CatalogoPage() {
       {/* BANNER a ancho completo */}
       <div className="relative w-full h-48 bg-black overflow-hidden">
         {p.imagen ? (
-          <img src={p.imagen} alt={p.plataforma} className="w-full h-full object-cover rounded-t-xl group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} />
+          <img src={p.imagen} alt={p.plataforma} className="w-full h-full object-contain p-2 rounded-t-xl group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Play className="w-10 h-10 text-white/80" />
@@ -1342,7 +1314,7 @@ export default function CatalogoPage() {
 
           {/* ✅ SIDEBAR DERECHO: SOLO si hay publicidad */}
           {productos.length > 0 && pubsDerecha.length > 0 && (
-            <aside className="col-span-1 lg:col-span-2 space-y-4 order-3 lg:order-3">
+            <aside className="hidden lg:block col-span-1 lg:col-span-2 space-y-4 order-3 lg:order-3">
               {pubsDerecha.map(renderPubCard)}
             </aside>
           )}
