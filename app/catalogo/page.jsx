@@ -10,7 +10,7 @@ import {
   Sun, Moon, Play, Clock, Zap, Truck,
   Sparkles, Trophy, AlertCircle, Ticket, Copy, Users,
   MessageSquare, ThumbsUp, Upload, Percent, Share2,
-  Image as ImageIcon, FileText, Info
+  Image as ImageIcon, FileText, Info, Menu
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -74,6 +74,7 @@ export default function CatalogoPage() {
   const [whatsappNumero, setWhatsappNumero] = useState('5841253785815'); // Número por defecto
   
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -612,6 +613,51 @@ export default function CatalogoPage() {
   const headerBg = darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-slate-200';
   const totalVotos = productosVotacion.reduce((sum, p) => sum + (p.votos || 0), 0);
 
+  const productosAgrupados = useMemo(() => {
+    const grupos = {};
+    productosFiltrados.forEach(p => {
+      const cat = (p.categoria || 'OTROS').toUpperCase();
+      (grupos[cat] = grupos[cat] || []).push(p);
+    });
+    return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [productosFiltrados]);
+
+  const renderProductCard = (p) => {
+    const precioInfo = getPrecioMostrar(p);
+    return (
+      <div key={p.id} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between cursor-pointer group`}>
+        <div className="aspect-square bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center overflow-hidden relative">
+          {p.imagen ? (
+            <img src={p.imagen} alt={p.producto} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} />
+          ) : (
+            <Package className="w-12 h-12 text-slate-300" />
+          )}
+          {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">OFERTA</div>}
+          {p.tipo === 'kit' && <div className="absolute top-2 left-2 bg-voltech-cyan text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">KIT</div>}
+        </div>
+        <div className="p-3 flex flex-col flex-1">
+          <div className="mb-1"><p className={`text-[10px] font-medium uppercase tracking-wide ${mutedText} truncate`}>{p.marca} • {p.categoria}</p></div>
+          <h3 className={`font-semibold text-sm mb-2 line-clamp-2 leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto}</h3>
+          <div className="mt-auto space-y-2">
+            <div>
+              {precioInfo.tieneOferta && <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)}</p>}
+              <p className={`text-xl font-bold ${precioInfo.tieneOferta ? 'text-red-600' : darkMode ? 'text-white' : 'text-slate-900'}`}>${precioInfo.precioPrincipal?.toFixed(2)}</p>
+              <p className={`text-xs font-medium ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
+            </div>
+            <div className="flex gap-1.5 pt-1">
+              <button onClick={(e) => { e.stopPropagation(); comprarRapido(p); }} className="flex-1 bg-green-500 text-white py-2 rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors flex items-center justify-center gap-1">
+                <MessageCircle className="w-3 h-3 flex-shrink-0" /> WhatsApp
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="flex-1 bg-purple-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-1">
+                <ShoppingCart className="w-3 h-3 flex-shrink-0" /> Carrito
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const registrarClickPub = async (pub) => {
     try {
       const nuevosClicks = (pub.clicks || 0) + 1;
@@ -684,16 +730,13 @@ export default function CatalogoPage() {
 
       <header className={`${headerBg} backdrop-blur-lg shadow-sm sticky top-0 z-40 border-b transition-colors duration-300`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>VOLTECH <span className="text-purple-600">STOREVE</span></h1>
-            
-            <nav className="flex md:hidden gap-3 overflow-x-auto pb-1 no-scrollbar flex-1 ml-4">
-              {['productos', 'streaming', 'ofertas', 'opiniones', 'sorteos'].map(s => (
-                <button key={s} onClick={() => setActiveSection(s)} className={`whitespace-nowrap text-xs font-medium capitalize px-3 py-1.5 rounded-full transition-colors ${activeSection === s ? 'bg-purple-600/20 text-purple-600 border border-purple-600/30' : 'text-voltech-muted hover:text-white'}`}>
-                  {s}
-                </button>
-              ))}
-            </nav>
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2 min-w-0">
+              <button onClick={() => setShowMobileMenu(!showMobileMenu)} className={`md:hidden p-2 rounded-lg ${darkMode ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-700'}`}>
+                <Menu className="w-5 h-5" />
+              </button>
+              <h1 className={`text-lg sm:text-2xl font-bold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>VOLTECH <span className="text-purple-600">STOREVE</span></h1>
+            </div>
 
             <nav className="hidden md:flex gap-6">
               {['productos', 'streaming', 'ofertas', 'opiniones', 'sorteos'].map(s => (
@@ -728,6 +771,20 @@ export default function CatalogoPage() {
             </div>
           </div>
           
+          <AnimatePresence>
+            {showMobileMenu && (
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="md:hidden overflow-hidden mb-3">
+                <div className="grid grid-cols-2 gap-2">
+                  {['productos', 'streaming', 'ofertas', 'opiniones', 'sorteos'].map(s => (
+                    <button key={s} onClick={() => { setActiveSection(s); setShowMobileMenu(false); }} className={`px-3 py-2.5 rounded-lg text-sm font-medium capitalize transition-colors ${activeSection === s ? 'bg-purple-600 text-white' : darkMode ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-700'}`}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <div className="mt-4 flex flex-col md:flex-row gap-3 items-stretch md:items-center max-w-4xl">
             <div className="relative flex-1 min-w-[200px]">
               <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
@@ -735,18 +792,33 @@ export default function CatalogoPage() {
             </div>
             
             {activeSection === 'productos' && (
-              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className={`w-full md:w-auto px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors ${inputBg}`}>
-                  <option value="">Todas las categorías</option>
-                  {categorias.map(c => <option key={c} value={c} className="text-slate-900 bg-white">{c}</option>)}
-                </select>
-                <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)} className={`w-full md:w-auto px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors ${inputBg}`}>
-                  <option value="">Todas las marcas</option>
-                  {marcas.map(m => <option key={m} value={m} className="text-slate-900 bg-white">{m}</option>)}
-                </select>
+              <div>
+                <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Productos</h2>
+                {productosFiltrados.length > 0 ? (
+                  <div className="space-y-10">
+                    {productosAgrupados.map(([cat, items]) => (
+                      <div key={cat}>
+                        <div className="flex items-center gap-3 mb-4">
+                          <h3 className={`text-sm font-bold uppercase tracking-widest ${darkMode ? 'text-voltech-cyan' : 'text-purple-700'}`}>{cat}</h3>
+                          <div className={`h-px flex-1 ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`}></div>
+                          <span className={`text-xs ${mutedText}`}>{items.length} {items.length === 1 ? 'producto' : 'productos'}</span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
+                          {items.map(renderProductCard)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-20">
+                    <Package className={`w-16 h-16 mx-auto mb-3 opacity-30 ${mutedText}`} />
+                    <p className={`text-lg ${mutedText}`}>No hay productos disponibles</p>
+                    <p className={`text-sm ${mutedText} mt-2`}>Total en sistema: {(productos || []).length}</p>
+                  </div>
+                )}
               </div>
             )}
-            
+                        
             {activeSection === 'streaming' && (
               <select value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)} className={`w-full md:w-auto px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors ${inputBg}`}>
                 <option value="">Todas las plataformas</option>
