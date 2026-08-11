@@ -1194,7 +1194,7 @@ useEffect(() => {
                   const isExpanded = expandedRowId === mov.id;
                   
                   return (
-                    <React.Fragment key={mov.id}>
+                    <Fragment key={mov.id}>
                       <tr className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors cursor-pointer" onClick={() => setExpandedRowId(isExpanded ? null : mov.id)}>
                         <td className="px-4 py-3 text-sm text-voltech-muted flex items-center gap-2"><Calendar className="w-3 h-3" /> {mov.fecha}</td>
                         <td className="px-4 py-3"><p className="text-sm font-medium text-white">{mov.miembroNombre}</p></td>
@@ -1324,7 +1324,7 @@ useEffect(() => {
                           </td>
                         </tr>
                       )}
-                    </React.Fragment>
+                    </Fragment>
                   );
                 })
               )}

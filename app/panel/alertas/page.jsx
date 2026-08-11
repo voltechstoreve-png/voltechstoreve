@@ -153,10 +153,14 @@ export default function AlertasPage() {
   const alertasVisibles = useMemo(() => {
     let lista = alertas;
     if (esVendedor && !esAdmin && !esSocio) {
+      const miNombre = (usuarioActual?.nombre || '').toLowerCase();
+      const miId = usuarioActual?.id;
       lista = lista.filter(a => {
-        if (!CATEGORIAS_VENDEDOR.includes(a.category)) return false;
-        const v = a.metadata?.vendedor;
-        return !v || v.toLowerCase() === (usuarioActual?.nombre || '').toLowerCase();
+        const v = (a.metadata?.vendedor || '').toLowerCase();
+        if (v) return v === miNombre;                                   // MIS ventas / comisiones
+        if (a.metadata?.miembro && a.metadata.miembro.toLowerCase() === miNombre) return true;  // MIS solicitudes/pagos
+        if (a.metadata?.usuarioId === miId || a.metadata?.usuario_id === miId) return true;     // notificaciones PARA MÍ
+        return false;                                                    // oculta publicidad, sistema, etc.
       });
     } else if (esSocio && !esAdmin) {
       lista = lista.filter(a => CATEGORIAS_SOCIO.includes(a.category));

@@ -19,7 +19,7 @@ import autoTable from 'jspdf-autotable';
 
 export default function VentasProductosPage() {
   const router = useRouter();
-  const { esVendedor, usuarioActual } = usePermissions();
+  const { esVendedor, esAdmin, esSocio, usuarioActual } = usePermissions();
   const { agregarNotificacion } = useNotificaciones();
   
   const [ventas, setVentas] = useState([]);
@@ -178,14 +178,18 @@ export default function VentasProductosPage() {
   const metodosPagoActivos = Object.entries(settings.pagos || {}).filter(([_, val]) => val && (val.activo === true || val === true));
   const carterasActivas = (settings.carteras || []).filter(c => c && c.activo === true);
 
-  const clientesFiltrados = clientes.filter(c => 
+  const clientesBase = (esVendedor && !esAdmin && !esSocio)
+    ? clientes.filter(c => (c.registradoPor || c.registrado_por) === usuarioActual?.nombre)
+    : clientes;
+
+  const clientesFiltrados = clientesBase.filter(c => 
     c.nombre.toLowerCase().includes(clienteSearch.toLowerCase()) || (c.telefono || '').includes(clienteSearch)
   );
 
   const handleClienteChange = (value) => {
     setClienteSearch(value);
     setFormData({ ...formData, cliente: value });
-    const clienteEncontrado = clientes.find(c => c.nombre.toLowerCase() === value.toLowerCase() || c.telefono === value);
+    const clienteEncontrado = clientesBase.find(c => c.nombre.toLowerCase() === value.toLowerCase() || c.telefono === value);
     if (clienteEncontrado) {
       setFormData(prev => ({ ...prev, cliente: clienteEncontrado.nombre, telefono: clienteEncontrado.telefono || prev.telefono }));
     }
