@@ -71,7 +71,7 @@ export default function CatalogoPage() {
   const [publicidad, setPublicidad] = useState([]);
   const [ventas, setVentas] = useState([]);
   const [masVendidosConfig, setMasVendidosConfig] = useState(null);
-  const [whatsappNumero, setWhatsappNumero] = useState('5841253785815'); // Número por defecto
+  const [whatsappNumero, setWhatsappNumero] = useState('584125378515'); // Número por defecto
   
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -102,21 +102,30 @@ export default function CatalogoPage() {
           supabase.from('publicidad').select('*').eq('estado', 'activo'),
           supabase.from('ventas').select('*'),
           supabase.from('marketing_config').select('valor').eq('clave', 'mas_vendidos').single(),
-          supabase.from('settings').select('clave, valor').in('clave', ['telefono_tienda', 'whatsapp_numero'])
+          supabase.from('settings').select('clave, valor').in('clave', ['telefono_tienda', 'whatsapp_numero', 'tienda'])
         ]);
         if (pData) pubs = pData;
         if (vData) vts = vData;
         if (mvData?.valor) mvConfig = mvData.valor;
         
-        // ✅ PRIORIDAD 1: Buscar número en configuración de la tienda
+        // ✅ Normaliza: quita símbolos, y si empieza en 0 le pone 58
+        const normalizarWa = (val) => {
+          let d = String(val || '').replace(/\D/g, '');
+          if (d.startsWith('0')) d = '58' + d;
+          else if (!d.startsWith('58')) d = '58' + d;
+          return d;
+        };
+        // ✅ PRIORIDAD 1: Ajustes → Tienda (o claves sueltas)
+        const tiendaVal = settingsData?.find(s => s.clave === 'tienda')?.valor || {};
         const telefonoSetting = settingsData?.find(s => s.clave === 'telefono_tienda' || s.clave === 'whatsapp_numero');
-        if (telefonoSetting?.valor) {
-          setWhatsappNumero(telefonoSetting.valor.replace(/\D/g, ''));
+        const rawNumero = telefonoSetting?.valor || tiendaVal.whatsapp || tiendaVal.telefono || tiendaVal.whatsappUrl || '';
+        if (rawNumero) {
+          setWhatsappNumero(normalizarWa(rawNumero));
         } else {
-          // ✅ PRIORIDAD 2: Buscar en la tabla de equipo (Admin)
+          // ✅ PRIORIDAD 2: tabla equipo (Admin)
           const { data: equipoData } = await supabase.from('equipo').select('*').eq('rol', 'Admin').limit(1);
           if (equipoData && equipoData.length > 0 && equipoData[0].telefono) {
-            setWhatsappNumero(equipoData[0].telefono.replace(/\D/g, ''));
+            setWhatsappNumero(normalizarWa(equipoData[0].telefono));
           }
         }
       }
@@ -818,7 +827,7 @@ export default function CatalogoPage() {
                 )}
               </div>
             )}
-                        
+
             {activeSection === 'streaming' && (
               <select value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)} className={`w-full md:w-auto px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors ${inputBg}`}>
                 <option value="">Todas las plataformas</option>
