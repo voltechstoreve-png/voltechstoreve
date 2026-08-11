@@ -419,7 +419,7 @@ export default function MarketingPage() {
 
     const codigo = formDataCupon.codigo || generarCodigoUnico(formDataCupon.titulo);
     const nuevoCupon = {
-      id: cuponEditando ? cuponEditando.id : `cupon-${Date.now()}`,
+      id: cuponEditando ? cuponEditando.id : crypto.randomUUID(),
       titulo: formDataCupon.titulo,
       descripcion: formDataCupon.descripcion,
       codigo: codigo,
