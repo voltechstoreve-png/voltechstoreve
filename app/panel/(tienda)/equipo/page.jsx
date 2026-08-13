@@ -304,15 +304,15 @@ export default function EquipoPage() {
         }}
       />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Equipo</h1>
-          <p className="text-sm text-voltech-muted mt-1">Gestiona los miembros de tu equipo y sus permisos</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
+        <div className="flex-1 min-w-0 pr-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Equipo</h1>
+          <p className="text-xs sm:text-sm text-voltech-muted mt-1">Gestiona los miembros de tu equipo y sus permisos</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <button
             onClick={() => setShowInvitationLink(!showInvitationLink)}
-            className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2"
+            className="w-full sm:w-auto shrink-0 justify-center text-xs py-2 px-3 border border-slate-700 rounded-xl bg-voltech-surface border-voltech-border text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2"
           >
             <Copy className="w-4 h-4" />
             Link de Invitación
@@ -320,7 +320,7 @@ export default function EquipoPage() {
           {!editingId && (
             <button
               onClick={handleNuevoMiembro}
-              className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2"
+              className="w-full sm:w-auto shrink-0 justify-center text-xs py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
               Agregar Miembro
@@ -433,17 +433,17 @@ export default function EquipoPage() {
               />
               <span className="text-sm text-voltech-muted">Miembro activo</span>
             </div>
-            <div className="flex gap-3 mt-6">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full mt-4">
               <button
                 onClick={() => editingId === 'new' ? guardarMiembro() : actualizarMiembro(editingId)}
-                className="flex-1 btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"
+                className="w-full sm:w-auto flex-1 justify-center text-xs sm:text-sm font-semibold py-2.5 px-4 rounded-xl btn-neon text-white flex items-center gap-2"
               >
                 <Check className="w-4 h-4" />
                 {editingId === 'new' ? 'Guardar y Generar Link' : 'Guardar Cambios'}
               </button>
               <button
                 onClick={cancelarEdicion}
-                className="px-6 py-3 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-error transition-all flex items-center gap-2"
+                className="w-full sm:w-auto text-xs py-2.5 px-4 justify-center bg-voltech-surface border border-voltech-border rounded-xl text-voltech-muted hover:text-white hover:border-voltech-error transition-all flex items-center gap-2"
               >
                 <X className="w-4 h-4" />
                 Cancelar
@@ -500,7 +500,86 @@ export default function EquipoPage() {
         </div>
       </div>
 
-      <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
+      {/* Vista para Pantallas Móviles (< md) */}
+      <div className="block md:hidden space-y-3">
+        {equipo.map((miembro) => (
+          <div key={miembro.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                  {miembro.nombre.charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-slate-100 truncate">{miembro.nombre}</h4>
+                  <p className="text-[11px] text-slate-400 truncate">{miembro.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {editingId === miembro.id ? (
+                  <>
+                    <button onClick={() => actualizarMiembro(miembro.id)} className="p-1.5 text-emerald-400 hover:text-emerald-300"><Check size={16}/></button>
+                    <button onClick={cancelarEdicion} className="p-1.5 text-rose-400 hover:text-rose-300"><X size={16}/></button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => editarMiembro(miembro)} className="p-1.5 text-slate-400 hover:text-white"><Edit size={16}/></button>
+                    <button onClick={() => eliminarMiembro(miembro.id)} className="p-1.5 text-slate-400 hover:text-rose-400"><Trash2 size={16}/></button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-2 text-[11px]">
+              <div>
+                <span className="text-slate-400 block">Contacto:</span>
+                <span className="text-slate-200 font-mono">{miembro.telefono || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block">Rol:</span>
+                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] ${
+                  miembro.rol === 'admin' ? 'bg-indigo-500/20 text-indigo-300' :
+                  miembro.rol === 'socio' ? 'bg-amber-500/20 text-amber-300' :
+                  miembro.rol === 'vendedor' ? 'bg-cyan-500/20 text-cyan-300' :
+                  'bg-emerald-500/20 text-emerald-300'
+                }`}>
+                  {miembro.rol}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block">Estado:</span>
+                <button
+                  onClick={() => toggleActivo(miembro.id)}
+                  className={`inline-block px-2 py-0.5 rounded-full text-[10px] ${
+                    miembro.activo 
+                      ? 'bg-emerald-500/20 text-emerald-300' 
+                      : 'bg-rose-500/20 text-rose-300'
+                  }`}
+                >
+                  {miembro.activo ? 'Activo' : 'Inactivo'}
+                </button>
+              </div>
+              <div>
+                <span className="text-slate-400 block">Aprobación:</span>
+                {miembro.rol === 'admin' && miembro.esAdminPrincipal ? (
+                  <span className="text-indigo-400 font-medium">★ Principal</span>
+                ) : miembro.aprobado ? (
+                  <span className="text-emerald-400 font-medium">✓ Aprobado</span>
+                ) : (
+                  <button
+                    onClick={() => aprobarMiembro(miembro.id)}
+                    className="text-amber-400 font-medium hover:text-amber-300"
+                  >
+                    ⏳ Aprobar
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Vista Tabla Tradicional para Desktop (>= md) */}
+      <div className="hidden md:block bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
         <table className="w-full">
           <thead className="bg-voltech-dark border-b border-voltech-border">
             <tr>

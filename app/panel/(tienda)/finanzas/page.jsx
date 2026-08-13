@@ -11,7 +11,9 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   PieChart,
-  BarChart3
+  BarChart3,
+  Percent,
+  Clock
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -37,12 +39,27 @@ export default function FinanzasPage() {
     productosConMargen: 0,
     ingresosTotales: 0,
     ventasTotales: 0,
+    ingresosHoy: 0,
+    ingresosMes: 0,
+    comisionesPagadas: 0,
+    comisionesPendientes: 0,
   });
+
+  // ✅ NUEVO: Detectar móvil para ajustar gráficos
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   useEffect(() => {
     const cargarDatos = async () => {
       let productosData = [];
       let ventasData = [];
+      let comisionesData = [];
 
       if (supabase) {
         const { data: prodsData } = await supabase.from('productos').select('*').eq('publicado', true);
@@ -50,6 +67,9 @@ export default function FinanzasPage() {
 
         const { data: vtsData } = await supabase.from('ventas').select('*');
         if (vtsData) ventasData = vtsData;
+
+        const { data: comData } = await supabase.from('comisiones_pendientes').select('*');
+        if (comData) comisionesData = comData;
       }
 
       if (productosData.length === 0) {
@@ -62,10 +82,14 @@ export default function FinanzasPage() {
         if (ventasGuardadas) ventasData = JSON.parse(ventasGuardadas);
       }
 
+      if (comisionesData.length === 0) {
+        const comGuardadas = localStorage.getItem('voltech_comisiones_pendientes');
+        if (comGuardadas) comisionesData = JSON.parse(comGuardadas);
+      }
+
       setProductos(productosData);
       setVentas(ventasData);
 
-      // ✅ CORRECCIÓN: Usar Number() para evitar errores de tipos
       const inversion = productosData.reduce((acc, p) => acc + (Number(p.precioMayor || 0) * Number(p.cantidad || 0)), 0);
       const valorVenta = productosData.reduce((acc, p) => acc + (Number(p.precioDetal || p.precioMayor || 0) * Number(p.cantidad || 0)), 0);
       const ganancia = valorVenta - inversion;
@@ -73,6 +97,17 @@ export default function FinanzasPage() {
       const conMargen = productosData.filter(p => Number(p.precioDetal || 0) > Number(p.precioMayor || 0)).length;
 
       const ingresosTotales = ventasData.reduce((acc, v) => acc + Number(v.montoAbonado || v.total || 0), 0);
+
+      // ✅ Métricas financieras trasladadas desde Dashboard Ventas
+      const hoyStr = new Date().toISOString().split('T')[0];
+      const mesAct = new Date().getMonth();
+      const anioAct = new Date().getFullYear();
+      const ventasHoyArr = ventasData.filter(v => (v.fechaRegistro || v.fecha || '').split('T')[0] === hoyStr);
+      const ventasMesArr = ventasData.filter(v => { const f = new Date(v.fechaRegistro || v.fecha); return !isNaN(f.getTime()) && f.getMonth() === mesAct && f.getFullYear() === anioAct; });
+      const ingresosHoy = ventasHoyArr.reduce((s, v) => s + Number(v.total || 0), 0);
+      const ingresosMes = ventasMesArr.reduce((s, v) => s + Number(v.total || 0), 0);
+      const comisionesPagadas = comisionesData.filter(c => c.estado === 'pagada').reduce((s, c) => s + Number(c.monto_comision || 0), 0);
+      const comisionesPendientes = comisionesData.filter(c => c.estado === 'pendiente').reduce((s, c) => s + Number(c.monto_comision || 0), 0);
 
       setStats({
         inversionTotal: inversion,
@@ -82,13 +117,16 @@ export default function FinanzasPage() {
         productosConMargen: conMargen,
         ingresosTotales: ingresosTotales,
         ventasTotales: ventasData.length,
+        ingresosHoy,
+        ingresosMes,
+        comisionesPagadas,
+        comisionesPendientes,
       });
     };
 
     cargarDatos();
   }, []);
 
-  // ✅ CORRECCIÓN: Asegurar que los valores sean números antes de calcular
   const datosMargenes = productos
     .filter(p => Number(p.precioDetal || 0) > 0)
     .map(p => {
@@ -112,7 +150,6 @@ export default function FinanzasPage() {
     if (!categoriasData[cat]) {
       categoriasData[cat] = 0;
     }
-    // ✅ CORRECCIÓN: Usar Number()
     categoriasData[cat] += Number(p.precioMayor || 0) * Number(p.cantidad || 0);
   });
 
@@ -121,71 +158,109 @@ export default function FinanzasPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* HEADER */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard Finanzas</h1>
-          <p className="text-sm text-voltech-muted mt-1">Análisis de inversión, márgenes y ganancias</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Dashboard Finanzas</h1>
+          <p className="text-xs sm:text-sm text-voltech-muted mt-1">Análisis de inversión, márgenes y ganancias</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-voltech-cyan to-blue-500">
-              <DollarSign className="w-5 h-5 text-white" />
+      {/* MÉTRICAS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Inversión Total</p>
+              <p className="text-base md:text-xl font-bold text-white mt-0.5 truncate">${Number(stats.inversionTotal).toFixed(2)}</p>
             </div>
+            <div className="p-2 rounded-lg bg-voltech-cyan/10 md:bg-voltech-cyan/20 text-voltech-cyan shrink-0 flex items-center justify-center"><DollarSign className="w-5 h-5" /></div>
           </div>
-          <p className="text-xs text-voltech-muted mb-1">Inversión Total</p>
-          <p className="text-2xl font-bold text-white">${Number(stats.inversionTotal).toFixed(2)}</p>
-          <p className="text-xs text-voltech-muted mt-1">Precio mayor × stock</p>
         </div>
 
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-voltech-purple to-pink-500">
-              <Package className="w-5 h-5 text-white" />
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Valor de Venta</p>
+              <p className="text-base md:text-xl font-bold text-white mt-0.5 truncate">${Number(stats.valorVentaTotal).toFixed(2)}</p>
             </div>
+            <div className="p-2 rounded-lg bg-voltech-purple/10 md:bg-voltech-purple/20 text-voltech-purple shrink-0 flex items-center justify-center"><Package className="w-5 h-5" /></div>
           </div>
-          <p className="text-xs text-voltech-muted mb-1">Valor de Venta</p>
-          <p className="text-2xl font-bold text-white">${Number(stats.valorVentaTotal).toFixed(2)}</p>
-          <p className="text-xs text-voltech-muted mt-1">Precio detal × stock</p>
         </div>
 
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500">
-              <TrendingUp className="w-5 h-5 text-white" />
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Ganancia Potencial</p>
+              <p className="text-base md:text-xl font-bold text-voltech-success mt-0.5 truncate">${Number(stats.gananciaPotencial).toFixed(2)}</p>
             </div>
-            <div className="flex items-center gap-1 text-xs text-voltech-success">
-              <ArrowUpRight className="w-3 h-3" />
-              Potencial
-            </div>
+            <div className="p-2 rounded-lg bg-voltech-success/10 md:bg-voltech-success/20 text-voltech-success shrink-0 flex items-center justify-center"><TrendingUp className="w-5 h-5" /></div>
           </div>
-          <p className="text-xs text-voltech-muted mb-1">Ganancia Potencial</p>
-          <p className="text-2xl font-bold text-voltech-success">${Number(stats.gananciaPotencial).toFixed(2)}</p>
-          <p className="text-xs text-voltech-muted mt-1">Si se vende todo el stock</p>
         </div>
 
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-red-500">
-              <Calculator className="w-5 h-5 text-white" />
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Margen Promedio</p>
+              <p className="text-base md:text-xl font-bold text-white mt-0.5 truncate">{Number(stats.margenPromedio).toFixed(1)}%</p>
             </div>
+            <div className="p-2 rounded-lg bg-orange-500/10 md:bg-orange-500/20 text-orange-400 shrink-0 flex items-center justify-center"><Calculator className="w-5 h-5" /></div>
           </div>
-          <p className="text-xs text-voltech-muted mb-1">Margen Promedio</p>
-          <p className="text-2xl font-bold text-white">{Number(stats.margenPromedio).toFixed(1)}%</p>
-          <p className="text-xs text-voltech-muted mt-1">{stats.productosConMargen} productos con margen</p>
         </div>
       </div>
 
+      {/* ✅ Métricas financieras (solo admin/socio) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Ingresos Hoy</p>
+              <p className="text-base md:text-xl font-bold text-voltech-success mt-0.5 truncate">${Number(stats.ingresosHoy).toFixed(2)}</p>
+            </div>
+            <div className="p-2 rounded-lg bg-voltech-success/10 md:bg-voltech-success/20 text-voltech-success shrink-0 flex items-center justify-center"><DollarSign className="w-5 h-5" /></div>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Ingresos Mes</p>
+              <p className="text-base md:text-xl font-bold text-voltech-success mt-0.5 truncate">${Number(stats.ingresosMes).toFixed(2)}</p>
+            </div>
+            <div className="p-2 rounded-lg bg-voltech-success/10 md:bg-voltech-success/20 text-voltech-success shrink-0 flex items-center justify-center"><DollarSign className="w-5 h-5" /></div>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Comis. Pagadas</p>
+              <p className="text-base md:text-xl font-bold text-voltech-purple mt-0.5 truncate">${Number(stats.comisionesPagadas).toFixed(2)}</p>
+            </div>
+            <div className="p-2 rounded-lg bg-voltech-purple/10 md:bg-voltech-purple/20 text-voltech-purple shrink-0 flex items-center justify-center"><Percent className="w-5 h-5" /></div>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Comis. Pendientes</p>
+              <p className="text-base md:text-xl font-bold text-voltech-warning mt-0.5 truncate">${Number(stats.comisionesPendientes).toFixed(2)}</p>
+            </div>
+            <div className="p-2 rounded-lg bg-voltech-warning/10 md:bg-voltech-warning/20 text-voltech-warning shrink-0 flex items-center justify-center"><Clock className="w-5 h-5" /></div>
+          </div>
+        </div>
+      </div>
+
+      {/* GRÁFICOS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-voltech-cyan" />
-              <h3 className="text-lg font-semibold text-white">Márgenes por Producto</h3>
+            <div className="flex items-center gap-2 min-w-0">
+              <BarChart3 className="w-5 h-5 text-voltech-cyan shrink-0" />
+              <h3 className="text-base sm:text-lg font-semibold text-white truncate">Márgenes por Producto</h3>
             </div>
-            <span className="text-xs bg-voltech-cyan/20 text-voltech-cyan px-2 py-1 rounded">
+            <span className="text-xs bg-voltech-cyan/20 text-voltech-cyan px-2 py-1 rounded shrink-0">
               % Ganancia
             </span>
           </div>
@@ -194,11 +269,11 @@ export default function FinanzasPage() {
               <p className="text-sm">Agrega precios detal para ver márgenes</p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={250}>
+            <ResponsiveContainer width="100%" height={isMobile ? 220 : 250}>
               <BarChart data={datosMargenes} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
                 <XAxis type="number" stroke="#a0a0b0" fontSize={12} />
-                <YAxis dataKey="nombre" type="category" stroke="#a0a0b0" fontSize={11} width={100} />
+                <YAxis dataKey="nombre" type="category" stroke="#a0a0b0" fontSize={isMobile ? 9 : 11} width={isMobile ? 70 : 100} />
                 <Tooltip 
                   contentStyle={{ 
                     backgroundColor: '#12121a', 
@@ -215,9 +290,9 @@ export default function FinanzasPage() {
 
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <PieChart className="w-5 h-5 text-voltech-purple" />
-              <h3 className="text-lg font-semibold text-white">Inversión por Categoría</h3>
+            <div className="flex items-center gap-2 min-w-0">
+              <PieChart className="w-5 h-5 text-voltech-purple shrink-0" />
+              <h3 className="text-base sm:text-lg font-semibold text-white truncate">Inversión por Categoría</h3>
             </div>
           </div>
           {datosCategorias.length === 0 ? (
@@ -225,42 +300,100 @@ export default function FinanzasPage() {
               <p className="text-sm">Agrega productos para ver distribución</p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={250}>
-              <RePieChart>
-                <Pie
-                  data={datosCategorias}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={90}
-                  paddingAngle={5}
-                  dataKey="value"
-                  label={({ name, percent }) => `${name} ${(Number(percent) * 100).toFixed(0)}%`}
-                >
+            <>
+              <ResponsiveContainer width="100%" height={isMobile ? 200 : 250}>
+                <RePieChart>
+                  <Pie
+                    data={datosCategorias}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={isMobile ? 40 : 60}
+                    outerRadius={isMobile ? 65 : 90}
+                    paddingAngle={5}
+                    dataKey="value"
+                    label={isMobile ? false : ({ name, percent }) => `${name} ${(Number(percent) * 100).toFixed(0)}%`}
+                  >
+                    {datosCategorias.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#12121a', 
+                      border: '1px solid #1e1e2e',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value) => `$${Number(value).toFixed(2)}`}
+                  />
+                </RePieChart>
+              </ResponsiveContainer>
+              {isMobile && (
+                <div className="mt-3 space-y-1.5">
                   {datosCategorias.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <div key={entry.name} className="flex items-center justify-between gap-2 text-[11px]">
+                      <span className="flex items-center gap-1.5 text-slate-300 min-w-0">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                        <span className="truncate">{entry.name}</span>
+                      </span>
+                      <span className="text-slate-200 font-bold shrink-0">${Number(entry.value).toFixed(2)}</span>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#12121a', 
-                    border: '1px solid #1e1e2e',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value) => `$${Number(value).toFixed(2)}`}
-                />
-              </RePieChart>
-            </ResponsiveContainer>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
 
+      {/* TABLA DE MÁRGENES */}
       <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
         <div className="p-5 border-b border-voltech-border">
           <h3 className="text-lg font-semibold text-white">Detalle de Márgenes por Producto</h3>
           <p className="text-xs text-voltech-muted mt-1">Comparación entre precio mayor (costo) y detal (venta)</p>
         </div>
-        <div className="overflow-x-auto">
+
+        {/* ✅ Vista Card Móvil (< md) */}
+        <div className="block md:hidden space-y-3 p-3">
+          {productos.length === 0 ? (
+            <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 text-center">
+              <Package className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+              <p className="text-xs text-slate-400">No hay productos registrados</p>
+            </div>
+          ) : (
+            productos.map((producto) => {
+              const precioDetal = Number(producto.precioDetal || producto.precioMayor || 0);
+              const precioMayor = Number(producto.precioMayor || 0);
+              const cantidad = Number(producto.cantidad || 0);
+              const gananciaUnid = precioDetal - precioMayor;
+              const margen = precioMayor > 0 ? (gananciaUnid / precioMayor * 100) : 0;
+              const gananciaTotal = gananciaUnid * cantidad;
+              return (
+                <div key={producto.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold text-slate-100 truncate">{producto.plataforma || producto.producto || 'Sin nombre'}</h4>
+                      <p className="text-[10px] text-slate-400 truncate">{producto.marca || 'N/A'}</p>
+                    </div>
+                    <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-bold ${cantidad === 0 ? 'bg-rose-500/20 text-rose-300' : cantidad <= 2 ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>Stock: {cantidad}</span>
+                  </div>
+                  <div className="pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-2 text-[11px]">
+                    <div><span className="text-slate-400 block">Precio Mayor:</span><span className="text-slate-200">${precioMayor.toFixed(2)}</span></div>
+                    <div><span className="text-slate-400 block">Precio Detal:</span><span className="text-slate-200">${precioDetal.toFixed(2)}</span></div>
+                    <div><span className="text-slate-400 block">Ganancia/Unid:</span><span className={`font-bold ${gananciaUnid >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>${gananciaUnid.toFixed(2)}</span></div>
+                    <div><span className="text-slate-400 block">Margen:</span><span className={`font-bold ${margen > 50 ? 'text-emerald-300' : margen > 20 ? 'text-cyan-300' : margen > 0 ? 'text-amber-300' : 'text-rose-300'}`}>{margen.toFixed(1)}%</span></div>
+                  </div>
+                  <div className="pt-2 border-t border-slate-700/40 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400">Ganancia Total:</span>
+                    <span className={`font-bold ${gananciaTotal >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>${gananciaTotal.toFixed(2)}</span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* ✅ Vista Tabla Desktop (>= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead className="bg-voltech-dark border-b border-voltech-border">
               <tr>
@@ -283,7 +416,6 @@ export default function FinanzasPage() {
                 </tr>
               ) : (
                 productos.map((producto) => {
-                  // ✅ CORRECCIÓN CRÍTICA: Forzar conversión a Number antes de cualquier operación
                   const precioDetal = Number(producto.precioDetal || producto.precioMayor || 0);
                   const precioMayor = Number(producto.precioMayor || 0);
                   const cantidad = Number(producto.cantidad || 0);

@@ -298,12 +298,12 @@ export default function AlertasPage() {
 
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex flex-col gap-3 mb-4">
-            <div className="flex gap-2">
-              <div className="relative flex-1">
+            <div className="flex flex-col sm:flex-row items-center gap-2 w-full mb-3">
+              <div className="relative w-full flex-1 min-w-0">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-voltech-muted" />
-                <input type="text" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar alerta..." className="w-full pl-10 pr-3 py-2 bg-voltech-dark border border-voltech-border rounded-lg text-sm text-white" />
+                <input type="text" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar alerta..." className="w-full pl-10 pr-3 py-2 bg-voltech-dark border border-voltech-border rounded-lg text-xs sm:text-sm text-white" />
               </div>
-              <select value={estadoFiltro} onChange={(e) => setEstadoFiltro(e.target.value)} className="bg-voltech-dark border border-voltech-border rounded-lg px-3 py-2 text-sm text-white">
+              <select value={estadoFiltro} onChange={(e) => setEstadoFiltro(e.target.value)} className="w-full sm:w-auto text-xs py-2 bg-voltech-dark border border-voltech-border rounded-lg px-3 text-white">
                 <option value="">Todos los estados</option>
                 <option value="requiere_accion">Requiere Acción</option>
                 <option value="pendiente">Pendiente</option>
@@ -311,9 +311,9 @@ export default function AlertasPage() {
                 <option value="expirado">Expirado</option>
               </select>
             </div>
-            <div className="flex gap-1 flex-wrap">
+            <div className="flex items-center gap-2 w-full overflow-x-auto no-scrollbar py-2 min-w-0">
               {CATEGORIAS.map(c => (
-                <button key={c.id} onClick={() => setCatActiva(c.id)} className={`text-xs px-2 py-1 rounded-full border transition-colors ${catActiva === c.id ? 'bg-voltech-cyan/20 text-voltech-cyan border-voltech-cyan/40' : 'text-voltech-muted border-voltech-border hover:text-white'}`}>{c.label}</button>
+                <button key={c.id} onClick={() => setCatActiva(c.id)} className={`shrink-0 whitespace-nowrap text-xs py-1.5 px-3 rounded-full border transition-all ${catActiva === c.id ? 'bg-voltech-cyan/20 text-voltech-cyan border-voltech-cyan/40' : 'text-voltech-muted border-voltech-border hover:text-white'}`}>{c.label}</button>
               ))}
             </div>
           </div>

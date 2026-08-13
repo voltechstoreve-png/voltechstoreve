@@ -88,7 +88,7 @@ export default function NotificationBell() {
       </button>
 
       {showDropdown && (
-        <div className="absolute right-0 mt-2 w-80 bg-voltech-surface border border-voltech-border rounded-xl shadow-2xl z-50">
+        <div className="fixed left-4 right-4 top-16 w-auto max-h-[80vh] overflow-y-auto sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-h-none sm:overflow-visible bg-voltech-surface border border-voltech-border rounded-xl shadow-2xl z-50">
           <div className="p-4 border-b border-voltech-border">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-bold text-white">Notificaciones</h3>

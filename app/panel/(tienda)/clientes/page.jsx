@@ -381,59 +381,52 @@ function ClientesContent() {
     <div className="space-y-6">
       <Toaster position="top-right" toastOptions={{ style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' }, success: { iconTheme: { primary: '#00ff88', secondary: '#fff' } }, error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } } }} />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Clientes</h1>
-          <p className="text-sm text-voltech-muted mt-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
+        <div className="flex-1 min-w-0 pr-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Clientes</h1>
+          <p className="text-xs sm:text-sm text-voltech-muted mt-1">
             {esVendedor ? 'Gestiona tus clientes personales y referidos' : 'Gestiona tu base de clientes, referidos y etiquetas'}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           {activeTab === 'clientes' && (
-            <button onClick={() => { resetForm(); setShowForm(true); }} className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2">
+            <button onClick={() => { resetForm(); setShowForm(true); }} className="w-full sm:w-auto shrink-0 justify-center text-xs sm:text-sm py-2.5 px-4 rounded-xl bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2">
               <UserPlus className="w-4 h-4" /> Nuevo Cliente
             </button>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-cyan/20"><Users className="w-5 h-5 text-voltech-cyan" /></div>
-            <div><p className="text-xs text-voltech-muted">Total Clientes</p><p className="text-xl font-bold text-white">{clientes.length}</p></div>
-          </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+          <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-cyan/10 md:bg-voltech-cyan/20 text-voltech-cyan shrink-0 flex items-center justify-center"><Users className="w-5 h-5" /></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Total Clientes</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{clientes.length}</p></div>
         </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-success/20"><CheckCircle className="w-5 h-5 text-voltech-success" /></div>
-            <div><p className="text-xs text-voltech-muted">Nuevos</p><p className="text-xl font-bold text-white">{clientes.filter(c => c.etiquetas?.includes('Nuevo')).length}</p></div>
-          </div>
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+          <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-success/10 md:bg-voltech-success/20 text-voltech-success shrink-0 flex items-center justify-center"><CheckCircle className="w-5 h-5" /></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Nuevos</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{clientes.filter(c => c.etiquetas?.includes('Nuevo')).length}</p></div>
         </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-purple/20"><Tag className="w-5 h-5 text-voltech-purple" /></div>
-            <div><p className="text-xs text-voltech-muted">Frecuentes</p><p className="text-xl font-bold text-white">{clientes.filter(c => c.etiquetas?.includes('Frecuente')).length}</p></div>
-          </div>
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+          <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-purple/10 md:bg-voltech-purple/20 text-voltech-purple shrink-0 flex items-center justify-center"><Tag className="w-5 h-5" /></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Frecuentes</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{clientes.filter(c => c.etiquetas?.includes('Frecuente')).length}</p></div>
         </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-warning/20"><Trophy className="w-5 h-5 text-voltech-warning" /></div>
-            <div><p className="text-xs text-voltech-muted">Embajadores (2+ referidos)</p><p className="text-xl font-bold text-white">{clientes.filter(c => (c.referidos?.length || 0) >= 2).length}</p></div>
-          </div>
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+          <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-warning/10 md:bg-voltech-warning/20 text-voltech-warning shrink-0 flex items-center justify-center"><Trophy className="w-5 h-5" /></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Embajadores (2+)</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{clientes.filter(c => (c.referidos?.length || 0) >= 2).length}</p></div>
         </div>
       </div>
 
       <div className="border-b border-voltech-border">
-        <div className="flex gap-6">
-          <button className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'clientes' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`} onClick={() => setActiveTab('clientes')}>
+        <div className="grid grid-cols-2 md:flex md:gap-6 w-full gap-y-2 pb-2 md:pb-1">
+          <button className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${activeTab === 'clientes' ? 'text-voltech-cyan bg-voltech-cyan/10 border-transparent md:bg-transparent md:border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`} onClick={() => setActiveTab('clientes')}>
             <Users className="w-4 h-4" /> Base de Clientes
           </button>
-          <button className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'referidos' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`} onClick={() => setActiveTab('referidos')}>
+          <button className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${activeTab === 'referidos' ? 'text-voltech-cyan bg-voltech-cyan/10 border-transparent md:bg-transparent md:border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`} onClick={() => setActiveTab('referidos')}>
             <Gift className="w-4 h-4" /> Programa de Referidos
           </button>
+        </div>
         {activeTab === 'notificaciones' && (
-          <div>
+          <div className="mt-4">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-lg font-bold text-white">Notificaciones</h3>
@@ -445,7 +438,6 @@ function ClientesContent() {
             </div>
           </div>
         )}
-        </div>
       </div>
 
       <div>
@@ -506,13 +498,13 @@ function ClientesContent() {
               )}
             </AnimatePresence>
 
-            <div className="flex items-center justify-between gap-4 mb-4">
-              <div className="relative flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full min-w-0 mt-3 mb-4">
+              <div className="relative w-full sm:flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
-                <input type="text" placeholder="Buscar por nombre, teléfono, correo..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-voltech w-full rounded-lg pl-10 pr-4 py-3 text-sm" />
+                <input type="text" placeholder="Buscar por nombre, teléfono, correo..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-voltech w-full rounded-lg pl-10 pr-4 py-2.5 sm:py-3 text-sm" />
               </div>
-              <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-voltech-muted" />
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Filter className="w-4 h-4 text-voltech-muted shrink-0" />
                 <select 
                   value={filterEtiqueta} 
                   onChange={(e) => {
@@ -527,7 +519,7 @@ function ClientesContent() {
                       setFilterEtiqueta(e.target.value);
                     }
                   }} 
-                  className="input-voltech rounded-lg px-4 py-3 text-sm min-w-[200px]"
+                  className="input-voltech w-full sm:w-auto rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm sm:min-w-[200px]"
                 >
                   <option value="">Todas las etiquetas</option>
                   {etiquetas.map(e => (<option key={e.id} value={e.nombre}>{e.nombre}</option>))}
@@ -541,8 +533,78 @@ function ClientesContent() {
               </div>
             </div>
 
-            <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
-              <div className="overflow-x-auto">
+            {/* ✅ Vista Card en Móvil (< md) */}
+            <div className="block md:hidden space-y-3">
+              {clientesFiltrados.length === 0 ? (
+                <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 text-center">
+                  <Users className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                  <p className="text-xs text-slate-400">No hay clientes registrados</p>
+                </div>
+              ) : (
+                clientesFiltrados.map((cliente) => (
+                  <div key={cliente.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-voltech-cyan to-voltech-purple flex items-center justify-center text-white font-bold text-xs shrink-0">
+                          {cliente.nombre.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-bold text-slate-100 truncate">{cliente.nombre} {cliente.apellido}</h4>
+                          <p className="text-[11px] text-slate-400 font-mono truncate">{cliente.telefono}</p>
+                        </div>
+                      </div>
+                      {(esAdmin || esSocio || (cliente.registradoPor || '').toLowerCase() === (usuarioActual?.nombre || '').toLowerCase()) && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => editarCliente(cliente)} className="p-1.5 text-slate-400 hover:text-white" title="Editar"><Edit3 size={16} /></button>
+                          <button onClick={() => eliminarCliente(cliente.id)} className="p-1.5 text-slate-400 hover:text-rose-400" title="Eliminar"><Trash2 size={16} /></button>
+                        </div>
+                      )}
+                    </div>
+
+                    {(cliente.etiquetas?.length > 0 || cliente.fuenteRegistro === 'sorteo') && (
+                      <div className="flex flex-wrap gap-1">
+                        {cliente.etiquetas?.filter(n => etiquetas.some(e => e.nombre === n)).map((n, idx) => {
+                          const et = etiquetas.find(e => e.nombre === n);
+                          return (
+                            <span key={idx} className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: `${et?.color || '#666'}30`, color: et?.color || '#fff', border: `1px solid ${et?.color || '#666'}` }}>
+                              {n}
+                            </span>
+                          );
+                        })}
+                        {cliente.fuenteRegistro === 'sorteo' && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300">🎁 Sorteo: {cliente.numeroOrdenSorteo || 'N/A'}</span>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-2 text-[11px]">
+                      <div>
+                        <span className="text-slate-400 block">Compras:</span>
+                        <span className="text-slate-200 font-bold">{cliente.totalCompras || 0}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">Total Gastado:</span>
+                        <span className="text-emerald-400 font-bold">${(cliente.totalGastado || 0).toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">Registrado por:</span>
+                        <span className="text-slate-200 truncate block">{cliente.registradoPor || 'Sistema'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">Referidos:</span>
+                        <button onClick={() => verReferidos(cliente)} className="text-cyan-400 font-medium hover:text-cyan-300">
+                          {cliente.referidos?.length || 0} Ver
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* ✅ Vista Tabla en Desktop (>= md) */}
+            <div className="hidden md:block bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
+              <div className="w-full overflow-x-auto min-w-0">
                 <table className="w-full">
                   <thead className="bg-voltech-dark border-b border-voltech-border">
                     <tr>
@@ -565,7 +627,7 @@ function ClientesContent() {
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-voltech-cyan to-voltech-purple flex items-center justify-center text-white font-bold text-sm">{cliente.nombre.charAt(0)}</div>
                               <div>
-                                <p className="text-sm font-medium text-white">{cliente.nombre} {cliente.apellido}</p>
+                                <p className="text-sm font-medium text-white whitespace-nowrap">{cliente.nombre} {cliente.apellido}</p>
                                 {cliente.etiquetas && cliente.etiquetas.length > 0 && (
                                   <div className="flex flex-wrap gap-1 mt-1">
                                     {cliente.etiquetas.filter(etiquetaNombre => etiquetas.some(e => e.nombre === etiquetaNombre)).map((etiquetaNombre, idx) => {

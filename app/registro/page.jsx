@@ -194,10 +194,10 @@ function RegistroContent() {
   if (!invitationValid) {
     return (
       <div className="min-h-screen bg-voltech-dark flex items-center justify-center p-4">
-        <div className="bg-voltech-surface border border-voltech-border rounded-2xl p-8 max-w-md w-full text-center">
-          <AlertCircle className="w-16 h-16 text-voltech-error mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Invitación Inválida</h1>
-          <p className="text-voltech-muted mb-6">El link de invitación no es válido o ha expirado.</p>
+        <div className="bg-voltech-surface border border-voltech-border rounded-2xl p-4 sm:p-8 max-w-md w-full text-center">
+          <AlertCircle className="w-12 h-12 sm:w-16 sm:h-16 text-voltech-error mx-auto mb-4" />
+          <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">Invitación Inválida</h1>
+          <p className="text-xs sm:text-sm text-voltech-muted mb-6">El link de invitación no es válido o ha expirado.</p>
           <button
             onClick={() => router.push('/login')}
             className="w-full btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"
@@ -221,7 +221,7 @@ function RegistroContent() {
         }}
       />
 
-      <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
         <div className="hidden md:flex flex-col justify-center items-center p-8">
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
             <div className="w-20 h-20 bg-gradient-to-br from-voltech-cyan to-voltech-purple rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -246,12 +246,12 @@ function RegistroContent() {
           </motion.div>
         </div>
 
-        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="bg-voltech-surface border border-voltech-border rounded-2xl p-8">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-2">
+        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="bg-voltech-surface border border-voltech-border rounded-2xl p-4 sm:p-8">
+          <div className="mb-6 sm:mb-8">
+            <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
               {invitationData ? 'Completa tu Registro' : 'Crear Cuenta'}
             </h2>
-            <p className="text-sm text-voltech-muted">
+            <p className="text-xs sm:text-sm text-voltech-muted">
               {invitationData 
                 ? 'Tu invitación está lista. Verifica tus datos y crea tu contraseña.' 
                 : 'Regístrate para unirte al equipo de VOLTECH'}

@@ -105,16 +105,16 @@ export default function RecuperarPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-md bg-voltech-surface border border-voltech-border rounded-2xl p-8 shadow-2xl relative z-10"
+        className="w-full max-w-md bg-voltech-surface border border-voltech-border rounded-2xl p-4 sm:p-8 shadow-2xl relative z-10"
       >
         {/* Logo y Título */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-extrabold bg-gradient-to-r from-voltech-cyan to-voltech-purple bg-clip-text text-transparent tracking-wider">
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-4xl font-extrabold bg-gradient-to-r from-voltech-cyan to-voltech-purple bg-clip-text text-transparent tracking-wider">
             VOLTECH
           </h1>
-          <p className="text-voltech-muted text-xs tracking-[0.3em] mt-1">STORE.VE</p>
-          <div className="w-16 h-0.5 bg-gradient-to-r from-voltech-cyan to-voltech-purple mx-auto mt-4 mb-3"></div>
-          <p className="text-voltech-muted text-sm">
+          <p className="text-voltech-muted text-[10px] sm:text-xs tracking-[0.2em] sm:tracking-[0.3em] mt-1">STORE.VE</p>
+          <div className="w-12 sm:w-16 h-0.5 bg-gradient-to-r from-voltech-cyan to-voltech-purple mx-auto mt-3 sm:mt-4 mb-3"></div>
+          <p className="text-voltech-muted text-xs sm:text-sm">
             {step === 1 ? 'Recupera tu contraseña' : 'Verifica tu identidad'}
           </p>
         </div>
@@ -122,9 +122,9 @@ export default function RecuperarPage() {
         {/* Botón volver al login */}
         <Link 
           href="/login"
-          className="absolute top-4 left-4 text-voltech-muted hover:text-voltech-cyan transition-colors flex items-center gap-2 text-xs"
+          className="absolute top-2 left-2 sm:top-4 sm:left-4 text-voltech-muted hover:text-voltech-cyan transition-colors flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
           Volver
         </Link>
 

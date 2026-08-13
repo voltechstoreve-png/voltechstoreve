@@ -924,17 +924,17 @@ export default function VentasProductosPage() {
         error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } } 
       }} />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Ventas de Productos</h1>
-          <p className="text-sm text-voltech-muted mt-1">{esVendedor ? 'Registra y gestiona tus ventas personales' : 'Registra ventas y descuenta inventario automáticamente'}</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
+        <div className="flex-1 min-w-0 pr-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Ventas de Productos</h1>
+          <p className="text-xs sm:text-sm text-voltech-muted mt-1">{esVendedor ? 'Registra y gestiona tus ventas personales' : 'Registra ventas y descuenta inventario automáticamente'}</p>
         </div>
-        <button onClick={() => { resetForm(); setShowForm(true); }} className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2">
+        <button onClick={() => { resetForm(); setShowForm(true); }} className="w-full sm:w-auto shrink-0 justify-center px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2">
           <Plus className="w-4 h-4" /> Nueva Venta
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-voltech-cyan/20"><ShoppingCart className="w-5 h-5 text-voltech-cyan" /></div>
@@ -1087,7 +1087,7 @@ export default function VentasProductosPage() {
                             )}
                           </div>
                         )}
-                        <div className="grid grid-cols-12 gap-3 items-end">
+                        <div className="grid grid-cols-2 md:grid-cols-12 gap-3 items-end">
                           <div className="col-span-12 md:col-span-2">
                             <label className="block text-xs text-voltech-muted mb-1 ml-1">SKU</label>
                             <input type="text" value={prod.sku} readOnly className="input-voltech w-full rounded-lg px-3 py-2 text-sm font-mono text-voltech-cyan bg-voltech-dark/50" placeholder="Auto" />
@@ -1125,11 +1125,11 @@ export default function VentasProductosPage() {
 
                           <div className="col-span-12 md:col-span-4 relative">
                             <label className="block text-xs text-voltech-muted mb-1 ml-1">Producto *</label>
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-2 w-full min-w-0">
                               <select
                                 value={prod.productoId}
                                 onChange={(e) => actualizarCampoProducto(index, 'productoId', e.target.value)}
-                                className="input-voltech flex-1 rounded-lg px-3 py-2 text-sm"
+                                className="input-voltech flex-1 min-w-0 w-full text-xs sm:text-sm rounded-lg px-3 py-2"
                                 disabled={prod.esKit}
                               >
                                 <option value="">-- Selecciona --</option>
@@ -1140,7 +1140,7 @@ export default function VentasProductosPage() {
                                 ))}
                               </select>
                               {!prod.esKit && (
-                                <button onClick={() => abrirModalProductoNuevo(index)} className="px-3 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg hover:bg-voltech-purple/30 transition-colors flex items-center gap-1" title="Crear nuevo"><Plus className="w-4 h-4" /></button>
+                                <button onClick={() => abrirModalProductoNuevo(index)} className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-voltech-purple/20 text-voltech-purple hover:bg-voltech-purple/30 transition-colors" title="Crear nuevo"><Plus className="w-4 h-4" /></button>
                               )}
                             </div>
                           </div>
@@ -1233,7 +1233,7 @@ export default function VentasProductosPage() {
                 </div>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button onClick={registrarVenta} className="flex-1 btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"><Save className="w-5 h-5" />{editingId ? 'Actualizar Venta' : 'Registrar Venta'}</button>
                 <button onClick={resetForm} className="px-6 py-3 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-error transition-all flex items-center gap-2"><X className="w-4 h-4" /> Cancelar</button>
               </div>
@@ -1279,16 +1279,88 @@ export default function VentasProductosPage() {
       </AnimatePresence>
 
       <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
-        <div className="p-4 border-b border-voltech-border flex items-center justify-between gap-4">
+        <div className="p-4 border-b border-voltech-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h3 className="text-lg font-bold text-white">Historial de Ventas</h3>
-          <div className="relative flex-1 max-w-md">
+          <div className="relative w-full sm:flex-1 sm:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
             <input type="text" placeholder="Buscar por cliente o producto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-voltech w-full rounded-lg pl-10 pr-4 py-2 text-sm" />
           </div>
         </div>
         
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        {/* ✅ Vista Card Móvil (< md) — mismo diseño que Ventas Streaming */}
+        <div className="block md:hidden space-y-3 p-3">
+          {ventasFiltradas.length === 0 ? (
+            <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 text-center">
+              <ShoppingCart className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+              <p className="text-xs text-slate-400">No hay ventas registradas</p>
+            </div>
+          ) : (
+            ventasFiltradas.map((venta) => {
+              const isExpanded = expandedId === venta.id;
+              return (
+                <div key={venta.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold text-slate-100 truncate">{venta.cliente}</h4>
+                      <p className="text-[11px] text-slate-400 font-mono truncate">{venta.telefono}</p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => { setShowWhatsappModal(venta); setWhatsappMode('gracias'); }} className="p-1.5 text-slate-400 hover:text-emerald-400" title="Mensaje de gracias"><MessageCircle size={16} /></button>
+                      <button onClick={() => { setShowWhatsappModal(venta); setWhatsappMode('recordatorio'); }} className="p-1.5 text-slate-400 hover:text-amber-400" title="Recordatorio de pago"><AlertTriangle size={16} /></button>
+                      <button onClick={() => editarVenta(venta)} className="p-1.5 text-slate-400 hover:text-cyan-400" title="Editar"><Edit3 size={16} /></button>
+                      <button onClick={() => eliminarVenta(venta)} className="p-1.5 text-slate-400 hover:text-rose-400" title="Eliminar"><Trash2 size={16} /></button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300">{venta.productos[0]?.nombre}{venta.productos.length > 1 ? ` +${venta.productos.length - 1} más` : ''}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${venta.estado === 'pagado' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>{venta.estado === 'pagado' ? 'Pagado' : 'Pendiente'}</span>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-2 text-[11px]">
+                    <div><span className="text-slate-400 block">Fecha:</span><span className="text-slate-200 font-mono">{venta.fecha}</span></div>
+                    <div><span className="text-slate-400 block">Total:</span><span className="text-emerald-300 font-bold">${Number(venta.total || 0).toFixed(2)}</span></div>
+                    <div><span className="text-slate-400 block">Comisión:</span><span className="text-indigo-300 font-bold">${Number(getComisionVenta(venta)).toFixed(2)}</span></div>
+                    <div><span className="text-slate-400 block">Método:</span><span className="text-slate-200 capitalize">{(venta.metodoPago || '').replace('_', ' ') || 'N/A'}</span></div>
+                  </div>
+
+                  <button onClick={() => setExpandedId(isExpanded ? null : venta.id)} className="w-full flex items-center justify-center gap-1 text-[11px] text-cyan-400 py-1.5 rounded-lg border border-slate-700/50 hover:bg-slate-700/30 transition-colors">
+                    <ChevronDown size={14} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                    Ver detalle ({venta.productos.length})
+                  </button>
+
+                  {isExpanded && (
+                    <div className="space-y-2">
+                      {venta.productos.map((prod, idx) => (
+                        <div key={idx} className="bg-slate-900/60 border border-slate-700/40 rounded-xl p-3 space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-bold text-slate-100">{prod.nombre}{prod.esKit ? ' (KIT)' : ''}</span>
+                            <span className="text-[11px] text-emerald-300 font-bold">${Number(prod.total || 0).toFixed(2)}</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400">x{prod.cantidad} • ${Number(prod.precioUnitario || 0).toFixed(2)} c/u</p>
+                        </div>
+                      ))}
+                      <div className="flex gap-2">
+                        {venta.estado !== 'pagado' && (
+                          <button onClick={() => marcarPagado(venta)} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-emerald-300 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors">
+                            <CheckCircle size={14} /> Marcar Pagado
+                          </button>
+                        )}
+                        <button onClick={() => generarPDF(venta)} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-indigo-300 py-2 rounded-lg bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 transition-colors">
+                          <FileText size={14} /> Recibo PDF
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* ✅ Vista Tabla Desktop (>= md) */}
+        <div className="hidden md:block w-full overflow-x-auto min-w-0">
+          <table className="w-full min-w-[900px] md:min-w-0">
             <thead className="bg-voltech-dark border-b border-voltech-border">
               <tr>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">N° Orden</th>
@@ -1312,12 +1384,12 @@ export default function VentasProductosPage() {
                 ventasFiltradas.map((venta) => (
                   <React.Fragment key={venta.id}>
                     <tr className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
-                      <td className="px-4 py-3 text-sm font-mono text-voltech-cyan">{venta.numeroOrden || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm text-voltech-muted flex items-center gap-2"><Calendar className="w-3 h-3" /> {venta.fecha}</td>
+                      <td className="px-4 py-3 text-xs font-mono whitespace-nowrap text-voltech-cyan pr-3">{venta.numeroOrden || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-voltech-muted whitespace-nowrap"><span className="inline-flex items-center gap-2"><Calendar className="w-3 h-3" /> {venta.fecha}</span></td>
                       <td className="px-4 py-3"><p className="text-sm font-medium text-white">{venta.cliente}</p><p className="text-xs text-voltech-muted">{venta.telefono}</p></td>
                       <td className="px-4 py-3"><p className="text-sm text-white">{venta.productos[0]?.nombre}{venta.productos[0]?.esKit && <span className="text-xs text-voltech-purple ml-1">(KIT)</span>}{venta.productos.length > 1 && (<span className="text-xs text-voltech-muted ml-1">(+{venta.productos.length - 1} más)</span>)}</p><button onClick={() => setExpandedId(expandedId === venta.id ? null : venta.id)} className="text-xs text-voltech-cyan hover:underline flex items-center gap-1 mt-1"><ChevronDown className={`w-3 h-3 transition-transform ${expandedId === venta.id ? 'rotate-180' : ''}`} /> Ver detalle</button></td>
-                      <td className="px-4 py-3 text-sm font-bold text-voltech-success">${Number(venta.total || 0).toFixed(2)}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-voltech-purple">${Number(getComisionVenta(venta)).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-voltech-success whitespace-nowrap">${Number(venta.total || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-voltech-purple whitespace-nowrap">${Number(getComisionVenta(venta)).toFixed(2)}</td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{venta.fechaPago || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-voltech-warning">{calcularDiasAtraso(venta) > 0 ? `+${calcularDiasAtraso(venta)}` : '0'}</td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{(venta.metodoPago || '').replace('_', ' ')}</td>

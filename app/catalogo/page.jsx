@@ -15,6 +15,18 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import ChatbotWidget from '@/components/ChatbotWidget';
+import WhatsAppIcon from '@/components/WhatsAppIcon';
+
+// ✅ Abre WhatsApp NATIVO en móvil o WhatsApp Web en PC (conserva emojis)
+const abrirWhatsAppNat = (numero, texto) => {
+  const limpio = String(numero || '').replace(/\D/g, '');
+  const cod = encodeURIComponent(texto);
+  const esMovil = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
+  const url = esMovil
+    ? `https://wa.me/${limpio}?text=${cod}`
+    : `https://web.whatsapp.com/send?phone=${limpio}&text=${cod}`;
+  window.open(url, '_blank');
+};
 
 export default function CatalogoPage() {
   const [activeSection, setActiveSection] = useState('productos');
@@ -193,6 +205,20 @@ export default function CatalogoPage() {
   useEffect(() => { 
     localStorage.setItem('voltech_cart', JSON.stringify(cart)); 
   }, [cart]);
+
+  // ✅ NUEVO: Contar visitas públicas (NO cuenta logueados), 1 por sesión
+  useEffect(() => {
+    const yaContada = sessionStorage.getItem('voltech_visita_contada');
+    const logueado = localStorage.getItem('voltech_user');
+    if (!yaContada && !logueado && supabase) {
+      sessionStorage.setItem('voltech_visita_contada', '1');
+      const ref = new URLSearchParams(window.location.search).get('ref');
+      supabase
+        .from('visitas_publicas')
+        .insert({ ref_code: ref ? ref.toUpperCase() : null })
+        .then(({ error }) => { if (error) console.warn('No se registró visita:', error.message); });
+    }
+  }, []);
     useEffect(() => {
     if (productos.length === 0) return;
     const prodId = new URLSearchParams(window.location.search).get('producto');
@@ -416,7 +442,7 @@ export default function CatalogoPage() {
     }
     mensaje += `\n💳 Pago: ${paymentMethod}`;
 
-    window.open(`https://wa.me/${whatsappNumero}?text=${encodeURIComponent(mensaje)}`, '_blank');
+    abrirWhatsAppNat(whatsappNumero, mensaje);
     toast.success('Pedido enviado');
   };
 
@@ -429,7 +455,7 @@ export default function CatalogoPage() {
       mensaje += `Precio: $${precioInfo.precioPrincipal.toFixed(2)}\n`;
     }
     mensaje += `Bs ${calcularPrecioBs(precioInfo.precioPrincipal)}\n\n¿Cómo procedo?`;
-    window.open(`https://wa.me/${whatsappNumero}?text=${encodeURIComponent(mensaje)}`, '_blank');
+    abrirWhatsAppNat(whatsappNumero, mensaje);
   };
 
   const categorias = [...new Set((productos || []).filter(p => p.categoria && p.categoria.toUpperCase() !== 'STREAMING').map(p => p.categoria).filter(Boolean))].sort();
@@ -811,6 +837,40 @@ export default function CatalogoPage() {
       </header>
 
       <main className="max-w-[1800px] xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
+        {/* ✅ PUBLICIDAD MÓVIL: carrusel horizontal (solo < lg) */}
+        {publicidad.filter(p => !p.dispositivos || p.dispositivos.movil !== false).length > 0 && (
+          <div className="lg:hidden mb-6">
+            <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 pb-1">
+              {publicidad.filter(p => !p.dispositivos || p.dispositivos.movil !== false).map(pub => (
+                <a
+                  key={pub.id}
+                  href={pub.url_destino || '#'}
+                  target={pub.url_destino ? '_blank' : '_self'}
+                  onClick={() => registrarClickPub(pub)}
+                  className={`relative shrink-0 w-72 rounded-xl overflow-hidden border ${cardBorder} ${cardBg} hover:border-voltech-cyan/50 transition-all`}
+                >
+                  <div className="relative w-full aspect-[16/9] bg-voltech-dark overflow-hidden">
+                    {pub.url_video ? (
+                      <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+                    ) : pub.url_imagen ? (
+                      <img src={pub.url_imagen} alt={pub.titulo} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-voltech-muted"><ImageIcon className="w-10 h-10 opacity-50" /></div>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <p className={`text-sm font-bold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{pub.titulo}</p>
+                    {pub.descripcion && <p className={`text-xs mt-1 line-clamp-2 ${mutedText}`}>{pub.descripcion}</p>}
+                    <span className="mt-2 block w-full bg-voltech-cyan/20 text-voltech-cyan text-xs font-semibold py-1.5 rounded text-center hover:bg-voltech-cyan/30 transition-colors">
+                      {pub.texto_boton || 'Ver Oferta'}
+                    </span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
           
           {/* ✅ SIDEBAR IZQUIERDO: SOLO si hay publicidad activa */}
@@ -851,20 +911,20 @@ export default function CatalogoPage() {
               <div>
 
                 <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Productos</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5 w-full">
                   {productosFiltrados.length > 0 ? (
                     productosFiltrados.map(p => {
                       const precioInfo = getPrecioMostrar(p);
                       return (
-                        <div key={p.id} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between cursor-pointer group`}>
-                          <div className="aspect-square bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center overflow-hidden relative">
+                        <div key={p.id} onClick={() => setSelectedProduct(p)} className={`flex flex-col justify-between h-full ${darkMode ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl shadow-md border overflow-hidden hover:shadow-xl hover:border-slate-700 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer group`}>
+                          <div className="relative w-full aspect-square bg-white flex items-center justify-center overflow-hidden rounded-t-2xl">
                             {p.imagen ? (
-                              <img src={p.imagen} alt={p.producto} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} />
+                              <img src={p.imagen} alt={p.producto} className="w-full h-full object-contain p-2 transition-transform duration-300 group-hover:scale-105" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} />
                             ) : (
                               <Package className="w-12 h-12 text-slate-300" />
                             )}
-                            {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">OFERTA</div>}
-                            {p.tipo === 'kit' && <div className="absolute top-2 left-2 bg-voltech-cyan text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">KIT</div>}
+                            {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md z-10">OFERTA</div>}
+                            {p.tipo === 'kit' && <div className="absolute top-2 left-2 bg-voltech-cyan text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md z-10">KIT</div>}
                           </div>
                           <div className="p-3 flex flex-col flex-1">
                             <div className="mb-1"><p className={`text-[10px] font-medium uppercase tracking-wide ${mutedText} truncate`}>{p.marca} • {p.categoria}</p></div>
@@ -875,12 +935,14 @@ export default function CatalogoPage() {
                                 <p className={`text-xl font-bold ${precioInfo.tieneOferta ? 'text-red-600' : darkMode ? 'text-white' : 'text-slate-900'}`}>${precioInfo.precioPrincipal?.toFixed(2)}</p>
                                 <p className={`text-xs font-medium ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
                               </div>
-                              <div className="flex gap-1.5 pt-1">
-                                <button onClick={(e) => { e.stopPropagation(); comprarRapido(p); }} className="flex-1 bg-green-500 text-white py-2 rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors flex items-center justify-center gap-1">
-                                  <MessageCircle className="w-3 h-3 flex-shrink-0" /> WhatsApp
+                              <div className="flex items-center gap-1.5 w-full mt-auto pt-3">
+                                <button onClick={(e) => { e.stopPropagation(); comprarRapido(p); }} className="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs py-2 px-2 rounded-xl transition-all shadow-sm">
+                                  <WhatsAppIcon className="w-4 h-4 shrink-0 fill-current" />
+                                  <span className="truncate">WhatsApp</span>
                                 </button>
-                                <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="flex-1 bg-purple-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-1">
-                                  <ShoppingCart className="w-3 h-3 flex-shrink-0" /> Carrito
+                                <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="shrink-0 inline-flex items-center justify-center gap-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs py-2 px-2.5 rounded-xl transition-all">
+                                  <ShoppingCart className="w-4 h-4 shrink-0" />
+                                  <span className="hidden sm:inline">Carrito</span>
                                 </button>
                               </div>
                             </div>
@@ -902,23 +964,19 @@ export default function CatalogoPage() {
             {activeSection === 'streaming' && (
               <div>
                 <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Streaming</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5 w-full">
 {streamingFiltrados.map(p => {
   const precioInfo = getPrecioMostrar(p);
   return (
-    <div key={p.id} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col cursor-pointer group`}>
-      {/* BANNER a ancho completo */}
-      <div className="relative w-full h-48 bg-black overflow-hidden">
+    <div key={p.id} onClick={() => setSelectedProduct(p)} className={`flex flex-col justify-between h-full ${darkMode ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl shadow-md border overflow-hidden hover:shadow-xl hover:border-slate-700 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer group`}>
+      <div className="relative w-full aspect-[16/9] bg-slate-950 flex items-center justify-center overflow-hidden rounded-t-2xl">
         {p.imagen ? (
-          <img src={p.imagen} alt={p.plataforma} className="w-full h-full object-contain p-2 rounded-t-xl group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} />
+          <img src={p.imagen} alt={p.plataforma} className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Play className="w-10 h-10 text-white/80" />
-          </div>
+          <Play className="w-10 h-10 text-white/80" />
         )}
-        {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">OFERTA</div>}
+        {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md z-10">OFERTA</div>}
       </div>
-      {/* Nombre + precio + botones ABAJO (igual que productos) */}
       <div className="p-3 flex flex-col flex-1">
         <h3 className={`font-semibold text-sm mb-2 line-clamp-2 leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.plataforma}</h3>
         <div className="mt-auto space-y-2">
@@ -927,12 +985,14 @@ export default function CatalogoPage() {
             <p className={`text-xl font-bold ${precioInfo.tieneOferta ? 'text-red-600' : darkMode ? 'text-white' : 'text-slate-900'}`}>${precioInfo.precioPrincipal}</p>
             <p className={`text-xs font-medium ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
           </div>
-          <div className="flex gap-1.5 pt-1">
-            <button onClick={(e) => { e.stopPropagation(); comprarRapido(p); }} className="flex-1 bg-green-500 text-white py-2 rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors flex items-center justify-center gap-1">
-              <MessageCircle className="w-3 h-3 flex-shrink-0" /> Comprar
+          <div className="flex items-center gap-1.5 w-full mt-auto pt-3">
+            <button onClick={(e) => { e.stopPropagation(); comprarRapido(p); }} className="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs py-2 px-2 rounded-xl transition-all shadow-sm">
+              <WhatsAppIcon className="w-4 h-4 shrink-0 fill-current" />
+              <span className="truncate">Comprar</span>
             </button>
-            <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="flex-1 bg-purple-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-1">
-              <ShoppingCart className="w-3 h-3 flex-shrink-0" /> Carrito
+            <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="shrink-0 inline-flex items-center justify-center gap-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs py-2 px-2.5 rounded-xl transition-all">
+              <ShoppingCart className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Carrito</span>
             </button>
           </div>
         </div>
@@ -948,15 +1008,15 @@ export default function CatalogoPage() {
             {activeSection === 'ofertas' && (
               <div>
                 <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}> Ofertas Especiales</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5 w-full">
                   {ofertas.length > 0 ? (
                     ofertas.map(p => {
                       const precioInfo = getPrecioMostrar(p);
                       return (
-                        <div key={p.id} onClick={() => setSelectedProduct(p)} className={`${darkMode ? 'bg-gradient-to-br from-orange-900/30 to-red-900/30 border-red-800' : 'bg-gradient-to-br from-orange-50 to-red-50 border-red-200'} rounded-xl shadow-md border-2 overflow-hidden flex flex-col relative hover:shadow-lg transition-all cursor-pointer group`}>
+                        <div key={p.id} onClick={() => setSelectedProduct(p)} className={`flex flex-col justify-between h-full ${darkMode ? 'bg-gradient-to-br from-orange-900/30 to-red-900/30 border-red-800' : 'bg-gradient-to-br from-orange-50 to-red-50 border-red-200'} rounded-2xl shadow-md border-2 overflow-hidden relative hover:shadow-xl hover:-translate-y-0.5 transition-all cursor-pointer group`}>
                           <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md z-10">OFERTA</div>
-                          <div className="aspect-video bg-black flex items-center justify-center overflow-hidden">
-                            {p.imagen ? <img src={p.imagen} alt={p.producto || p.plataforma} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-12 h-12 text-slate-300" />}
+                          <div className={`relative w-full overflow-hidden rounded-t-2xl flex items-center justify-center ${(p.tipo === 'streaming' || (p.categoria || '').toUpperCase() === 'STREAMING') ? 'aspect-[16/9] bg-slate-950' : 'aspect-square bg-white'}`}>
+                            {p.imagen ? <img src={p.imagen} alt={p.producto || p.plataforma} className={`w-full h-full transition-transform duration-300 group-hover:scale-105 ${(p.tipo === 'streaming' || (p.categoria || '').toUpperCase() === 'STREAMING') ? 'object-cover object-center' : 'object-contain p-2'}`} onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-12 h-12 text-slate-300" />}
                           </div>
                           <div className="p-3 flex flex-col flex-1">
                             <h3 className={`font-semibold text-sm mb-2 line-clamp-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto || p.plataforma}</h3>
@@ -965,12 +1025,14 @@ export default function CatalogoPage() {
                               <p className={`text-xl font-bold ${darkMode ? 'text-red-400' : 'text-red-600'}`}>${precioInfo.precioPrincipal}</p>
                               <p className={`text-xs ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
                             </div>
-                            <div className="flex gap-1.5 mt-auto">
-                              <button onClick={(e) => { e.stopPropagation(); comprarRapido(p); }} className="flex-1 bg-green-500 text-white py-2 rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors flex items-center justify-center gap-1">
-                                <MessageCircle className="w-3 h-3 flex-shrink-0" /> WhatsApp
+                            <div className="flex items-center gap-1.5 w-full mt-auto pt-3">
+                              <button onClick={(e) => { e.stopPropagation(); comprarRapido(p); }} className="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs py-2 px-2 rounded-xl transition-all shadow-sm">
+                                <WhatsAppIcon className="w-4 h-4 shrink-0 fill-current" />
+                                <span className="truncate">WhatsApp</span>
                               </button>
-                              <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="flex-1 bg-purple-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-1">
-                                <ShoppingCart className="w-3 h-3 flex-shrink-0" /> Carrito
+                              <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="inline-flex items-center justify-center gap-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs py-2 px-2.5 rounded-xl transition-all shrink-0">
+                                <ShoppingCart className="w-4 h-4 shrink-0" />
+                                <span className="hidden sm:inline">Carrito</span>
                               </button>
                             </div>
                           </div>
@@ -1343,7 +1405,7 @@ export default function CatalogoPage() {
                 {settings.tienda?.instagramUrl && <a href={settings.tienda.instagramUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-pink-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg> Instagram</a>}
                 {settings.tienda?.tiktokUrl && <a href={settings.tienda.tiktokUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/></svg> TikTok</a>}
                 {settings.tienda?.facebookUrl && <a href={settings.tienda.facebookUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-blue-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg> Facebook</a>}
-                {settings.tienda?.whatsappUrl && <a href={settings.tienda.whatsappUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-green-400 transition-colors"><MessageCircle className="w-4 h-4" /> WhatsApp</a>}
+                <button onClick={() => abrirWhatsAppNat(whatsappNumero, '¡Hola VOLTECH! 👋 Quiero más información.')} className="flex items-center gap-2 text-slate-400 hover:text-green-400 transition-colors"><WhatsAppIcon className="w-4 h-4" /> WhatsApp</button>
               </div>
             </div>
             <div>
@@ -1514,22 +1576,20 @@ export default function CatalogoPage() {
                     </div>
                   )}
 
-                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                  <div className="flex items-center gap-2 w-full mt-auto pt-3">
                     <button 
                       onClick={() => { comprarRapido(selectedProduct); setSelectedProduct(null); }} 
-                      className="flex-1 bg-green-500 text-white py-3 rounded-xl font-semibold hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
+                      className="flex-1 py-2 px-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-colors"
                     >
-                      <span className="flex items-center justify-center gap-2">
-                        <MessageCircle className="w-5 h-5 shrink-0" />
-                        <span>Comprar por WhatsApp</span>
-                      </span>
+                      <WhatsAppIcon className="w-4 h-4 shrink-0" />
+                      <span className="truncate"><span className="hidden sm:inline">Comprar por </span>WhatsApp</span>
                     </button>
                     <button 
                       onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }} 
-                      className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
+                      className="flex-1 py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-colors"
                     >
-                      <ShoppingCart className="w-5 h-5" /> 
-                      <span>Agregar al Carrito</span>
+                      <ShoppingCart className="w-4 h-4 shrink-0" />
+                      <span className="truncate"><span className="hidden sm:inline">Agregar al </span>Carrito</span>
                     </button>
                   </div>
                 </div>
@@ -1745,7 +1805,10 @@ export default function CatalogoPage() {
                       <div className="flex justify-between"><span className={mutedText}>Bs:</span><span className={mutedText}>Bs {calcularPrecioBs(calculateTotal())}</span></div>
                     </div>
 
-                    <button onClick={finalizarPedido} className="w-full bg-green-500 text-white py-3 rounded-xl mb-2 flex items-center justify-center gap-2 font-semibold hover:bg-green-600 transition-colors shadow-md"><MessageCircle className="w-5 h-5" /> Finalizar por WhatsApp</button>
+                    <button onClick={finalizarPedido} className="w-full py-2.5 px-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-md mb-2">
+                      <WhatsAppIcon className="w-4 h-4 shrink-0" />
+                      <span className="whitespace-nowrap">Finalizar por WhatsApp</span>
+                    </button>
                     <button onClick={() => setCart([])} className={`w-full py-2 rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>Vaciar Carrito</button>
                   </>
                 )}

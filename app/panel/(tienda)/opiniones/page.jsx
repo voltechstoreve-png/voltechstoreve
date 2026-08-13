@@ -157,123 +157,151 @@ export default function OpinionesPage() {
         }}
       />
       
-      <div className="w-full space-y-6 p-6">
-        {/* Header - IGUAL QUE SORTEOS */}
-        <div className="flex items-center justify-between">
+      <div className="w-full max-w-full space-y-6 overflow-x-hidden">
+        {/* Header */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
           <div>
-            <h1 className="text-2xl font-bold text-white">Opiniones</h1>
-            <p className="text-sm text-voltech-muted mt-1">
-              Gestión de reseñas y comentarios de clientes
-            </p>
+            <h1 className="text-xl sm:text-2xl font-bold text-white">Opiniones</h1>
+            <p className="text-xs sm:text-sm text-voltech-muted mt-0.5">Gestión de reseñas y comentarios de clientes</p>
           </div>
-          {/* ✅ ELIMINADO: Botón "Agregar Opinión" */}
         </div>
 
-        {/* Grid de Métricas - 4 COLUMNAS */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-voltech-surface border border-voltech-border rounded-xl p-4"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-500/20">
-                <MessageSquare className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xs text-voltech-muted">Total Opiniones</p>
-                <p className="text-lg font-bold text-white">{getTotalOpiniones()}</p>
-              </div>
+        {/* Grid de Métricas */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 w-full mb-4">
+          <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+            <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-blue-500/10 md:bg-blue-500/20 text-blue-400 md:text-blue-600 shrink-0 flex items-center justify-center">
+              <MessageSquare className="w-5 h-5" />
             </div>
-          </motion.div>
-
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-voltech-surface border border-voltech-border rounded-xl p-4"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-yellow-500/20">
-                <Clock className="w-5 h-5 text-yellow-600" />
-              </div>
-              <div>
-                <p className="text-xs text-voltech-muted">Pendientes</p>
-                <p className="text-lg font-bold text-white">{getPendientes()}</p>
-              </div>
+            <div className="min-w-0 flex-1 md:flex-none">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Total Opiniones</p>
+              <p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0 truncate">{getTotalOpiniones()}</p>
             </div>
-          </motion.div>
-
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-voltech-surface border border-voltech-border rounded-xl p-4"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-500/20">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs text-voltech-muted">Aprobadas</p>
-                <p className="text-lg font-bold text-white">{getAprobadas()}</p>
-              </div>
+          </div>
+          <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+            <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-yellow-500/10 md:bg-yellow-500/20 text-yellow-400 md:text-yellow-600 shrink-0 flex items-center justify-center">
+              <Clock className="w-5 h-5" />
             </div>
-          </motion.div>
-
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-voltech-surface border border-voltech-border rounded-xl p-4"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-500/20">
-                <Star className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-xs text-voltech-muted">Promedio</p>
-                <p className="text-lg font-bold text-white">{getPromedio()}</p>
-              </div>
+            <div className="min-w-0 flex-1 md:flex-none">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Pendientes</p>
+              <p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0 truncate">{getPendientes()}</p>
             </div>
-          </motion.div>
+          </div>
+          <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+            <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-green-500/10 md:bg-green-500/20 text-green-400 md:text-green-600 shrink-0 flex items-center justify-center">
+              <CheckCircle className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1 md:flex-none">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Aprobadas</p>
+              <p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0 truncate">{getAprobadas()}</p>
+            </div>
+          </div>
+          <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+            <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-purple-500/10 md:bg-purple-500/20 text-purple-400 md:text-purple-600 shrink-0 flex items-center justify-center">
+              <Star className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1 md:flex-none">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Promedio</p>
+              <p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0 truncate">{getPromedio()}</p>
+            </div>
+          </div>
         </div>
 
         {/* Filtros y Búsqueda */}
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-voltech-muted">Filtrar por estado:</span>
+        <div className="flex flex-col gap-3 w-full mb-4 bg-slate-900/50 p-3 rounded-2xl border border-slate-800">
+          <div className="flex flex-col gap-2 w-full">
+            <span className="text-xs text-slate-400 font-medium">Filtrar por estado:</span>
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 w-full no-scrollbar">
               {['todas', 'pendiente', 'aprobada', 'rechazada'].map(estado => (
                 <button
                   key={estado}
                   onClick={() => setFilterEstado(estado)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
                     filterEstado === estado
                       ? 'bg-voltech-purple text-white'
-                      : 'bg-voltech-dark text-voltech-muted hover:bg-voltech-border'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                   }`}
                 >
                   {estado.charAt(0).toUpperCase() + estado.slice(1)}
                 </button>
               ))}
             </div>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-voltech-muted" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar por nombre o producto..."
-                className="input-voltech w-full pl-10 pr-4 py-2 text-sm rounded-lg"
-              />
-            </div>
+          </div>
+          <div className="relative w-full">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar por nombre o producto..."
+              className="w-full bg-slate-900/80 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500/50"
+            />
           </div>
         </div>
 
         {/* Tabla de Opiniones - IGUAL QUE SORTEOS */}
         <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden w-full">
-          <div className="overflow-x-auto w-full">
+          {/* ✅ Vista Card Móvil (< md) */}
+          <div className="block md:hidden space-y-3 p-3">
+            {opinionesFiltradas.length === 0 ? (
+              <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 text-center">
+                <MessageSquare className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                <p className="text-xs text-slate-400">No hay opiniones</p>
+              </div>
+            ) : (
+              opinionesFiltradas.map(opinion => (
+                <div key={opinion.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-purple-500 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                        {opinion.nombre.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-slate-100 truncate">{opinion.nombre}</h4>
+                        {opinion.correo && <p className="text-[10px] text-slate-400 truncate">{opinion.correo}</p>}
+                      </div>
+                    </div>
+                    <span className={`shrink-0 text-[10px] px-2 py-1 rounded-full font-medium ${
+                      opinion.estado === 'aprobada' ? 'bg-emerald-500/20 text-emerald-300' :
+                      opinion.estado === 'rechazada' ? 'bg-rose-500/20 text-rose-300' :
+                      'bg-amber-500/20 text-amber-300'
+                    }`}>
+                      {opinion.estado}
+                    </span>
+                  </div>
+                  <div className="pt-2 border-t border-slate-700/40">
+                    <p className="text-[11px] text-slate-400 mb-1">Producto: <span className="text-slate-200">{opinion.producto || 'Sin producto'}</span></p>
+                    <p className="text-[11px] text-slate-300 line-clamp-2">{opinion.comentario}</p>
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-700/40 text-[11px]">
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <Star key={star} className={`w-3 h-3 ${star <= opinion.rating ? 'text-yellow-400 fill-yellow-400' : 'text-slate-500'}`} />
+                      ))}
+                      <span className="text-slate-400 ml-1">{opinion.rating}/5</span>
+                    </div>
+                    <span className="text-slate-400 font-mono">{new Date(opinion.fecha).toLocaleDateString('es-VE')}</span>
+                  </div>
+                  <div className="flex items-center gap-2 pt-2 border-t border-slate-700/40">
+                    {opinion.estado === 'pendiente' && (
+                      <>
+                        <button onClick={() => cambiarEstado(opinion, 'aprobada')} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-emerald-300 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors">
+                          <CheckCircle size={14} /> Aprobar
+                        </button>
+                        <button onClick={() => cambiarEstado(opinion, 'rechazada')} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-rose-300 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 transition-colors">
+                          <X size={14} /> Rechazar
+                        </button>
+                      </>
+                    )}
+                    <button onClick={() => { setEditingOpinion(opinion); setFormData(opinion); setShowModal(true); }} className="p-2 text-slate-400 hover:text-cyan-400" title="Editar"><Edit size={16} /></button>
+                    <button onClick={() => eliminarOpinion(opinion.id)} className="p-2 text-slate-400 hover:text-rose-400" title="Eliminar"><Trash2 size={16} /></button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* ✅ Vista Tabla Desktop (>= md) */}
+          <div className="hidden md:block overflow-x-auto w-full">
             <table className="w-full">
               <thead className="bg-voltech-dark border-b border-voltech-border">
                 <tr>
@@ -514,18 +542,18 @@ export default function OpinionesPage() {
                     </select>
                   </div>
 
-                  <div className="flex gap-3 pt-4 border-t border-voltech-border">
+                  <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-voltech-border">
                     <button
                       type="button"
                       onClick={() => setShowModal(false)}
-                      className="px-6 py-3 rounded-lg font-medium bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white hover:border-voltech-cyan/50 transition-all"
+                      className="w-full sm:w-auto px-6 py-3 rounded-lg font-medium bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white hover:border-voltech-cyan/50 transition-all"
                     >
                       Cancelar
                     </button>
                     <button
                       type="submit"
                       className="btn-neon flex-1 text-white font-bold py-3 rounded-lg hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all"
-                    >
+                    > 
                       Guardar Cambios
                     </button>
                   </div>

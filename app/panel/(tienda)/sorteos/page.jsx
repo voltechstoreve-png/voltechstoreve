@@ -438,46 +438,50 @@ export default function PanelSorteosPage() {
     <div className="min-h-screen bg-voltech-dark text-white">
       <Toaster position="top-right" toastOptions={{ style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e', borderRadius: '8px' }, success: { iconTheme: { primary: '#00ff88', secondary: '#fff' } }, error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } } }} />
       
-      <div className="w-full space-y-6 p-6">
+      <div className="w-full max-w-full space-y-6 overflow-x-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
           <div>
-            <h1 className="text-2xl font-bold text-white">Sorteos</h1>
-            <p className="text-sm text-voltech-muted mt-1">Gestiona sorteos, votaciones y premios de tu tienda</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-white">Sorteos</h1>
+            <p className="text-xs sm:text-sm text-voltech-muted mt-0.5">Gestiona sorteos, votaciones y premios de tu tienda</p>
           </div>
           {activeTab !== 'configuracion' && (
-            <button onClick={() => setShowForm(true)} className="btn-neon bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg px-4 py-2 text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2">
+            <button onClick={() => setShowForm(true)} className="w-full sm:w-auto shrink-0 justify-center px-4 py-2.5 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-xl text-xs sm:text-sm font-semibold hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2">
               <Plus className="w-4 h-4" /> Crear Sorteo
             </button>
           )}
         </div>
 
         {/* Grid de Métricas */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-            <div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-voltech-cyan/20"><Gift className="w-5 h-5 text-voltech-cyan" /></div><div><p className="text-xs text-voltech-muted">Total Sorteos</p><p className="text-lg font-bold text-white">{getTotalSorteos()}</p></div></div>
-          </motion.div>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-            <div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-voltech-success/20"><Check className="w-5 h-5 text-voltech-success" /></div><div><p className="text-xs text-voltech-muted">Sorteos Activos</p><p className="text-lg font-bold text-white">{getSorteosActivos()}</p></div></div>
-          </motion.div>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-            <div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-voltech-warning/20"><Clock className="w-5 h-5 text-voltech-warning" /></div><div><p className="text-xs text-voltech-muted">Finalizados</p><p className="text-lg font-bold text-white">{getSorteosFinalizados()}</p></div></div>
-          </motion.div>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-            <div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-voltech-purple/20"><Users className="w-5 h-5 text-voltech-purple" /></div><div><p className="text-xs text-voltech-muted">Total Participantes</p><p className="text-lg font-bold text-white">{getTotalParticipantes()}</p></div></div>
-          </motion.div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 w-full">
+          <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+            <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-cyan/10 md:bg-voltech-cyan/20 text-voltech-cyan shrink-0 flex items-center justify-center"><Gift className="w-5 h-5" /></div>
+            <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Total Sorteos</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{getTotalSorteos()}</p></div>
+          </div>
+          <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+            <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-success/10 md:bg-voltech-success/20 text-voltech-success shrink-0 flex items-center justify-center"><Check className="w-5 h-5" /></div>
+            <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Sorteos Activos</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{getSorteosActivos()}</p></div>
+          </div>
+          <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+            <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-warning/10 md:bg-voltech-warning/20 text-voltech-warning shrink-0 flex items-center justify-center"><Clock className="w-5 h-5" /></div>
+            <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Finalizados</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{getSorteosFinalizados()}</p></div>
+          </div>
+          <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+            <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-purple/10 md:bg-voltech-purple/20 text-voltech-purple shrink-0 flex items-center justify-center"><Users className="w-5 h-5" /></div>
+            <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Total Participantes</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{getTotalParticipantes()}</p></div>
+          </div>
         </div>
 
         {/* Pestañas de Navegación */}
         <div className="border-b border-voltech-border">
-          <div className="flex gap-6">
-            <button onClick={() => setActiveTab('activos')} className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'activos' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>
+          <div className="grid grid-cols-2 md:flex md:gap-6 w-full gap-y-2 pb-2 md:pb-1">
+            <button onClick={() => setActiveTab('activos')} className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${activeTab === 'activos' ? 'text-voltech-cyan bg-voltech-cyan/10 border-transparent md:bg-transparent md:border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>
               <Play className="w-4 h-4" /> Sorteos Activos
             </button>
-            <button onClick={() => setActiveTab('finalizados')} className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'finalizados' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>
+            <button onClick={() => setActiveTab('finalizados')} className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${activeTab === 'finalizados' ? 'text-voltech-cyan bg-voltech-cyan/10 border-transparent md:bg-transparent md:border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>
               <Check className="w-4 h-4" /> Finalizados
             </button>
-            <button onClick={() => setActiveTab('configuracion')} className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${activeTab === 'configuracion' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>
+            <button onClick={() => setActiveTab('configuracion')} className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${activeTab === 'configuracion' ? 'text-voltech-cyan bg-voltech-cyan/10 border-transparent md:bg-transparent md:border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>
               <Settings className="w-4 h-4" /> Configuración Global
             </button>
           </div>
@@ -581,8 +585,8 @@ export default function PanelSorteosPage() {
                         <textarea value={formData.descripcion} onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })} rows={3} className="input-voltech w-full rounded-lg px-4 py-3 text-sm resize-none" placeholder="1. Debes ser mayor de edad&#10;2. Solo una participación por persona..." />
                       </div>
 
-                      <div className="flex gap-3 pt-4 border-t border-voltech-border">
-                        <button type="button" onClick={() => { setShowForm(false); setSorteoEditando(null); }} className="px-6 py-3 rounded-lg font-medium bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white hover:border-voltech-cyan/50 transition-all">Cancelar</button>
+                      <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-voltech-border">
+                        <button type="button" onClick={() => { setShowForm(false); setSorteoEditando(null); }} className="w-full sm:w-auto px-6 py-3 rounded-lg font-medium bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white hover:border-voltech-cyan/50 transition-all">Cancelar</button>
                         <button type="submit" className="btn-neon flex-1 text-white font-bold py-3 rounded-lg hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all">{sorteoEditando ? 'Guardar Cambios' : 'Guardar y Publicar Sorteo'}</button>
                       </div>
                     </form>
@@ -593,15 +597,64 @@ export default function PanelSorteosPage() {
 
             {/* Tabla de Sorteos */}
             <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden w-full">
-              <div className="p-6 border-b border-voltech-border flex items-center justify-between">
+              <div className="p-4 sm:p-6 border-b border-voltech-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <h2 className="text-lg font-semibold text-white">{activeTab === 'activos' ? 'Sorteos Activos' : 'Sorteos Finalizados'}</h2>
-                <div className="relative w-64">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-voltech-muted" />
-                  <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar por sorteo o participante..." className="input-voltech w-full pl-10 pr-4 py-2 text-sm rounded-lg" />
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Buscar por sorteo o participante..." className="w-full bg-slate-900/80 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500/50" />
                 </div>
               </div>
 
-              <div className="overflow-x-auto w-full">
+              {/* ✅ Vista Card Móvil (< md) */}
+              <div className="block md:hidden space-y-3 p-3">
+                {sorteosFiltrados.length === 0 ? (
+                  <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 text-center">
+                    <Gift className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                    <p className="text-xs text-slate-400">No hay sorteos en esta categoría</p>
+                  </div>
+                ) : (
+                  sorteosFiltrados.map((sorteo) => {
+                    const participantesCount = getParticipantesCount(sorteo.id);
+                    return (
+                      <div key={sorteo.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-slate-100 truncate">{sorteo.titulo}</h4>
+                            <p className="text-[11px] text-cyan-400 font-semibold truncate">{getNombrePremio(sorteo)}</p>
+                          </div>
+                          <span className="shrink-0 text-[11px] text-slate-400 font-mono">{new Date(sorteo.fecha_fin).toLocaleDateString('es-VE')}</span>
+                        </div>
+                        {sorteo.estado === 'finalizado' && sorteo.ganador && (
+                          <p className="text-[11px] text-emerald-300 flex items-center gap-1"><Trophy className="w-3 h-3" /> Ganó: {sorteo.ganador.nombre}</p>
+                        )}
+                        <div className="pt-2 border-t border-slate-700/40 flex items-center justify-between text-[11px]">
+                          <span className="text-slate-400">Participantes: <span className="text-slate-200 font-bold">{participantesCount}</span></span>
+                        </div>
+                        <div className="flex items-center gap-2 pt-2 border-t border-slate-700/40">
+                          <button onClick={() => handleVerParticipantes(sorteo)} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-cyan-300 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 transition-colors">
+                            <Eye size={14} /> Participantes
+                          </button>
+                          {sorteo.estado === 'activo' && participantesCount > 0 && (
+                            <button onClick={() => handleSortearGanador(sorteo)} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-amber-300 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 transition-colors">
+                              <Sparkles size={14} /> Sortear
+                            </button>
+                          )}
+                          {sorteo.estado === 'finalizado' && sorteo.ganador && (
+                            <button onClick={() => { setGanadorData(sorteo.ganador); setShowGanador(true); }} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-purple-300 py-2 rounded-lg bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500/20 transition-colors">
+                              <QrCode size={14} /> Premio
+                            </button>
+                          )}
+                          <button onClick={() => handleEditar(sorteo)} className="p-2 text-slate-400 hover:text-cyan-400" title="Editar"><Edit size={16} /></button>
+                          <button onClick={() => handleEliminar(sorteo.id)} className="p-2 text-slate-400 hover:text-rose-400" title="Eliminar"><Trash2 size={16} /></button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* ✅ Vista Tabla Desktop (>= md) */}
+              <div className="hidden md:block overflow-x-auto w-full">
                 <table className="w-full">
                   <thead className="bg-voltech-dark border-b border-voltech-border">
                     <tr>

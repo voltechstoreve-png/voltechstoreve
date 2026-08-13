@@ -32,15 +32,15 @@ const CustomSelect = ({ label, value, onChange, options, placeholder = '-- Selec
   const selectedOption = options.find(opt => opt.value === value);
 
   return (
-    <div className={`relative ${className}`} ref={ref}>
+    <div className={`relative min-w-0 ${className}`} ref={ref}>
       {label && <label className="block text-xs text-voltech-muted mb-1 ml-1">{label}</label>}
       <div
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`w-full bg-voltech-dark border border-voltech-cyan/30 rounded-md px-4 py-2 text-sm cursor-pointer flex items-center justify-between transition-colors ${
+        className={`w-full min-w-0 bg-voltech-dark border border-voltech-cyan/30 rounded-md px-3 md:px-4 py-2 text-sm cursor-pointer flex items-center justify-between transition-colors ${
           disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-voltech-cyan'
         }`}
       >
-        <span className={selectedOption ? 'text-white' : 'text-voltech-muted'}>
+        <span className={`${selectedOption ? 'text-white' : 'text-voltech-muted'} truncate flex-1 min-w-0`}>
           {selectedOption?.label || placeholder}
         </span>
         <ChevronDown className={`w-4 h-4 text-voltech-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -1177,16 +1177,16 @@ export default function ProductosPage() {
     <div className="space-y-6">
       <Toaster position="top-right" toastOptions={{ style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' }, success: { iconTheme: { primary: '#00ff88', secondary: '#fff' } }, error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } } }} />
 
-      <div className="flex items-center justify-between">
+      <div className="relative z-0 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
         <div>
-          <h1 className="text-2xl font-bold text-white">Productos</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Productos</h1>
           <p className="text-sm text-voltech-muted mt-1">Gestiona tu catálogo e inventario</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={generarPDFCatalogo} className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2"><Download className="w-4 h-4" /> Catálogo</button>
-          <Link href="/panel/compras" className={`px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}><Database className="w-4 h-4" /> Compras</Link>
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <button onClick={generarPDFCatalogo} className="flex-1 sm:flex-none px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center justify-center gap-2"><Download className="w-4 h-4" /> Catálogo</button>
+          <Link href="/panel/compras" className={`flex-1 sm:flex-none px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center justify-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}><Database className="w-4 h-4" /> Compras</Link>
           {!showForm && tienePermiso('puedeVerInventarioCompleto') && (
-            <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2"><Plus className="w-4 h-4" /> Nuevo Producto</button>
+            <button onClick={() => setShowForm(true)} className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center justify-center gap-2"><Plus className="w-4 h-4" /> Nuevo Producto</button>
           )}
         </div>
       </div>
@@ -1254,7 +1254,7 @@ export default function ProductosPage() {
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-voltech-cyan/20"><Package className="w-5 h-5 text-voltech-cyan" /></div>
@@ -1287,7 +1287,7 @@ export default function ProductosPage() {
             <div><h3 className="text-sm font-semibold text-white">Tasa de Cambio</h3><p className="text-xs text-voltech-muted">Configura la tasa para calcular precios en Bs</p></div>
             <div className="flex items-center gap-3 flex-wrap">
               <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={usarTasaBCV} onChange={(e) => setUsarTasaBCV(e.target.checked)} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" /><span className="text-xs text-voltech-muted">Usar tasa BCV</span></label>
-              <div className="flex items-center gap-2"><span className="text-xs text-voltech-muted">Tasa:</span><input type="number" step="0.01" value={usarTasaBCV ? tasaBCV : tasaPersonalizada} onChange={(e) => usarTasaBCV ? setTasaBCV(parseFloat(e.target.value)) : setTasaPersonalizada(parseFloat(e.target.value))} className="input-voltech w-24 rounded-lg px-3 py-1 text-sm" /><span className="text-xs text-voltech-muted">Bs/$</span></div>
+              <div className="flex items-center gap-2"><span className="text-xs text-voltech-muted">Tasa:</span><input type="number" step="0.01" value={usarTasaBCV ? tasaBCV : tasaPersonalizada} onChange={(e) => usarTasaBCV ? setTasaBCV(parseFloat(e.target.value)) : setTasaPersonalizada(parseFloat(e.target.value))} className="input-voltech w-20 md:w-24 rounded-lg px-2 md:px-3 py-1 text-sm min-w-0" /><span className="text-xs text-voltech-muted shrink-0">Bs/$</span></div>
               <button onClick={guardarTasa} className="px-3 py-1 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors">Guardar</button>
             </div>
           </div>
@@ -1295,15 +1295,15 @@ export default function ProductosPage() {
       )}
 
       {selectedProducts.length > 0 && tienePermiso('puedeVerInventarioCompleto') && (
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="bg-voltech-purple/20 border border-voltech-purple rounded-xl p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <CheckCircle className="w-5 h-5 text-voltech-purple" />
-            <span className="text-sm text-white font-medium">{selectedProducts.length} producto(s) seleccionado(s)</span>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="bg-voltech-purple/20 border border-voltech-purple rounded-xl p-3 md:p-4 flex flex-col gap-2 w-full max-w-full md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <CheckCircle className="w-5 h-5 text-voltech-purple shrink-0" />
+            <span className="text-sm text-white font-medium truncate">{selectedProducts.length} producto(s) seleccionado(s)</span>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => setShowBulkCommissionModal(true)} className="px-4 py-2 bg-voltech-purple text-white rounded-lg text-sm font-medium hover:bg-voltech-purple/80 transition-colors flex items-center gap-2"><Percent className="w-4 h-4" /> Asignar % Comisión</button>
-            <button onClick={eliminarSeleccionados} className="px-4 py-2 bg-voltech-error/20 text-voltech-error rounded-lg text-sm font-medium hover:bg-voltech-error/30 transition-colors flex items-center gap-2"><Trash2 className="w-4 h-4" /> Eliminar Seleccionados</button>
-            <button onClick={() => setSelectedProducts([])} className="px-4 py-2 bg-voltech-surface border border-voltech-border text-voltech-muted rounded-lg text-sm hover:text-white transition-colors"><X className="w-4 h-4" /></button>
+          <div className="grid grid-cols-2 gap-2 w-full md:w-auto md:flex md:items-center">
+            <button onClick={() => setShowBulkCommissionModal(true)} className="text-xs py-2 px-2 text-center w-full md:w-auto md:text-sm md:px-4 md:py-2 bg-voltech-purple text-white rounded-lg font-medium hover:bg-voltech-purple/80 transition-colors flex items-center justify-center gap-1.5"><Percent className="w-4 h-4 shrink-0" /> Asignar % Comisión</button>
+            <button onClick={eliminarSeleccionados} className="text-xs py-2 px-2 text-center w-full md:w-auto md:text-sm md:px-4 md:py-2 bg-voltech-error/20 text-voltech-error rounded-lg font-medium hover:bg-voltech-error/30 transition-colors flex items-center justify-center gap-1.5"><Trash2 className="w-4 h-4 shrink-0" /> Eliminar Seleccionados</button>
+            <button onClick={() => setSelectedProducts([])} className="col-span-2 md:col-span-1 w-full md:w-auto px-2 py-2 bg-voltech-surface border border-voltech-border text-voltech-muted rounded-lg text-xs md:text-sm hover:text-white transition-colors flex items-center justify-center"><X className="w-4 h-4" /></button>
           </div>
         </motion.div>
       )}
@@ -1354,10 +1354,10 @@ export default function ProductosPage() {
                     
                     <div className="mb-4">
                       <label className="block text-xs text-voltech-muted mb-2 ml-1">Tipo de Producto</label>
-                      <div className="flex gap-3">
-                        <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'fisico')} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'fisico' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Package className="w-4 h-4" />Físico</button>
-                        <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'streaming')} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'streaming' ? 'bg-voltech-purple/20 border-voltech-purple text-voltech-purple' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-purple'}`}><MonitorPlay className="w-4 h-4" />Streaming</button>
-                        <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'kit')} className={`flex-1 py-3 rounded-lg border flex items-center justify-center gap-2 transition-all ${item.tipo === 'kit' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Gift className="w-4 h-4" />Kit</button>
+                      <div className="grid grid-cols-3 gap-1.5 w-full md:flex md:gap-3">
+                        <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'fisico')} className={`flex-1 py-2 md:py-3 px-1 md:px-3 rounded-lg border flex items-center justify-center gap-1 md:gap-2 transition-all text-xs md:text-sm ${item.tipo === 'fisico' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Package className="w-3 h-3 md:w-4 md:h-4 shrink-0" /><span className="truncate">Físico</span></button>
+                        <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'streaming')} className={`flex-1 py-2 md:py-3 px-1 md:px-3 rounded-lg border flex items-center justify-center gap-1 md:gap-2 transition-all text-xs md:text-sm ${item.tipo === 'streaming' ? 'bg-voltech-purple/20 border-voltech-purple text-voltech-purple' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-purple'}`}><MonitorPlay className="w-3 h-3 md:w-4 md:h-4 shrink-0" /><span className="truncate">Streaming</span></button>
+                        <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'kit')} className={`flex-1 py-2 md:py-3 px-1 md:px-3 rounded-lg border flex items-center justify-center gap-1 md:gap-2 transition-all text-xs md:text-sm ${item.tipo === 'kit' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Gift className="w-3 h-3 md:w-4 md:h-4 shrink-0" /><span className="truncate">Kit</span></button>
                       </div>
                     </div>
 
@@ -1380,13 +1380,13 @@ export default function ProductosPage() {
                         <label className="text-xs text-voltech-muted font-medium">
                           {item.tipo === 'streaming' ? 'Nombre Plataforma *' : item.tipo === 'kit' ? 'Nombre del Kit *' : 'Nombre del Producto *'}
                         </label>
-                        <div className="flex items-center gap-2 w-full">
+                        <div className="flex items-center gap-2 w-full min-w-0">
                           <CustomSelect
                             value={item.plataforma}
                             onChange={(value) => handleChange(itemIndex, 'plataforma', value)}
                             options={productosDisponibles.map(nombre => ({ value: nombre, label: nombre }))}
                             placeholder="-- Selecciona --"
-                            className="flex-1"
+                            className="flex-1 min-w-0"
                           />
                           <button 
                             type="button" 
@@ -1402,13 +1402,13 @@ export default function ProductosPage() {
                       {item.tipo === 'fisico' ? (
                         <div className="flex flex-col gap-1 w-full">
                           <label className="text-xs text-voltech-muted font-medium">Categoría *</label>
-                          <div className="flex items-center gap-2 w-full">
+                          <div className="flex items-center gap-2 w-full min-w-0">
                             <CustomSelect
                               value={item.categoria}
                               onChange={(value) => handleChange(itemIndex, 'categoria', value)}
                               options={categoriasDisponibles.map(cat => ({ value: cat, label: cat }))}
                               placeholder="-- Selecciona --"
-                              className="flex-1"
+                              className="flex-1 min-w-0"
                             />
                             <button 
                               type="button" 
@@ -1430,13 +1430,13 @@ export default function ProductosPage() {
                       {item.tipo === 'fisico' && (
                         <div className="flex flex-col gap-1 w-full">
                           <label className="text-xs text-voltech-muted font-medium">Marca *</label>
-                          <div className="flex items-center gap-2 w-full">
+                          <div className="flex items-center gap-2 w-full min-w-0">
                             <CustomSelect
                               value={item.marca}
                               onChange={(value) => handleChange(itemIndex, 'marca', value)}
                               options={marcasDisponibles.map(marca => ({ value: marca, label: marca }))}
                               placeholder="-- Selecciona --"
-                              className="flex-1"
+                              className="flex-1 min-w-0"
                             />
                             <button 
                               type="button" 
@@ -1584,8 +1584,8 @@ export default function ProductosPage() {
                   </div>
                 );})}
               </div>
-              <div className="mt-6 flex gap-3">
-                <button onClick={agregarItem} className="px-6 py-3 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center gap-2"><Plus className="w-4 h-4" />Agregar Otro Producto</button>
+              <div className="mt-6 flex flex-col sm:flex-row gap-3 w-full">
+                <button onClick={agregarItem} className="w-full sm:w-auto px-6 py-3 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center justify-center gap-2"><Plus className="w-4 h-4" />Agregar Otro Producto</button>
                 <button onClick={guardarProductos} className="flex-1 btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"><Save className="w-5 h-5" />Guardar {items.length > 1 ? `${items.length} Productos` : 'Producto'}</button>
               </div>
             </div>
@@ -1611,21 +1611,119 @@ export default function ProductosPage() {
         )}
       </AnimatePresence>
 
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
+        <div className="relative w-full sm:flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
           <input type="text" placeholder="Buscar por nombre, SKU, categoría o marca..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-voltech w-full rounded-lg pl-10 pr-4 py-3 text-sm" />
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => setVista('tabla')} className={`p-3 rounded-lg transition-colors ${vista === 'tabla' ? 'bg-voltech-cyan/20 text-voltech-cyan' : 'bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white'}`}><Table className="w-5 h-5" /></button>
-          <button onClick={() => setVista('grid')} className={`p-3 rounded-lg transition-colors ${vista === 'grid' ? 'bg-voltech-cyan/20 text-voltech-cyan' : 'bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white'}`}><LayoutGrid className="w-5 h-5" /></button>
+        <div className="flex gap-2 shrink-0 justify-center sm:justify-end">
+          <button onClick={() => setVista('tabla')} className={`flex-1 sm:flex-none px-4 py-3 sm:p-3 rounded-lg transition-colors ${vista === 'tabla' ? 'bg-voltech-cyan/20 text-voltech-cyan' : 'bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white'}`} title="Vista tabla">
+            <Table className="w-5 h-5 inline sm:block" />
+            <span className="sm:hidden text-xs ml-2">Tabla</span>
+          </button>
+          <button onClick={() => setVista('grid')} className={`flex-1 sm:flex-none px-4 py-3 sm:p-3 rounded-lg transition-colors ${vista === 'grid' ? 'bg-voltech-cyan/20 text-voltech-cyan' : 'bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white'}`} title="Vista grid">
+            <LayoutGrid className="w-5 h-5 inline sm:block" />
+            <span className="sm:hidden text-xs ml-2">Grid</span>
+          </button>
         </div>
       </div>
 
       {vista === 'tabla' ? (
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+        <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden w-full">
+          {/* ✅ Vista Card Móvil (< md) */}
+          <div className="block md:hidden space-y-3 p-3">
+            {productosFiltrados.length === 0 ? (
+              <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 text-center">
+                <Package className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                <p className="text-xs text-slate-400">No hay productos registrados</p>
+                <p className="text-[10px] text-slate-500 mt-1">Haz clic en "Nuevo Producto" para comenzar</p>
+              </div>
+            ) : (
+              productosFiltrados.map((producto) => {
+                const isSelected = selectedProducts.includes(producto.id);
+                const isEditing = editandoId === producto.id;
+                return (
+                  <div key={producto.id} className={`bg-slate-800/60 border rounded-2xl p-4 space-y-3 ${isSelected ? 'border-purple-500' : 'border-slate-700/50'}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {producto.imagen ? (
+                          <img src={producto.imagen} alt={producto.plataforma} className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-slate-900 flex items-center justify-center shrink-0">
+                            <ImageIcon className="w-6 h-6 text-slate-500" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-bold text-slate-100 truncate">{producto.plataforma}</h4>
+                          <p className="text-[10px] text-slate-400 font-mono truncate">{producto.sku || 'N/A'}</p>
+                        </div>
+                      </div>
+                      {tienePermiso('puedeVerInventarioCompleto') && (
+                        <input type="checkbox" checked={isSelected} onChange={() => toggleProductSelection(producto.id)} className="w-4 h-4 rounded border-slate-600 bg-slate-900 text-cyan-400 shrink-0" />
+                      )}
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-1">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${producto.tipo === 'streaming' ? 'bg-purple-500/20 text-purple-300' : producto.tipo === 'kit' ? 'bg-cyan-500/20 text-cyan-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                        {producto.tipo === 'streaming' ? '📺 Streaming' : producto.tipo === 'kit' ? '🎁 Kit' : '📦 Físico'}
+                      </span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${getEstadoBadge(producto.estado)}`}>
+                        {producto.estado ? producto.estado.charAt(0).toUpperCase() + producto.estado.slice(1) : 'Nuevo'}
+                      </span>
+                      {producto.esCombo && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300">🎯 Combo</span>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-2 text-[11px]">
+                      <div><span className="text-slate-400 block">Categoría:</span><span className="text-slate-200 truncate block">{producto.categoria || 'N/A'}</span></div>
+                      <div><span className="text-slate-400 block">Marca:</span><span className="text-slate-200 truncate block">{producto.marca || 'N/A'}</span></div>
+                      <div><span className="text-slate-400 block">Stock:</span><span className={`${producto.cantidad === 0 ? 'text-rose-300' : producto.cantidad <= 2 ? 'text-amber-300' : 'text-emerald-300'} font-bold`}>{producto.cantidad} unid.</span></div>
+                      <div><span className="text-slate-400 block">Comisión:</span><span className="text-purple-300 font-bold">{producto.porcentaje_comision || 5}%</span></div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-700/40">
+                      <div>
+                        {producto.precioOferta > 0 && producto.estado === 'oferta' ? (
+                          <>
+                            <p className="text-[10px] text-slate-500 line-through">${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</p>
+                            <p className="text-sm font-bold text-amber-300">${Number(producto.precioOferta || 0).toFixed(2)}</p>
+                          </>
+                        ) : (
+                          <p className="text-sm font-bold text-slate-100">${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</p>
+                        )}
+                        <p className="text-[10px] text-slate-400">Bs {producto.precioBs.toFixed(2)}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => togglePublicado(producto.id)} className={`p-1.5 rounded-lg transition-colors ${producto.publicado ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700/50 text-slate-400'}`} title={producto.publicado ? 'Ocultar' : 'Publicar'}>
+                          {producto.publicado ? <Globe size={14} /> : <EyeOff size={14} />}
+                        </button>
+                        {tienePermiso('puedeVerInventarioCompleto') && (
+                          <>
+                            {isEditing ? (
+                              <>
+                                <button onClick={() => guardarEdicion(producto.id)} className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg"><CheckCircle size={14} /></button>
+                                <button onClick={cancelarEdicion} className="p-1.5 bg-rose-500/20 text-rose-400 rounded-lg"><X size={14} /></button>
+                              </>
+                            ) : (
+                              <>
+                                <button onClick={() => abrirEdicion(producto)} className="p-1.5 text-slate-400 hover:text-cyan-400"><Edit size={14} /></button>
+                                <button onClick={() => eliminarProducto(producto.id)} className="p-1.5 text-slate-400 hover:text-rose-400"><Trash2 size={14} /></button>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* ✅ Vista Tabla Desktop (>= md) */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full min-w-[760px] md:min-w-0">
               <thead className="bg-voltech-dark border-b border-voltech-border">
                 <tr>
                   {tienePermiso('puedeVerInventarioCompleto') && (<th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted"><input type="checkbox" checked={selectedProducts.length === productosFiltrados.length && productosFiltrados.length > 0} onChange={selectAll} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" /></th>)}
@@ -1649,14 +1747,14 @@ export default function ProductosPage() {
                   productosFiltrados.map((producto) => (
                     <tr key={producto.id} className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
                       {tienePermiso('puedeVerInventarioCompleto') && (<td className="px-4 py-3 text-center"><input type="checkbox" checked={selectedProducts.includes(producto.id)} onChange={() => toggleProductSelection(producto.id)} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" /></td>)}
-                      <td className="px-4 py-3"><span className="text-xs font-mono text-voltech-cyan">{producto.sku}</span></td>
+                      <td className="px-4 py-3"><span className="text-xs font-mono whitespace-nowrap text-voltech-cyan">{producto.sku}</span></td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           {producto.imagen ? (<img src={producto.imagen} alt={producto.plataforma} className="w-10 h-10 rounded-lg object-cover" />) : (<div className="w-10 h-10 rounded-lg bg-voltech-dark flex items-center justify-center"><ImageIcon className="w-5 h-5 text-voltech-muted" /></div>)}
                           <div><p className="text-sm font-medium text-white">{producto.plataforma}</p>{producto.esCombo && (<p className="text-xs text-voltech-purple">Combo: {producto.plataformasCombo?.join(', ')}</p>)}</div>
                         </div>
                       </td>
-                      <td className="px-4 py-3">{producto.tipo === 'streaming' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-purple/20 text-voltech-purple flex items-center gap-1 w-fit"><MonitorPlay className="w-3 h-3" />Streaming</span>) : producto.tipo === 'kit' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit"><Gift className="w-3 h-3" />Kit</span>) : (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit"><Package className="w-3 h-3" />Físico</span>)}</td>
+                      <td className="px-4 py-3">{producto.tipo === 'streaming' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-purple/20 text-voltech-purple flex items-center gap-1 w-fit whitespace-nowrap"><MonitorPlay className="w-3 h-3" />Streaming</span>) : producto.tipo === 'kit' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit whitespace-nowrap"><Gift className="w-3 h-3" />Kit</span>) : (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit whitespace-nowrap"><Package className="w-3 h-3" />Físico</span>)}</td>
                       <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full font-medium ${getEstadoBadge(producto.estado)}`}>{producto.estado ? producto.estado.charAt(0).toUpperCase() + producto.estado.slice(1) : 'Nuevo'}</span></td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{producto.categoria}</td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{producto.marca || '—'}</td>
@@ -1689,7 +1787,7 @@ export default function ProductosPage() {
               </tbody>
             </table>
           </div>
-        </div>
+          </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {productosFiltrados.length === 0 ? (
@@ -1729,7 +1827,7 @@ export default function ProductosPage() {
       )}
 
       {editandoId && tienePermiso('puedeVerInventarioCompleto') && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-voltech-surface border border-voltech-border rounded-xl p-6 sticky bottom-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 w-full max-w-full overflow-x-hidden min-w-0 mx-auto bg-slate-900 md:bg-voltech-surface p-4 md:p-6 rounded-xl shadow-xl border border-slate-800 md:border-voltech-border md:sticky md:bottom-6">
           <h3 className="text-lg font-bold text-white mb-4">Editando Producto</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-3">
@@ -1757,9 +1855,9 @@ export default function ProductosPage() {
               <p className="text-xs text-voltech-muted mt-1">Información técnica detallada para que el chatbot responda preguntas</p>
             </div>
           </div>
-          <div className="flex gap-3 mt-4">
+          <div className="flex flex-col sm:flex-row gap-3 mt-4 w-full">
             <button onClick={() => guardarEdicion(editandoId)} className="flex-1 btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"><Save className="w-5 h-5" />Guardar Cambios</button>
-            <button onClick={cancelarEdicion} className="px-6 py-3 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-error transition-all flex items-center gap-2"><X className="w-4 h-4" />Cancelar</button>
+            <button onClick={cancelarEdicion} className="w-full sm:w-auto px-6 py-3 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-error transition-all flex items-center justify-center gap-2"><X className="w-4 h-4" />Cancelar</button>
           </div>
         </motion.div>
       )}

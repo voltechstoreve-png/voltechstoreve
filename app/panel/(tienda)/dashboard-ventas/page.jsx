@@ -7,12 +7,13 @@ import {
   BarChart, TrendingUp, ShoppingCart, DollarSign,
   Calendar, Users, Package, ArrowUpRight, Trophy, 
   Medal, Award, Target, Percent, ShoppingBag,
-  TrendingDown, Activity, CheckCircle, Clock, MonitorPlay
+  TrendingDown, Activity, CheckCircle, Clock, MonitorPlay, Eye
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function DashboardVentasPage() {
   const { usuarioActual, esAdmin, esSocio } = usePermissions();
+  const puedeVerFinanzas = esAdmin || esSocio;
   
   const [stats, setStats] = useState({
     ventasHoy: 0,
@@ -34,6 +35,7 @@ export default function DashboardVentasPage() {
   const [ranking, setRanking] = useState([]);
   const [equipo, setEquipo] = useState([]);
   const [comisiones, setComisiones] = useState([]);
+  const [visitasTotales, setVisitasTotales] = useState(0);
   const [loading, setLoading] = useState(true);
   const [referidosResumen, setReferidosResumen] = useState({ total: 0, top: null });  
 
@@ -78,6 +80,14 @@ export default function DashboardVentasPage() {
 
         setComisiones(coms);
         setEquipo(usuarios);
+
+        // ✅ Visitas públicas totales (sin contar logueados)
+        try {
+          if (supabase) {
+            const { count } = await supabase.from('visitas_publicas').select('*', { count: 'exact', head: true });
+            setVisitasTotales(count || 0);
+          }
+        } catch (e) { console.warn('visitas:', e); }
 
         const hoy = new Date();
         const mesActual = hoy.getMonth();
@@ -209,135 +219,101 @@ export default function DashboardVentasPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Dashboard Ventas</h1>
-        <p className="text-sm text-voltech-muted mt-1">Análisis de rendimiento y ranking de vendedores</p>
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between w-full">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Dashboard Ventas</h1>
+          <p className="text-xs sm:text-sm text-voltech-muted mt-1">Análisis de rendimiento y ranking de vendedores</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-voltech-muted">Ventas Hoy</p>
-              <p className="text-xl font-bold text-white">{stats.ventasHoy}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Ventas Hoy</p>
+              <p className="text-base md:text-xl font-bold text-white mt-0.5 truncate">{stats.ventasHoy}</p>
             </div>
-            <div className="p-2 rounded-lg bg-voltech-cyan/20">
-              <ShoppingCart className="w-5 h-5 text-voltech-cyan" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-voltech-muted">Ingresos Hoy</p>
-              <p className="text-xl font-bold text-voltech-success">${stats.ingresosHoy.toFixed(2)}</p>
-            </div>
-            <div className="p-2 rounded-lg bg-voltech-success/20">
-              <DollarSign className="w-5 h-5 text-voltech-success" />
+            <div className="p-2 md:p-2 rounded-lg md:rounded-lg bg-voltech-cyan/10 md:bg-voltech-cyan/20 text-voltech-cyan shrink-0 flex items-center justify-center">
+              <ShoppingCart className="w-5 h-5" />
             </div>
           </div>
         </div>
 
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-voltech-muted">Ventas Mes</p>
-              <p className="text-xl font-bold text-white">{stats.ventasMes}</p>
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Ventas Mes</p>
+              <p className="text-base md:text-xl font-bold text-white mt-0.5 truncate">{stats.ventasMes}</p>
             </div>
-            <div className="p-2 rounded-lg bg-voltech-purple/20">
-              <BarChart className="w-5 h-5 text-voltech-purple" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-voltech-muted">Ingresos Mes</p>
-              <p className="text-xl font-bold text-voltech-success">${stats.ingresosMes.toFixed(2)}</p>
-            </div>
-            <div className="p-2 rounded-lg bg-voltech-success/20">
-              <DollarSign className="w-5 h-5 text-voltech-success" />
+            <div className="p-2 md:p-2 rounded-lg md:rounded-lg bg-voltech-purple/10 md:bg-voltech-purple/20 text-voltech-purple shrink-0 flex items-center justify-center">
+              <BarChart className="w-5 h-5" />
             </div>
           </div>
         </div>
 
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-voltech-muted">Comis. Pagadas</p>
-              <p className="text-xl font-bold text-voltech-purple">${stats.comisionesPagadas.toFixed(2)}</p>
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Total Clientes</p>
+              <p className="text-base md:text-xl font-bold text-white mt-0.5 truncate">{stats.totalClientes}</p>
             </div>
-            <div className="p-2 rounded-lg bg-voltech-purple/20">
-              <Percent className="w-5 h-5 text-voltech-purple" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-voltech-muted">Comis. Pendientes</p>
-              <p className="text-xl font-bold text-voltech-warning">${stats.comisionesPendientes.toFixed(2)}</p>
-            </div>
-            <div className="p-2 rounded-lg bg-voltech-warning/20">
-              <Clock className="w-5 h-5 text-voltech-warning" />
+            <div className="p-2 md:p-2 rounded-lg md:rounded-lg bg-voltech-cyan/10 md:bg-voltech-cyan/20 text-voltech-cyan shrink-0 flex items-center justify-center">
+              <Users className="w-5 h-5" />
             </div>
           </div>
         </div>
 
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-voltech-muted">Total Clientes</p>
-              <p className="text-xl font-bold text-white">{stats.totalClientes}</p>
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Productos Vendidos</p>
+              <p className="text-base md:text-xl font-bold text-white mt-0.5 truncate">{stats.productosVendidos}</p>
             </div>
-            <div className="p-2 rounded-lg bg-voltech-cyan/20">
-              <Users className="w-5 h-5 text-voltech-cyan" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-voltech-muted">Productos Vendidos</p>
-              <p className="text-xl font-bold text-white">{stats.productosVendidos}</p>
-            </div>
-            <div className="p-2 rounded-lg bg-voltech-success/20">
-              <Package className="w-5 h-5 text-voltech-success" />
+            <div className="p-2 md:p-2 rounded-lg md:rounded-lg bg-voltech-success/10 md:bg-voltech-success/20 text-voltech-success shrink-0 flex items-center justify-center">
+              <Package className="w-5 h-5" />
             </div>
           </div>
         </div>
 
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-voltech-muted">Referidos Equipo</p>
-              <p className="text-xl font-bold text-white">{referidosResumen.total}</p>
-              {referidosResumen.top && <p className="text-[10px] text-voltech-cyan mt-0.5">🏆 {referidosResumen.top.nombre} ({referidosResumen.top.cantidad})</p>}
+        <div className="col-span-2 lg:col-span-1 bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Visitas Totales</p>
+              <p className="text-base md:text-xl font-bold text-white mt-0.5 truncate">{visitasTotales}</p>
             </div>
-            <div className="p-2 rounded-lg bg-voltech-purple/20">
-              <Users className="w-5 h-5 text-voltech-purple" />
+            <div className="p-2 rounded-lg bg-voltech-cyan/10 md:bg-voltech-cyan/20 text-voltech-cyan shrink-0 flex items-center justify-center"><Eye className="w-5 h-5" /></div>
+          </div>
+        </div>
+
+        <div className="col-span-2 lg:col-span-3 bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Referidos Equipo</p>
+              <p className="text-base md:text-xl font-bold text-white mt-0.5 truncate">{referidosResumen.total}</p>
+              {referidosResumen.top && <p className="text-[10px] text-voltech-cyan mt-0.5 truncate">🏆 {referidosResumen.top.nombre} ({referidosResumen.top.cantidad})</p>}
+            </div>
+            <div className="p-2 md:p-2 rounded-lg md:rounded-lg bg-voltech-purple/10 md:bg-voltech-purple/20 text-voltech-purple shrink-0 flex items-center justify-center">
+              <Users className="w-5 h-5" />
             </div>
           </div>
         </div>
       </div>
 
       <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <Trophy className="w-6 h-6 text-yellow-400" />
-            <h3 className="text-lg font-bold text-white">Ranking de Vendedores</h3>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+          <div className="flex items-center gap-2 min-w-0">
+            <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-400 shrink-0" />
+            <h3 className="text-base sm:text-lg font-bold text-white truncate">Ranking de Vendedores</h3>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-voltech-muted bg-voltech-dark px-3 py-1 rounded-full">
-              {ranking.length} miembros activos
+          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+            <span className="text-[10px] sm:text-xs text-voltech-muted bg-voltech-dark px-2.5 sm:px-3 py-1 rounded-full whitespace-nowrap">
+              {ranking.length} activos
             </span>
-            <div className="text-xs text-voltech-muted">
-              Total acumulado: <span className="text-voltech-success font-bold">${stats.ingresosMes.toFixed(2)}</span>
-            </div>
+            {puedeVerFinanzas && (
+              <div className="text-[10px] sm:text-xs text-voltech-muted whitespace-nowrap">
+                Total: <span className="text-voltech-success font-bold">${stats.ingresosMes.toFixed(2)}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -371,23 +347,23 @@ export default function DashboardVentasPage() {
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-voltech-cyan to-voltech-purple flex items-center justify-center text-white font-bold text-sm">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-voltech-cyan to-voltech-purple flex items-center justify-center text-white font-bold text-xs sm:text-sm shrink-0">
                             {member.nombre?.charAt(0) || '?'}
                           </div>
-                          <div>
-                            <p className="text-sm font-bold text-white truncate">
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm font-bold text-white truncate">
                               {member.nombre}
-                              {esTop3 && <span className="ml-2 text-xs text-yellow-400">⭐ TOP</span>}
+                              {esTop3 && <span className="ml-1 text-[10px] sm:text-xs text-yellow-400">⭐</span>}
                             </p>
-                            <p className="text-xs text-voltech-muted capitalize">{member.rol || 'Vendedor'}</p>
+                            <p className="text-[10px] sm:text-xs text-voltech-muted capitalize truncate">{member.rol || 'Vendedor'}</p>
                           </div>
                         </div>
                         
-                        <div className="text-right hidden sm:block">
-                          <p className="text-lg font-bold text-voltech-cyan">{member.totalVentas}</p>
-                          <p className="text-[10px] text-voltech-muted uppercase tracking-wider">Ventas</p>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm sm:text-lg font-bold text-voltech-cyan">{member.totalVentas}</p>
+                          <p className="text-[9px] sm:text-[10px] text-voltech-muted uppercase tracking-wider">Ventas</p>
                         </div>
                       </div>
 
@@ -403,14 +379,16 @@ export default function DashboardVentasPage() {
                         ></div>
                       </div>
 
-                      <div className="flex items-center justify-between text-xs flex-wrap gap-2">
-                        <span className="text-voltech-muted">
-                          Monto: <span className="text-voltech-success font-semibold">${member.montoTotal.toFixed(2)}</span>
-                        </span>
-                        <span className="text-voltech-muted">
-                          Comisión Acum: <span className="text-voltech-purple font-semibold">${member.comisionAcumulada.toFixed(2)}</span>
-                        </span>
-                      </div>
+                      {puedeVerFinanzas && (
+                        <div className="flex items-center justify-between text-xs flex-wrap gap-2">
+                          <span className="text-voltech-muted">
+                            Monto: <span className="text-voltech-success font-semibold">${member.montoTotal.toFixed(2)}</span>
+                          </span>
+                          <span className="text-voltech-muted">
+                            Comisión Acum: <span className="text-voltech-purple font-semibold">${member.comisionAcumulada.toFixed(2)}</span>
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -466,7 +444,9 @@ export default function DashboardVentasPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-voltech-success">${Number(venta.total || 0).toFixed(2)}</p>
+                  {puedeVerFinanzas && (
+                    <p className="text-sm font-bold text-voltech-success">${Number(venta.total || 0).toFixed(2)}</p>
+                  )}
                   <p className="text-xs text-voltech-muted">
                     {venta.tipo === 'streaming' ? 'Streaming' : (venta.productos?.length || 1) + ' prod.'}
                   </p>

@@ -280,7 +280,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="absolute right-0 mt-2 w-80 bg-voltech-surface border border-voltech-border rounded-lg shadow-xl z-50"
+                    className="fixed left-4 right-4 top-16 w-auto max-h-[80vh] overflow-y-auto sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-h-none sm:overflow-visible bg-voltech-surface border border-voltech-border rounded-lg shadow-xl z-50"
                   >
                     <div className="p-3 border-b border-voltech-border">
                       <h3 className="font-semibold text-white flex items-center gap-2">
@@ -356,7 +356,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="absolute right-0 mt-2 w-56 bg-voltech-surface border border-voltech-border rounded-lg shadow-xl z-50 overflow-hidden"
+                    className="fixed left-4 right-4 top-16 w-auto sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-56 bg-voltech-surface border border-voltech-border rounded-lg shadow-xl z-50 overflow-hidden"
                   >
                     <div className="p-3 border-b border-voltech-border">
                       <p className="text-sm font-semibold text-white">{userData.nombre}</p>
@@ -409,7 +409,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 z-[60] flex items-start justify-center pt-[20vh]"
+            className="fixed inset-0 bg-black/80 z-[60] flex items-start justify-center pt-[15vh] px-4"
             onClick={() => setSearchOpen(false)}
           >
             <motion.div

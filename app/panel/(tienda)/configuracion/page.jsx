@@ -200,26 +200,28 @@ export default function ConfiguracionPage() {
       <Toaster position="top-right" toastOptions={{ style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' }, success: { iconTheme: { primary: '#00ff88', secondary: '#fff' } }, error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } } }} />
 
       {/* ✅ Header + Tabs */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Configuración del Sistema</h1>
-          <p className="text-sm text-voltech-muted mt-1">Personaliza notificaciones, recordatorios y plantillas</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-white truncate">Configuración del Sistema</h1>
+          <p className="text-xs sm:text-sm text-voltech-muted mt-1">Personaliza notificaciones, recordatorios y plantillas</p>
         </div>
-        <button onClick={guardarTodo} className="px-5 py-2.5 bg-gradient-to-r from-voltech-purple to-voltech-success text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all flex items-center gap-2">
+        <button onClick={guardarTodo} className="w-full sm:w-auto shrink-0 justify-center px-5 py-2.5 bg-gradient-to-r from-voltech-purple to-voltech-success text-white rounded-xl text-xs sm:text-sm font-semibold hover:shadow-lg transition-all flex items-center gap-2">
           <Save className="w-4 h-4" /> Guardar Cambios
         </button>
       </div>
 
-      <div className="flex gap-2 border-b border-voltech-border overflow-x-auto pb-px">
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2.5 text-sm font-medium flex items-center gap-2 whitespace-nowrap border-b-2 transition-colors ${activeTab === tab.id ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}
-          >
-            <tab.icon className="w-4 h-4" /> {tab.label}
-          </button>
-        ))}
+      <div className="border-b border-voltech-border">
+        <div className="grid grid-cols-2 md:flex md:gap-6 w-full gap-y-2 pb-2 md:pb-1">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${activeTab === tab.id ? 'text-voltech-cyan bg-voltech-cyan/10 border-transparent md:bg-transparent md:border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}
+            >
+              <tab.icon className="w-4 h-4" /> {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ================= TAB 1: NOTIFICACIONES ================= */}
@@ -309,7 +311,7 @@ export default function ConfiguracionPage() {
       {activeTab === 'plantillas' && (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
           {/* Editor 60% */}
-          <div className="lg:col-span-3 bg-voltech-surface border border-voltech-border rounded-xl p-6 space-y-4">
+          <div className="lg:col-span-3 bg-voltech-surface border border-voltech-border rounded-xl p-4 sm:p-6 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-lg bg-voltech-success/20"><MessageSquare className="w-5 h-5 text-voltech-success" /></div>
@@ -353,14 +355,16 @@ export default function ConfiguracionPage() {
           {/* Preview 40% */}
           <div className="lg:col-span-2 space-y-3 lg:h-full flex flex-col">
             <p className="text-xs text-voltech-muted flex items-center gap-1"><Eye className="w-3 h-3" /> Vista previa en vivo (con datos de ejemplo)</p>
-            <PreviewWA texto={textoPreview} nombre="Cliente" />
+            <div className="h-[350px] sm:h-[400px] lg:h-full">
+              <PreviewWA texto={textoPreview} nombre="Cliente" />
+            </div>
           </div>
         </div>
       )}
 
       {/* ================= TAB 4: SEGURIDAD ================= */}
       {activeTab === 'seguridad' && (
-        <div className="max-w-lg bg-voltech-surface border border-voltech-border rounded-xl p-6 space-y-4">
+        <div className="w-full lg:max-w-lg bg-voltech-surface border border-voltech-border rounded-xl p-4 sm:p-6 space-y-4">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-lg bg-voltech-success/20"><ShieldCheck className="w-5 h-5 text-voltech-success" /></div>
             <div><h3 className="text-lg font-bold text-white">Cambiar Contraseña</h3><p className="text-xs text-voltech-muted">Protege tu cuenta</p></div>

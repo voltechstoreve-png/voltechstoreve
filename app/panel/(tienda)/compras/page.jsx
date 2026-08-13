@@ -163,26 +163,26 @@ export default function ComprasPage() {
               animate={{ opacity: 1, y: 0 }}
               className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden hover:border-voltech-cyan/50 transition-all"
             >
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-voltech-cyan/20">
+              <div className="p-4 md:p-6">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 w-full">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="p-2 rounded-lg bg-voltech-cyan/20 shrink-0">
                       <Calendar className="w-5 h-5 text-voltech-cyan" />
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-white">{compra.fecha}</p>
-                      <div className="flex items-center gap-3 text-xs text-voltech-muted mt-1">
-                        <span className="flex items-center gap-1">
-                          <User className="w-3 h-3" /> {compra.comprador || 'N/A'}
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white truncate">{compra.fecha}</p>
+                      <div className="flex items-center gap-2 md:gap-3 text-xs text-voltech-muted mt-1 flex-wrap">
+                        <span className="flex items-center gap-1 shrink-0">
+                          <User className="w-3 h-3" /> <span className="truncate max-w-[90px]">{compra.comprador || 'N/A'}</span>
                         </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          <Building className="w-3 h-3" /> {compra.proveedor || 'N/A'}
+                        <span className="shrink-0">•</span>
+                        <span className="flex items-center gap-1 shrink-0">
+                          <Building className="w-3 h-3" /> <span className="truncate max-w-[90px]">{compra.proveedor || 'N/A'}</span>
                         </span>
                         {compra.esFallback && (
                           <>
-                            <span>•</span>
-                            <span className="text-voltech-warning">Último estado</span>
+                            <span className="shrink-0">•</span>
+                            <span className="text-voltech-warning whitespace-nowrap">Último estado</span>
                           </>
                         )}
                       </div>
@@ -190,10 +190,10 @@ export default function ComprasPage() {
                   </div>
                   <button
                     onClick={() => setExpandedId(expandedId === compra.id ? null : compra.id)}
-                    className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"
+                    className="shrink-0 text-xs py-1.5 px-3 md:text-sm md:py-2 md:px-4 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors flex items-center justify-center gap-1.5 md:gap-2 w-full sm:w-auto"
                   >
                     <Eye className="w-4 h-4" />
-                    {expandedId === compra.id ? 'Ocultar' : 'Ver Detalles'}
+                    <span>{expandedId === compra.id ? 'Ocultar' : 'Ver Detalles'}</span>
                   </button>
                 </div>
 

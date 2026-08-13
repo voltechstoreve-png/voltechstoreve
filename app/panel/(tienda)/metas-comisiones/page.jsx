@@ -7,7 +7,7 @@ import { useNotificaciones } from '@/app/context/NotificationContext';
 import { 
   DollarSign, BarChart, Target, MessageCircle, CheckCircle, 
   User, Users, Save, Trash2, Plus, Calendar, Bell, X, TrendingUp, ChevronDown, 
-  Award, Download, AlertCircle, ExternalLink, ShoppingCart
+  Award, Download, AlertCircle, ExternalLink, ShoppingCart, Send
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -582,11 +582,13 @@ export default function MetasYComisionesPage() {
         </div>
       </div>
           
-      <div className="flex gap-2 border-b border-voltech-border">
-        <button onClick={() => setTabMetas('rendimiento')} className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${tabMetas === 'rendimiento' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>📊 Mi Rendimiento</button>
-        {puedeGestionar && (
-          <button onClick={() => setTabMetas('config')} className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${tabMetas === 'config' ? 'text-voltech-purple border-voltech-purple' : 'text-voltech-muted border-transparent hover:text-white'}`}>⚙️ Configuraciones</button>
-        )}
+      <div className="border-b border-voltech-border">
+        <div className="grid grid-cols-2 md:flex md:gap-6 w-full gap-y-2 pb-2 md:pb-1">
+          <button onClick={() => setTabMetas('rendimiento')} className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${tabMetas === 'rendimiento' ? 'text-voltech-cyan bg-voltech-cyan/10 border-transparent md:bg-transparent md:border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>📊 Mi Rendimiento</button>
+          {puedeGestionar && (
+            <button onClick={() => setTabMetas('config')} className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${tabMetas === 'config' ? 'text-voltech-purple bg-voltech-purple/10 border-transparent md:bg-transparent md:border-voltech-purple' : 'text-voltech-muted border-transparent hover:text-white'}`}>⚙️ Configuraciones</button>
+          )}
+        </div>
       </div>
 
       {tabMetas === 'rendimiento' && (<>
@@ -599,7 +601,7 @@ export default function MetasYComisionesPage() {
             <p className="text-xs text-voltech-muted">Tu progreso personal del mes</p>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <div className="bg-voltech-dark/50 border border-voltech-border rounded-xl p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-voltech-cyan/20"><TrendingUp className="w-5 h-5 text-voltech-cyan" /></div>
@@ -654,7 +656,59 @@ export default function MetasYComisionesPage() {
             {puedeGestionar && <p className="text-xs text-voltech-muted mt-1">Haz clic en "Verificar y Generar Bonos" para revisar el progreso del equipo.</p>}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* ✅ Vista Card Móvil (< md) */}
+          <div className="block md:hidden space-y-3 p-3">
+            {bonosPendientes.map((bono) => (
+              <div key={bono.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-bold text-slate-100 truncate">{bono.producto_nombre}</h4>
+                    <p className="text-[11px] text-slate-400 font-mono truncate">{new Date(bono.fecha_registro).toLocaleDateString('es-VE')} • {bono.periodo}</p>
+                  </div>
+                  <span className="shrink-0 text-sm font-bold text-emerald-300">${Number(bono.monto_comision).toFixed(2)}</span>
+                </div>
+                {!esVendedor && (
+                  <p className="text-[11px] text-slate-400">Vendedor: <span className="text-slate-200 font-medium">{bono.miembro_nombre}</span></p>
+                )}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-700/40">
+                  {bono.estado === 'pagada' ? (
+                    <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-300">✅ Pagado</span>
+                  ) : bono.estado === 'solicitado' ? (
+                    <span className="text-[11px] px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-300">⏳ Solicitado</span>
+                  ) : (
+                    <span className="text-[11px] px-2 py-1 rounded-full bg-amber-500/20 text-amber-300">⏳ Pendiente</span>
+                  )}
+                  {bono.estado !== 'pagada' && bono.estado !== 'solicitado' && bono.miembro_nombre === (usuarioActual?.nombre || '') && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          if (supabase) await supabase.from('comisiones_pendientes').update({ estado: 'solicitado' }).eq('id', bono.id);
+                          setBonosPendientes(bonosPendientes.map(b => b.id === bono.id ? { ...b, estado: 'solicitado' } : b));
+                          if (agregarNotificacion) {
+                            agregarNotificacion({
+                              tipo: 'cobro_solicitado',
+                              titulo: '💰 Solicitud de cobro de bono',
+                              mensaje: `${bono.miembro_nombre} solicita el cobro de $${Number(bono.monto_comision).toFixed(2)}`,
+                              detalle: `${bono.producto_nombre} - Período ${bono.periodo}`,
+                              usuario_id: 'admin'
+                            });
+                          }
+                          toast.success('Solicitud enviada al administrador');
+                        } catch (e) { toast.error('Error al enviar solicitud'); }
+                      }}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs px-3 py-1.5 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                    >
+                      <Send className="w-3.5 h-3.5 shrink-0" /> Pedir Cobro
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ✅ Vista Tabla Desktop (>= md) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead className="bg-voltech-dark border-b border-voltech-border">
                 <tr>
@@ -713,6 +767,7 @@ export default function MetasYComisionesPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 
@@ -726,7 +781,115 @@ export default function MetasYComisionesPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* ✅ Vista Card Móvil (< md) */}
+        <div className="block md:hidden space-y-3 p-3">
+          {referidosEquipo.length === 0 ? (
+            <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 text-center">
+              <Users className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+              <p className="text-xs text-slate-400">Aún no hay miembros en el equipo.</p>
+            </div>
+          ) : (
+            referidosEquipo.map((r, index) => {
+              const rank = ranking.find(x => x.nombre === r.nombre) || {};
+              const isSel = miembroSeleccionado === r.nombre;
+              const susClientes = clientesTodos.filter(c => (c.registradoPor || c.registrado_por) === r.nombre);
+              const susVentas = ventasTodas.filter(v => v.vendedor === r.nombre);
+              const ventasReferidas = ventasTodas.filter(v => v.vendedor !== r.nombre && susClientes.some(c => c.nombre === (v.clienteNombre || v.cliente || '')));
+              const ventasDetalle = [
+                ...susVentas.map(v => ({ ...v, _propia: true })),
+                ...ventasReferidas.map(v => ({ ...v, _propia: false })),
+              ];
+              const cuponesUsados = susVentas.filter(v => v.cuponCodigo || v.cupon).length;
+              const pagadasSet = new Set(comisionesTodas.filter(c => c.estado === 'pagada').map(c => c.venta_id));
+              const comisionVentasReal = susVentas.reduce((s, v) => s + comisionDe(v, rank.porcentajeComision), 0);
+              const comisionTotal = comisionVentasReal + (r.comision || 0);
+              return (
+                <div key={r.nombre} className={`bg-slate-800/60 border rounded-2xl p-4 space-y-3 ${isSel ? 'border-cyan-500' : 'border-slate-700/50'}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                        index === 0 ? 'bg-yellow-500/20 text-yellow-500' :
+                        index === 1 ? 'bg-gray-400/20 text-gray-400' :
+                        index === 2 ? 'bg-orange-700/20 text-orange-700' :
+                        'bg-slate-500/20 text-slate-400'
+                      }`}>#{index + 1}</span>
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-purple-500 flex items-center justify-center text-white font-bold text-xs shrink-0">{r.nombre?.charAt(0) || '?'}</div>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-slate-100 truncate">{r.nombre}</h4>
+                        <p className="text-[10px] text-slate-400 capitalize truncate">{r.rol}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-2 text-[11px]">
+                    <div><span className="text-slate-400 block">Ventas:</span><span className="text-slate-200 font-bold">{rank.ventas || 0}</span></div>
+                    <div><span className="text-slate-400 block">% Ventas:</span><span className="text-emerald-300 font-bold">{rank.porcentajeComision || 0}%</span></div>
+                    <div><span className="text-slate-400 block">% Referidos:</span><span className="text-purple-300 font-bold">{r.porcentaje}%</span></div>
+                    <div><span className="text-slate-400 block">Cupones:</span><span className="text-cyan-300 font-bold">{cuponesUsados}</span></div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const sol = { id: String(Date.now()), miembro_nombre: r.nombre, monto: comisionTotal, fecha: new Date().toISOString(), estado: 'pendiente', sync: false };
+                        const sols = JSON.parse(localStorage.getItem('voltech_solicitudes_pago') || '[]');
+                        localStorage.setItem('voltech_solicitudes_pago', JSON.stringify([sol, ...sols]));
+                        if (agregarNotificacion) {
+                          agregarNotificacion({ tipo: 'solicitud_pago', categoria: 'pagos_equipo', titulo: '💰 Solicitud de pago', mensaje: `${r.nombre} solicita el pago de $${comisionTotal.toFixed(2)}`, detalle: `Ventas: ${rank.ventas || 0} | Referidos: ${r.referidos}`, usuario_id: 'admin', miembro: r.nombre });
+                        }
+                        window.dispatchEvent(new Event('voltech-data-updated'));
+                        toast.success('Solicitud de pago enviada al administrador');
+                      }}
+                      className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                    >
+                      <DollarSign className="w-3.5 h-3.5 shrink-0" /> Pedir Pago
+                    </button>
+                    <button onClick={() => setMiembroSeleccionado(isSel ? null : r.nombre)} className="flex-1 bg-slate-700/50 border border-slate-600 text-slate-200 font-semibold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors">
+                      Detalle <ChevronDown size={14} className={`transition-transform ${isSel ? 'rotate-180' : ''}`} />
+                    </button>
+                  </div>
+                  {isSel && (
+                    <div className="space-y-2 pt-2 border-t border-slate-700/40">
+                      {ventasDetalle.length === 0 ? (
+                        <p className="text-center text-[11px] text-slate-400 py-3">Sin ventas este período.</p>
+                      ) : (
+                        ventasDetalle.map((v, i) => {
+                          const esPropia = v._propia;
+                          const esStream = !!v.plataformas;
+                          const esKit = v.esKit || (v.productos || []).some(p => p.tipo === 'kit');
+                          const tipo = esStream ? 'Streaming' : esKit ? 'Kit' : 'Producto';
+                          const tipoColor = esStream ? 'bg-purple-500/20 text-purple-300' : esKit ? 'bg-orange-500/20 text-orange-300' : 'bg-emerald-500/20 text-emerald-300';
+                          const total = Number(v.total || 0);
+                          const comVenta = esPropia ? comisionDe(v, rank.porcentajeComision) : 0;
+                          const comRef = !esPropia ? total * (r.porcentaje || 0) / 100 : 0;
+                          return (
+                            <div key={i} className="bg-slate-900/60 border border-slate-700/40 rounded-xl p-3 space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[11px] font-bold text-slate-100 truncate">#{v.numeroOrden || v.id?.slice(-6) || 'N/A'}</span>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full ${tipoColor}`}>{tipo}</span>
+                              </div>
+                              <p className="text-[10px] text-slate-400">{v.fecha || (v.fechaRegistro || '').split('T')[0]}</p>
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-slate-400">Comisión:</span>
+                                <span className={`font-bold ${esPropia ? 'text-emerald-300' : 'text-purple-300'}`}>
+                                  {esPropia ? `$${comVenta.toFixed(2)}` : `$${comRef.toFixed(2)}`}
+                                </span>
+                              </div>
+                              {esPropia && (
+                                <button onClick={() => pedirPagoVenta(v, r, comVenta)} className="w-full text-[10px] py-1.5 bg-cyan-500/10 text-cyan-300 rounded-lg hover:bg-cyan-500/20 transition-colors">Pedir pago</button>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* ✅ Vista Tabla Desktop (>= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead className="bg-voltech-dark border-b border-voltech-border">
               <tr>

@@ -268,70 +268,62 @@ export default function ProveedoresPage() {
       }} />
 
       {/* HEADER */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
         <div>
-          <h1 className="text-2xl font-bold text-white">Proveedores</h1>
-          <p className="text-sm text-voltech-muted mt-1">Gestiona tus proveedores nacionales y sus contactos comerciales</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Proveedores</h1>
+          <p className="text-xs sm:text-sm text-voltech-muted mt-1">Gestiona tus proveedores nacionales y sus contactos comerciales</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2"
+          className="w-full sm:w-auto shrink-0 justify-center px-4 py-2.5 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-xl text-xs sm:text-sm font-semibold hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2"
         >
           <Plus className="w-4 h-4" /> Nuevo Proveedor
         </button>
       </div>
 
       {/* MÉTRICAS */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-cyan/20"><Building2 className="w-5 h-5 text-voltech-cyan" /></div>
-            <div><p className="text-xs text-voltech-muted">Total Proveedores</p><p className="text-xl font-bold text-white">{totalProveedores}</p></div>
-          </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+          <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-cyan/10 md:bg-voltech-cyan/20 text-voltech-cyan shrink-0 flex items-center justify-center"><Building2 className="w-5 h-5" /></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Total Proveedores</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{totalProveedores}</p></div>
         </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-success/20"><CheckCircle className="w-5 h-5 text-voltech-success" /></div>
-            <div><p className="text-xs text-voltech-muted">Activos</p><p className="text-xl font-bold text-white">{activos}</p></div>
-          </div>
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+          <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-success/10 md:bg-voltech-success/20 text-voltech-success shrink-0 flex items-center justify-center"><CheckCircle className="w-5 h-5" /></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Activos</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{activos}</p></div>
         </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-purple/20"><MapPin className="w-5 h-5 text-voltech-purple" /></div>
-            <div><p className="text-xs text-voltech-muted">Ciudades</p><p className="text-xl font-bold text-white">{ciudadesUnicas}</p></div>
-          </div>
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+          <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-purple/10 md:bg-voltech-purple/20 text-voltech-purple shrink-0 flex items-center justify-center"><MapPin className="w-5 h-5" /></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Ciudades</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{ciudadesUnicas}</p></div>
         </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-warning/20"><Users className="w-5 h-5 text-voltech-warning" /></div>
-            <div><p className="text-xs text-voltech-muted">Contactos Totales</p><p className="text-xl font-bold text-white">{totalContactos}</p></div>
-          </div>
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+          <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-warning/10 md:bg-voltech-warning/20 text-voltech-warning shrink-0 flex items-center justify-center"><Users className="w-5 h-5" /></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Contactos Totales</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{totalContactos}</p></div>
         </div>
       </div>
 
       {/* PESTAÑAS */}
       <div className="border-b border-voltech-border">
-        <div className="flex gap-6">
+        <div className="grid grid-cols-2 md:flex md:gap-6 w-full gap-y-2 pb-2 md:pb-1">
           <button
             onClick={() => setActiveTab('todos')}
-            className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${
-              activeTab === 'todos' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'
+            className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${
+              activeTab === 'todos' ? 'text-voltech-cyan bg-voltech-cyan/10 border-transparent md:bg-transparent md:border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'
             }`}
           >
-            <Building2 className="w-4 h-4" /> Todos los Proveedores
+            <Building2 className="w-4 h-4" /> Todos
           </button>
           <button
             onClick={() => setActiveTab('ciudad')}
-            className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${
-              activeTab === 'ciudad' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'
+            className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${
+              activeTab === 'ciudad' ? 'text-voltech-cyan bg-voltech-cyan/10 border-transparent md:bg-transparent md:border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'
             }`}
           >
             <MapPin className="w-4 h-4" /> Por Ciudad
           </button>
           <button
             onClick={() => setActiveTab('inactivos')}
-            className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 ${
-              activeTab === 'inactivos' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'
+            className={`col-span-2 md:col-span-1 justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${
+              activeTab === 'inactivos' ? 'text-voltech-cyan bg-voltech-cyan/10 border-transparent md:bg-transparent md:border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'
             }`}
           >
             <AlertCircle className="w-4 h-4" /> Inactivos
@@ -628,11 +620,11 @@ export default function ProveedoresPage() {
                 </div>
 
                 {/* Botones */}
-                <div className="flex gap-3 pt-4 border-t border-voltech-border">
+                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-voltech-border">
                   <button
                     type="button"
                     onClick={resetForm}
-                    className="px-6 py-3 rounded-lg font-medium bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white hover:border-voltech-cyan/50 transition-all"
+                    className="w-full sm:w-auto px-6 py-3 rounded-lg font-medium bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white hover:border-voltech-cyan/50 transition-all"
                   >
                     Cancelar
                   </button>
@@ -651,22 +643,22 @@ export default function ProveedoresPage() {
       </AnimatePresence>
 
       {/* FILTROS Y BÚSQUEDA */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full">
+        <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
           <input
             type="text"
-            placeholder="Buscar proveedor, asesor, ciudad o tipo de producto..."
+            placeholder="Buscar proveedor, asesor, ciudad..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="input-voltech w-full rounded-lg pl-10 pr-4 py-3 text-sm"
+            className="input-voltech w-full rounded-xl pl-10 pr-4 py-2.5 text-sm"
           />
         </div>
         {activeTab === 'ciudad' && (
           <select
             value={filterCiudad}
             onChange={(e) => setFilterCiudad(e.target.value)}
-            className="input-voltech rounded-lg px-4 py-3 text-sm min-w-[200px]"
+            className="input-voltech w-full sm:w-auto rounded-xl px-4 py-2.5 text-sm sm:min-w-[200px]"
           >
             <option value="">Todas las ciudades</option>
             {ciudades.map(c => <option key={c} value={c}>{c}</option>)}
@@ -851,23 +843,23 @@ export default function ProveedoresPage() {
                         )}
 
                         {/* Acciones */}
-                        <div className="flex items-center justify-end gap-2 pt-4 border-t border-voltech-border">
+                        <div className="grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2 pt-4 border-t border-voltech-border">
                           <button
                             onClick={() => proveedor.email && abrirEmail(proveedor.email)}
                             disabled={!proveedor.email}
-                            className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Mail className="w-4 h-4" /> Email
                           </button>
                           <button
                             onClick={() => handleEditar(proveedor)}
-                            className="px-3 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg text-xs hover:bg-voltech-purple/30 transition-colors flex items-center gap-1"
+                            className="px-3 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg text-xs hover:bg-voltech-purple/30 transition-colors flex items-center justify-center gap-1"
                           >
                             <Edit3 className="w-4 h-4" /> Editar
                           </button>
                           <button
                             onClick={() => toggleEstado(proveedor)}
-                            className={`px-3 py-2 rounded-lg text-xs transition-colors flex items-center gap-1 ${
+                            className={`px-3 py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1 ${
                               proveedor.estado === 'activo'
                                 ? 'bg-voltech-warning/20 text-voltech-warning hover:bg-voltech-warning/30'
                                 : 'bg-voltech-success/20 text-voltech-success hover:bg-voltech-success/30'
@@ -881,7 +873,7 @@ export default function ProveedoresPage() {
                           </button>
                           <button
                             onClick={() => handleEliminar(proveedor.id)}
-                            className="px-3 py-2 bg-voltech-error/20 text-voltech-error rounded-lg text-xs hover:bg-voltech-error/30 transition-colors flex items-center gap-1"
+                            className="px-3 py-2 bg-voltech-error/20 text-voltech-error rounded-lg text-xs hover:bg-voltech-error/30 transition-colors flex items-center justify-center gap-1"
                           >
                             <Trash2 className="w-4 h-4" /> Eliminar
                           </button>

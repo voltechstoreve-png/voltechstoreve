@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
 import { useNotificaciones } from '@/app/context/NotificationContext';
 import ModalWhatsApp from '@/components/ModalWhatsApp';
+import WhatsAppIcon from '@/components/WhatsAppIcon';
 import { 
   MessageSquare, Send, Users, Gift, Copy, Plus, Search, Trash2, 
   Edit3, Save, X, CheckCircle, ShoppingCart, Tag, FileText, 
@@ -295,7 +296,8 @@ export default function MarketingPage() {
     }
     
     mensaje += ` *Producto:* ${nombreProducto}\n`;
-    mensaje += `💰 *Precio Especial:* $${precioProducto}\n\n`;
+    mensaje += `💰 *Precio Especial:* $${precioProducto}\n`;
+    mensaje += `🔗 *Ver promoción:* ${window.location.origin}/catalogo?producto=${productoSeleccionado.id}\n\n`;
     
     if (plantillaWhatsappSeleccionada) {
       const plantilla = plantillas.find(p => String(p.id) === String(plantillaWhatsappSeleccionada));
@@ -634,7 +636,7 @@ export default function MarketingPage() {
 
   // ✅ TABS POR ROL: vendedor SIN Publicidad ni Más Vendidos; Calendario ELIMINADO
   const tabsDisponibles = [
-    { id: 'whatsapp', icon: Send, label: 'WhatsApp' },
+    { id: 'whatsapp', icon: WhatsAppIcon, label: 'WhatsApp' },
     { id: 'marketplace', icon: FileText, label: 'Marketplace' },
     { id: 'cupones', icon: Ticket, label: 'Cupones' },
     ...((esAdmin || esSocio) ? [
@@ -673,9 +675,9 @@ export default function MarketingPage() {
       </div>
 
       <div className="border-b border-voltech-border">
-        <div className="flex gap-6 overflow-x-auto pb-1">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:gap-6 w-full gap-y-2 pb-2 md:pb-1">
           {tabsDisponibles.map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`pb-3 flex items-center gap-2 font-medium text-sm transition-colors border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${activeTab === tab.id ? 'text-voltech-cyan bg-voltech-cyan/10 border-transparent md:bg-transparent md:border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>
               <tab.icon className="w-4 h-4" /> {tab.label}
             </button>
           ))}
@@ -696,7 +698,7 @@ export default function MarketingPage() {
             {showPlantillaForm && puedeGestionar && (
               <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6 space-y-3">
                 <div className="flex items-center justify-between border-b border-gray-800 pb-3 mb-4">
-                  <div className="flex items-center gap-3"><MessageSquare className="w-5 h-5 text-voltech-cyan" /><h3 className="text-lg font-semibold text-white">Nueva Plantilla de WhatsApp</h3></div>
+                  <div className="flex items-center gap-3"><WhatsAppIcon className="w-5 h-5 text-[#25D366]" /><h3 className="text-lg font-semibold text-white">Nueva Plantilla de WhatsApp</h3></div>
                   <button onClick={() => { setShowPlantillaForm(false); setPlantillaEditando(null); }} className="flex items-center gap-1 text-xs text-gray-400 hover:text-white bg-gray-800/50 hover:bg-gray-800 px-2.5 py-1 rounded-lg transition-colors"><span>✕</span> Cerrar</button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -716,7 +718,7 @@ export default function MarketingPage() {
             <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
               <div className="p-4 bg-voltech-dark/30 border-b border-gray-800">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3"><Send className="w-5 h-5 text-voltech-cyan" /><h3 className="text-lg font-semibold text-white">Nueva Difusión por WhatsApp</h3></div>
+                  <div className="flex items-center gap-3"><WhatsAppIcon className="w-5 h-5 text-[#25D366]" /><h3 className="text-lg font-semibold text-white">Nueva Difusión por WhatsApp</h3></div>
                   <button onClick={() => setWhatsappOpen(false)} className="flex items-center gap-1 text-xs text-gray-400 hover:text-white bg-gray-800/50 hover:bg-gray-800 px-2.5 py-1 rounded-lg transition-colors"><span>✕</span> Cerrar</button>
                 </div>
               </div>
@@ -800,7 +802,7 @@ export default function MarketingPage() {
                         <BurbujaWA texto={mensajePersonalizadoWa} nombre={clientes.find(c => String(c.id) === String(clientesSeleccionados[0]))?.nombre || 'Cliente'} />
                         <div className="flex gap-3">
                           <button onClick={() => { navigator.clipboard.writeText(mensajePersonalizadoWa); toast.success('Mensaje copiado'); }} disabled={!mensajePersonalizadoWa} className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-voltech-muted hover:text-white disabled:opacity-50">Copiar</button>
-                          <button onClick={lanzarDifusion} disabled={clientesSeleccionados.length === 0 || !mensajePersonalizadoWa} className="flex-1 py-2 bg-green-500 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"><Send className="w-4 h-4" /> Lanzar Difusión ({clientesSeleccionados.length})</button>
+                          <button onClick={lanzarDifusion} disabled={clientesSeleccionados.length === 0 || !mensajePersonalizadoWa} className="flex-1 py-2 bg-green-500 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"><WhatsAppIcon className="w-4 h-4" /> Lanzar Difusión ({clientesSeleccionados.length})</button>
                         </div>
                       </>
                     ) : (
@@ -813,7 +815,7 @@ export default function MarketingPage() {
             )}
 
             <div className="bg-voltech-surface border border-voltech-border rounded-xl">
-              <div className="p-6 border-b border-voltech-border"><h3 className="text-lg font-bold text-white flex items-center gap-2"><MessageSquare className="w-5 h-5 text-voltech-cyan" /> Mensajes Creados</h3></div>
+              <div className="p-6 border-b border-voltech-border"><h3 className="text-lg font-bold text-white flex items-center gap-2"><WhatsAppIcon className="w-5 h-5 text-[#25D366]" /> Mensajes Creados</h3></div>
               {plantillas.filter(p => p.tipo === 'whatsapp').length === 0 ? (
                 <div className="p-12 text-center"><MessageSquare className="w-16 h-16 text-voltech-muted mx-auto mb-4 opacity-30" /><h3 className="text-lg font-semibold text-white mb-2">No hay mensajes</h3><p className="text-voltech-muted text-sm">Crea tu primer texto para WhatsApp</p></div>
               ) : (
@@ -1509,7 +1511,7 @@ export default function MarketingPage() {
                         {esAdmin && (
                           <div className="flex gap-2">
                             <button onClick={() => enviarResumenPub(pub)} className="p-2 hover:bg-voltech-success/20 rounded-lg text-voltech-success" title="Enviar resumen al anunciante">
-                              <Send className="w-4 h-4" />
+                              <WhatsAppIcon className="w-4 h-4" />
                             </button>
                             <button onClick={() => { setPublicidadEditando(pub); setShowPublicidadForm(true); }} className="p-2 hover:bg-voltech-cyan/20 rounded-lg text-voltech-cyan">
                               <Edit3 className="w-4 h-4" />
@@ -1618,6 +1620,16 @@ export default function MarketingPage() {
         )}
         {/* ❌ ELIMINADO: todo el tab 'calendario' (vive ahora en /panel/alertas) */}
       </div>
+
+      {/* ✅ Modal para enviar resumen por WhatsApp */}
+      <ModalWhatsApp
+        abierto={resumenData.abierto}
+        textoFijo={resumenData.texto}
+        titulo={resumenData.titulo || 'Resumen de Publicidad'}
+        telefono={resumenData.telefono || ''}
+        nombreCliente={resumenData.cliente || ''}
+        onClose={() => setResumenData({ abierto: false, texto: '', telefono: '', titulo: '', cliente: '' })}
+      />
     </div>
   );
 }

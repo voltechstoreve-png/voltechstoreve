@@ -139,72 +139,72 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="text-sm text-voltech-muted mt-1">Resumen general de tu tienda</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Dashboard</h1>
+          <p className="text-xs sm:text-sm text-voltech-muted mt-1">Resumen general de tu tienda</p>
         </div>
-        <div className="text-right">
+        <div className="text-left sm:text-right">
           <p className="text-xs text-voltech-muted">Última actualización</p>
           <p className="text-sm text-white">Hace un momento</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-5">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-4 md:p-5">
           <div className="flex items-start justify-between mb-3">
             <div className="p-2 rounded-lg bg-gradient-to-br from-voltech-cyan to-blue-500">
               <DollarSign className="w-5 h-5 text-white" />
             </div>
-            <div className="flex items-center gap-1 text-xs text-voltech-success">
+            <div className="flex items-center gap-1 text-[10px] md:text-xs text-voltech-success">
               <ArrowUpRight className="w-3 h-3" />
               +12.5%
             </div>
           </div>
-          <p className="text-xs text-voltech-muted mb-1">Valor Inventario</p>
-          <p className="text-2xl font-bold text-white">${stats.valorInventario.toFixed(2)}</p>
+          <p className="text-[11px] md:text-xs text-slate-400 md:text-voltech-muted mb-1">Valor Inventario</p>
+          <p className="text-lg md:text-2xl font-bold text-white">${stats.valorInventario.toFixed(2)}</p>
         </div>
 
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-5">
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-4 md:p-5">
           <div className="flex items-start justify-between mb-3">
             <div className="p-2 rounded-lg bg-gradient-to-br from-voltech-purple to-pink-500">
               <Package className="w-5 h-5 text-white" />
             </div>
-            <div className="flex items-center gap-1 text-xs text-voltech-success">
+            <div className="flex items-center gap-1 text-[10px] md:text-xs text-voltech-success">
               <ArrowUpRight className="w-3 h-3" />
               {stats.productosPublicados}
             </div>
           </div>
-          <p className="text-xs text-voltech-muted mb-1">Productos Publicados</p>
-          <p className="text-2xl font-bold text-white">{stats.productosPublicados}</p>
+          <p className="text-[11px] md:text-xs text-slate-400 md:text-voltech-muted mb-1">Productos Publicados</p>
+          <p className="text-lg md:text-2xl font-bold text-white">{stats.productosPublicados}</p>
         </div>
 
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-5">
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-4 md:p-5">
           <div className="flex items-start justify-between mb-3">
             <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500">
               <Users className="w-5 h-5 text-white" />
             </div>
-            <div className="flex items-center gap-1 text-xs text-voltech-success">
+            <div className="flex items-center gap-1 text-[10px] md:text-xs text-voltech-success">
               <ArrowUpRight className="w-3 h-3" />
               Activos
             </div>
           </div>
-          <p className="text-xs text-voltech-muted mb-1">Miembros Equipo</p>
-          <p className="text-2xl font-bold text-white">{stats.clientesActivos}</p>
+          <p className="text-[11px] md:text-xs text-slate-400 md:text-voltech-muted mb-1">Miembros Equipo</p>
+          <p className="text-lg md:text-2xl font-bold text-white">{stats.clientesActivos}</p>
         </div>
 
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-5">
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-4 md:p-5">
           <div className="flex items-start justify-between mb-3">
             <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-red-500">
               <ShoppingCart className="w-5 h-5 text-white" />
             </div>
-            <div className="flex items-center gap-1 text-xs text-voltech-error">
+            <div className="flex items-center gap-1 text-[10px] md:text-xs text-voltech-error">
               <ArrowDownRight className="w-3 h-3" />
               {stats.agotados}
             </div>
           </div>
-          <p className="text-xs text-voltech-muted mb-1">Productos Agotados</p>
-          <p className="text-2xl font-bold text-white">{stats.agotados}</p>
+          <p className="text-[11px] md:text-xs text-slate-400 md:text-voltech-muted mb-1">Productos Agotados</p>
+          <p className="text-lg md:text-2xl font-bold text-white">{stats.agotados}</p>
         </div>
       </div>
 
@@ -219,7 +219,7 @@ export default function DashboardPage() {
               En vivo
             </span>
           </div>
-          <ResponsiveContainer width="100%" height={250}>
+          <ResponsiveContainer width="100%" height={220} className="md:!h-[250px]">
             <LineChart data={ventasSemanales}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
               <XAxis dataKey="dia" stroke="#a0a0b0" fontSize={12} />
@@ -258,7 +258,7 @@ export default function DashboardPage() {
               <p className="text-sm">Agrega productos para ver estadísticas</p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={250}>
+            <ResponsiveContainer width="100%" height={220} className="md:!h-[250px]">
               <BarChart data={productosMasVendidos}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e1e2e" />
                 <XAxis dataKey="nombre" stroke="#a0a0b0" fontSize={12} />

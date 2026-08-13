@@ -151,81 +151,81 @@ export default function PerfilPage() {
       />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
         <div>
-          <h1 className="text-2xl font-bold text-white">Mi Perfil</h1>
-          <p className="text-sm text-voltech-muted mt-1">Gestiona tu información personal</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Mi Perfil</h1>
+          <p className="text-xs sm:text-sm text-voltech-muted mt-1">Gestiona tu información personal</p>
         </div>
-        <button className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2">
+        <button className="w-full sm:w-auto shrink-0 justify-center px-4 py-2.5 bg-voltech-cyan/20 text-voltech-cyan rounded-xl text-xs sm:text-sm font-medium hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2">
           <Camera className="w-4 h-4" />
           Cambiar Foto
         </button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-cyan/20">
-              <User className="w-5 h-5 text-voltech-cyan" />
+            <div className="p-2 md:p-2 rounded-lg md:rounded-lg bg-voltech-cyan/10 md:bg-voltech-cyan/20 text-voltech-cyan shrink-0 flex items-center justify-center">
+              <User className="w-5 h-5" />
             </div>
-            <div>
-              <p className="text-xs text-voltech-muted">Nombre</p>
-              <p className="text-lg font-bold text-white">{userData.nombre}</p>
+            <div className="min-w-0 flex-1 md:flex-none">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Nombre</p>
+              <p className="text-sm md:text-lg font-bold text-white mt-0.5 truncate">{userData.nombre}</p>
             </div>
           </div>
         </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-purple/20">
-              <Mail className="w-5 h-5 text-voltech-purple" />
+            <div className="p-2 md:p-2 rounded-lg md:rounded-lg bg-voltech-purple/10 md:bg-voltech-purple/20 text-voltech-purple shrink-0 flex items-center justify-center">
+              <Mail className="w-5 h-5" />
             </div>
-            <div>
-              <p className="text-xs text-voltech-muted">Email</p>
-              <p className="text-lg font-bold text-white truncate max-w-[150px]">{userData.email}</p>
+            <div className="min-w-0 flex-1 md:flex-none">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Email</p>
+              <p className="text-sm md:text-lg font-bold text-white mt-0.5 truncate">{userData.email}</p>
             </div>
           </div>
         </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-warning/20">
-              <Phone className="w-5 h-5 text-voltech-warning" />
+            <div className="p-2 md:p-2 rounded-lg md:rounded-lg bg-voltech-warning/10 md:bg-voltech-warning/20 text-voltech-warning shrink-0 flex items-center justify-center">
+              <Phone className="w-5 h-5" />
             </div>
-            <div>
-              <p className="text-xs text-voltech-muted">Teléfono</p>
-              <p className="text-lg font-bold text-white">{userData.telefono || '-'}</p>
+            <div className="min-w-0 flex-1 md:flex-none">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Teléfono</p>
+              <p className="text-sm md:text-lg font-bold text-white mt-0.5 truncate">{userData.telefono || '-'}</p>
             </div>
           </div>
         </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-success/20">
-              <Shield className="w-5 h-5 text-voltech-success" />
+            <div className="p-2 md:p-2 rounded-lg md:rounded-lg bg-voltech-success/10 md:bg-voltech-success/20 text-voltech-success shrink-0 flex items-center justify-center">
+              <Shield className="w-5 h-5" />
             </div>
-            <div>
-              <p className="text-xs text-voltech-muted">Rol</p>
-              <p className="text-lg font-bold text-white">{userData.rol}</p>
+            <div className="min-w-0 flex-1 md:flex-none">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Rol</p>
+              <p className="text-sm md:text-lg font-bold text-white mt-0.5 truncate">{userData.rol}</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Información Personal */}
-      <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-voltech-cyan/20">
+      <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="p-2 rounded-lg bg-voltech-cyan/20 shrink-0">
               <User className="w-5 h-5 text-voltech-cyan" />
             </div>
-            <div>
-              <h3 className="text-lg font-bold text-white">Información Personal</h3>
-              <p className="text-xs text-voltech-muted">Actualiza tus datos personales</p>
+            <div className="min-w-0">
+              <h3 className="text-base sm:text-lg font-bold text-white truncate">Información Personal</h3>
+              <p className="text-xs text-voltech-muted truncate">Actualiza tus datos personales</p>
             </div>
           </div>
           {!editMode && (
             <button
               onClick={() => setEditMode(true)}
-              className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"
+              className="w-full sm:w-auto shrink-0 justify-center px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs sm:text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"
             >
               <Edit3 className="w-4 h-4" />
               Editar Perfil
@@ -300,7 +300,7 @@ export default function PerfilPage() {
           </div>
 
           {editMode && (
-            <div className="flex gap-3 pt-4">
+            <div className="flex flex-col sm:flex-row gap-3 pt-4">
               <button
                 onClick={handleSave}
                 className="flex-1 btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"
@@ -310,7 +310,7 @@ export default function PerfilPage() {
               </button>
               <button
                 onClick={handleCancel}
-                className="px-6 py-3 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-error transition-all flex items-center gap-2"
+                className="w-full sm:w-auto px-6 py-3 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-error transition-all flex items-center justify-center gap-2"
               >
                 <X className="w-4 h-4" />
                 Cancelar
@@ -321,7 +321,7 @@ export default function PerfilPage() {
       </div>
 
       {/* Seguridad */}
-      <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
+      <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4 sm:p-6">
         <div className="flex items-center gap-2 mb-6">
           <div className="p-2 rounded-lg bg-voltech-success/20">
             <Lock className="w-5 h-5 text-voltech-success" />

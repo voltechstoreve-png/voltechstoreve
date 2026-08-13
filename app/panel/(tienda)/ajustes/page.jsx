@@ -428,22 +428,22 @@ export default function AjustesPage() {
         error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } },
       }} />
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
         <div>
-          <h1 className="text-2xl font-bold text-white">Ajustes</h1>
-          <p className="text-sm text-voltech-muted mt-1">Configura tu tienda y preferencias</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Ajustes</h1>
+          <p className="text-xs sm:text-sm text-voltech-muted mt-1">Configura tu tienda y preferencias</p>
         </div>
         {esAdmin && (
-          <button onClick={() => { handleSave(); scrollToTop(); }} className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2">
+          <button onClick={() => { handleSave(); scrollToTop(); }} className="w-full sm:w-auto shrink-0 justify-center px-4 py-2.5 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-xl text-xs sm:text-sm font-semibold hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2">
             <Save className="w-4 h-4" /> Guardar Cambios
           </button>
         )}
       </div>
 
       {!esAdmin && (
-        <div className="bg-voltech-warning/10 border border-voltech-warning/30 rounded-lg p-4 flex items-start gap-3">
+        <div className="bg-voltech-warning/10 border border-voltech-warning/30 rounded-xl p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-voltech-warning flex-shrink-0 mt-0.5" />
-          <div>
+          <div className="min-w-0">
             <p className="text-sm text-voltech-warning font-medium">Solo lectura</p>
             <p className="text-xs text-voltech-muted mt-1">No tienes permisos para modificar los ajustes. Contacta al administrador.</p>
           </div>
@@ -456,14 +456,14 @@ export default function AjustesPage() {
           onClick={() => toggleSection('datosTienda')}
           className="w-full flex items-center justify-between mb-6"
         >
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-voltech-cyan/20"><Store className="w-5 h-5 text-voltech-cyan" /></div>
-            <div className="text-left">
-              <h3 className="text-lg font-bold text-white">Datos de la Tienda</h3>
-              <p className="text-xs text-voltech-muted">Información pública de tu negocio</p>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="p-2 rounded-lg bg-voltech-cyan/20 shrink-0"><Store className="w-5 h-5 text-voltech-cyan" /></div>
+            <div className="text-left min-w-0">
+              <h3 className="text-base sm:text-lg font-bold text-white truncate">Datos de la Tienda</h3>
+              <p className="text-xs text-voltech-muted truncate">Información pública de tu negocio</p>
             </div>
           </div>
-          <div className={`p-2 rounded-lg transition-transform ${expandedSections.datosTienda ? 'rotate-180' : ''}`}>
+          <div className={`p-2 rounded-lg transition-transform shrink-0 ${expandedSections.datosTienda ? 'rotate-180' : ''}`}>
             <ChevronDown className="w-5 h-5 text-voltech-muted" />
           </div>
         </button>
@@ -772,16 +772,16 @@ export default function AjustesPage() {
                   </span>
                 ))}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
                   value={nuevoPunto}
                   onChange={(e) => setNuevoPunto(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && agregarPuntoEntrega()}
-                  className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm"
+                  className="input-voltech w-full sm:flex-1 min-w-0 rounded-lg px-4 py-2 text-sm"
                   placeholder="Ej: Plaza Venezuela, Sambil Chacao..."
                 />
-                <button onClick={agregarPuntoEntrega} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 flex items-center gap-2">
+                <button onClick={agregarPuntoEntrega} className="w-full sm:w-auto shrink-0 justify-center px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 flex items-center gap-2">
                   <Plus className="w-4 h-4" /> Agregar
                 </button>
               </div>
@@ -872,9 +872,9 @@ export default function AjustesPage() {
         
         {expandedSections.metodosPago && (
           <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-            <div className="flex gap-2 mb-4">
-              <input type="text" value={nuevoMetodo} onChange={(e) => setNuevoMetodo(e.target.value)} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" placeholder="Ej: Zelle, PayPal" />
-              <button onClick={agregarMetodoPago} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 mb-4">
+              <input type="text" value={nuevoMetodo} onChange={(e) => setNuevoMetodo(e.target.value)} className="input-voltech w-full sm:flex-1 min-w-0 rounded-lg px-4 py-2 text-sm" placeholder="Ej: Zelle, PayPal" />
+              <button onClick={agregarMetodoPago} className="w-full sm:w-auto shrink-0 justify-center px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 flex items-center gap-2">
                 <Plus className="w-4 h-4" /> Agregar
               </button>
             </div>
@@ -949,9 +949,9 @@ export default function AjustesPage() {
         
         {expandedSections.carteras && (
           <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-            <div className="flex gap-2 mb-4">
-              <input type="text" value={nuevaCartera} onChange={(e) => setNuevaCartera(e.target.value)} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" placeholder="Ej: Banco de Venezuela, Binance Wallet 2" />
-              <button onClick={agregarCartera} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 mb-4">
+              <input type="text" value={nuevaCartera} onChange={(e) => setNuevaCartera(e.target.value)} className="input-voltech w-full sm:flex-1 min-w-0 rounded-lg px-4 py-2 text-sm" placeholder="Ej: Banco de Venezuela, Binance Wallet 2" />
+              <button onClick={agregarCartera} className="w-full sm:w-auto shrink-0 justify-center px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 flex items-center gap-2">
                 <Plus className="w-4 h-4" /> Agregar
               </button>
             </div>
@@ -1072,11 +1072,11 @@ export default function AjustesPage() {
       </div>
 
       {/* Backup y Datos */}
-      <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
+      <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4 sm:p-6">
         <div className="flex items-center gap-2 mb-6">
-          <div className="p-2 rounded-lg bg-voltech-cyan/20"><Database className="w-5 h-5 text-voltech-cyan" /></div>
-          <div>
-            <h3 className="text-lg font-bold text-white">Backup y Datos</h3>
+          <div className="p-2 rounded-lg bg-voltech-cyan/20 shrink-0"><Database className="w-5 h-5 text-voltech-cyan" /></div>
+          <div className="min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-white">Backup y Datos</h3>
             <p className="text-xs text-voltech-muted">Exporta o restaura la información de tu tienda</p>
           </div>
         </div>

@@ -969,36 +969,52 @@ export default function VentasStreamingPage() {
     <div className="space-y-6">
       <Toaster position="top-right" toastOptions={{ style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' }, success: { iconTheme: { primary: '#00ff88', secondary: '#fff' } }, error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } } }} />
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
         <div>
-          <h1 className="text-2xl font-bold text-white">Ventas Streaming</h1>
-          <p className="text-sm text-voltech-muted mt-1">Gestiona plataformas, cuentas e inventario</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Ventas Streaming</h1>
+          <p className="text-xs sm:text-sm text-voltech-muted mt-0.5">Gestiona plataformas, cuentas e inventario</p>
         </div>
-        <button onClick={handleHeaderButton} className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2">
+        <button onClick={handleHeaderButton} className="w-full sm:w-auto shrink-0 justify-center px-4 py-2.5 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-xl text-xs sm:text-sm font-semibold hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2">
           <Plus className="w-4 h-4" /> {getHeaderText()}
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-voltech-cyan/20"><MonitorPlay className="w-5 h-5 text-voltech-cyan" /></div><div><p className="text-xs text-voltech-muted">Ventas Activas</p><p className="text-xl font-bold text-white">{ventas.filter(v => v.estado === 'activa').length}</p></div></div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 w-full">
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+          <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-cyan/10 md:bg-voltech-cyan/20 text-voltech-cyan shrink-0 flex items-center justify-center"><MonitorPlay className="w-5 h-5" /></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Ventas Activas</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{ventas.filter(v => v.estado === 'activa').length}</p></div>
         </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-voltech-success/20"><Database className="w-5 h-5 text-voltech-success" /></div><div><p className="text-xs text-voltech-muted">Cuentas Disponibles</p><p className="text-xl font-bold text-white">{cuentas.filter(c => c.estado === 'libre').length}</p></div></div>
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+          <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-success/10 md:bg-voltech-success/20 text-voltech-success shrink-0 flex items-center justify-center"><Database className="w-5 h-5" /></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Cuentas Disponibles</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{cuentas.filter(c => c.estado === 'libre').length}</p></div>
         </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-voltech-warning/20"><AlertTriangle className="w-5 h-5 text-voltech-warning" /></div><div><p className="text-xs text-voltech-muted">Por Vencer (7 días)</p><p className="text-xl font-bold text-white">{ventas.filter(v => v.plataformas?.some(p => { const d = calcularDiasRestantes(p.fechaVencimiento); return d <= 7 && d >= 0; }) && v.estado === 'activa').length}</p></div></div>
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+          <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-warning/10 md:bg-voltech-warning/20 text-voltech-warning shrink-0 flex items-center justify-center"><AlertTriangle className="w-5 h-5" /></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Por Vencer (7 días)</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{ventas.filter(v => v.plataformas?.some(p => { const d = calcularDiasRestantes(p.fechaVencimiento); return d <= 7 && d >= 0; }) && v.estado === 'activa').length}</p></div>
         </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-voltech-purple/20"><DollarSign className="w-5 h-5 text-voltech-purple" /></div><div><p className="text-xs text-voltech-muted">Ingresos del Mes</p><p className="text-xl font-bold text-white">${ventas.filter(v => v.fecharegistro?.startsWith(new Date().toISOString().slice(0, 7))).reduce((acc, v) => acc + (v.total || 0), 0).toFixed(2)}</p></div></div>
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+          <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-purple/10 md:bg-voltech-purple/20 text-voltech-purple shrink-0 flex items-center justify-center"><DollarSign className="w-5 h-5" /></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Ingresos del Mes</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">${ventas.filter(v => v.fecharegistro?.startsWith(new Date().toISOString().slice(0, 7))).reduce((acc, v) => acc + (v.total || 0), 0).toFixed(2)}</p></div>
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-voltech-border">
-        <button onClick={() => setActiveTab('nueva')} className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'nueva' ? 'text-voltech-cyan border-b-2 border-voltech-cyan' : 'text-voltech-muted hover:text-white'}`}><MonitorPlay className="w-4 h-4 inline mr-2" /> Nueva Plataforma</button>
-        <button onClick={() => setActiveTab('cuentas')} className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'cuentas' ? 'text-voltech-cyan border-b-2 border-voltech-cyan' : 'text-voltech-muted hover:text-white'}`}><Database className="w-4 h-4 inline mr-2" /> Agregar Cuentas</button>
-        {(esAdmin || esSocio) && (<button onClick={() => setActiveTab('inventario')} className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'inventario' ? 'text-voltech-cyan border-b-2 border-voltech-cyan' : 'text-voltech-muted hover:text-white'}`}><Package className="w-4 h-4 inline mr-2" /> Inventario Plataformas</button>)}
-        <button onClick={() => setShowPlataformasModal(true)} className="px-4 py-2 text-sm font-medium text-voltech-muted hover:text-white transition-colors flex items-center gap-2"><Tag className="w-4 h-4" /> Gestionar Plataformas</button>
+      <div className="border-b border-voltech-border">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-2 md:flex md:gap-6 w-full pb-2 md:pb-1">
+          <button onClick={() => setActiveTab('nueva')} className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${activeTab === 'nueva' ? 'text-voltech-cyan bg-voltech-cyan/10 border-transparent md:bg-transparent md:border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>
+            <MonitorPlay className="w-4 h-4" /> Nueva Plataforma
+          </button>
+          <button onClick={() => setActiveTab('cuentas')} className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${activeTab === 'cuentas' ? 'text-voltech-cyan bg-voltech-cyan/10 border-transparent md:bg-transparent md:border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>
+            <Database className="w-4 h-4" /> Agregar Cuentas
+          </button>
+          {(esAdmin || esSocio) && (
+            <button onClick={() => setActiveTab('inventario')} className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${activeTab === 'inventario' ? 'text-voltech-cyan bg-voltech-cyan/10 border-transparent md:bg-transparent md:border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}>
+              <Package className="w-4 h-4" /> Inventario Plataformas
+            </button>
+          )}
+          <button onClick={() => setShowPlataformasModal(true)} className="justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm text-voltech-muted border-transparent hover:text-white transition-colors whitespace-nowrap rounded-lg md:rounded-none">
+            <Tag className="w-4 h-4" /> Gestionar Plataformas
+          </button>
+        </div>
       </div>
             {/* ================= TAB: NUEVA PLATAFORMA ================= */}
       {activeTab === 'nueva' && (
@@ -1076,11 +1092,98 @@ export default function VentasStreamingPage() {
           </AnimatePresence>
 
           <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-voltech-border flex items-center justify-between">
+            <div className="p-4 border-b border-voltech-border flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <h3 className="text-lg font-bold text-white">Historial de Ventas</h3>
-              <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" /><input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-voltech rounded-lg pl-10 pr-4 py-2 text-sm w-64" /></div>
+              <div className="relative w-full md:w-64"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500/50" /></div>
             </div>
-            <div className="overflow-x-auto">
+
+            {/* ✅ Vista Card Móvil (< md) */}
+            <div className="block md:hidden space-y-3 p-3">
+              {ventasFiltradas.length === 0 ? (
+                <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 text-center">
+                  <MonitorPlay className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                  <p className="text-xs text-slate-400">No hay ventas registradas</p>
+                </div>
+              ) : (
+                ventasFiltradas.map((venta) => {
+                  const diasRestantes = calcularDiasRestantes(venta.plataformas?.[0]?.fechaVencimiento);
+                  const puedeEditar = esAdmin || esSocio || (venta.vendedor || '').toLowerCase() === (usuarioActual?.nombre || '').toLowerCase();
+                  const totalPlataformas = venta.plataformas?.length || 0;
+                  const cuentasAsignadas = (venta.plataformas || []).filter((_, idx) => getCuentaAsignadaDePlataforma(venta, idx)).length;
+                  return (
+                    <div key={venta.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-bold text-slate-100 truncate">{venta.cliente}</h4>
+                          <p className="text-[11px] text-slate-400 font-mono truncate">{venta.telefono}</p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => renovarVenta(venta)} className="p-1.5 text-slate-400 hover:text-white" title="Renovar"><RefreshCw size={16} /></button>
+                          {puedeEditar && <button onClick={() => editarVenta(venta)} className="p-1.5 text-slate-400 hover:text-white" title="Editar"><Edit3 size={16} /></button>}
+                          {puedeEditar && <button onClick={() => eliminarVenta(venta.id)} className="p-1.5 text-slate-400 hover:text-rose-400" title="Eliminar"><Trash2 size={16} /></button>}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300">{venta.plataformas?.[0]?.plataforma}{totalPlataformas > 1 ? ` +${totalPlataformas - 1} más` : ''}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${diasRestantes <= 3 ? 'bg-rose-500/20 text-rose-300' : diasRestantes <= 7 ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>Vence: {diasRestantes} días</span>
+                      </div>
+                      <div className="pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-2 text-[11px]">
+                        <div><span className="text-slate-400 block">Fecha:</span><span className="text-slate-200 font-mono">{venta.fecha}</span></div>
+                        <div><span className="text-slate-400 block">Comisión:</span><span className="text-indigo-300 font-bold">${Number(getComisionVenta(venta)).toFixed(2)}</span></div>
+                        <div><span className="text-slate-400 block">Método:</span><span className="text-slate-200 capitalize">{(venta.metodopago || '').replace('_', ' ') || 'N/A'}</span></div>
+                        <div><span className="text-slate-400 block">Cuentas:</span><span className="text-cyan-400 font-medium">{cuentasAsignadas}/{totalPlataformas} asignadas</span></div>
+                      </div>
+
+                      {/* ✅ Acordeón "Ver Cuentas" (cerrado por defecto) */}
+                      <button onClick={() => setExpandedCuentasVenta(expandedCuentasVenta === venta.id ? null : venta.id)} className="w-full flex items-center justify-center gap-1 text-[11px] text-cyan-400 py-1.5 rounded-lg border border-slate-700/50 hover:bg-slate-700/30 transition-colors">
+                        <EyeIcon size={14} /> Ver Cuentas ({cuentasAsignadas}/{totalPlataformas})
+                        <ChevronDown size={14} className={`transition-transform ${expandedCuentasVenta === venta.id ? 'rotate-180' : ''}`} />
+                      </button>
+                      {expandedCuentasVenta === venta.id && (
+                        <div className="space-y-2">
+                          {(venta.plataformas || []).map((plat, platIdx) => {
+                            const cuentaAsig = getCuentaAsignadaDePlataforma(venta, platIdx);
+                            const diasRest = calcularDiasRestantes(plat.fechaVencimiento);
+                            return (
+                              <div key={platIdx} className="bg-slate-900/60 border border-slate-700/40 rounded-xl p-3 space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[11px] font-bold text-slate-100">{plat.plataforma}</span>
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${diasRest <= 3 ? 'bg-rose-500/20 text-rose-300' : diasRest <= 7 ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>Vence: {diasRest} días</span>
+                                </div>
+                                {cuentaAsig ? (
+                                  <>
+                                    <p className="text-[11px] text-slate-400 truncate">📧 {cuentaAsig.correo}</p>
+                                    <p className="text-[11px] text-slate-400">👤 Perfil: <span className="text-slate-200">{cuentaAsig.nombrePerfil || 'N/A'}</span> • 🔐 PIN: <span className="text-slate-200 font-mono">{cuentaAsig.pin || 'N/A'}</span></p>
+                                    <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">Asignada</span>
+                                  </>
+                                ) : (
+                                  <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300">Sin cuenta asignada</span>
+                                )}
+                                <div className="flex items-center justify-end gap-1 pt-2 border-t border-slate-700/40">
+                                  <button onClick={() => { setRegaloData({ ventaId: venta.id, plataformaIndex: platIdx, dias: 0, tipo: 'regalo', nota: '' }); setShowRegaloModal(true); }} className="p-1.5 text-slate-400 hover:text-indigo-300" title="Regalo/Falla"><Gift size={16} /></button>
+                                  {!cuentaAsig ? (
+                                    <button onClick={() => abrirModalAsignarPlataforma(venta, platIdx)} className="p-1.5 text-slate-400 hover:text-cyan-400" title="Asignar cuenta"><LinkIcon size={16} /></button>
+                                  ) : (
+                                    <>
+                                      <button onClick={() => generarRecordatorio(venta, platIdx)} className="p-1.5 text-slate-400 hover:text-emerald-400" title="Recordatorio"><MessageCircle size={16} /></button>
+                                      <button onClick={() => generarEnviarCuenta(venta, platIdx)} className="p-1.5 text-slate-400 hover:text-cyan-400" title="Enviar cuenta"><Mail size={16} /></button>
+                                      <button onClick={() => generarEnviarReemplazo(venta, platIdx)} className="p-1.5 text-slate-400 hover:text-indigo-300" title="Enviar reemplazo"><RefreshCw size={16} /></button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* ✅ Vista Tabla Desktop (>= md) */}
+            <div className="hidden md:block w-full overflow-x-auto min-w-0">
               <table className="w-full">
                 <thead className="bg-voltech-dark border-b border-voltech-border">
                   <tr>
@@ -1106,7 +1209,7 @@ export default function VentasStreamingPage() {
                     return (
                       <Fragment key={venta.id}>
                         <tr className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
-                          <td className="px-4 py-3 text-sm text-voltech-muted">{venta.fecha}</td>
+                          <td className="px-4 py-3 text-xs font-mono whitespace-nowrap text-voltech-muted pr-3">{venta.fecha}</td>
                           <td className="px-4 py-3"><p className="text-sm font-medium text-white">{venta.cliente}</p><p className="text-xs text-voltech-muted">{venta.telefono}</p></td>
                           <td className="px-4 py-3">
                             <div>
@@ -1132,7 +1235,7 @@ export default function VentasStreamingPage() {
                             </button>
                           </td>
                           <td className="px-4 py-3">
-                            <div className="flex items-center justify-end gap-1 flex-wrap">
+                            <div className="flex items-center justify-end gap-1 flex-nowrap md:flex-wrap">
                               <button onClick={() => renovarVenta(venta)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-purple" title="Renovar"><RefreshCw className="w-4 h-4" /></button>
                               {puedeEditar && (<button onClick={() => editarVenta(venta)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan" title="Editar"><Edit3 className="w-4 h-4" /></button>)}
                               {puedeEditar && (<button onClick={() => eliminarVenta(venta.id)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error" title="Eliminar"><Trash2 className="w-4 h-4" /></button>)}
@@ -1183,7 +1286,7 @@ export default function VentasStreamingPage() {
                                 )}
                               </td>
                               <td className="px-4 py-3">
-                                <div className="flex items-center justify-end gap-1 flex-wrap">
+                                <div className="flex items-center justify-end gap-1 flex-nowrap md:flex-wrap">
                                   <button onClick={() => { setRegaloData({ ventaId: venta.id, plataformaIndex: platIdx, dias: 0, tipo: 'regalo', nota: '' }); setShowRegaloModal(true); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-purple" title="Regalo/Falla"><Gift className="w-4 h-4" /></button>
                                   {sinCuenta ? (
                                     <button onClick={() => abrirModalAsignarPlataforma(venta, platIdx)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan" title="Asignar"><LinkIcon className="w-4 h-4" /></button>
@@ -1235,11 +1338,47 @@ export default function VentasStreamingPage() {
           {showFormCuenta && (<div className="flex justify-end"><button onClick={() => setFormDataCuenta({ plataforma: '', correo: '', contraseña: '', nombrePerfil: '', pins: [''], cantidad: 1, vendedor: '' })} className="flex items-center gap-2 px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30"><Plus className="w-4 h-4" /> Agregar otra cuenta</button></div>)}
 
           <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-voltech-border flex items-center justify-between">
+            <div className="p-4 border-b border-voltech-border flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <h3 className="text-lg font-bold text-white">Cuentas Disponibles</h3>
-              <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" /><input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-voltech rounded-lg pl-10 pr-4 py-2 text-sm w-64" /></div>
+              <div className="relative w-full md:w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" /><input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-voltech w-full md:w-64 rounded-lg pl-10 pr-4 py-2 text-sm" /></div>
             </div>
-            <div className="overflow-x-auto">
+
+            {/* ✅ Vista Card Móvil (< md) — SOLO CUENTAS */}
+            <div className="block md:hidden space-y-3 p-3">
+              {cuentasFiltradas.length === 0 ? (
+                <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 text-center">
+                  <Database className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                  <p className="text-xs text-slate-400">No hay cuentas registradas</p>
+                </div>
+              ) : (
+                cuentasFiltradas.map((cuenta) => (
+                  <div key={cuenta.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-slate-100 truncate">{cuenta.plataforma}</h4>
+                        <p className="text-[11px] text-slate-400 font-mono truncate">{cuenta.correo}</p>
+                      </div>
+                      <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${cuenta.estado === 'libre' ? 'bg-emerald-500/20 text-emerald-300' : cuenta.estado === 'ocupada' ? 'bg-cyan-500/20 text-cyan-300' : 'bg-amber-500/20 text-amber-300'}`}>{cuenta.estado}</span>
+                    </div>
+                    <div className="pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-2 text-[11px]">
+                      <div><span className="text-slate-400 block">Perfil:</span><span className="text-slate-200 truncate block">{cuenta.nombrePerfil || '-'}</span></div>
+                      <div><span className="text-slate-400 block">PIN:</span><span className="text-slate-200 font-mono block">{cuenta.pin || '-'}</span></div>
+                    </div>
+                    <div className="flex items-center justify-end gap-1">
+                      {cuenta.estado === 'libre' && (
+                        <button onClick={() => { setVentaParaAsignar(null); setPlataformaIdxParaAsignar(null); setSelectedVenta({ cuenta, ventasDisponibles: ventas.filter(v => (v.plataformas || []).some(p => p.plataforma === cuenta.plataforma && !getCuentaAsignadaDePlataforma(v, (v.plataformas || []).indexOf(p)))) }); setShowAssignModal(true); }} className="p-1.5 text-slate-400 hover:text-cyan-400" title="Asignar"><LinkIcon size={16} /></button>
+                      )}
+                      <button onClick={() => { setReemplazoData({ cuentaId: cuenta.id, nuevaPlataforma: cuenta.plataforma, nuevoCorreo: '', nuevaContraseña: '', nuevosPins: [''], observacion: '' }); setShowReemplazoCuentaModal(true); }} className="p-1.5 text-slate-400 hover:text-indigo-300" title="Reemplazar"><RefreshCw size={16} /></button>
+                      <button onClick={() => { setFormDataCuenta({ plataforma: cuenta.plataforma, correo: cuenta.correo, contraseña: cuenta.contraseña, nombrePerfil: cuenta.nombrePerfil || '', pins: cuenta.pins || [cuenta.pin || ''], cantidad: cuenta.cantidad || 1, vendedor: cuenta.vendedor || '' }); setShowFormCuenta(true); }} className="p-1.5 text-slate-400 hover:text-white" title="Editar"><Edit3 size={16} /></button>
+                      <button onClick={async () => { if(confirm('¿Eliminar?')) { if (supabase) await supabase.from('cuentas_streaming').delete().eq('id', cuenta.id); setCuentas(cuentas.filter(c => c.id !== cuenta.id)); toast.success('Cuenta eliminada'); } }} className="p-1.5 text-slate-400 hover:text-rose-400" title="Eliminar"><Trash2 size={16} /></button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            {/* ✅ Vista Tabla Desktop (>= md) */}
+            <div className="hidden md:block w-full overflow-x-auto min-w-0">
               <table className="w-full">
                 <thead className="bg-voltech-dark border-b border-voltech-border">
                   <tr>
@@ -1573,9 +1712,9 @@ export default function VentasStreamingPage() {
                 <button onClick={() => setShowPlataformasModal(false)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted"><X className="w-5 h-5" /></button>
               </div>
               <div className="p-6">
-                <div className="flex gap-2 mb-6">
-                  <input type="text" value={nuevaPlataforma} onChange={(e) => setNuevaPlataforma(e.target.value)} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" placeholder="Nombre de la plataforma" onKeyPress={(e) => e.key === 'Enter' && agregarPlataforma()} />
-                  <button onClick={agregarPlataforma} className="px-4 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg hover:bg-voltech-purple/30 flex items-center gap-2"><Plus className="w-4 h-4" /> Agregar</button>
+                <div className="flex items-center gap-2 w-full min-w-0 mb-6">
+                  <input type="text" value={nuevaPlataforma} onChange={(e) => setNuevaPlataforma(e.target.value)} className="input-voltech flex-1 min-w-0 w-full text-xs sm:text-sm rounded-lg px-3 sm:px-4 py-2" placeholder="Nombre de la plataforma" onKeyPress={(e) => e.key === 'Enter' && agregarPlataforma()} />
+                  <button onClick={agregarPlataforma} className="shrink-0 text-xs py-2 px-3 sm:text-sm sm:px-4 bg-voltech-purple/20 text-voltech-purple rounded-lg hover:bg-voltech-purple/30 flex items-center justify-center gap-1 sm:gap-2"><Plus className="w-4 h-4" /> <span className="whitespace-nowrap">Agregar</span></button>
                 </div>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {plataformas.map((plataforma, index) => (

@@ -250,15 +250,15 @@ export default function LoginPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="w-full max-w-md bg-voltech-surface border border-voltech-border rounded-2xl p-8 shadow-2xl relative z-10"
+          className="w-full max-w-md bg-voltech-surface border border-voltech-border rounded-2xl p-4 sm:p-8 shadow-2xl relative z-10"
         >
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-extrabold bg-gradient-to-r from-voltech-cyan to-voltech-purple bg-clip-text text-transparent tracking-wider">
+          <div className="text-center mb-6 sm:mb-8">
+            <h1 className="text-2xl sm:text-4xl font-extrabold bg-gradient-to-r from-voltech-cyan to-voltech-purple bg-clip-text text-transparent tracking-wider">
               VOLTECH
             </h1>
-            <p className="text-voltech-muted text-xs tracking-[0.3em] mt-1">STORE.VE</p>
-            <div className="w-16 h-0.5 bg-gradient-to-r from-voltech-cyan to-voltech-purple mx-auto mt-4 mb-3"></div>
-            <p className="text-voltech-muted text-sm">
+            <p className="text-voltech-muted text-[10px] sm:text-xs tracking-[0.2em] sm:tracking-[0.3em] mt-1">STORE.VE</p>
+            <div className="w-12 sm:w-16 h-0.5 bg-gradient-to-r from-voltech-cyan to-voltech-purple mx-auto mt-3 sm:mt-4 mb-3"></div>
+            <p className="text-voltech-muted text-xs sm:text-sm">
               {isLogin ? 'Inicia sesión en tu cuenta' : 'Crea tu cuenta nueva'}
             </p>
           </div>
@@ -510,16 +510,16 @@ export default function LoginPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="w-full max-w-md bg-voltech-surface border border-voltech-border rounded-2xl p-8 shadow-2xl relative z-10"
+          className="w-full max-w-md bg-voltech-surface border border-voltech-border rounded-2xl p-4 sm:p-8 shadow-2xl relative z-10"
         >
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-voltech-cyan/10 border border-voltech-cyan/30 flex items-center justify-center">
-              {modo === 'activacion' ? <KeyRound className="w-8 h-8 text-voltech-cyan" /> : <ShieldCheck className="w-8 h-8 text-voltech-success" />}
+          <div className="text-center mb-6 sm:mb-8">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 rounded-2xl bg-voltech-cyan/10 border border-voltech-cyan/30 flex items-center justify-center">
+              {modo === 'activacion' ? <KeyRound className="w-7 h-7 sm:w-8 sm:h-8 text-voltech-cyan" /> : <ShieldCheck className="w-7 h-7 sm:w-8 sm:h-8 text-voltech-success" />}
             </div>
-            <h1 className="text-2xl font-extrabold text-white">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-white">
               {modo === 'activacion' ? 'Activar Cuenta' : 'Cambia tu Contraseña'}
             </h1>
-            <p className="text-voltech-muted text-sm mt-2">
+            <p className="text-voltech-muted text-xs sm:text-sm mt-2">
               {modo === 'activacion'
                 ? `Hola ${usuarioActivar?.nombre || ''}, ingresa tu clave temporal`
                 : 'Por seguridad, crea tu contraseña definitiva'}

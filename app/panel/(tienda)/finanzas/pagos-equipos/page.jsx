@@ -728,64 +728,54 @@ useEffect(() => {
         </div>
       </div>
 
-      <div className="flex gap-4 border-b border-voltech-border">
-        <button 
-          onClick={() => setActiveTab('pagos')}
-          className={`pb-3 px-4 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'pagos' ? 'text-voltech-cyan border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}
-        >
-          <Briefcase className="w-4 h-4" /> Pagos a Vendedores
-        </button>
-        <button 
-          onClick={() => setActiveTab('inversiones')}
-          className={`pb-3 px-4 font-medium text-sm flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'inversiones' ? 'text-voltech-success border-voltech-success' : 'text-voltech-muted border-transparent hover:text-white'}`}
-        >
-          <TrendingUp className="w-4 h-4" /> Inversiones Socios
-        </button>
+      <div className="border-b border-voltech-border">
+        <div className="grid grid-cols-2 md:flex md:gap-6 w-full gap-y-2 pb-2 md:pb-1">
+          <button 
+            onClick={() => setActiveTab('pagos')}
+            className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${activeTab === 'pagos' ? 'text-voltech-cyan bg-voltech-cyan/10 border-transparent md:bg-transparent md:border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}
+          >
+            <Briefcase className="w-4 h-4" /> Pagos a Vendedores
+          </button>
+          <button 
+            onClick={() => setActiveTab('inversiones')}
+            className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${activeTab === 'inversiones' ? 'text-voltech-success bg-voltech-success/10 border-transparent md:bg-transparent md:border-voltech-success' : 'text-voltech-muted border-transparent hover:text-white'}`}
+          >
+            <TrendingUp className="w-4 h-4" /> Inversiones Socios
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {activeTab === 'pagos' ? (
           <>
-            <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-voltech-error/20"><TrendingDown className="w-5 h-5 text-voltech-error" /></div>
-                <div><p className="text-xs text-voltech-muted">Total Pagado</p><p className="text-xl font-bold text-voltech-error">${totalPagado.toFixed(2)}</p></div>
-              </div>
+            <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+              <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-error/10 md:bg-voltech-error/20 text-voltech-error shrink-0 flex items-center justify-center"><TrendingDown className="w-5 h-5" /></div>
+              <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Total Pagado</p><p className="text-base md:text-xl font-bold text-voltech-error mt-0.5 md:mt-0">${totalPagado.toFixed(2)}</p></div>
             </div>
-            <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-voltech-warning/20"><Clock className="w-5 h-5 text-voltech-warning" /></div>
-                <div><p className="text-xs text-voltech-muted">Comisiones Pendientes</p><p className="text-xl font-bold text-voltech-warning">${totalPendienteComisiones.toFixed(2)}</p></div>
-              </div>
+            <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+              <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-warning/10 md:bg-voltech-warning/20 text-voltech-warning shrink-0 flex items-center justify-center"><Clock className="w-5 h-5" /></div>
+              <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Comisiones Pendientes</p><p className="text-base md:text-xl font-bold text-voltech-warning mt-0.5 md:mt-0">${totalPendienteComisiones.toFixed(2)}</p></div>
             </div>
           </>
         ) : (
           <>
-            <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-voltech-success/20"><TrendingUp className="w-5 h-5 text-voltech-success" /></div>
-                <div><p className="text-xs text-voltech-muted">Total Invertido (Activo)</p><p className="text-xl font-bold text-voltech-success">${totalInvertidoActivo.toFixed(2)}</p></div>
-              </div>
+            <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+              <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-success/10 md:bg-voltech-success/20 text-voltech-success shrink-0 flex items-center justify-center"><TrendingUp className="w-5 h-5" /></div>
+              <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Total Invertido (Activo)</p><p className="text-base md:text-xl font-bold text-voltech-success mt-0.5 md:mt-0">${totalInvertidoActivo.toFixed(2)}</p></div>
             </div>
-            <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-voltech-warning/20"><Clock className="w-5 h-5 text-voltech-warning" /></div>
-                <div><p className="text-xs text-voltech-muted">Rendimientos por Pagar</p><p className="text-xl font-bold text-voltech-warning">${rendimientosPorPagar.toFixed(2)}</p></div>
-              </div>
+            <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+              <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-warning/10 md:bg-voltech-warning/20 text-voltech-warning shrink-0 flex items-center justify-center"><Clock className="w-5 h-5" /></div>
+              <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Rendimientos por Pagar</p><p className="text-base md:text-xl font-bold text-voltech-warning mt-0.5 md:mt-0">${rendimientosPorPagar.toFixed(2)}</p></div>
             </div>
           </>
         )}
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-cyan/20"><Wallet className="w-5 h-5 text-voltech-cyan" /></div>
-            <div><p className="text-xs text-voltech-muted">{activeTab === 'inversiones' ? 'Total Retornado' : 'Balance Neto'}</p><p className={`text-xl font-bold ${balance >= 0 ? 'text-voltech-cyan' : 'text-voltech-error'}`}>${(activeTab === 'inversiones' ? totalRetornado : balance).toFixed(2)}</p></div>
-          </div>
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+          <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-cyan/10 md:bg-voltech-cyan/20 text-voltech-cyan shrink-0 flex items-center justify-center"><Wallet className="w-5 h-5" /></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">{activeTab === 'inversiones' ? 'Total Retornado' : 'Balance Neto'}</p><p className={`text-base md:text-xl font-bold mt-0.5 md:mt-0 ${balance >= 0 ? 'text-voltech-cyan' : 'text-voltech-error'}`}>${(activeTab === 'inversiones' ? totalRetornado : balance).toFixed(2)}</p></div>
         </div>
-        <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-voltech-purple/20"><PieChart className="w-5 h-5 text-voltech-purple" /></div>
-            <div><p className="text-xs text-voltech-muted">Movimientos Totales</p><p className="text-xl font-bold text-white">{movimientos.length}</p></div>
-          </div>
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
+          <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-purple/10 md:bg-voltech-purple/20 text-voltech-purple shrink-0 flex items-center justify-center"><PieChart className="w-5 h-5" /></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Movimientos Totales</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{movimientos.length}</p></div>
         </div>
       </div>
 
@@ -817,18 +807,67 @@ useEffect(() => {
               </select>
             </div>
           </div>
-          {!equipoColapsado && (<div className="overflow-x-auto">
-            <table className="w-full">
+          {!equipoColapsado && (<>
+            {/* ✅ Vista Card Móvil (< md) */}
+            <div className="block md:hidden space-y-3 p-3">
+              {equipoFiltrado.length === 0 ? (
+                <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 text-center">
+                  <Users className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                  <p className="text-xs text-slate-400">No hay miembros.</p>
+                </div>
+              ) : (
+                equipoFiltrado.map((miembro, index) => {
+                  const stats = getMiembroStats(miembro.id);
+                  const solPend = solicitudes.some(s => s.miembro_nombre === miembro.nombre && s.estado === 'pendiente');
+                  return (
+                    <div key={miembro.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-voltech-cyan to-voltech-purple flex items-center justify-center text-white font-bold text-xs shrink-0">{miembro.nombre?.charAt(0) || '?'}</div>
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-slate-100 truncate">#{index + 1} • {miembro.nombre}</h4>
+                            <p className="text-[11px] text-slate-400 capitalize truncate">{miembro.rol}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setFormData({ ...formData, tipo: 'pago', miembroId: miembro.id, miembroNombre: miembro.nombre });
+                            setSelectedComisiones([]);
+                            setShowForm(true);
+                          }}
+                          className="shrink-0 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs px-3 py-1.5 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                        >
+                          <Wallet className="w-4 h-4 shrink-0" /> Pagar
+                        </button>
+                      </div>
+                      {solPend && (
+                        <span className="inline-block text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300">💰 Solicitado</span>
+                      )}
+                      <div className="pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-2 text-[11px]">
+                        <div><span className="text-slate-400 block">Ventas:</span><span className="text-slate-200 font-bold">{stats.totalVentas}</span></div>
+                        <div><span className="text-slate-400 block">Pagadas:</span><span className="text-emerald-300 font-bold">{stats.totalPagadas}</span></div>
+                        <div><span className="text-slate-400 block">Pendientes:</span><span className="text-amber-300 font-bold">{stats.totalPendientes}</span></div>
+                        <div><span className="text-slate-400 block">Pendiente ($):</span><span className="text-amber-300 font-bold">${stats.montoPendiente.toFixed(2)}</span></div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* ✅ Vista Tabla Desktop (>= md) */}
+            <div className="hidden md:block w-full overflow-x-auto min-w-0">
+            <table className="w-full min-w-[720px] md:min-w-0">
               <thead className="bg-voltech-dark border-b border-voltech-border">
                 <tr>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">#</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Miembro</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">Ventas</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">Pagadas</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">Pendientes</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Pendiente $</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">Solicitud</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Acciones</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted whitespace-nowrap">#</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted whitespace-nowrap">Miembro</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted whitespace-nowrap">Ventas</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted whitespace-nowrap">Pagadas</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted whitespace-nowrap">Pendientes</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted whitespace-nowrap">Pendiente ($)</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted whitespace-nowrap">Solicitud</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted whitespace-nowrap">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -866,9 +905,9 @@ useEffect(() => {
                               setSelectedComisiones([]);
                               setShowForm(true);
                             }}
-                            className="px-3 py-1.5 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors ml-auto flex items-center gap-1"
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs px-3 py-1.5 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm ml-auto"
                           >
-                            <Send className="w-3 h-3" /> Pagar
+                            <Wallet className="w-3.5 h-3.5 shrink-0" /> Pagar
                           </button>
                         </td>
                       </tr>
@@ -877,7 +916,8 @@ useEffect(() => {
                 )}
               </tbody>
             </table>
-          </div>)}
+            </div>
+          </>)}
         </div>
       )}
 
@@ -1115,18 +1155,26 @@ useEffect(() => {
                           <div 
                             key={com.id} 
                             onClick={() => toggleComision(com)}
-                            className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${isSelected ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-surface border-voltech-border hover:border-voltech-cyan/50'}`}
+                            className={`flex flex-col md:flex-row md:items-center md:justify-between gap-2 p-3 rounded-xl md:rounded-lg w-full border cursor-pointer transition-all ${isSelected ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-slate-800/60 md:bg-voltech-surface border-slate-700/50 md:border-voltech-border hover:border-voltech-cyan/50'}`}
                           >
-                            <div className="flex items-center gap-3">
-                              <div className={`w-5 h-5 rounded border flex items-center justify-center ${isSelected ? 'bg-voltech-cyan border-voltech-cyan' : 'border-voltech-muted'}`}>
+                            <div className="flex items-start gap-3 min-w-0">
+                              <div className={`w-5 h-5 mt-0.5 shrink-0 rounded border flex items-center justify-center ${isSelected ? 'bg-voltech-cyan border-voltech-cyan' : 'border-voltech-muted'}`}>
                                 {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
                               </div>
-                              <div>
-                                <p className="text-sm text-white font-medium">{com.producto_nombre} {solicitudes.some(s => s.venta_id === com.venta_id && s.estado === 'pendiente') && <span className="ml-1 text-[10px] px-2 py-0.5 rounded-full bg-voltech-warning/20 text-voltech-warning">💰 Solicitada</span>}</p>
-                                <p className="text-xs text-voltech-muted">Venta #{com.venta_numero_orden} • {com.fecha_venta}</p>
+                              <div className="min-w-0">
+                                <p className="text-xs md:text-sm font-medium text-slate-200 md:text-white line-clamp-2">{com.producto_nombre} {solicitudes.some(s => s.venta_id === com.venta_id && s.estado === 'pendiente') && <span className="ml-1 text-[10px] px-2 py-0.5 rounded-full bg-voltech-warning/20 text-voltech-warning">💰 Solicitada</span>}</p>
+                                <p className="text-[11px] text-slate-400 md:text-voltech-muted font-mono mt-0.5">Venta #{com.venta_numero_orden} • {com.fecha_venta}</p>
                               </div>
                             </div>
-                            <div className="text-right">
+
+                            {/* Móvil: barra inferior con desglose */}
+                            <div className="md:hidden flex items-center justify-between pt-2 border-t border-slate-700/40 text-xs">
+                              <span className="text-slate-400">Venta: ${Number(com.monto_venta).toFixed(2)} ({com.porcentaje_comision}%)</span>
+                              <span className="text-emerald-400 font-bold text-sm">${Number(com.monto_comision).toFixed(2)}</span>
+                            </div>
+
+                            {/* Desktop: bloque derecho original */}
+                            <div className="hidden md:block text-right">
                               <p className="text-xs text-voltech-muted">Venta: ${Number(com.monto_venta).toFixed(2)}</p>
                               <p className="text-sm font-bold text-voltech-cyan">{com.porcentaje_comision}% = ${Number(com.monto_comision).toFixed(2)}</p>
                             </div>
@@ -1154,22 +1202,106 @@ useEffect(() => {
       <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
         <div className="p-4 border-b border-voltech-border flex flex-col md:flex-row items-center justify-between gap-4">
           <h3 className="text-lg font-bold text-white">Historial de {activeTab === 'pagos' ? 'Pagos' : 'Inversiones'}</h3>
-          <div className="flex gap-2 w-full md:w-auto items-center">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
             {activeTab === 'pagos' && (
-              <button onClick={depurarPagos} className="px-3 py-2 bg-voltech-error/20 text-voltech-error rounded-lg text-xs hover:bg-voltech-error/30 flex items-center gap-1"><Trash2 className="w-3 h-3" /> Depurar</button>
+              <button onClick={depurarPagos} className="w-full sm:w-auto shrink-0 bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><Trash2 className="w-3 h-3" /> Depurar</button>
             )}
-            <select value={filtroMiembro} onChange={(e) => setFiltroMiembro(e.target.value)} className="input-voltech rounded-lg px-3 py-2 text-sm">
+            <select value={filtroMiembro} onChange={(e) => setFiltroMiembro(e.target.value)} className="flex-1 w-full bg-slate-900/80 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500">
               <option value="todos">Todos los miembros</option>
               {equipo.map(e => (<option key={e.id} value={e.id}>{e.nombre}</option>))}
             </select>
-            <div className="relative flex-1 md:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
-              <input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-voltech w-full rounded-lg pl-10 pr-4 py-2 text-sm" />
+            <div className="relative w-full sm:w-56 shrink-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+              <input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-900/80 border border-slate-700/60 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-300 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-purple-500" />
             </div>
           </div>
         </div>
         
-        <div className="overflow-x-auto">
+        {/* ✅ Vista Card Móvil (< md) */}
+        <div className="block md:hidden space-y-3 p-3">
+          {movimientosFiltrados.length === 0 ? (
+            <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 text-center">
+              <FileText className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+              <p className="text-xs text-slate-400">No hay registros</p>
+            </div>
+          ) : (
+            movimientosFiltrados.map((mov) => {
+              const detalles = getDetallesMovimiento(mov.id);
+              const isExpanded = expandedRowId === mov.id;
+              const st = mov.subtipo || (mov.tipo === 'inversion' ? 'inyeccion' : 'pago');
+              const cfg = { inyeccion: { cls: 'bg-emerald-500/20 text-emerald-300', label: '💚 Inyección' }, retorno: { cls: 'bg-rose-500/20 text-rose-300', label: '🔴 Retorno' }, rendimiento: { cls: 'bg-amber-500/20 text-amber-300', label: '🟡 Rendimiento' }, pago: { cls: 'bg-cyan-500/20 text-cyan-300', label: '💵 Pago' } }[st] || { cls: 'bg-slate-500/20 text-slate-300', label: st };
+              return (
+                <div key={mov.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold text-slate-100 truncate">{mov.miembroNombre}</h4>
+                      <p className="text-[11px] text-slate-400 font-mono truncate">{mov.fecha}</p>
+                    </div>
+                    <span className={`shrink-0 text-[11px] font-bold ${mov.tipo === 'inversion' && mov.subtipo === 'inyeccion' ? 'text-emerald-300' : 'text-rose-300'}`}>
+                      {mov.tipo === 'inversion' && mov.subtipo === 'inyeccion' ? '+' : '-'}${Number(mov.monto).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${cfg.cls}`}>{cfg.label}</span>
+                    {activeTab === 'inversiones' && (
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${mov.estadoInversion === 'liquidada' ? 'bg-purple-500/20 text-purple-300' : mov.estadoInversion === 'rendimiento_pagado' ? 'bg-cyan-500/20 text-cyan-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                        {mov.estadoInversion === 'liquidada' ? '🟣 Liquidada' : mov.estadoInversion === 'rendimiento_pagado' ? '🔵 Rend. Pagado' : '🟢 Activa'}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400 line-clamp-2">{mov.descripcion || (mov.tipo === 'pago' ? 'Pago de comisiones' : 'Aporte de capital')}</p>
+                  <div className="pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-2 text-[11px]">
+                    <div><span className="text-slate-400 block">Método:</span><span className="text-slate-200 capitalize">{(mov.metodoPago || '').replace('_', ' ') || 'N/A'}</span></div>
+                    {activeTab === 'inversiones' ? (
+                      <div><span className="text-slate-400 block">% ROI:</span><span className="text-emerald-300 font-bold">{mov.porcentajeRetorno || 0}%</span></div>
+                    ) : (
+                      <div><span className="text-slate-400 block">Ventas en pago:</span><span className="text-cyan-300 font-bold">{detalles.length}</span></div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {detalles.length > 0 && (
+                      <button onClick={() => setExpandedRowId(isExpanded ? null : mov.id)} className="flex-1 flex items-center justify-center gap-1 text-[11px] text-cyan-400 py-1.5 rounded-lg border border-slate-700/50 hover:bg-slate-700/30 transition-colors">
+                        <ChevronDown size={14} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} /> Ver detalle
+                      </button>
+                    )}
+                    {activeTab === 'inversiones' && (mov.subtipo === 'inyeccion' || !mov.subtipo) && mov.estadoInversion !== 'liquidada' && mov.estadoInversion !== 'rendimiento_pagado' && (
+                      <button onClick={() => pagarRendimiento(mov)} className="flex-1 text-[11px] font-semibold text-amber-300 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 transition-colors">💰 Rend.</button>
+                    )}
+                    {activeTab === 'inversiones' && (mov.subtipo === 'inyeccion' || !mov.subtipo) && mov.estadoInversion !== 'liquidada' && (
+                      <button onClick={() => liquidarInversion(mov)} className="flex-1 text-[11px] font-semibold text-purple-300 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500/20 transition-colors">🏁 Liquidar</button>
+                    )}
+                    <button onClick={() => handleEdit(mov)} className="p-1.5 text-slate-400 hover:text-cyan-400" title="Editar"><Edit3 size={16} /></button>
+                    <button onClick={() => handleDelete(mov)} className="p-1.5 text-slate-400 hover:text-rose-400" title="Eliminar"><Trash2 size={16} /></button>
+                  </div>
+                  {isExpanded && detalles.length > 0 && (
+                    <div className="space-y-2">
+                      {detalles.map((det) => (
+                        <div key={det.id} className="bg-slate-900/60 border border-slate-700/40 rounded-xl p-3 space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-bold text-slate-100 truncate">{det.producto_nombre}</span>
+                            <span className="text-[11px] text-emerald-300 font-bold">${Number(det.monto_comision).toFixed(2)}</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400">#{det.venta_numero_orden} • {det.fecha_venta} • {det.porcentaje_comision}%</p>
+                        </div>
+                      ))}
+                      <div className="flex gap-2">
+                        <button onClick={() => notificarWhatsApp(mov)} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-emerald-300 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors">
+                          <MessageCircle size={14} /> WhatsApp
+                        </button>
+                        <button onClick={() => generarReciboPDF(mov)} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-cyan-300 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 transition-colors">
+                          <Printer size={14} /> Recibo PDF
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* ✅ Vista Tabla Desktop (>= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead className="bg-voltech-dark border-b border-voltech-border">
               <tr>
