@@ -837,39 +837,66 @@ export default function CatalogoPage() {
       </header>
 
       <main className="max-w-[1800px] xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
-        {/* ✅ PUBLICIDAD MÓVIL: carrusel horizontal (solo < lg) */}
-        {publicidad.filter(p => !p.dispositivos || p.dispositivos.movil !== false).length > 0 && (
-          <div className="lg:hidden mb-6">
-            <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 pb-1">
-              {publicidad.filter(p => !p.dispositivos || p.dispositivos.movil !== false).map(pub => (
-                <a
-                  key={pub.id}
-                  href={pub.url_destino || '#'}
-                  target={pub.url_destino ? '_blank' : '_self'}
-                  onClick={() => registrarClickPub(pub)}
-                  className={`relative shrink-0 w-72 rounded-xl overflow-hidden border ${cardBorder} ${cardBg} hover:border-voltech-cyan/50 transition-all`}
-                >
-                  <div className="relative w-full aspect-[16/9] bg-voltech-dark overflow-hidden">
-                    {pub.url_video ? (
-                      <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
-                    ) : pub.url_imagen ? (
-                      <img src={pub.url_imagen} alt={pub.titulo} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-voltech-muted"><ImageIcon className="w-10 h-10 opacity-50" /></div>
-                    )}
+        {/* ✅ PUBLICIDAD MÓVIL + MÁS VENDIDOS: carrusel uniforme (mismo tamaño lado a lado) */}
+        {(() => {
+          const pubsMovil = publicidad.filter(p => !p.dispositivos || p.dispositivos.movil !== false);
+          const mvMovilActivo = hayMasVendidos && (masVendidosConfig?.ubicacion_movil || 'arriba') === 'arriba';
+          if (pubsMovil.length === 0 && !mvMovilActivo) return null;
+          return (
+            <div className="lg:hidden mb-6">
+              <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 snap-x">
+                {/* Publicidad */}
+                {pubsMovil.map(pub => (
+                  <a
+                    key={pub.id}
+                    href={pub.url_destino || '#'}
+                    target={pub.url_destino ? '_blank' : '_self'}
+                    onClick={() => registrarClickPub(pub)}
+                    className={`snap-start shrink-0 w-64 rounded-xl overflow-hidden border ${cardBorder} ${cardBg} hover:border-voltech-cyan/50 transition-all`}
+                  >
+                    <div className="relative w-full h-36 bg-voltech-dark overflow-hidden">
+                      {pub.url_video ? (
+                        <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+                      ) : pub.url_imagen ? (
+                        <img src={pub.url_imagen} alt={pub.titulo} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-voltech-muted"><ImageIcon className="w-8 h-8 opacity-50" /></div>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <p className={`text-sm font-bold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{pub.titulo}</p>
+                      <span className="mt-2 block w-full bg-voltech-cyan/20 text-voltech-cyan text-xs font-semibold py-1.5 rounded text-center">{pub.texto_boton || 'Ver Oferta'}</span>
+                    </div>
+                  </a>
+                ))}
+                {/* Más Vendidos - UNA tarjeta con lista de productos */}
+                {mvMovilActivo && (
+                  <div className={`snap-start shrink-0 w-64 rounded-xl overflow-hidden border ${cardBorder} ${cardBg} p-3`}>
+                    <h3 className={`text-xs font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>🔥 {masVendidosConfig?.titulo || 'Los Favoritos de Nuestros Clientes'}</h3>
+                    <div className="space-y-2">
+                      {productosMasVendidos.slice(0, 3).map(p => { const pi = getPrecioMostrar(p); return (
+                        <div key={p.id} onClick={() => setSelectedProduct(p)} className={`flex items-center gap-2 p-1.5 rounded-lg border ${cardBorder} hover:border-voltech-cyan/50 cursor-pointer transition-all`}>
+                          <div className="w-9 h-9 rounded bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                            {p.imagen ? <img src={p.imagen} alt={p.producto} className="w-full h-full object-contain" /> : <Package className="w-4 h-4 text-slate-300" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-[10px] font-semibold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto}</p>
+                            <p className={`text-[10px] ${mutedText}`}>${pi.precioPrincipal?.toFixed(2)}</p>
+                          </div>
+                          <Trophy className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+                        </div>
+                      ); })}
+                    </div>
+                    <div className={`mt-2 space-y-0.5 text-[9px] ${mutedText}`}>
+                      {masVendidosConfig?.descripcion_1 && <p>{masVendidosConfig.descripcion_1}</p>}
+                      {masVendidosConfig?.descripcion_2 && <p>{masVendidosConfig.descripcion_2}</p>}
+                    </div>
                   </div>
-                  <div className="p-3">
-                    <p className={`text-sm font-bold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{pub.titulo}</p>
-                    {pub.descripcion && <p className={`text-xs mt-1 line-clamp-2 ${mutedText}`}>{pub.descripcion}</p>}
-                    <span className="mt-2 block w-full bg-voltech-cyan/20 text-voltech-cyan text-xs font-semibold py-1.5 rounded text-center hover:bg-voltech-cyan/30 transition-colors">
-                      {pub.texto_boton || 'Ver Oferta'}
-                    </span>
-                  </div>
-                </a>
-              ))}
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
           

@@ -163,7 +163,8 @@ export default function MarketingPage() {
     anunciante: '', costo_por_click: 0.10, telefono_anunciante: '',
     fecha_inicio: '', duracion_dias: 30, fecha_fin: '', hora_inicio: '00:00', hora_fin: '23:59', prioridad: 'normal',
     mostrar_en: { inicio: true, catalogo: true, streaming: false, ofertas: false },
-    dispositivos: { desktop: true, movil: true, tablet: true }, rotacion: 5, estado: 'activo'
+    dispositivos: { desktop: true, movil: true, tablet: true }, rotacion: 5, estado: 'activo',
+    ubicacion_web: 'oculta', ubicacion_movil: 'arriba'
   });
 
   const [masVendidosConfig, setMasVendidosConfig] = useState({
@@ -1454,11 +1455,19 @@ export default function MarketingPage() {
                       <input type="text" value={formDataPublicidad.texto_boton} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, texto_boton: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="Ver Oferta / Ir a la tienda / Conseguir descuento" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-voltech-muted mb-2">Ubicación en el catálogo</label>
-                      <select value={formDataPublicidad.lado} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, lado: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                        <option value="izquierdo">Izquierda</option>
-                        <option value="derecho">Derecha</option>
-                        <option value="ambos">Ambos lados</option>
+                      <label className="block text-sm font-medium text-voltech-muted mb-2">🖥️ Ubicación en WEB</label>
+                      <select value={formDataPublicidad.ubicacion_web || 'oculta'} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, ubicacion_web: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                        <option value="oculta">No mostrar en web</option>
+                        <option value="izquierda">⬅️ Columna izquierda</option>
+                        <option value="derecha">➡️ Columna derecha</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-voltech-muted mb-2">📱 Ubicación en MÓVIL</label>
+                      <select value={formDataPublicidad.ubicacion_movil || 'oculta'} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, ubicacion_movil: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                        <option value="oculta">No mostrar en móvil</option>
+                        <option value="arriba">⬆️ Banner superior</option>
+                        <option value="abajo">⬇️ Final de página</option>
                       </select>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -1513,7 +1522,7 @@ export default function MarketingPage() {
                             <button onClick={() => enviarResumenPub(pub)} className="p-2 hover:bg-voltech-success/20 rounded-lg text-voltech-success" title="Enviar resumen al anunciante">
                               <WhatsAppIcon className="w-4 h-4" />
                             </button>
-                            <button onClick={() => { setPublicidadEditando(pub); setShowPublicidadForm(true); }} className="p-2 hover:bg-voltech-cyan/20 rounded-lg text-voltech-cyan">
+                            <button onClick={() => { setPublicidadEditando(pub); setImagenPreview(pub.url_imagen || ''); setFormDataPublicidad(prev => ({ ...prev, ...pub, ubicacion_web: pub.ubicacion_web || 'oculta', ubicacion_movil: pub.ubicacion_movil || 'arriba' })); setShowPublicidadForm(true); }} className="p-2 hover:bg-voltech-cyan/20 rounded-lg text-voltech-cyan">
                               <Edit3 className="w-4 h-4" />
                             </button>
                             <button onClick={async () => { 

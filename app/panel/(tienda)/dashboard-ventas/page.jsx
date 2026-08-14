@@ -281,7 +281,7 @@ export default function DashboardVentasPage() {
               <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Visitas Totales</p>
               <p className="text-base md:text-xl font-bold text-white mt-0.5 truncate">{visitasTotales}</p>
             </div>
-            <div className="p-2 rounded-lg bg-voltech-cyan/10 md:bg-voltech-cyan/20 text-voltech-cyan shrink-0 flex items-center justify-center"><Eye className="w-5 h-5" /></div>
+            <div className="p-2 rou nded-lg bg-voltech-cyan/10 md:bg-voltech-cyan/20 text-voltech-cyan shrink-0 flex items-center justify-center"><Eye className="w-5 h-5" /></div>
           </div>
         </div>
 

@@ -37,7 +37,8 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
   const [salesStats, setSalesStats] = useState({
     clics: 0,
     ventas: 0,
-    comisiones: 0
+    comisiones: 0,
+    vistasLink: 0
   });
 
   const { notificaciones } = useNotificaciones();
@@ -178,10 +179,24 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
 
         const clics = parseInt(localStorage.getItem(`clics_ref_${user.nombre}`) || '0') || 8;
 
+        // ✅ Vistas por tu link de referido (tabla visitas_publicas)
+        let vistasLink = 0;
+        try {
+          if (supabase && user.nombre) {
+            const refCode = `VOLTECHSTORE-${user.nombre.substring(0, 5).toUpperCase()}-${(user.id || '0000').toString().slice(-4)}`;
+            const { count } = await supabase
+              .from('visitas_publicas')
+              .select('*', { count: 'exact', head: true })
+              .eq('ref_code', refCode);
+            vistasLink = count || 0;
+          }
+        } catch (e) { console.warn('visitas:', e); }
+
         setSalesStats({
           clics,
           ventas: ventasCount,
-          comisiones: comisionesTotal
+          comisiones: comisionesTotal,
+          vistasLink
         });
       }
     };
@@ -305,8 +320,8 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
                       
                       <div className="grid grid-cols-3 gap-2 text-center">
                         <div className="bg-voltech-dark/50 rounded-lg p-2">
-                          <p className="text-lg font-bold text-white">{salesStats.clics}</p>
-                          <p className="text-[10px] text-voltech-muted">Clics</p>
+                          <p className="text-lg font-bold text-white">{salesStats.vistasLink || salesStats.clics}</p>
+                          <p className="text-[10px] text-voltech-muted">Vistas tu link</p>
                         </div>
                         <div className="bg-voltech-dark/50 rounded-lg p-2">
                           <p className="text-lg font-bold text-voltech-success">{salesStats.ventas}</p>
