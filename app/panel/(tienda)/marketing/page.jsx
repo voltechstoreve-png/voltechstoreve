@@ -1485,7 +1485,7 @@ export default function MarketingPage() {
                    </div>
                   </div>
                   <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-voltech-muted mb-2">Fecha Inicio *</label>
                         <input type="date" value={formDataPublicidad.fecha_inicio} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, fecha_inicio: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" />
@@ -1503,7 +1503,7 @@ export default function MarketingPage() {
                       <label className="block text-sm font-medium text-voltech-muted mb-2">Video (URL, opcional)</label>
                       <input type="text" value={formDataPublicidad.url_video} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, url_video: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="https://.../video.mp4" />
                     </div>
-                                        <div className="grid grid-cols-2 gap-4">
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-voltech-muted mb-2">🔘 Texto del Botón (CTA)</label>
                         <input type="text" value={formDataPublicidad.texto_boton} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, texto_boton: e.target.value.toUpperCase()})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="VER OFERTA" />
@@ -1542,7 +1542,7 @@ export default function MarketingPage() {
                         <option value="abajo">⬇️ Final de página</option>
                       </select>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-voltech-muted mb-2">Anunciante (cliente)</label>
                         <input type="text" value={formDataPublicidad.anunciante} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, anunciante: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="Nombre del cliente" />
@@ -1569,15 +1569,15 @@ export default function MarketingPage() {
                       {/* 🖥️ PC */}
                       <div className="lg:col-span-2">
                         <p className="text-xs text-voltech-muted mb-1">🖥️ Así se verá en PC {portadaAncha ? <span className="text-voltech-cyan ml-1">• Portada ancha (70/30)</span> : <span className="text-voltech-cyan ml-1">• Portada cuadrada (50/50)</span>}</p>
-                        <div className="relative w-full h-[280px] flex overflow-hidden rounded-2xl border border-voltech-border bg-voltech-dark">
-                          <div className={`${portadaAncha ? 'w-[70%]' : 'w-1/2'} h-full relative flex-shrink-0`}>
+                        <div className="relative w-full flex flex-col sm:flex-row sm:h-[280px] overflow-hidden rounded-2xl border border-voltech-border bg-voltech-dark">
+                          <div className={`w-full h-40 sm:h-full ${portadaAncha ? 'sm:w-[70%]' : 'sm:w-1/2'} relative flex-shrink-0`}>
                             {imagenPreview ? (
                               <img src={imagenPreview} alt="" className="absolute inset-0 w-full h-full object-cover" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-voltech-muted"><ImageIcon className="w-10 h-10 opacity-40" /></div>
                             )}
                           </div>
-                          <div className={`${portadaAncha ? 'w-[30%]' : 'w-1/2'} h-full relative`}>
+                          <div className={`w-full sm:h-full ${portadaAncha ? 'sm:w-[30%]' : 'sm:w-1/2'} relative`}>
                             {formDataPublicidad.url_fondo && (
                               <img src={formDataPublicidad.url_fondo} alt="" className="absolute inset-0 w-full h-full object-cover" />
                             )}
