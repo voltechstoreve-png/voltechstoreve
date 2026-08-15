@@ -87,6 +87,19 @@ export default function CatalogoPage() {
   
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const bannerRef = useRef(null);
+  const [bannerIdx, setBannerIdx] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const scrollBanner = (dir) => {
+    const el = bannerRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * el.clientWidth, behavior: 'smooth' });
+  };
+  const onBannerScroll = () => {
+    const el = bannerRef.current;
+    if (!el) return;
+    setBannerIdx(Math.round(el.scrollLeft / el.clientWidth));
+  };
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -269,7 +282,12 @@ export default function CatalogoPage() {
 
   const tieneSoloProductosDigitales = cart.length > 0 && cart.every(item => item.tipo === 'streaming' || item.categoria?.toUpperCase() === 'STREAMING');
   
-  const calcularPrecioBs = (precioUsd) => {
+  const getPrecioPub = (pub) => {
+if (pub.precio_manual) return pub.precio_manual;
+const prod = productos.find(pr => `/catalogo?producto=${pr.id}` === pub.url_destino);
+return prod ? `$${Number(prod.precioDetal || 0).toFixed(2)}` : null;
+};
+const calcularPrecioBs = (precioUsd) => {
     const precio = Number(precioUsd) || 0;
     return (precio * tasaBCV).toFixed(2);
   };
@@ -837,61 +855,120 @@ export default function CatalogoPage() {
       </header>
 
       <main className="max-w-[1800px] xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
-        {/* ✅ PUBLICIDAD MÓVIL + MÁS VENDIDOS: carrusel uniforme (mismo tamaño lado a lado) */}
+        {/* ✅ HERO BANNER: Desktop (50/50) + Móvil (carrusel con slides) */}
         {(() => {
-          const pubsMovil = publicidad.filter(p => !p.dispositivos || p.dispositivos.movil !== false);
+          const pubsActivas = publicidad.filter(p => !p.dispositivos || p.dispositivos.movil !== false);
           const mvMovilActivo = hayMasVendidos && (masVendidosConfig?.ubicacion_movil || 'arriba') === 'arriba';
-          if (pubsMovil.length === 0 && !mvMovilActivo) return null;
+          const totalSlides = pubsActivas.length + (mvMovilActivo ? 1 : 0);
+          if (totalSlides === 0) return null;
           return (
-            <div className="lg:hidden mb-6">
-              <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 snap-x">
-                {/* Publicidad */}
-                {pubsMovil.map(pub => (
-                  <a
-                    key={pub.id}
-                    href={pub.url_destino || '#'}
-                    target={pub.url_destino ? '_blank' : '_self'}
-                    onClick={() => registrarClickPub(pub)}
-                    className={`snap-start shrink-0 w-64 rounded-xl overflow-hidden border ${cardBorder} ${cardBg} hover:border-voltech-cyan/50 transition-all`}
-                  >
-                    <div className="relative w-full h-36 bg-voltech-dark overflow-hidden">
-                      {pub.url_video ? (
-                        <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
-                      ) : pub.url_imagen ? (
-                        <img src={pub.url_imagen} alt={pub.titulo} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-voltech-muted"><ImageIcon className="w-8 h-8 opacity-50" /></div>
-                      )}
-                    </div>
-                    <div className="p-3">
-                      <p className={`text-sm font-bold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{pub.titulo}</p>
-                      <span className="mt-2 block w-full bg-voltech-cyan/20 text-voltech-cyan text-xs font-semibold py-1.5 rounded text-center">{pub.texto_boton || 'Ver Oferta'}</span>
-                    </div>
-                  </a>
-                ))}
-                {/* Más Vendidos - UNA tarjeta con lista de productos */}
-                {mvMovilActivo && (
-                  <div className={`snap-start shrink-0 w-64 rounded-xl overflow-hidden border ${cardBorder} ${cardBg} p-3`}>
-                    <h3 className={`text-xs font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>🔥 {masVendidosConfig?.titulo || 'Los Favoritos de Nuestros Clientes'}</h3>
-                    <div className="space-y-2">
-                      {productosMasVendidos.slice(0, 3).map(p => { const pi = getPrecioMostrar(p); return (
-                        <div key={p.id} onClick={() => setSelectedProduct(p)} className={`flex items-center gap-2 p-1.5 rounded-lg border ${cardBorder} hover:border-voltech-cyan/50 cursor-pointer transition-all`}>
-                          <div className="w-9 h-9 rounded bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-                            {p.imagen ? <img src={p.imagen} alt={p.producto} className="w-full h-full object-contain" /> : <Package className="w-4 h-4 text-slate-300" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-[10px] font-semibold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto}</p>
-                            <p className={`text-[10px] ${mutedText}`}>${pi.precioPrincipal?.toFixed(2)}</p>
-                          </div>
-                          <Trophy className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+            <div className="mb-8">
+              {/* DESKTOP: Hero Banner 50/50 */}
+              <div className="hidden lg:block relative">
+                {pubsActivas.length > 0 && (
+                  <div className={`relative rounded-2xl overflow-hidden border ${cardBorder} ${cardBg} shadow-2xl`}>
+                    {pubsActivas[bannerIdx % pubsActivas.length] && (
+                      <>
+                        <div className="absolute inset-0 blur-3xl opacity-20 pointer-events-none scale-110">
+                          <img src={pubsActivas[bannerIdx % pubsActivas.length].url_imagen} alt="" className="w-full h-full object-cover" />
                         </div>
-                      ); })}
-                    </div>
-                    <div className={`mt-2 space-y-0.5 text-[9px] ${mutedText}`}>
-                      {masVendidosConfig?.descripcion_1 && <p>{masVendidosConfig.descripcion_1}</p>}
-                      {masVendidosConfig?.descripcion_2 && <p>{masVendidosConfig.descripcion_2}</p>}
-                    </div>
+                        <div className="relative flex items-center gap-8 p-6 min-h-[280px]">
+                          <div className="w-1/2 h-56 rounded-xl bg-voltech-dark overflow-hidden border border-voltech-border">
+                            {pubsActivas[bannerIdx % pubsActivas.length].url_video ? (
+                              <video src={pubsActivas[bannerIdx % pubsActivas.length].url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+                            ) : pubsActivas[bannerIdx % pubsActivas.length].url_imagen ? (
+                              <img src={pubsActivas[bannerIdx % pubsActivas.length].url_imagen} alt={pubsActivas[bannerIdx % pubsActivas.length].titulo} className="w-full h-full object-contain" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-voltech-muted"><ImageIcon className="w-12 h-12 opacity-50" /></div>
+                            )}
+                          </div>
+                          <div className="flex-1 space-y-3">
+                            <span className="text-[10px] font-bold tracking-widest text-voltech-cyan uppercase bg-voltech-cyan/10 border border-voltech-cyan/30 px-2.5 py-1 rounded-md inline-block">Publicidad Destacada</span>
+                            <h2 className={`text-2xl font-extrabold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{pubsActivas[bannerIdx % pubsActivas.length].titulo}</h2>
+                            {pubsActivas[bannerIdx % pubsActivas.length].descripcion && (
+                              <p className={`text-sm ${mutedText}`}>{pubsActivas[bannerIdx % pubsActivas.length].descripcion}</p>
+                            )}
+                            <a href={pubsActivas[bannerIdx % pubsActivas.length].url_destino || '#'} target={pubsActivas[bannerIdx % pubsActivas.length].url_destino ? '_blank' : '_self'} onClick={() => registrarClickPub(pubsActivas[bannerIdx % pubsActivas.length])} className="inline-block px-6 py-2.5 bg-voltech-cyan text-voltech-dark font-bold text-sm uppercase tracking-wider rounded-xl shadow-lg hover:bg-voltech-cyan/90 transition-all">
+                              {getPrecioPub(pubsActivas[bannerIdx % pubsActivas.length]) && <p className="text-emerald-400 font-black text-xl md:text-2xl">{getPrecioPub(pubsActivas[bannerIdx % pubsActivas.length])}</p>}
+{pubsActivas[bannerIdx % pubsActivas.length].texto_boton || 'Ver Oferta'}
+                            </a>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
+                )}
+                {pubsActivas.length > 1 && (
+                  <>
+                    <button onClick={() => setBannerIdx((bannerIdx - 1 + pubsActivas.length) % pubsActivas.length)} className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-voltech-dark/80 text-white hover:text-voltech-cyan transition-colors z-10">‹</button>
+                    <button onClick={() => setBannerIdx((bannerIdx + 1) % pubsActivas.length)} className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-voltech-dark/80 text-white hover:text-voltech-cyan transition-colors z-10">›</button>
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+                      {pubsActivas.map((_, i) => (
+                        <button key={i} onClick={() => setBannerIdx(i)} className={`h-1.5 rounded-full transition-all ${i === (bannerIdx % pubsActivas.length) ? 'w-6 bg-voltech-cyan' : 'w-2 bg-slate-600'}`} />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* MÓVIL: Carrusel con slides (publicidades + Más Vendidos) */}
+              <div className="lg:hidden relative" onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)} onTouchStart={() => setIsPaused(true)} onTouchEnd={() => setIsPaused(false)}>
+                <div ref={bannerRef} onScroll={onBannerScroll} className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory rounded-2xl">
+                  {pubsActivas.map(pub => (
+                    <a key={pub.id} href={pub.url_destino || '#'} target={pub.url_destino ? '_blank' : '_self'} onClick={() => registrarClickPub(pub)} className={`shrink-0 w-full snap-start rounded-2xl overflow-hidden border ${cardBorder} ${cardBg}`}>
+                      <div className="relative w-full h-40 sm:h-52 lg:h-64 bg-voltech-dark overflow-hidden">
+                        {pub.url_imagen && (
+                        <img src={pub.url_imagen} alt="" className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-30 scale-110 pointer-events-none" />
+                         )}
+                        {pub.url_video ? (
+                          <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+                        ) : pub.url_imagen ? (
+                          <img src={pub.url_imagen} alt={pub.titulo} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-voltech-muted"><ImageIcon className="w-10 h-10 opacity-50" /></div>
+                        )}
+                      </div>
+                      <div className="p-4">
+                        <p className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{pub.titulo}</p>
+                        {pub.descripcion && <p className={`text-xs mt-1 ${mutedText}`}>{pub.descripcion}</p>}
+                        <span className="mt-3 block w-full bg-voltech-cyan/20 text-voltech-cyan text-xs font-semibold py-2 rounded text-center">{pub.texto_boton || 'Ver Oferta'}</span>
+                      </div>
+                    </a>
+                  ))}
+                  {mvMovilActivo && (
+                    <div className={`shrink-0 w-full snap-start rounded-2xl overflow-hidden border ${cardBorder} ${cardBg} p-4`}>
+                      <h3 className={`text-sm font-bold mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>🔥 {masVendidosConfig?.titulo || 'Los Favoritos de Nuestros Clientes'}</h3>
+                      <div className="space-y-2">
+                        {productosMasVendidos.slice(0, 3).map(p => { const pi = getPrecioMostrar(p); return (
+                          <div key={p.id} onClick={() => setSelectedProduct(p)} className={`flex items-center gap-3 p-2 rounded-lg border ${cardBorder} hover:border-voltech-cyan/50 cursor-pointer transition-all`}>
+                            <div className="w-12 h-12 rounded bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                              {p.imagen ? <img src={p.imagen} alt={p.producto} className="w-full h-full object-contain" /> : <Package className="w-5 h-5 text-slate-300" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-xs font-semibold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto}</p>
+                              <p className={`text-xs ${mutedText}`}>${pi.precioPrincipal?.toFixed(2)}</p>
+                            </div>
+                            <Trophy className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+                          </div>
+                        ); })}
+                      </div>
+                      <div className={`mt-3 space-y-0.5 text-[10px] ${mutedText}`}>
+                        {masVendidosConfig?.descripcion_1 && <p>{masVendidosConfig.descripcion_1}</p>}
+                        {masVendidosConfig?.descripcion_2 && <p>{masVendidosConfig.descripcion_2}</p>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {totalSlides > 1 && (
+                  <>
+                    <button onClick={() => scrollBanner(-1)} className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-voltech-dark/80 text-white hover:text-voltech-cyan transition-colors z-10">‹</button>
+                    <button onClick={() => scrollBanner(1)} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-voltech-dark/80 text-white hover:text-voltech-cyan transition-colors z-10">›</button>
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+                      {Array.from({ length: totalSlides }).map((_, i) => (
+                        <span key={i} className={`w-1.5 h-1.5 rounded-full transition-all ${i === bannerIdx ? 'w-6 bg-voltech-cyan' : 'w-2 bg-slate-600'}`} />
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             </div>

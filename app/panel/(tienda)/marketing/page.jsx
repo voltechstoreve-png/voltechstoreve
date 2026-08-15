@@ -155,6 +155,9 @@ export default function MarketingPage() {
   const [resumenData, setResumenData] = useState({ abierto: false, texto: '', telefono: '', titulo: '', cliente: '' });
   const [publicidadEditando, setPublicidadEditando] = useState(null);
   const [imagenPreview, setImagenPreview] = useState('');
+  const [imagenesExtra, setImagenesExtra] = useState([]);
+  const [bgImageIndex, setBgImageIndex] = useState(0);
+  const [portadaRatio, setPortadaRatio] = useState(1);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef(null);
   
@@ -164,7 +167,8 @@ export default function MarketingPage() {
     fecha_inicio: '', duracion_dias: 30, fecha_fin: '', hora_inicio: '00:00', hora_fin: '23:59', prioridad: 'normal',
     mostrar_en: { inicio: true, catalogo: true, streaming: false, ofertas: false },
     dispositivos: { desktop: true, movil: true, tablet: true }, rotacion: 5, estado: 'activo',
-    ubicacion_web: 'oculta', ubicacion_movil: 'arriba'
+    ubicacion_web: 'oculta', ubicacion_movil: 'arriba', url_fondo: '',
+    texto_boton: 'VER OFERTA', color_boton: '#22d3ee'
   });
 
   const [masVendidosConfig, setMasVendidosConfig] = useState({
@@ -371,16 +375,47 @@ export default function MarketingPage() {
     reader.readAsDataURL(file);
   };
 
+  // ✅ Cargar VARIAS imágenes; la primera se vuelve PORTADA automáticamente
+  const handleImagenesExtra = (files) => {
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith('image/')) { toast.error('Solo se permiten imágenes'); return; }
+      if (file.size > 5 * 1024 * 1024) { toast.error('Cada imagen máximo 5MB'); return; }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagenesExtra(prev => [...prev, reader.result]);
+        setImagenPreview(prev => prev || reader.result);
+        setFormDataPublicidad(prev => prev.url_imagen ? prev : { ...prev, url_imagen: reader.result });
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+  // ✅ Sin duplicados: usa Set para garantizar una sola miniatura por imagen
+  const todasImagenes = Array.from(new Set([formDataPublicidad.url_imagen, ...imagenesExtra].filter(Boolean)));
+  const quitarImagen = (img) => {
+    setImagenesExtra(prev => prev.filter(x => x !== img));
+    if (formDataPublicidad.url_imagen === img) { setImagenPreview(''); setFormDataPublicidad(p => ({ ...p, url_imagen: '' })); }
+    if (formDataPublicidad.url_fondo === img) setFormDataPublicidad(p => ({ ...p, url_fondo: '' }));
+  };
+
+    // ✅ Detecta si la Portada es ANCHA (banner) o CUADRADA
+  const portadaAncha = portadaRatio >= 1.5;
+  useEffect(() => {
+    if (!imagenPreview) { setPortadaRatio(1); return; }
+    const img = new Image();
+    img.onload = () => setPortadaRatio(img.naturalWidth / (img.naturalHeight || 1));
+    img.src = imagenPreview;
+  }, [imagenPreview]);
+
   const guardarPublicidad = async () => {
     if (!esAdmin) return toast.error('Solo el administrador puede gestionar publicidad');
     if (!formDataPublicidad.titulo || !formDataPublicidad.url_imagen || !formDataPublicidad.fecha_inicio || !formDataPublicidad.fecha_fin) {
       return toast.error('Título, imagen y fechas son obligatorios');
     }
-    const nuevaPublicidad = { id: publicidadEditando ? publicidadEditando.id : `pub-${Date.now()}`, ...formDataPublicidad, fecha_creacion: new Date().toISOString() };
+    const nuevaPublicidad = { id: publicidadEditando ? publicidadEditando.id : `pub-${Date.now()}`, ...formDataPublicidad, imagenes: [formDataPublicidad.url_imagen, ...imagenesExtra].filter(Boolean), url_fondo: formDataPublicidad.url_fondo || '', fecha_creacion: new Date().toISOString() };
     if (supabase) { const { error } = await supabase.from('publicidad').upsert(nuevaPublicidad, { onConflict: 'id' }); if (error) toast.error('Error: ' + error.message); }
     const actualizadas = publicidadEditando ? publicidad.map(p => p.id === publicidadEditando.id ? nuevaPublicidad : p) : [...publicidad, nuevaPublicidad];
     setPublicidad(actualizadas); localStorage.setItem('voltech_publicidad', JSON.stringify(actualizadas));
-    toast.success('Publicidad guardada'); setShowPublicidadForm(false); setPublicidadEditando(null);
+    toast.success('Publicidad guardada'); setShowPublicidadForm(false); setPublicidadEditando(null); setImagenesExtra([]); setImagenPreview('');
   };
 
     const construirResumen = (pub) => {
@@ -1413,6 +1448,8 @@ export default function MarketingPage() {
                             url_destino: val,
                             url_imagen: prod?.imagen || prev.url_imagen,
                             titulo: prev.titulo || (prod?.producto || prod?.plataforma || prev.titulo),
+                            descripcion: prev.descripcion || (prod?.descripcion || ''),
+                            precio_manual: prev.precio_manual || (prod ? `$${Number(prod.precioDetal || 0).toFixed(2)}` : ''),
                           }));
                           if (prod?.imagen) setImagenPreview(prod.imagen);
                         }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
@@ -1424,12 +1461,28 @@ export default function MarketingPage() {
                       )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-voltech-muted mb-2">Agregar Imagen *</label>
-                      <div onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }} onDrop={(e) => { e.preventDefault(); handleImageUpload(e.dataTransfer.files[0]); }} onClick={() => fileInputRef.current?.click()} className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer ${isDragOver ? 'border-voltech-cyan bg-voltech-cyan/10' : 'border-voltech-border'}`}>
-                        {imagenPreview ? <img src={imagenPreview} alt="Preview" className="max-h-48 mx-auto" /> : <div className="flex flex-col items-center gap-2"><Upload className="w-6 h-6 text-voltech-muted" /><p className="text-sm text-voltech-muted">Arrastra o haz clic</p></div>}
+                      <label className="block text-sm font-medium text-voltech-muted mb-2">🖼️ Imágenes del Banner * <span className="text-[10px]">(agrega todas las que quieras)</span></label>
+                      <div onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }} onDrop={(e) => { e.preventDefault(); setIsDragOver(false); handleImagenesExtra(e.dataTransfer.files); }} onClick={() => fileInputRef.current?.click()} className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer ${isDragOver ? 'border-voltech-cyan bg-voltech-cyan/10' : 'border-voltech-border'}`}>
+                        <div className="flex flex-col items-center gap-2"><Upload className="w-6 h-6 text-voltech-muted" /><p className="text-sm text-voltech-muted">Arrastra o haz clic (puedes elegir varias)</p></div>
                       </div>
-                      <input ref={fileInputRef} type="file" accept="image/*" onChange={(e) => handleImageUpload(e.target.files[0])} className="hidden" />
-                    </div>
+                      <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={(e) => { handleImagenesExtra(e.target.files); e.target.value = ''; }} className="hidden" />
+                      {todasImagenes.length > 0 && (
+                        <div className="flex gap-3 flex-wrap mt-3">
+                          {todasImagenes.map((img, i) => (
+                            <div key={i} className="w-24">
+                              <div className="relative">
+                                <img src={img} alt={`Img ${i+1}`} className={`w-24 h-16 object-cover rounded-lg border-2 ${formDataPublicidad.url_imagen === img ? 'border-voltech-cyan' : formDataPublicidad.url_fondo === img ? 'border-voltech-purple' : 'border-voltech-border'}`} />
+                                <button type="button" title="Quitar" onClick={() => quitarImagen(img)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] hover:bg-red-600"><X className="w-3 h-3" /></button>
+                              </div>
+                              <div className="flex gap-1 mt-1.5">
+                                <button type="button" onClick={() => { setImagenPreview(img); setFormDataPublicidad({...formDataPublicidad, url_imagen: img}); }} className={`flex-1 text-[9px] font-bold px-1.5 py-1 rounded-full transition-colors ${formDataPublicidad.url_imagen === img ? 'bg-voltech-cyan text-voltech-dark' : 'bg-voltech-cyan/10 text-voltech-cyan hover:bg-voltech-cyan/30'}`}>Portada</button>
+                                <button type="button" onClick={() => { setBgImageIndex(i); setFormDataPublicidad({...formDataPublicidad, url_fondo: img}); }} className={`flex-1 text-[9px] font-bold px-1.5 py-1 rounded-full transition-colors ${formDataPublicidad.url_fondo === img ? 'bg-voltech-purple text-white' : 'bg-voltech-purple/10 text-voltech-purple hover:bg-voltech-purple/30'}`}>Fondo</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                   </div>
                   </div>
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -1450,17 +1503,36 @@ export default function MarketingPage() {
                       <label className="block text-sm font-medium text-voltech-muted mb-2">Video (URL, opcional)</label>
                       <input type="text" value={formDataPublicidad.url_video} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, url_video: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="https://.../video.mp4" />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-voltech-muted mb-2">Texto del Botón</label>
-                      <input type="text" value={formDataPublicidad.texto_boton} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, texto_boton: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="Ver Oferta / Ir a la tienda / Conseguir descuento" />
+                                        <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-voltech-muted mb-2">🔘 Texto del Botón (CTA)</label>
+                        <input type="text" value={formDataPublicidad.texto_boton} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, texto_boton: e.target.value.toUpperCase()})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="VER OFERTA" />
+                        <div className="flex gap-1 mt-2 flex-wrap">
+                          {['VER OFERTA', 'COMPRA YA', 'VER MÁS', 'APROVECHAR', 'QUIERO UNO'].map(txt => (
+                            <button key={txt} type="button" onClick={() => setFormDataPublicidad({...formDataPublicidad, texto_boton: txt})} className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${formDataPublicidad.texto_boton === txt ? 'bg-voltech-cyan text-voltech-dark' : 'bg-voltech-border/50 text-voltech-muted hover:bg-voltech-border'}`}>{txt}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-voltech-muted mb-2">🎨 Color del Botón</label>
+                        <div className="flex gap-2 items-center">
+                          <input type="color" value={formDataPublicidad.color_boton || '#22d3ee'} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, color_boton: e.target.value})} className="w-12 h-10 rounded-lg border border-voltech-border cursor-pointer bg-transparent" />
+                          <input type="text" value={formDataPublicidad.color_boton || '#22d3ee'} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, color_boton: e.target.value})} className="input-voltech flex-1 rounded-lg px-3 py-2 text-sm font-mono" placeholder="#22d3ee" />
+                        </div>
+                        <div className="flex gap-1 mt-2">
+                          {['#22d3ee', '#a855f7', '#10b981', '#f59e0b', '#ef4444', '#ec4899'].map(c => (
+                            <button key={c} type="button" onClick={() => setFormDataPublicidad({...formDataPublicidad, color_boton: c})} className="w-6 h-6 rounded-full border-2 border-voltech-border hover:scale-110 transition-transform" style={{ backgroundColor: c }} title={c} />
+                          ))}
+                        </div>
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-voltech-muted mb-2">🖥️ Ubicación en WEB</label>
                       <select value={formDataPublicidad.ubicacion_web || 'oculta'} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, ubicacion_web: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                        <option value="oculta">No mostrar en web</option>
-                        <option value="izquierda">⬅️ Columna izquierda</option>
-                        <option value="derecha">➡️ Columna derecha</option>
-                      </select>
+                      <option value="oculta">No mostrar en web</option>
+                      <option value="arriba">⬆️ Banner superior</option>
+                       <option value="abajo">⬇️ Banner inferior</option>
+                       </select>                    
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-voltech-muted mb-2">📱 Ubicación en MÓVIL</label>
@@ -1487,6 +1559,61 @@ export default function MarketingPage() {
                     <div className="flex gap-3 pt-4">
                       <button onClick={guardarPublicidad} className="flex-1 px-4 py-2 bg-voltech-cyan text-white rounded-lg">Guardar</button>
                       <button onClick={() => { setShowPublicidadForm(false); setPublicidadEditando(null); }} className="px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-voltech-muted">Cancelar</button>
+                    </div>
+                  </div>
+
+                  {/* 👁️ VISTA PREVIA EN VIVO DEL BANNER */}
+                  <div className="mt-6 space-y-3">
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2"><Eye className="w-4 h-4 text-voltech-cyan" /> Vista Previa en Vivo</h4>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      {/* 🖥️ PC */}
+                      <div className="lg:col-span-2">
+                        <p className="text-xs text-voltech-muted mb-1">🖥️ Así se verá en PC {portadaAncha ? <span className="text-voltech-cyan ml-1">• Portada ancha (70/30)</span> : <span className="text-voltech-cyan ml-1">• Portada cuadrada (50/50)</span>}</p>
+                        <div className="relative w-full h-[280px] flex overflow-hidden rounded-2xl border border-voltech-border bg-voltech-dark">
+                          <div className={`${portadaAncha ? 'w-[70%]' : 'w-1/2'} h-full relative flex-shrink-0`}>
+                            {imagenPreview ? (
+                              <img src={imagenPreview} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-voltech-muted"><ImageIcon className="w-10 h-10 opacity-40" /></div>
+                            )}
+                          </div>
+                          <div className={`${portadaAncha ? 'w-[30%]' : 'w-1/2'} h-full relative`}>
+                            {formDataPublicidad.url_fondo && (
+                              <img src={formDataPublicidad.url_fondo} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                            )}
+                            <div className="absolute inset-0 bg-black/60"></div>
+                            <div className="relative z-10 h-full w-full flex flex-col items-center justify-center text-center gap-2 p-4">
+                              <h3 className="text-base lg:text-lg font-extrabold text-white drop-shadow leading-tight">{formDataPublicidad.titulo || 'Título del anuncio'}</h3>
+                              {formDataPublicidad.descripcion && <p className="text-xs lg:text-sm text-white/90 drop-shadow line-clamp-2">{formDataPublicidad.descripcion}</p>}
+                              <span className="inline-block px-4 py-1.5 font-bold text-xs uppercase tracking-wider rounded-xl w-fit mt-1 shadow-lg" style={{ backgroundColor: formDataPublicidad.color_boton || '#22d3ee', color: '#0a0a0a' }}>{formDataPublicidad.texto_boton || 'VER OFERTA'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {/* 📱 Móvil */}
+                      <div>
+                        <p className="text-xs text-voltech-muted mb-1">📱 Así se verá en Móvil</p>
+                        <div className="max-w-[240px] mx-auto rounded-2xl overflow-hidden border border-voltech-border bg-voltech-dark flex flex-col">
+                          <div className="w-full h-40 relative flex-shrink-0">
+                            {imagenPreview ? (
+                              <img src={imagenPreview} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-voltech-muted"><ImageIcon className="w-8 h-8 opacity-40" /></div>
+                            )}
+                          </div>
+                          <div className="relative flex-1 min-h-[180px]">
+                            {formDataPublicidad.url_fondo && (
+                              <img src={formDataPublicidad.url_fondo} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                            )}
+                            <div className="absolute inset-0 bg-black/60"></div>
+                            <div className="relative z-10 h-full w-full flex flex-col items-center justify-center text-center gap-1.5 p-4">
+                              <p className="text-sm font-bold text-white drop-shadow leading-tight w-full">{formDataPublicidad.titulo || 'Título'}</p>
+                              {formDataPublicidad.descripcion && <p className="text-[10px] text-white/90 drop-shadow line-clamp-2">{formDataPublicidad.descripcion}</p>}
+                              <span className="block w-full text-center text-[10px] font-bold py-1.5 rounded mt-1 shadow-lg" style={{ backgroundColor: formDataPublicidad.color_boton || '#22d3ee', color: '#0a0a0a' }}>{formDataPublicidad.texto_boton || 'VER OFERTA'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1522,7 +1649,7 @@ export default function MarketingPage() {
                             <button onClick={() => enviarResumenPub(pub)} className="p-2 hover:bg-voltech-success/20 rounded-lg text-voltech-success" title="Enviar resumen al anunciante">
                               <WhatsAppIcon className="w-4 h-4" />
                             </button>
-                            <button onClick={() => { setPublicidadEditando(pub); setImagenPreview(pub.url_imagen || ''); setFormDataPublicidad(prev => ({ ...prev, ...pub, ubicacion_web: pub.ubicacion_web || 'oculta', ubicacion_movil: pub.ubicacion_movil || 'arriba' })); setShowPublicidadForm(true); }} className="p-2 hover:bg-voltech-cyan/20 rounded-lg text-voltech-cyan">
+                            <button onClick={() => { setPublicidadEditando(pub); setImagenPreview(pub.url_imagen || ''); setImagenesExtra((pub.imagenes || []).slice(1)); setFormDataPublicidad(prev => ({ ...prev, ...pub, ubicacion_web: pub.ubicacion_web || 'oculta', ubicacion_movil: pub.ubicacion_movil || 'arriba' })); setShowPublicidadForm(true); }} className="p-2 hover:bg-voltech-cyan/20 rounded-lg text-voltech-cyan">
                               <Edit3 className="w-4 h-4" />
                             </button>
                             <button onClick={async () => { 
@@ -1574,6 +1701,24 @@ export default function MarketingPage() {
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
+                          <label className="block text-xs text-voltech-muted mb-1">🖥️ Ubicación en WEB</label>
+                          <select value={masVendidosConfig.ubicacion_web || 'oculta'} onChange={(e) => setMasVendidosConfig({...masVendidosConfig, ubicacion_web: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                            <option value="oculta">No mostrar en web</option>
+                            <option value="izquierda">⬅️ Columna izquierda</option>
+                            <option value="derecha">➡️ Columna derecha</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-voltech-muted mb-1">📱 Ubicación en MÓVIL</label>
+                          <select value={masVendidosConfig.ubicacion_movil || 'oculta'} onChange={(e) => setMasVendidosConfig({...masVendidosConfig, ubicacion_movil: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                            <option value="oculta">No mostrar en móvil</option>
+                            <option value="arriba">⬆️ Banner superior (junto a publicidad)</option>
+                            <option value="abajo">⬇️ Final de página</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
                           <label className="block text-xs text-voltech-muted mb-1">Título de la Sección</label>
                           <input type="text" value={masVendidosConfig.titulo} onChange={(e) => setMasVendidosConfig({...masVendidosConfig, titulo: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
                         </div>
@@ -1585,6 +1730,7 @@ export default function MarketingPage() {
                             <option value={3}>3</option>
                             <option value={4}>4</option>
                             <option value={5}>5</option>
+                            <option value={6}>6</option>
                           </select>
                         </div>
                         <div>
