@@ -1652,10 +1652,18 @@ export default function MarketingPage() {
                         <p className="text-xs text-voltech-muted mb-1">🖥️ Así se verá en PC <span className="text-voltech-cyan ml-1">• Imagen al alto · ancho auto (máx 70%)</span></p>
                         <div className="relative w-full h-[260px] overflow-hidden rounded-2xl border border-voltech-border bg-black shadow-2xl flex">
                           {modoDosImagenes && imgsPC.length >= 2 ? (
-                            <div className="h-full w-[70%] shrink-0 bg-black grid grid-cols-2 gap-1 overflow-hidden">
-                              {imgsPC.slice(0, 2).map((src, i) => (
-                                <img key={i} src={src} alt="" className="w-full h-full object-contain" />
-                              ))}
+                            /* 🟢 Ancho dinámico para que la imagen vertical llene la altura sin vacíos */
+                            <div className="h-full max-w-[70%] shrink-0 bg-black flex items-center justify-start overflow-hidden">
+                              <img 
+                                src={imgsPC[0]} 
+                                alt="" 
+                                className="h-full w-auto object-cover shrink-0" 
+                              />
+                              <img 
+                                src={imgsPC[1]} 
+                                alt="" 
+                                className="h-full w-auto object-contain bg-white shrink-0" 
+                              />
                             </div>
                           ) : (
                             <div className="h-full max-w-[70%] bg-black flex items-center justify-center" style={{ aspectRatio: `${portadaRatio || 1}` }}>
@@ -1678,6 +1686,7 @@ export default function MarketingPage() {
                           </div>
                         </div>
                       </div>
+
                       {/* 📱 Móvil: imagen al ANCHO, alto auto (máx 70%) */}
                       <div className="w-[220px] flex-shrink-0">
                         <p className="text-xs text-voltech-muted mb-1">📱 Así se verá en Móvil <span className="text-voltech-cyan ml-1">• Imagen al ancho · alto auto (máx 70%)</span></p>
