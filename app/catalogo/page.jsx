@@ -1,5 +1,6 @@
 'use client';
 
+import BannerCard from '@/components/BannerCard';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useTheme } from '@/app/context/ThemeContext';
 import { useProductos, useSettings, useTasaBCV, useAuth } from '@/hooks/useVoltech';
@@ -8,9 +9,9 @@ import {
   Search, ShoppingCart, MessageCircle, X, Plus, Minus, Trash2, 
   MapPin, Tag, Star, Gift, CheckCircle, Package, TrendingUp, 
   Sun, Moon, Play, Clock, Zap, Truck,
-  Sparkles, Trophy, AlertCircle, Ticket, Copy, Users,
+  Sparkles, Trophy, AlertCircle, Ticket, Copy, Users, LayoutDashboard, LogIn,
   MessageSquare, ThumbsUp, Upload, Percent, Share2,
-  Image as ImageIcon, FileText, Info, Menu
+  Image as ImageIcon, FileText, Info, Menu, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -42,6 +43,8 @@ export default function CatalogoPage() {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterBrand, setFilterBrand] = useState('');
   const [filterPlatform, setFilterPlatform] = useState('');
+  const [precioMin, setPrecioMin] = useState('');
+  const [precioMax, setPrecioMax] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('retiro');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [couponCode, setCouponCode] = useState('');
@@ -85,11 +88,29 @@ export default function CatalogoPage() {
   const [masVendidosConfig, setMasVendidosConfig] = useState(null);
   const [whatsappNumero, setWhatsappNumero] = useState('584125378515'); // Número por defecto
   
-  const [showTermsModal, setShowTermsModal] = useState(false);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const bannerRef = useRef(null);
-  const [bannerIdx, setBannerIdx] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
+const [showTermsModal, setShowTermsModal] = useState(false);
+const [showMobileMenu, setShowMobileMenu] = useState(false);
+const bannerRef = useRef(null);
+const [bannerIdx, setBannerIdx] = useState(0);
+const [isPaused, setIsPaused] = useState(false);
+
+// 🔴 NUEVO ESTADO: Guarda la relación de aspecto dinámica de cada imagen
+const [ratios, setRatios] = useState({});
+
+useEffect(() => {
+  if (!publicidad.length) return;
+  let mounted = true;
+  publicidad.filter(p => p.url_imagen).forEach(p => {
+    const img = new Image();
+    img.onload = () => { 
+      if (mounted) {
+        setRatios(r => ({ ...r, [p.id]: img.naturalWidth / (img.naturalHeight || 1) }));
+      }
+    };
+    img.src = p.url_imagen;
+  });
+  return () => { mounted = false; };
+}, [publicidad]);
   const scrollBanner = (dir) => {
     const el = bannerRef.current;
     if (!el) return;
@@ -277,7 +298,7 @@ export default function CatalogoPage() {
         }
       });
     }
-    return [...productos].sort((a, b) => (conteo[b.id] || 0) - (conteo[a.id] || 0)).slice(0, 3);
+    return [...productos].sort((a, b) => (conteo[b.id] || 0) - (conteo[a.id] || 0)).slice(0, 6);
   }, [productos, ventas]);
 
   const tieneSoloProductosDigitales = cart.length > 0 && cart.every(item => item.tipo === 'streaming' || item.categoria?.toUpperCase() === 'STREAMING');
@@ -640,14 +661,16 @@ const calcularPrecioBs = (precioUsd) => {
 
   // ✅ ACTUALIZADO: Incluir 'kit' en el filtro para que aparezcan en el catálogo
   const productosFiltrados = (productos || []).filter(p => {
-    const searchTermLower = searchTerm.toLowerCase();
-    const match = (p.producto || '').toLowerCase().includes(searchTermLower) || 
-                  (p.marca || '').toLowerCase().includes(searchTermLower) || 
-                  (p.categoria || '').toLowerCase().includes(searchTermLower) ||
-                  (p.descripcion_detallada || '').toLowerCase().includes(searchTermLower);
-    return match && (!filterCategory || p.categoria === filterCategory) && (!filterBrand || p.marca === filterBrand) && (p.tipo === 'fisico' || p.tipo === 'kit') && !p.esCombo;
-  });
-
+  const searchTermLower = searchTerm.toLowerCase();
+  const match = (p.producto || '').toLowerCase().includes(searchTermLower) || 
+                (p.marca || '').toLowerCase().includes(searchTermLower) || 
+                (p.categoria || '').toLowerCase().includes(searchTermLower) ||
+                (p.descripcion_detallada || '').toLowerCase().includes(searchTermLower);
+  const precioActual = getPrecioMostrar(p).precioPrincipal;
+  const min = precioMin === '' ? 0 : parseFloat(precioMin);
+  const max = precioMax === '' ? Infinity : parseFloat(precioMax);
+    return match && (!filterCategory || p.categoria === filterCategory) && (!filterBrand || p.marca === filterBrand) && (p.tipo === 'fisico' || p.tipo === 'kit') && !p.esCombo && precioActual >= min && precioActual <= max;
+     });
   const streamingFiltrados = (productos || []).filter(p => {
     const searchTermLower = searchTerm.toLowerCase();
     const match = (p.plataforma || '').toLowerCase().includes(searchTermLower) ||
@@ -788,7 +811,7 @@ const calcularPrecioBs = (precioUsd) => {
               <button onClick={() => setShowMobileMenu(!showMobileMenu)} className={`md:hidden p-2 rounded-lg ${darkMode ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-700'}`}>
                 <Menu className="w-5 h-5" />
               </button>
-              <h1 className={`text-lg sm:text-2xl font-bold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>VOLTECH <span className="text-purple-600">STOREVE</span></h1>
+              <h1 className={`text-sm sm:text-base font-bold tracking-tight truncate max-w-[130px] sm:max-w-none ${darkMode ? 'text-white' : 'text-slate-900'}`}>VOLTECH <span className="text-purple-600">STOREVE</span></h1>
             </div>
 
             <nav className="hidden md:flex gap-6">
@@ -807,20 +830,27 @@ const calcularPrecioBs = (precioUsd) => {
                 currentUser.rol?.toLowerCase() === 'vendedor' || 
                 currentUser.rol?.toLowerCase() === 'socio'
               ) && (
-                <button 
-                  onClick={() => window.location.href = '/panel/dashboard'} 
-                  className="px-3 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 transition-colors flex items-center gap-2"
-                  title="Ir al Panel"
-                >
-                  <TrendingUp className="w-4 h-4" /> 
-                  <span className="hidden sm:inline">Panel</span>
+<button
+onClick={() => window.location.href = '/panel/dashboard-ventas'}
+className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-800/50 transition-colors"
+title="Ir al Panel de Ventas"
+>
+<div className="w-9 h-9 rounded-full bg-cyan-400 flex items-center justify-center text-slate-900 font-bold text-sm">
+{(currentUser.nombre || 'U').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+</div>
+<div className="hidden sm:block text-left">
+<p className="text-sm font-semibold text-white leading-tight">{currentUser.nombre}</p>
+<p className="text-xs text-slate-400">{currentUser.rol}</p>
+</div>
+<ChevronDown className="w-4 h-4 text-slate-400" />
+</button>
+              )}
+              {!currentUser && (
+                <button onClick={() => setShowCart(true)} className={`relative p-2 ${darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}>
+                  <ShoppingCart className="w-6 h-6" />
+                  {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{cart.length}</span>}
                 </button>
               )}
-              
-              <button onClick={() => setShowCart(true)} className={`relative p-2 ${darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}>
-                <ShoppingCart className="w-6 h-6" />
-                {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{cart.length}</span>}
-              </button>
             </div>
           </div>
           
@@ -855,132 +885,209 @@ const calcularPrecioBs = (precioUsd) => {
       </header>
 
       <main className="max-w-[1800px] xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
-        {/* ✅ HERO BANNER: Desktop (50/50) + Móvil (carrusel con slides) */}
-        {(() => {
-          const pubsActivas = publicidad.filter(p => !p.dispositivos || p.dispositivos.movil !== false);
-          const mvMovilActivo = hayMasVendidos && (masVendidosConfig?.ubicacion_movil || 'arriba') === 'arriba';
-          const totalSlides = pubsActivas.length + (mvMovilActivo ? 1 : 0);
-          if (totalSlides === 0) return null;
-          return (
-            <div className="mb-8">
-              {/* DESKTOP: Hero Banner 50/50 */}
-              <div className="hidden lg:block relative">
-                {pubsActivas.length > 0 && (
-                  <div className={`relative rounded-2xl overflow-hidden border ${cardBorder} ${cardBg} shadow-2xl`}>
-                    {pubsActivas[bannerIdx % pubsActivas.length] && (
-                      <>
-                        <div className="absolute inset-0 blur-3xl opacity-20 pointer-events-none scale-110">
-                          <img src={pubsActivas[bannerIdx % pubsActivas.length].url_imagen} alt="" className="w-full h-full object-cover" />
-                        </div>
-                        <div className="relative flex items-center gap-8 p-6 min-h-[280px]">
-                          <div className="w-1/2 h-56 rounded-xl bg-voltech-dark overflow-hidden border border-voltech-border">
-                            {pubsActivas[bannerIdx % pubsActivas.length].url_video ? (
-                              <video src={pubsActivas[bannerIdx % pubsActivas.length].url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
-                            ) : pubsActivas[bannerIdx % pubsActivas.length].url_imagen ? (
-                              <img src={pubsActivas[bannerIdx % pubsActivas.length].url_imagen} alt={pubsActivas[bannerIdx % pubsActivas.length].titulo} className="w-full h-full object-contain" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-voltech-muted"><ImageIcon className="w-12 h-12 opacity-50" /></div>
-                            )}
-                          </div>
-                          <div className="flex-1 space-y-3">
-                            <span className="text-[10px] font-bold tracking-widest text-voltech-cyan uppercase bg-voltech-cyan/10 border border-voltech-cyan/30 px-2.5 py-1 rounded-md inline-block">Publicidad Destacada</span>
-                            <h2 className={`text-2xl font-extrabold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{pubsActivas[bannerIdx % pubsActivas.length].titulo}</h2>
-                            {pubsActivas[bannerIdx % pubsActivas.length].descripcion && (
-                              <p className={`text-sm ${mutedText}`}>{pubsActivas[bannerIdx % pubsActivas.length].descripcion}</p>
-                            )}
-                            <a href={pubsActivas[bannerIdx % pubsActivas.length].url_destino || '#'} target={pubsActivas[bannerIdx % pubsActivas.length].url_destino ? '_blank' : '_self'} onClick={() => registrarClickPub(pubsActivas[bannerIdx % pubsActivas.length])} className="inline-block px-6 py-2.5 bg-voltech-cyan text-voltech-dark font-bold text-sm uppercase tracking-wider rounded-xl shadow-lg hover:bg-voltech-cyan/90 transition-all">
-                              {getPrecioPub(pubsActivas[bannerIdx % pubsActivas.length]) && <p className="text-emerald-400 font-black text-xl md:text-2xl">{getPrecioPub(pubsActivas[bannerIdx % pubsActivas.length])}</p>}
-{pubsActivas[bannerIdx % pubsActivas.length].texto_boton || 'Ver Oferta'}
-                            </a>
-                          </div>
-                        </div>
-                      </>
+{/* ✅ HERO BANNER: adaptable dinámicamente según la imagen */}
+{(() => {
+  const pubsActivas = publicidad.filter(p => !p.dispositivos || p.dispositivos.movil !== false);
+  const mvMovilActivo = hayMasVendidos && (masVendidosConfig?.ubicacion_movil || 'arriba') === 'arriba';
+  const totalSlides = pubsActivas.length + (mvMovilActivo ? 1 : 0);
+  if (totalSlides === 0) return null;
+
+  return (
+    <div className="mb-8">
+      {/* 🖥️ DESKTOP: Mantiene altura fija pero ajusta la imagen con su Aspect Ratio natural */}
+      <div className="hidden lg:block relative">
+        {pubsActivas.length > 0 && (
+          <div className="grid grid-cols-2 gap-4 w-full">
+            {[0, 1].map(offset => {
+              const pub = pubsActivas[(bannerIdx + offset) % pubsActivas.length];
+              if (!pub) return null;
+              const aspect = ratios[pub.id] || 1;
+
+              return (
+                <a 
+                  key={pub.id + '-' + offset} 
+                  href={pub.url_destino || '#'} 
+                  target={pub.url_destino ? '_blank' : '_self'} 
+                  onClick={() => registrarClickPub(pub)} 
+                  className="relative w-full h-[280px] rounded-2xl overflow-hidden border border-voltech-border bg-black shadow-xl flex"
+                >
+                  <div 
+                    className="h-full max-w-[70%] bg-black flex items-center justify-center overflow-hidden" 
+                    style={{ aspectRatio: `${aspect}` }}
+                  >
+                    {pub.url_video ? (
+                      <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+                    ) : pub.url_imagen ? (
+                      <img src={pub.url_imagen} alt={pub.titulo} className="w-full h-full object-contain" />
+                    ) : (
+                      <ImageIcon className="w-12 h-12 opacity-40 text-voltech-muted" />
                     )}
                   </div>
-                )}
-                {pubsActivas.length > 1 && (
-                  <>
-                    <button onClick={() => setBannerIdx((bannerIdx - 1 + pubsActivas.length) % pubsActivas.length)} className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-voltech-dark/80 text-white hover:text-voltech-cyan transition-colors z-10">‹</button>
-                    <button onClick={() => setBannerIdx((bannerIdx + 1) % pubsActivas.length)} className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-voltech-dark/80 text-white hover:text-voltech-cyan transition-colors z-10">›</button>
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-                      {pubsActivas.map((_, i) => (
-                        <button key={i} onClick={() => setBannerIdx(i)} className={`h-1.5 rounded-full transition-all ${i === (bannerIdx % pubsActivas.length) ? 'w-6 bg-voltech-cyan' : 'w-2 bg-slate-600'}`} />
-                      ))}
+                  <div className="relative h-full flex-1 bg-black">
+                    {pub.url_fondo && <img src={pub.url_fondo} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+                    <div className="absolute inset-0 bg-black/60"></div>
+                    <div className="relative z-10 h-full w-full flex flex-col items-center justify-center text-center gap-2 p-4">
+                      <h2 className="font-bold text-white text-sm md:text-base drop-shadow leading-tight line-clamp-2">{pub.titulo}</h2>
+                      {pub.descripcion && <p className="text-[10px] text-white/90 drop-shadow line-clamp-2">{pub.descripcion}</p>}
+                      {getPrecioPub(pub) && <p className="text-emerald-400 font-black text-base drop-shadow">{getPrecioPub(pub)}</p>}
+                      <span className="inline-block px-4 py-2 font-bold text-xs uppercase tracking-wider rounded-lg shadow-lg" style={{ backgroundColor: pub.color_boton || '#22d3ee', color: '#0a0a0a' }}>
+                        {pub.texto_boton || 'VER OFERTA'}
+                      </span>
                     </div>
-                  </>
-                )}
-              </div>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        )}
 
-              {/* MÓVIL: Carrusel con slides (publicidades + Más Vendidos) */}
-              <div className="lg:hidden relative" onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)} onTouchStart={() => setIsPaused(true)} onTouchEnd={() => setIsPaused(false)}>
-                <div ref={bannerRef} onScroll={onBannerScroll} className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory rounded-2xl">
-                  {pubsActivas.map(pub => (
-                    <a key={pub.id} href={pub.url_destino || '#'} target={pub.url_destino ? '_blank' : '_self'} onClick={() => registrarClickPub(pub)} className={`shrink-0 w-full snap-start rounded-2xl overflow-hidden border ${cardBorder} ${cardBg}`}>
-                      <div className="relative w-full h-40 sm:h-52 lg:h-64 bg-voltech-dark overflow-hidden">
-                        {pub.url_imagen && (
-                        <img src={pub.url_imagen} alt="" className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-30 scale-110 pointer-events-none" />
-                         )}
-                        {pub.url_video ? (
-                          <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
-                        ) : pub.url_imagen ? (
-                          <img src={pub.url_imagen} alt={pub.titulo} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-voltech-muted"><ImageIcon className="w-10 h-10 opacity-50" /></div>
-                        )}
-                      </div>
-                      <div className="p-4">
-                        <p className={`text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{pub.titulo}</p>
-                        {pub.descripcion && <p className={`text-xs mt-1 ${mutedText}`}>{pub.descripcion}</p>}
-                        <span className="mt-3 block w-full bg-voltech-cyan/20 text-voltech-cyan text-xs font-semibold py-2 rounded text-center">{pub.texto_boton || 'Ver Oferta'}</span>
-                      </div>
-                    </a>
-                  ))}
-                  {mvMovilActivo && (
-                    <div className={`shrink-0 w-full snap-start rounded-2xl overflow-hidden border ${cardBorder} ${cardBg} p-4`}>
-                      <h3 className={`text-sm font-bold mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>🔥 {masVendidosConfig?.titulo || 'Los Favoritos de Nuestros Clientes'}</h3>
-                      <div className="space-y-2">
-                        {productosMasVendidos.slice(0, 3).map(p => { const pi = getPrecioMostrar(p); return (
-                          <div key={p.id} onClick={() => setSelectedProduct(p)} className={`flex items-center gap-3 p-2 rounded-lg border ${cardBorder} hover:border-voltech-cyan/50 cursor-pointer transition-all`}>
-                            <div className="w-12 h-12 rounded bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-                              {p.imagen ? <img src={p.imagen} alt={p.producto} className="w-full h-full object-contain" /> : <Package className="w-5 h-5 text-slate-300" />}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-xs font-semibold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto}</p>
-                              <p className={`text-xs ${mutedText}`}>${pi.precioPrincipal?.toFixed(2)}</p>
-                            </div>
-                            <Trophy className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-                          </div>
-                        ); })}
-                      </div>
-                      <div className={`mt-3 space-y-0.5 text-[10px] ${mutedText}`}>
-                        {masVendidosConfig?.descripcion_1 && <p>{masVendidosConfig.descripcion_1}</p>}
-                        {masVendidosConfig?.descripcion_2 && <p>{masVendidosConfig.descripcion_2}</p>}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                {totalSlides > 1 && (
-                  <>
-                    <button onClick={() => scrollBanner(-1)} className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-voltech-dark/80 text-white hover:text-voltech-cyan transition-colors z-10">‹</button>
-                    <button onClick={() => scrollBanner(1)} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-voltech-dark/80 text-white hover:text-voltech-cyan transition-colors z-10">›</button>
-                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-                      {Array.from({ length: totalSlides }).map((_, i) => (
-                        <span key={i} className={`w-1.5 h-1.5 rounded-full transition-all ${i === bannerIdx ? 'w-6 bg-voltech-cyan' : 'w-2 bg-slate-600'}`} />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
+        {pubsActivas.length > 1 && (
+          <>
+            <button onClick={() => setBannerIdx((bannerIdx - 1 + pubsActivas.length) % pubsActivas.length)} className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-voltech-dark/80 text-white hover:text-voltech-cyan transition-colors z-10 flex items-center justify-center">‹</button>
+            <button onClick={() => setBannerIdx((bannerIdx + 1) % pubsActivas.length)} className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-voltech-dark/80 text-white hover:text-voltech-cyan transition-colors z-10 flex items-center justify-center">›</button>
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+              {pubsActivas.map((_, i) => (
+                <button key={i} onClick={() => setBannerIdx(i)} className={`h-1.5 rounded-full transition-all ${i === (bannerIdx % pubsActivas.length) ? 'w-6 bg-voltech-cyan' : 'w-2 bg-slate-600'}`} />
+              ))}
             </div>
-          );
-        })()}
+          </>
+        )}
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
+{/* 📱 MÓVIL: Banner Único Horizontal con Look Estilo PC (HBO MAX / Netflix) */}
+<div className="lg:hidden relative mb-6" onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)} onTouchStart={() => setIsPaused(true)} onTouchEnd={() => setIsPaused(false)}>
+  <div ref={bannerRef} onScroll={onBannerScroll} className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory rounded-2xl">
+    {pubsActivas.map(pub => {
+      // Cálculo de proporciones exactas según tipo
+      let pctMedia = 'w-[55%]';
+      let pctTexto = 'w-[45%]';
+
+      if (pub.tipo_disposicion === '35_35_30') {
+        pctMedia = 'w-[70%]';
+        pctTexto = 'w-[30%]';
+      } else if (pub.tipo_disposicion === '70_30') {
+        pctMedia = 'w-[70%]';
+        pctTexto = 'w-[30%]';
+      }
+
+      return (
+        <a 
+          key={pub.id} 
+          href={pub.url_destino || '#'} 
+          target={pub.url_destino ? '_blank' : '_self'} 
+          onClick={() => registrarClickPub(pub)} 
+          className="shrink-0 w-full snap-start rounded-2xl overflow-hidden bg-black border border-slate-800/80 flex flex-row items-center h-44 shadow-2xl"
+        >
+          {/* 1. LADO IZQUIERDO: Multimedia (Sin padding blanco, encaje directo) */}
+          <div className={`${pctMedia} h-full relative flex items-center justify-center bg-black overflow-hidden shrink-0`}>
+            {pub.tipo_disposicion === '35_35_30' ? (
+              <div className="flex w-full h-full items-center justify-center gap-1 p-2">
+                <div className="w-1/2 h-full flex items-center justify-center overflow-hidden">
+                  {pub.url_imagen && <img src={pub.url_imagen} alt="" className="max-h-full max-w-full object-contain" />}
+                </div>
+                <div className="w-1/2 h-full flex items-center justify-center overflow-hidden">
+                  {pub.url_imagen_2 && <img src={pub.url_imagen_2} alt="" className="max-h-full max-w-full object-contain" />}
+                </div>
+              </div>
+            ) : pub.url_video ? (
+              <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+            ) : pub.url_imagen ? (
+              <img src={pub.url_imagen} alt={pub.titulo} className="w-full h-full object-cover" />
+            ) : (
+              <ImageIcon className="w-8 h-8 opacity-40 text-voltech-muted" />
+            )}
+          </div>
+
+          {/* 2. LADO DERECHO: Fondo Negro Puro + Texto + Botón */}
+          <div className={`relative ${pctTexto} h-full p-3 flex flex-col justify-center items-center text-center gap-1 bg-black overflow-hidden shrink-0`}>
+            {pub.url_fondo && (
+              <img src={pub.url_fondo} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 pointer-events-none" />
+            )}
+            
+            <p className="text-xs font-black text-white tracking-wide uppercase drop-shadow leading-tight line-clamp-2 w-full z-10">
+              {pub.titulo}
+            </p>
+            
+            {pub.descripcion && (
+              <p className="text-[10px] text-slate-300 drop-shadow line-clamp-1 z-10">
+                {pub.descripcion}
+              </p>
+            )}
+            
+            {getPrecioPub(pub) && (
+              <p className="text-emerald-400 font-black text-xs drop-shadow z-10">
+                {getPrecioPub(pub)}
+              </p>
+            )}
+            
+            <span 
+              className="mt-1 px-3 py-1.5 rounded-lg font-black transition-transform active:scale-95 text-[9px] uppercase shadow-md z-10 truncate max-w-full" 
+              style={{ backgroundColor: pub.color_boton || '#22d3ee', color: '#0a0a0a' }}
+            >
+              {pub.texto_boton || 'VER OFERTA'}
+            </span>
+          </div>
+        </a>
+      );
+    })}
+
+    {mvMovilActivo && (
+      <div className={`shrink-0 w-full snap-start rounded-2xl overflow-hidden border ${cardBorder} ${cardBg} p-4`}>
+        <h3 className={`text-sm font-bold mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>🔥 {masVendidosConfig?.titulo || 'Los Favoritos de Nuestros Clientes'}</h3>
+        <div className="space-y-2">
+          {productosMasVendidos.slice(0, masVendidosConfig?.cantidad_maxima || 3).map(p => { 
+            const pi = getPrecioMostrar(p); 
+            return (
+              <div key={p.id} onClick={() => setSelectedProduct(p)} className={`flex items-center gap-3 p-2 rounded-lg border ${cardBorder} hover:border-voltech-cyan/50 cursor-pointer transition-all`}>
+                <div className="w-12 h-12 rounded bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {p.imagen ? <img src={p.imagen} alt={p.producto} className="w-full h-full object-contain" /> : <Package className="w-5 h-5 text-slate-300" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-xs font-semibold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto}</p>
+                  <p className={`text-xs ${mutedText}`}>${pi.precioPrincipal?.toFixed(2)}</p>
+                </div>
+                <Trophy className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+              </div>
+            ); 
+          })}
+        </div>
+        <div className={`mt-3 space-y-0.5 text-[10px] ${mutedText}`}>
+          {masVendidosConfig?.descripcion_1 && <p>{masVendidosConfig.descripcion_1}</p>}
+          {masVendidosConfig?.descripcion_2 && <p>{masVendidosConfig.descripcion_2}</p>}
+        </div>
+      </div>
+    )}
+  </div>
+
+  {totalSlides > 1 && (
+    <div className="mt-2.5 flex justify-center gap-1.5 z-10">
+      {Array.from({ length: totalSlides }).map((_, i) => (
+        <span key={i} className={`h-1.5 rounded-full transition-all ${i === bannerIdx ? 'w-6 bg-voltech-cyan' : 'w-2 bg-slate-700'}`} />
+      ))}
+    </div>
+  )}
+</div>
+</div>
+  );
+})()}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
           
           {/* ✅ SIDEBAR IZQUIERDO: SOLO si hay publicidad activa */}
-          {haySidebarIzq && (
-            <aside className="hidden lg:block col-span-1 lg:col-span-2 space-y-4 order-2 lg:order-1">
-              {hayMasVendidos && (
+          <aside className="hidden lg:block col-span-1 lg:col-span-2 space-y-4 order-2 lg:order-1">
+           <div className={`${cardBg} border ${cardBorder} rounded-xl p-4`}>
+            <h3 className={`text-sm font-bold mb-3 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+          <Tag className="w-4 h-4 text-purple-600" /> Rango de Precio ($)
+            </h3>
+           <div className="flex items-center gap-2">
+           <input type="number" min="0" placeholder="Mín" value={precioMin} onChange={(e) => setPrecioMin(e.target.value)} className={`w-full px-2 py-1.5 border rounded-lg text-xs ${inputBg}`} />
+          <span className={mutedText}>—</span>
+          <input type="number" min="0" placeholder="Máx" value={precioMax} onChange={(e) => setPrecioMax(e.target.value)} className={`w-full px-2 py-1.5 border rounded-lg text-xs ${inputBg}`} />
+             </div>
+          {(precioMin !== '' || precioMax !== '') && (
+          <button onClick={() => { setPrecioMin(''); setPrecioMax(''); }} className={`mt-2 text-xs ${mutedText} hover:text-purple-600`}>✕ Limpiar rango</button>
+           )}
+          </div>
+             {hayMasVendidos && (
                 <div className={`${cardBg} border ${cardBorder} rounded-xl p-3`}>
                   <h3 className={`text-sm font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{masVendidosConfig.titulo}</h3>
                   <div className="space-y-2">
@@ -1006,65 +1113,33 @@ const calcularPrecioBs = (precioUsd) => {
                   </div>
                 </div>
               )}
-              {pubsIzquierda.map(renderPubCard)}
             </aside>
-          )}
 
-          <div className={`${!haySidebarIzq ? 'col-span-full' : 'col-span-1 lg:col-span-8 xl:col-span-8'} order-1 lg:order-2`}>
-            {activeSection === 'productos' && (
-              <div>
-
-                <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Productos</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5 w-full">
-                  {productosFiltrados.length > 0 ? (
-                    productosFiltrados.map(p => {
-                      const precioInfo = getPrecioMostrar(p);
-                      return (
-                        <div key={p.id} onClick={() => setSelectedProduct(p)} className={`flex flex-col justify-between h-full ${darkMode ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl shadow-md border overflow-hidden hover:shadow-xl hover:border-slate-700 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer group`}>
-                          <div className="relative w-full aspect-square bg-white flex items-center justify-center overflow-hidden rounded-t-2xl">
-                            {p.imagen ? (
-                              <img src={p.imagen} alt={p.producto} className="w-full h-full object-contain p-2 transition-transform duration-300 group-hover:scale-105" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} />
-                            ) : (
-                              <Package className="w-12 h-12 text-slate-300" />
-                            )}
-                            {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md z-10">OFERTA</div>}
-                            {p.tipo === 'kit' && <div className="absolute top-2 left-2 bg-voltech-cyan text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md z-10">KIT</div>}
-                          </div>
-                          <div className="p-3 flex flex-col flex-1">
-                            <div className="mb-1"><p className={`text-[10px] font-medium uppercase tracking-wide ${mutedText} truncate`}>{p.marca} • {p.categoria}</p></div>
-                            <h3 className={`font-semibold text-sm mb-2 line-clamp-2 leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto}</h3>
-                            <div className="mt-auto space-y-2">
-                              <div>
-                                {precioInfo.tieneOferta && <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)}</p>}
-                                <p className={`text-xl font-bold ${precioInfo.tieneOferta ? 'text-red-600' : darkMode ? 'text-white' : 'text-slate-900'}`}>${precioInfo.precioPrincipal?.toFixed(2)}</p>
-                                <p className={`text-xs font-medium ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
-                              </div>
-                              <div className="flex items-center gap-1.5 w-full mt-auto pt-3">
-                                <button onClick={(e) => { e.stopPropagation(); comprarRapido(p); }} className="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs py-2 px-2 rounded-xl transition-all shadow-sm">
-                                  <WhatsAppIcon className="w-4 h-4 shrink-0 fill-current" />
-                                  <span className="truncate">WhatsApp</span>
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="shrink-0 inline-flex items-center justify-center gap-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs py-2 px-2.5 rounded-xl transition-all">
-                                  <ShoppingCart className="w-4 h-4 shrink-0" />
-                                  <span className="hidden sm:inline">Carrito</span>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="col-span-full text-center py-20">
-                      <Package className={`w-16 h-16 mx-auto mb-3 opacity-30 ${mutedText}`} />
-                      <p className={`text-lg ${mutedText}`}>No hay productos disponibles</p>
-                      <p className={`text-sm ${mutedText} mt-2`}>Total en sistema: {(productos || []).length}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
+          <div className="col-span-1 lg:col-span-10 xl:col-span-10 order-1 lg:order-2">
+{activeSection === 'productos' && (
+<div>
+<h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Productos</h2>
+{productosAgrupados.length > 0 ? (
+productosAgrupados.map(([cat, items]) => (
+<div key={cat} className="mb-10">
+<h3 className={`text-lg md:text-xl font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+<Tag className="w-5 h-5 text-purple-600" /> {cat}
+<span className={`text-xs font-normal ${mutedText}`}>({items.length})</span>
+</h3>
+<div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5 w-full">
+{items.map(p => renderProductCard(p))}
+</div>
+</div>
+))
+) : (
+<div className="text-center py-20">
+<Package className={`w-16 h-16 mx-auto mb-3 opacity-30 ${mutedText}`} />
+<p className={`text-lg ${mutedText}`}>No hay productos disponibles</p>
+<p className={`text-sm ${mutedText} mt-2`}>Total en sistema: {(productos || []).length}</p>
+</div>
+)}
+</div>
+)}
             {activeSection === 'streaming' && (
               <div>
                 <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Streaming</h2>
@@ -1477,14 +1552,6 @@ const calcularPrecioBs = (precioUsd) => {
               </div>
             )}
           </div>
-
-          {/* ✅ SIDEBAR DERECHO: SOLO si hay publicidad */}
-          {productos.length > 0 && pubsDerecha.length > 0 && (
-            <aside className="hidden lg:block col-span-1 lg:col-span-2 space-y-4 order-3 lg:order-3">
-              {pubsDerecha.map(renderPubCard)}
-            </aside>
-          )}
-
         </div>
       </main>
 

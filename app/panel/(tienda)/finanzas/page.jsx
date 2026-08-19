@@ -43,6 +43,7 @@ export default function FinanzasPage() {
     ingresosMes: 0,
     comisionesPagadas: 0,
     comisionesPendientes: 0,
+    valorInventario: 0,
   });
 
   // ✅ NUEVO: Detectar móvil para ajustar gráficos
@@ -109,6 +110,9 @@ export default function FinanzasPage() {
       const comisionesPagadas = comisionesData.filter(c => c.estado === 'pagada').reduce((s, c) => s + Number(c.monto_comision || 0), 0);
       const comisionesPendientes = comisionesData.filter(c => c.estado === 'pendiente').reduce((s, c) => s + Number(c.monto_comision || 0), 0);
 
+      // ✅ Valor Inventario (trasladado desde Dashboard general)
+      const valorInventario = productosData.reduce((acc, p) => acc + ((Number(p.precioMayor || 0)) * (Number(p.cantidad || 0))), 0);
+
       setStats({
         inversionTotal: inversion,
         valorVentaTotal: valorVenta,
@@ -121,6 +125,7 @@ export default function FinanzasPage() {
         ingresosMes,
         comisionesPagadas,
         comisionesPendientes,
+        valorInventario,
       });
     };
 
@@ -163,6 +168,20 @@ export default function FinanzasPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-white">Dashboard Finanzas</h1>
           <p className="text-xs sm:text-sm text-voltech-muted mt-1">Análisis de inversión, márgenes y ganancias</p>
+        </div>
+      </div>
+
+      {/* ✅ TARJETA DESTACADA: Valor Inventario (trasladada desde Dashboard general) */}
+      <div className="bg-gradient-to-r from-voltech-cyan/10 via-voltech-surface to-voltech-purple/10 border border-voltech-cyan/30 rounded-2xl p-4 md:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs md:text-sm font-medium text-voltech-muted leading-tight">💰 Valor Total del Inventario</p>
+            <p className="text-2xl md:text-3xl font-bold text-white mt-1 truncate">${Number(stats.valorInventario).toFixed(2)}</p>
+            <p className="text-[10px] md:text-xs text-voltech-muted mt-1">Suma de (precio mayor × stock) de todos los productos</p>
+          </div>
+          <div className="p-3 rounded-xl bg-gradient-to-br from-voltech-cyan to-blue-500 shrink-0 flex items-center justify-center shadow-lg shadow-voltech-cyan/20">
+            <DollarSign className="w-6 h-6 text-white" />
+          </div>
         </div>
       </div>
 

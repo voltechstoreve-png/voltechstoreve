@@ -38,21 +38,25 @@ export default function DashboardVentasPage() {
   const [visitasTotales, setVisitasTotales] = useState(0);
   const [loading, setLoading] = useState(true);
   const [referidosResumen, setReferidosResumen] = useState({ total: 0, top: null });  
+  const [productosPublicados, setProductosPublicados] = useState(0);
+  const [productosAgotados, setProductosAgotados] = useState(0);
+  const [miembrosActivos, setMiembrosActivos] = useState(0);
 
   useEffect(() => {
     const cargarDatos = async () => {
       setLoading(true);
-      let ventas = [], ventasStreaming = [], clientes = [], usuarios = [], coms = [];
+      let ventas = [], ventasStreaming = [], clientes = [], usuarios = [], coms = [], prods = [];
 
       try {
         if (supabase) {
           console.log('🔄 Cargando desde Supabase...');
-          const [{ data: vData, error: vError }, { data: vsData, error: vsError }, { data: cData }, { data: uData }, { data: comData }] = await Promise.all([
+          const [{ data: vData, error: vError }, { data: vsData, error: vsError }, { data: cData }, { data: uData }, { data: comData }, { data: pData }] = await Promise.all([
             supabase.from('ventas').select('*').order('fecharegistro', { ascending: false }),
             supabase.from('ventas_streaming').select('*').order('fecharegistro', { ascending: false }),
             supabase.from('clientes').select('*'),
             supabase.from('usuarios').select('*'),
-            supabase.from('comisiones_pendientes').select('*')
+            supabase.from('comisiones_pendientes').select('*'),
+            supabase.from('productos').select('*')
           ]);
           
           if (vError) console.warn('⚠️ Error Supabase ventas:', vError.message);
@@ -63,6 +67,7 @@ export default function DashboardVentasPage() {
           clientes = cData || [];
           usuarios = uData || [];
           coms = comData || [];
+          prods = pData || [];
           console.log('✅ Datos cargados:', ventas.length, 'productos,', ventasStreaming.length, 'streaming');
         } else {
           ventas = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
@@ -70,6 +75,7 @@ export default function DashboardVentasPage() {
           clientes = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
           usuarios = JSON.parse(localStorage.getItem('voltech_equipo') || '[]');
           coms = JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]');
+          prods = JSON.parse(localStorage.getItem('voltech_productos') || '[]');
         }
 
         // ✅ COMBINAR ventas de productos y streaming
@@ -80,6 +86,10 @@ export default function DashboardVentasPage() {
 
         setComisiones(coms);
         setEquipo(usuarios);
+        // ✅ Métricas trasladadas desde Dashboard general
+        setProductosPublicados(prods.filter(p => p.publicado).length);
+        setProductosAgotados(prods.filter(p => (p.cantidad || 0) === 0).length);
+        setMiembrosActivos(usuarios.filter(m => m.activo !== false).length);
 
         // ✅ Visitas públicas totales (sin contar logueados)
         try {
@@ -227,7 +237,7 @@ export default function DashboardVentasPage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+        <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0 flex-1">
               <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Ventas Hoy</p>
@@ -251,7 +261,7 @@ export default function DashboardVentasPage() {
           </div>
         </div>
 
-        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+        <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0 flex-1">
               <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Total Clientes</p>
@@ -281,7 +291,7 @@ export default function DashboardVentasPage() {
               <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Visitas Totales</p>
               <p className="text-base md:text-xl font-bold text-white mt-0.5 truncate">{visitasTotales}</p>
             </div>
-            <div className="p-2 rou nded-lg bg-voltech-cyan/10 md:bg-voltech-cyan/20 text-voltech-cyan shrink-0 flex items-center justify-center"><Eye className="w-5 h-5" /></div>
+            <div className="p-2 rounded-lg bg-voltech-cyan/10 text-voltech-cyan shrink-0 flex items-center justify-center"><Eye className="w-5 h-5" /></div>
           </div>
         </div>
 
@@ -294,6 +304,44 @@ export default function DashboardVentasPage() {
             </div>
             <div className="p-2 md:p-2 rounded-lg md:rounded-lg bg-voltech-purple/10 md:bg-voltech-purple/20 text-voltech-purple shrink-0 flex items-center justify-center">
               <Users className="w-5 h-5" />
+            </div>
+          </div>
+        </div>
+
+        {/* ✅ NUEVAS TARJETAS: trasladadas desde Dashboard general */}
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Productos Publicados</p>
+              <p className="text-base md:text-xl font-bold text-white mt-0.5 truncate">{productosPublicados}</p>
+            </div>
+            <div className="p-2 rounded-lg bg-voltech-purple/10 md:bg-voltech-purple/20 text-voltech-purple shrink-0 flex items-center justify-center">
+              <Package className="w-5 h-5" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Miembros Equipo</p>
+              <p className="text-base md:text-xl font-bold text-white mt-0.5 truncate">{miembrosActivos}</p>
+            </div>
+            <div className="p-2 rounded-lg bg-green-500/10 md:bg-green-500/20 text-green-400 shrink-0 flex items-center justify-center">
+              <Users className="w-5 h-5" />
+            </div>
+          </div>
+        </div>
+
+        <div className="col-span-2 lg:col-span-2 bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Productos Agotados</p>
+              <p className="text-base md:text-xl font-bold text-white mt-0.5 truncate">{productosAgotados}</p>
+              {productosAgotados > 0 && <p className="text-[10px] text-voltech-error mt-0.5 truncate">⚠️ Requieren reposición</p>}
+            </div>
+            <div className="p-2 rounded-lg bg-voltech-error/10 md:bg-voltech-error/20 text-voltech-error shrink-0 flex items-center justify-center">
+              <Package className="w-5 h-5" />
             </div>
           </div>
         </div>
@@ -398,61 +446,114 @@ export default function DashboardVentasPage() {
         )}
       </div>
 
-      <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
+      <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 md:p-6">
         <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
           <Activity className="w-5 h-5 text-voltech-cyan" /> Últimas Ventas
         </h3>
-        <div className="space-y-3 max-h-96 overflow-y-auto">
+        <div className="max-h-[500px] overflow-y-auto space-y-3">
           {ventasRecientes.length === 0 ? (
             <div className="text-center py-12 text-voltech-muted">
               <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>No hay ventas registradas aún.</p>
             </div>
           ) : (
-            ventasRecientes.map((venta, idx) => (
-              <motion.div 
-                key={venta.id || idx}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                className="flex items-center justify-between p-3 bg-voltech-dark/50 rounded-lg border border-voltech-border hover:border-voltech-cyan/30 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${
-                    venta.tipo === 'streaming' 
-                      ? 'bg-voltech-purple/20 text-voltech-purple' 
-                      : 'bg-voltech-success/20 text-voltech-success'
-                  }`}>
-                    {venta.tipo === 'streaming' ? <MonitorPlay className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">{venta.cliente || 'Cliente General'}</p>
-                    <p className="text-xs text-voltech-muted">
-                      {venta.fecha || (venta.fechaRegistro ? venta.fechaRegistro.split('T')[0] : 'Reciente')} 
-                      {venta.vendedor && <span className="ml-2 text-voltech-cyan">• {venta.vendedor}</span>}
-                    </p>
-                    {venta.productos && Array.isArray(venta.productos) && (
-                      <p className="text-xs text-voltech-muted mt-1">
-                        {venta.productos.map(p => p.nombre || p.producto).join(', ')}
-                      </p>
+            <>
+              {/* 📱 MÓVIL: tarjetas estilo "Detalle de Márgenes" */}
+              <div className="md:hidden space-y-3">
+                {ventasRecientes.map((venta, idx) => (
+                  <div key={venta.id || idx} className="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-slate-100 truncate">{venta.cliente || 'Cliente General'}</h4>
+                        <p className="text-[10px] text-slate-400 truncate">
+                          {venta.fecha || (venta.fechaRegistro ? venta.fechaRegistro.split('T')[0] : 'Reciente')}
+                          {venta.vendedor ? ` • ${venta.vendedor}` : ''}
+                        </p>
+                      </div>
+                      <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        venta.tipo === 'streaming' ? 'bg-voltech-purple/20 text-voltech-purple' : 'bg-emerald-500/20 text-emerald-300'
+                      }`}>
+                        {venta.tipo === 'streaming' ? 'Streaming' : 'Producto'}
+                      </span>
+                    </div>
+
+                    {(venta.productos?.length > 0 || venta.plataformas?.length > 0) && (
+                      <div className="pt-2 border-t border-slate-700/40 space-y-1 text-[11px]">
+                        {venta.tipo === 'streaming' && venta.plataformas?.map((p, i) => (
+                          <div key={i} className="flex items-center justify-between">
+                            <span className="text-slate-400 truncate">{p.plataforma}</span>
+                            <span className="text-slate-200 shrink-0">Streaming</span>
+                          </div>
+                        ))}
+                        {venta.tipo !== 'streaming' && venta.productos?.map((p, i) => (
+                          <div key={i} className="flex items-center justify-between">
+                            <span className="text-slate-400 truncate">{p.nombre || p.producto}{p.cantidad ? ` x${p.cantidad}` : ''}</span>
+                            <span className="text-slate-200 shrink-0">Producto</span>
+                          </div>
+                        ))}
+                      </div>
                     )}
-                    {venta.tipo === 'streaming' && venta.plataformas && (
-                      <p className="text-xs text-voltech-muted mt-1">
-                        {venta.plataformas.map(p => p.plataforma).join(', ')}
-                      </p>
-                    )}
+
+                    <div className="pt-2 border-t border-slate-700/40 flex items-center justify-between text-[11px]">
+                      <span className="text-slate-400">Total:</span>
+                      {puedeVerFinanzas ? (
+                        <span className="font-bold text-emerald-300">${Number(venta.total || 0).toFixed(2)}</span>
+                      ) : (
+                        <span className="font-bold text-slate-200">•••</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="text-right">
-                  {puedeVerFinanzas && (
-                    <p className="text-sm font-bold text-voltech-success">${Number(venta.total || 0).toFixed(2)}</p>
-                  )}
-                  <p className="text-xs text-voltech-muted">
-                    {venta.tipo === 'streaming' ? 'Streaming' : (venta.productos?.length || 1) + ' prod.'}
-                  </p>
-                </div>
-              </motion.div>
-            ))
+                ))}
+              </div>
+
+              {/* 🖥️ DESKTOP: filas actuales */}
+              <div className="hidden md:block space-y-3">
+                {ventasRecientes.map((venta, idx) => (
+                  <motion.div
+                    key={venta.id || idx}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className="flex items-center justify-between p-3 bg-slate-900/40 rounded-lg border border-slate-700/40 hover:border-voltech-cyan/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${
+                        venta.tipo === 'streaming'
+                          ? 'bg-voltech-purple/20 text-voltech-purple'
+                          : 'bg-voltech-success/20 text-voltech-success'
+                      }`}>
+                        {venta.tipo === 'streaming' ? <MonitorPlay className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-white">{venta.cliente || 'Cliente General'}</p>
+                        <p className="text-xs text-voltech-muted">
+                          {venta.fecha || (venta.fechaRegistro ? venta.fechaRegistro.split('T')[0] : 'Reciente')}
+                          {venta.vendedor && <span className="ml-2 text-voltech-cyan">• {venta.vendedor}</span>}
+                        </p>
+                        {venta.productos && Array.isArray(venta.productos) && (
+                          <p className="text-xs text-voltech-muted mt-1 truncate max-w-xs">
+                            {venta.productos.map(p => p.nombre || p.producto).join(', ')}
+                          </p>
+                        )}
+                        {venta.tipo === 'streaming' && venta.plataformas && (
+                          <p className="text-xs text-voltech-muted mt-1 truncate max-w-xs">
+                            {venta.plataformas.map(p => p.plataforma).join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      {puedeVerFinanzas && (
+                        <p className="text-sm font-bold text-voltech-success">${Number(venta.total || 0).toFixed(2)}</p>
+                      )}
+                      <p className="text-xs text-voltech-muted">
+                        {venta.tipo === 'streaming' ? 'Streaming' : (venta.productos?.length || 1) + ' prod.'}
+                      </p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>

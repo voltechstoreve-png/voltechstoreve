@@ -1,5 +1,6 @@
 'use client';
 
+import BannerCard from '@/components/BannerCard';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
@@ -160,15 +161,17 @@ export default function MarketingPage() {
   const [portadaRatio, setPortadaRatio] = useState(1);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef(null);
+  const [modoDosImagenes, setModoDosImagenes] = useState(false);
   
   const [formDataPublicidad, setFormDataPublicidad] = useState({
-    titulo: '', descripcion: '', url_destino: '', url_imagen: '', url_video: '', texto_boton: 'Ver Oferta', lado: 'izquierdo', posicion: 'sidebar',
+    titulo: '', descripcion: '', url_destino: '', url_imagen: '', url_video: '', lado: 'izquierdo', posicion: 'sidebar',
     anunciante: '', costo_por_click: 0.10, telefono_anunciante: '',
     fecha_inicio: '', duracion_dias: 30, fecha_fin: '', hora_inicio: '00:00', hora_fin: '23:59', prioridad: 'normal',
     mostrar_en: { inicio: true, catalogo: true, streaming: false, ofertas: false },
     dispositivos: { desktop: true, movil: true, tablet: true }, rotacion: 5, estado: 'activo',
     ubicacion_web: 'oculta', ubicacion_movil: 'arriba', url_fondo: '',
-    texto_boton: 'VER OFERTA', color_boton: '#22d3ee'
+    texto_boton: 'VER OFERTA', color_boton: '#22d3ee',
+    color_titulo: '#ffffff', color_descripcion: '#ffffff', color_precio: '#34d399'
   });
 
   const [masVendidosConfig, setMasVendidosConfig] = useState({
@@ -272,6 +275,15 @@ export default function MarketingPage() {
       if (!esAdmin && !esSocio && usuarioActual?.nombre) {
         clientesFiltrados = clts.filter(c => c.registradoPor === usuarioActual.nombre);
       }
+
+      // ✅ Limpia duplicados por id (corrige error React "two children with the same key")
+      const idsVistos = new Set();
+      pubs = pubs.filter(p => {
+        if (!p || !p.id || idsVistos.has(p.id)) return false;
+        idsVistos.add(p.id);
+        return true;
+      });
+      localStorage.setItem('voltech_publicidad', JSON.stringify(pubs));
 
       setPlantillas(plts); setCupones(cpons); setPublicidad(pubs);
       setProductos(prods); setClientes(clientesFiltrados); setEtiquetas(etqs);
@@ -399,12 +411,48 @@ export default function MarketingPage() {
 
     // ✅ Detecta si la Portada es ANCHA (banner) o CUADRADA
   const portadaAncha = portadaRatio >= 1.5;
+  // ✅ Switch "2 imágenes" para rellenar espacios en PC
+  // ✅ % de ancho dinámico: cuadrada 50% / banner 70%
+  // ✅ Imágenes que se muestran en PC (1 o 2 según el switch)
+  const imgsPC = (modoDosImagenes ? todasImagenes.slice(0, 2) : [imagenPreview]).filter(Boolean);
+  // ✅ % dinámico de altura vertical para la tarjeta MÓVIL según la proporción de la imagen:
+  // Cuadrada (≈1:1) → 70% imagen / 30% texto · Banner (≥1.5) → 50%/50% · Intermedio → proporcional (ej. 64%/36%)
+  const imagePercent = portadaRatio <= 1.1 ? 70 : portadaRatio >= 1.5 ? 50 : Math.round(70 - ((portadaRatio - 1.1) / 0.4) * 20);
+  const textPercent = 100 - imagePercent;
+  // ✅ PC: % de ANCHO de la imagen — Cuadrada 50% · Banner 70% · Intermedio 51–69% proporcional
+  const imgPct = portadaRatio <= 1.1 ? 50 : portadaRatio >= 1.5 ? 70 : Math.round(50 + ((portadaRatio - 1.1) / 0.4) * 20);
+  const textPct = 100 - imgPct;
+  // ✅ Zona de imagen: mín 50% / máx 70% según la portada. El texto ocupa el resto.
+  const imgPctPC = Math.min(70, Math.max(50, Math.round(50 + (portadaRatio - 1) * 20)));
+  const textPctPC = 100 - imgPctPC;
+  const imgPctMovil = Math.min(70, Math.max(50, Math.round(70 - (portadaRatio - 1) * 20)));
+  const textPctMovil = 100 - imgPctMovil;
   useEffect(() => {
     if (!imagenPreview) { setPortadaRatio(1); return; }
     const img = new Image();
     img.onload = () => setPortadaRatio(img.naturalWidth / (img.naturalHeight || 1));
     img.src = imagenPreview;
   }, [imagenPreview]);
+
+  // ✅ Limpia TODO el formulario al crear una publicidad NUEVA (evita que quede la vieja)
+  const abrirNuevaPublicidad = () => {
+    setPublicidadEditando(null);
+    setFormDataPublicidad({
+      titulo: '', descripcion: '', url_destino: '', url_imagen: '', url_video: '', lado: 'izquierdo', posicion: 'sidebar',
+      anunciante: '', costo_por_click: 0.10, telefono_anunciante: '',
+      fecha_inicio: '', duracion_dias: 30, fecha_fin: '', hora_inicio: '00:00', hora_fin: '23:59', prioridad: 'normal',
+      mostrar_en: { inicio: true, catalogo: true, streaming: false, ofertas: false },
+      dispositivos: { desktop: true, movil: true, tablet: true }, rotacion: 5, estado: 'activo',
+      ubicacion_web: 'oculta', ubicacion_movil: 'arriba', url_fondo: '',
+      texto_boton: 'VER OFERTA', color_boton: '#22d3ee',
+      color_titulo: '#ffffff', color_descripcion: '#ffffff', color_precio: '#34d399'
+    });
+    setImagenPreview('');
+    setImagenesExtra([]);
+    setModoDosImagenes(false);
+    setPortadaRatio(1);
+    setShowPublicidadForm(true);
+  };
 
   const guardarPublicidad = async () => {
     if (!esAdmin) return toast.error('Solo el administrador puede gestionar publicidad');
@@ -413,7 +461,9 @@ export default function MarketingPage() {
     }
     const nuevaPublicidad = { id: publicidadEditando ? publicidadEditando.id : `pub-${Date.now()}`, ...formDataPublicidad, imagenes: [formDataPublicidad.url_imagen, ...imagenesExtra].filter(Boolean), url_fondo: formDataPublicidad.url_fondo || '', fecha_creacion: new Date().toISOString() };
     if (supabase) { const { error } = await supabase.from('publicidad').upsert(nuevaPublicidad, { onConflict: 'id' }); if (error) toast.error('Error: ' + error.message); }
-    const actualizadas = publicidadEditando ? publicidad.map(p => p.id === publicidadEditando.id ? nuevaPublicidad : p) : [...publicidad, nuevaPublicidad];
+    const actualizadas = publicidadEditando
+      ? publicidad.map(p => p.id === publicidadEditando.id ? nuevaPublicidad : p)
+      : [...publicidad.filter(p => p.id !== nuevaPublicidad.id), nuevaPublicidad];  
     setPublicidad(actualizadas); localStorage.setItem('voltech_publicidad', JSON.stringify(actualizadas));
     toast.success('Publicidad guardada'); setShowPublicidadForm(false); setPublicidadEditando(null); setImagenesExtra([]); setImagenPreview('');
   };
@@ -684,8 +734,6 @@ export default function MarketingPage() {
   return (
     <div className="space-y-6">
       <Toaster position="top-right" toastOptions={{ style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' } }} />
-      
-
       {alertasVencimiento.length > 0 && (
         <div className="bg-gradient-to-r from-voltech-warning/20 to-voltech-error/20 border border-voltech-warning/50 rounded-xl p-4 animate-pulse">
           <div className="flex items-center gap-2 mb-2"><AlertCircle className="w-5 h-5 text-voltech-warning" /><h3 className="text-sm font-bold text-white">️ Campañas por Vencer</h3></div>
@@ -1408,7 +1456,7 @@ export default function MarketingPage() {
                 <h2 className="text-xl font-bold text-white">Gestión de Publicidad</h2>
               </div>
               {esAdmin && (
-                <button onClick={() => { setPublicidadEditando(null); setShowPublicidadForm(true); }} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"><Plus className="w-4 h-4" /> Nueva Publicidad</button>
+                <button onClick={abrirNuevaPublicidad} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"><Plus className="w-4 h-4" /> Nueva Publicidad</button>
               )}
             </div>
             {showPublicidadForm && esAdmin && (
@@ -1468,18 +1516,28 @@ export default function MarketingPage() {
                       <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={(e) => { handleImagenesExtra(e.target.files); e.target.value = ''; }} className="hidden" />
                       {todasImagenes.length > 0 && (
                         <div className="flex gap-3 flex-wrap mt-3">
-                          {todasImagenes.map((img, i) => (
-                            <div key={i} className="w-24">
+                          {todasImagenes.map((img, i) => {
+                            const esPortada = formDataPublicidad.url_imagen === img;
+                            const esFondo = formDataPublicidad.url_fondo === img;
+                            return (
+                            <div key={i} className="w-28">
                               <div className="relative">
-                                <img src={img} alt={`Img ${i+1}`} className={`w-24 h-16 object-cover rounded-lg border-2 ${formDataPublicidad.url_imagen === img ? 'border-voltech-cyan' : formDataPublicidad.url_fondo === img ? 'border-voltech-purple' : 'border-voltech-border'}`} />
+                                <img src={img} alt={`Img ${i+1}`} className={`w-28 h-28 object-cover rounded-lg border-2 ${esPortada ? 'border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.6)]' : esFondo ? 'border-fuchsia-500 shadow-[0_0_10px_rgba(217,70,239,0.6)]' : 'border-voltech-border'}`} />
                                 <button type="button" title="Quitar" onClick={() => quitarImagen(img)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] hover:bg-red-600"><X className="w-3 h-3" /></button>
                               </div>
                               <div className="flex gap-1 mt-1.5">
-                                <button type="button" onClick={() => { setImagenPreview(img); setFormDataPublicidad({...formDataPublicidad, url_imagen: img}); }} className={`flex-1 text-[9px] font-bold px-1.5 py-1 rounded-full transition-colors ${formDataPublicidad.url_imagen === img ? 'bg-voltech-cyan text-voltech-dark' : 'bg-voltech-cyan/10 text-voltech-cyan hover:bg-voltech-cyan/30'}`}>Portada</button>
-                                <button type="button" onClick={() => { setBgImageIndex(i); setFormDataPublicidad({...formDataPublicidad, url_fondo: img}); }} className={`flex-1 text-[9px] font-bold px-1.5 py-1 rounded-full transition-colors ${formDataPublicidad.url_fondo === img ? 'bg-voltech-purple text-white' : 'bg-voltech-purple/10 text-voltech-purple hover:bg-voltech-purple/30'}`}>Fondo</button>
+                                <button type="button" onClick={() => {
+                                  if (esPortada) { setImagenPreview(''); setFormDataPublicidad(p => ({...p, url_imagen: ''})); }
+                                  else { setImagenPreview(img); setFormDataPublicidad(p => ({...p, url_imagen: img})); }
+                                }} className={`flex-1 text-[9px] px-1.5 py-1 rounded-full transition-all ${esPortada ? 'bg-cyan-500 text-black font-bold shadow-[0_0_10px_rgba(6,182,212,0.6)] opacity-100' : 'bg-gray-800/80 text-gray-400 opacity-70 hover:opacity-100'}`}>Portada</button>
+                                <button type="button" onClick={() => {
+                                  if (esFondo) { setBgImageIndex(0); setFormDataPublicidad(p => ({...p, url_fondo: ''})); }
+                                  else { setBgImageIndex(i); setFormDataPublicidad(p => ({...p, url_fondo: img})); }
+                                }} className={`flex-1 text-[9px] px-1.5 py-1 rounded-full transition-all ${esFondo ? 'bg-fuchsia-500 text-white font-bold shadow-[0_0_10px_rgba(217,70,239,0.6)] opacity-100' : 'bg-gray-800/80 text-gray-400 opacity-70 hover:opacity-100'}`}>Fondo</button>
                               </div>
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                    </div>
@@ -1526,6 +1584,29 @@ export default function MarketingPage() {
                         </div>
                       </div>
                     </div>
+                    {/* 🎛️ Switch "2 imágenes" + colores de texto */}
+                    <div className="sm:col-span-2 bg-voltech-dark/30 border border-voltech-border rounded-lg p-3 space-y-3">
+                      <label className="flex items-center justify-between gap-2 cursor-pointer">
+                        <span className="text-xs font-medium text-voltech-muted">🖼️ Modo 2 Imágenes (rellena espacios en PC)</span>
+                        <button type="button" onClick={() => setModoDosImagenes(!modoDosImagenes)} className={`relative w-10 h-5 rounded-full transition-colors ${modoDosImagenes ? 'bg-voltech-cyan' : 'bg-slate-700'}`}>
+                          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${modoDosImagenes ? 'left-5' : 'left-0.5'}`} />
+                        </button>
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-[10px] text-voltech-muted mb-1">Color Título</label>
+                          <input type="color" value={formDataPublicidad.color_titulo || '#ffffff'} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, color_titulo: e.target.value})} className="w-full h-8 rounded-lg border border-voltech-border cursor-pointer bg-transparent" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-voltech-muted mb-1">Color Descripción</label>
+                          <input type="color" value={formDataPublicidad.color_descripcion || '#ffffff'} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, color_descripcion: e.target.value})} className="w-full h-8 rounded-lg border border-voltech-border cursor-pointer bg-transparent" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-voltech-muted mb-1">Color Precio</label>
+                          <input type="color" value={formDataPublicidad.color_precio || '#34d399'} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, color_precio: e.target.value})} className="w-full h-8 rounded-lg border border-voltech-border cursor-pointer bg-transparent" />
+                        </div>
+                      </div>
+                    </div>
                     <div>
                       <label className="block text-sm font-medium text-voltech-muted mb-2">🖥️ Ubicación en WEB</label>
                       <select value={formDataPublicidad.ubicacion_web || 'oculta'} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, ubicacion_web: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
@@ -1563,53 +1644,59 @@ export default function MarketingPage() {
                   </div>
 
                   {/* 👁️ VISTA PREVIA EN VIVO DEL BANNER */}
-                  <div className="mt-6 space-y-3">
+                  <div className="mt-6 space-y-3 lg:col-span-2">
                     <h4 className="text-sm font-bold text-white flex items-center gap-2"><Eye className="w-4 h-4 text-voltech-cyan" /> Vista Previa en Vivo</h4>
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                      {/* 🖥️ PC */}
-                      <div className="lg:col-span-2">
-                        <p className="text-xs text-voltech-muted mb-1">🖥️ Así se verá en PC {portadaAncha ? <span className="text-voltech-cyan ml-1">• Portada ancha (70/30)</span> : <span className="text-voltech-cyan ml-1">• Portada cuadrada (50/50)</span>}</p>
-                        <div className="relative w-full flex flex-col sm:flex-row sm:h-[280px] overflow-hidden rounded-2xl border border-voltech-border bg-voltech-dark">
-                          <div className={`w-full h-40 sm:h-full ${portadaAncha ? 'sm:w-[70%]' : 'sm:w-1/2'} relative flex-shrink-0`}>
-                            {imagenPreview ? (
-                              <img src={imagenPreview} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-voltech-muted"><ImageIcon className="w-10 h-10 opacity-40" /></div>
-                            )}
-                          </div>
-                          <div className={`w-full sm:h-full ${portadaAncha ? 'sm:w-[30%]' : 'sm:w-1/2'} relative`}>
-                            {formDataPublicidad.url_fondo && (
-                              <img src={formDataPublicidad.url_fondo} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                            )}
+                    <div className="flex flex-col lg:flex-row items-start gap-6 w-full">
+                      {/* 🖥️ PC: imagen al ALTO, ancho auto (máx 70%) */}
+                      <div className="w-full lg:flex-1 lg:max-w-[800px]">
+                        <p className="text-xs text-voltech-muted mb-1">🖥️ Así se verá en PC <span className="text-voltech-cyan ml-1">• Imagen al alto · ancho auto (máx 70%)</span></p>
+                        <div className="relative w-full h-[260px] overflow-hidden rounded-2xl border border-voltech-border bg-black shadow-2xl flex">
+                          {modoDosImagenes && imgsPC.length >= 2 ? (
+                            <div className="h-full w-[70%] shrink-0 bg-black grid grid-cols-2 gap-1 overflow-hidden">
+                              {imgsPC.slice(0, 2).map((src, i) => (
+                                <img key={i} src={src} alt="" className="w-full h-full object-contain" />
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="h-full max-w-[70%] bg-black flex items-center justify-center" style={{ aspectRatio: `${portadaRatio || 1}` }}>
+                              {imagenPreview ? (
+                                <img src={imagenPreview} alt="" className="w-full h-full object-contain" />
+                              ) : (
+                                <ImageIcon className="w-12 h-12 opacity-40 text-voltech-muted" />
+                              )}
+                            </div>
+                          )}
+                          <div className="relative h-full flex-1 bg-black">
+                            {formDataPublicidad.url_fondo && <img src={formDataPublicidad.url_fondo} alt="" className="absolute inset-0 w-full h-full object-cover" />}
                             <div className="absolute inset-0 bg-black/60"></div>
                             <div className="relative z-10 h-full w-full flex flex-col items-center justify-center text-center gap-2 p-4">
-                              <h3 className="text-base lg:text-lg font-extrabold text-white drop-shadow leading-tight">{formDataPublicidad.titulo || 'Título del anuncio'}</h3>
-                              {formDataPublicidad.descripcion && <p className="text-xs lg:text-sm text-white/90 drop-shadow line-clamp-2">{formDataPublicidad.descripcion}</p>}
-                              <span className="inline-block px-4 py-1.5 font-bold text-xs uppercase tracking-wider rounded-xl w-fit mt-1 shadow-lg" style={{ backgroundColor: formDataPublicidad.color_boton || '#22d3ee', color: '#0a0a0a' }}>{formDataPublicidad.texto_boton || 'VER OFERTA'}</span>
+                              <h2 className="text-lg lg:text-xl font-extrabold text-white drop-shadow leading-tight line-clamp-2" style={{ color: formDataPublicidad.color_titulo || '#fff' }}>{formDataPublicidad.titulo || 'Título del anuncio'}</h2>
+                              {formDataPublicidad.descripcion && <p className="text-xs drop-shadow line-clamp-2" style={{ color: formDataPublicidad.color_descripcion || '#fff' }}>{formDataPublicidad.descripcion}</p>}
+                              {formDataPublicidad.precio_manual && <p className="text-emerald-400 font-black text-lg drop-shadow" style={{ color: formDataPublicidad.color_precio || '#34d399' }}>{formDataPublicidad.precio_manual}</p>}
+                              <span className="px-5 py-2 rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg" style={{ backgroundColor: formDataPublicidad.color_boton || '#22d3ee', color: '#0a0a0a' }}>{formDataPublicidad.texto_boton || 'VER OFERTA'}</span>
                             </div>
                           </div>
                         </div>
                       </div>
-                      {/* 📱 Móvil */}
-                      <div>
-                        <p className="text-xs text-voltech-muted mb-1">📱 Así se verá en Móvil</p>
-                        <div className="max-w-[240px] mx-auto rounded-2xl overflow-hidden border border-voltech-border bg-voltech-dark flex flex-col">
-                          <div className="w-full h-40 relative flex-shrink-0">
+                      {/* 📱 Móvil: imagen al ANCHO, alto auto (máx 70%) */}
+                      <div className="w-[220px] flex-shrink-0">
+                        <p className="text-xs text-voltech-muted mb-1">📱 Así se verá en Móvil <span className="text-voltech-cyan ml-1">• Imagen al ancho · alto auto (máx 70%)</span></p>
+                        <div className="w-full h-[420px] overflow-hidden rounded-2xl border border-voltech-border bg-black flex flex-col">
+                          <div className="w-full max-h-[70%] bg-black flex items-center justify-center" style={{ aspectRatio: `${portadaRatio || 1}` }}>
                             {imagenPreview ? (
-                              <img src={imagenPreview} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                              <img src={imagenPreview} alt="" className="w-full h-full object-contain" />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center text-voltech-muted"><ImageIcon className="w-8 h-8 opacity-40" /></div>
+                              <ImageIcon className="w-10 h-10 opacity-40 text-voltech-muted" />
                             )}
                           </div>
-                          <div className="relative flex-1 min-h-[180px]">
-                            {formDataPublicidad.url_fondo && (
-                              <img src={formDataPublicidad.url_fondo} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                            )}
+                          <div className="relative flex-1 bg-black">
+                            {formDataPublicidad.url_fondo && <img src={formDataPublicidad.url_fondo} alt="" className="absolute inset-0 w-full h-full object-cover" />}
                             <div className="absolute inset-0 bg-black/60"></div>
-                            <div className="relative z-10 h-full w-full flex flex-col items-center justify-center text-center gap-1.5 p-4">
-                              <p className="text-sm font-bold text-white drop-shadow leading-tight w-full">{formDataPublicidad.titulo || 'Título'}</p>
-                              {formDataPublicidad.descripcion && <p className="text-[10px] text-white/90 drop-shadow line-clamp-2">{formDataPublicidad.descripcion}</p>}
-                              <span className="block w-full text-center text-[10px] font-bold py-1.5 rounded mt-1 shadow-lg" style={{ backgroundColor: formDataPublicidad.color_boton || '#22d3ee', color: '#0a0a0a' }}>{formDataPublicidad.texto_boton || 'VER OFERTA'}</span>
+                            <div className="relative z-10 h-full w-full flex flex-col items-center justify-center text-center gap-1.5 p-3">
+                              <p className="text-sm font-bold text-white drop-shadow leading-tight" style={{ color: formDataPublicidad.color_titulo || '#fff' }}>{formDataPublicidad.titulo || 'Título'}</p>
+                              {formDataPublicidad.descripcion && <p className="text-[10px] drop-shadow line-clamp-2" style={{ color: formDataPublicidad.color_descripcion || '#fff' }}>{formDataPublicidad.descripcion}</p>}
+                              {formDataPublicidad.precio_manual && <p className="text-[11px] font-black" style={{ color: formDataPublicidad.color_precio || '#34d399' }}>{formDataPublicidad.precio_manual}</p>}
+                              <span className="px-4 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg" style={{ backgroundColor: formDataPublicidad.color_boton || '#22d3ee', color: '#0a0a0a' }}>{formDataPublicidad.texto_boton || 'VER OFERTA'}</span>
                             </div>
                           </div>
                         </div>
@@ -1619,10 +1706,8 @@ export default function MarketingPage() {
                 </div>
               </div>
             )}
-            <div className="bg-voltech-surface border border-voltech-border rounded-xl">
               <div className="p-6 border-b border-voltech-border">
                 <h3 className="text-lg font-bold text-white">Publicidades Creadas</h3>
-              </div>
               <div className="divide-y divide-voltech-border">
                 {publicidad.length === 0 ? (
                   <div className="p-12 text-center">
