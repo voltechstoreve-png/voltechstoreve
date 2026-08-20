@@ -176,11 +176,14 @@ useEffect(() => {
         }
       }
       
-      if (pubs.length === 0) {
+        // ✅ Combina Supabase + localStorage (por si alguna publicidad no se sincronizó a la BD)
         const localPubs = localStorage.getItem('voltech_publicidad');
-        if (localPubs) pubs = JSON.parse(localPubs).filter(p => p.estado === 'activo');
-      }
-      if (vts.length === 0) {
+        if (localPubs) {
+        const arr = JSON.parse(localPubs).filter(p => p.estado === 'activo');
+        const porId = new Map(pubs.map(p => [p.id, p]));
+        arr.forEach(p => porId.set(p.id, p)); // la versión local (más reciente) gana
+        pubs = Array.from(porId.values());
+        }      if (vts.length === 0) {
         const localVts = localStorage.getItem('voltech_ventas');
         if (localVts) vts = JSON.parse(localVts);
       }
@@ -979,16 +982,16 @@ title="Ir al Panel de Ventas"
           className="shrink-0 w-full snap-start rounded-2xl overflow-hidden bg-black border border-slate-800/80 flex flex-row items-center h-44 shadow-2xl"
         >
           {/* 1. LADO IZQUIERDO: Multimedia (Sin padding blanco, encaje directo) */}
-          <div className={`${pctMedia} h-full relative flex items-center justify-center bg-black overflow-hidden shrink-0`}>
-            {pub.tipo_disposicion === '35_35_30' ? (
-              <div className="flex w-full h-full items-center justify-center gap-1 p-2">
-                <div className="w-1/2 h-full flex items-center justify-center overflow-hidden">
-                  {pub.url_imagen && <img src={pub.url_imagen} alt="" className="max-h-full max-w-full object-contain" />}
-                </div>
-                <div className="w-1/2 h-full flex items-center justify-center overflow-hidden">
-                  {pub.url_imagen_2 && <img src={pub.url_imagen_2} alt="" className="max-h-full max-w-full object-contain" />}
-                </div>
-              </div>
+          <div className="h-full max-w-[70%] relative flex items-center justify-center bg-black overflow-hidden shrink-0" style={{ aspectRatio: `${ratios[pub.id] || 1}` }}>
+            {(pub.tipo_disposicion === '35_35_30' || (pub.imagenes && pub.imagenes.length >= 2)) ? (
+            <div className="w-full h-full flex overflow-x-auto overflow-y-hidden no-scrollbar snap-x snap-mandatory">
+            <div className="w-full h-full shrink-0 snap-center flex items-center justify-center bg-black">
+            <img src={(pub.imagenes && pub.imagenes[0]) || pub.url_imagen} alt="" className="max-h-full max-w-full object-contain" />
+            </div>
+            <div className="w-full h-full shrink-0 snap-center flex items-center justify-center bg-black">
+            <img src={(pub.imagenes && pub.imagenes[1]) || pub.url_imagen_2} alt="" className="max-h-full max-w-full object-contain" />
+            </div>
+            </div>
             ) : pub.url_video ? (
               <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
             ) : pub.url_imagen ? (
@@ -999,7 +1002,7 @@ title="Ir al Panel de Ventas"
           </div>
 
           {/* 2. LADO DERECHO: Fondo Negro Puro + Texto + Botón */}
-          <div className={`relative ${pctTexto} h-full p-3 flex flex-col justify-center items-center text-center gap-1 bg-black overflow-hidden shrink-0`}>
+          <div className="relative flex-1 h-full p-3 flex flex-col justify-center items-center text-center gap-1 bg-black overflow-hidden shrink-0">
             {pub.url_fondo && (
               <img src={pub.url_fondo} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 pointer-events-none" />
             )}

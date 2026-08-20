@@ -249,53 +249,49 @@ export default function MarketingPage() {
   }, [cupones]);
 
   useEffect(() => {
-    const cargarDatos = async () => {
-      let plts = [], cpons = [], pubs = [], prods = [], clts = [], etqs = [], mvConfig = {};
-      if (supabase) {
-        const [{ data: pData }, { data: cData }, { data: puData }, { data: prData }, { data: clData }, { data: etData }, { data: mvData }, { data: eqData }] = await Promise.all([
-          supabase.from('plantillas').select('*'), supabase.from('cupones').select('*'),
-          supabase.from('publicidad').select('*'), supabase.from('productos').select('*'),
-          supabase.from('clientes').select('*'), supabase.from('settings').select('valor').eq('clave', 'etiquetas').single(),
-          supabase.from('marketing_config').select('valor').eq('clave', 'mas_vendidos').single(),
-          supabase.from('usuarios').select('*')
-        ]);
-        if (pData) plts = pData; if (cData) cpons = cData; if (puData) pubs = puData;
-        if (prData) prods = prData; if (clData) clts = clData; if (etData?.valor) etqs = etData.valor;
-        if (mvData?.valor) mvConfig = mvData.valor;
-        if (eqData) setEquipo(eqData);
-      }
-      if (plts.length === 0) { const d = localStorage.getItem('voltech_plantillas'); if (d) plts = JSON.parse(d); }
-      if (cpons.length === 0) { const d = localStorage.getItem('voltech_cupones'); if (d) cpons = JSON.parse(d); }
-      if (pubs.length === 0) { const d = localStorage.getItem('voltech_publicidad'); if (d) pubs = JSON.parse(d); }
-      if (prods.length === 0) { const d = localStorage.getItem('voltech_productos'); if (d) prods = JSON.parse(d); }
-      if (clts.length === 0) { const d = localStorage.getItem('voltech_clientes'); if (d) clts = JSON.parse(d); }
-      if (etqs.length === 0) { const d = localStorage.getItem('voltech_etiquetas'); if (d) etqs = JSON.parse(d); }
-      if (Object.keys(mvConfig).length === 0) { const d = localStorage.getItem('voltech_mas_vendidos_config'); if (d) mvConfig = JSON.parse(d); }
-
-      if (Object.keys(mvConfig).length > 0) setMasVendidosConfig(mvConfig);
-
-      // ✅ VENDEDOR solo ve SUS clientes; admin/socio ven todos
-      let clientesFiltrados = clts;
-      if (!esAdmin && !esSocio && usuarioActual?.nombre) {
-        clientesFiltrados = clts.filter(c => c.registradoPor === usuarioActual.nombre);
-      }
-
-      // ✅ Limpia duplicados por id (corrige error React "two children with the same key")
-      const idsVistos = new Set();
-      pubs = pubs.filter(p => {
-        if (!p || !p.id || idsVistos.has(p.id)) return false;
-        idsVistos.add(p.id);
-        return true;
-      });
-      localStorage.setItem('voltech_publicidad', JSON.stringify(pubs));
-
-      setPlantillas(plts); setCupones(cpons); setPublicidad(pubs);
-      setProductos(prods); setClientes(clientesFiltrados); setEtiquetas(etqs);
-      // ❌ ELIMINADO: construcción de campanasCalendario
-    };
-    cargarDatos();
-  }, [esAdmin, esSocio, usuarioActual]);
-
+const cargarDatos = async () => {
+let plts = [], cpons = [], pubs = [], prods = [], clts = [], etqs = [], mvConfig = {};
+if (supabase) {
+const safe = (q) => q.then(r => r.data).catch(() => null);
+const [pData, cData, puData, prData, clData, etData, mvData, eqData] = await Promise.all([
+safe(supabase.from('plantillas').select('*')),
+safe(supabase.from('cupones').select('*')),
+safe(supabase.from('publicidad').select('*')),
+safe(supabase.from('productos').select('*')),
+safe(supabase.from('clientes').select('*')),
+safe(supabase.from('settings').select('valor').eq('clave', 'etiquetas').single()),
+safe(supabase.from('marketing_config').select('valor').eq('clave', 'mas_vendidos').single()),
+safe(supabase.from('usuarios').select('*')),
+]);
+if (pData) plts = pData; if (cData) cpons = cData; if (puData) pubs = puData;
+if (prData) prods = prData; if (clData) clts = clData; if (etData?.valor) etqs = etData.valor;
+if (mvData?.valor) mvConfig = mvData.valor;
+if (eqData) setEquipo(eqData);
+}
+if (plts.length === 0) { const d = localStorage.getItem('voltech_plantillas'); if (d) plts = JSON.parse(d); }
+if (cpons.length === 0) { const d = localStorage.getItem('voltech_cupones'); if (d) cpons = JSON.parse(d); }
+if (pubs.length === 0) { const d = localStorage.getItem('voltech_publicidad'); if (d) pubs = JSON.parse(d); }
+if (prods.length === 0) { const d = localStorage.getItem('voltech_productos'); if (d) prods = JSON.parse(d); }
+if (clts.length === 0) { const d = localStorage.getItem('voltech_clientes'); if (d) clts = JSON.parse(d); }
+if (etqs.length === 0) { const d = localStorage.getItem('voltech_etiquetas'); if (d) etqs = JSON.parse(d); }
+if (Object.keys(mvConfig).length === 0) { const d = localStorage.getItem('voltech_mas_vendidos_config'); if (d) mvConfig = JSON.parse(d); }
+if (Object.keys(mvConfig).length > 0) setMasVendidosConfig(mvConfig);
+let clientesFiltrados = clts;
+if (!esAdmin && !esSocio && usuarioActual?.nombre) {
+clientesFiltrados = clts.filter(c => c.registradoPor === usuarioActual.nombre);
+}
+const idsVistos = new Set();
+pubs = pubs.filter(p => {
+if (!p || !p.id || idsVistos.has(p.id)) return false;
+idsVistos.add(p.id);
+return true;
+});
+localStorage.setItem('voltech_publicidad', JSON.stringify(pubs));
+setPlantillas(plts); setCupones(cpons); setPublicidad(pubs);
+setProductos(prods); setClientes(clientesFiltrados); setEtiquetas(etqs);
+};
+cargarDatos();
+}, [esAdmin, esSocio, usuarioActual]);
   useEffect(() => {
     if (!productoSeleccionado || clientesSeleccionados.length === 0) {
       setMensajePersonalizadoWa('');
@@ -1738,16 +1734,16 @@ export default function MarketingPage() {
                         <p className="text-xs text-voltech-muted mb-1">📱 Así se verá en Móvil <span className="text-voltech-cyan ml-1">• Horizontal imagen izq + texto der</span></p>
                         <div className="w-full rounded-2xl overflow-hidden bg-black border border-slate-800/80 flex flex-row items-center h-44 shadow-2xl">
                           {/* 1. LADO IZQUIERDO: Multimedia */}
-                          <div className="w-[55%] h-full relative flex items-center justify-center bg-black overflow-hidden shrink-0">
+                          <div className="h-full max-w-[70%] relative flex items-center justify-center bg-black overflow-hidden shrink-0" style={{ aspectRatio: `${portadaRatio || 1}` }}>
                             {modoDosImagenes && imgsPC.length >= 2 ? (
-                              <div className="flex w-full h-full items-center justify-center gap-1 p-2">
-                                <div className="w-1/2 h-full flex items-center justify-center overflow-hidden">
-                                  <img src={imgsPC[0]} alt="" className="max-h-full max-w-full object-contain" />
-                                </div>
-                                <div className="w-1/2 h-full flex items-center justify-center overflow-hidden">
-                                  <img src={imgsPC[1]} alt="" className="max-h-full max-w-full object-contain" />
-                                </div>
-                              </div>
+                            <div className="w-full h-full flex overflow-x-auto overflow-y-hidden no-scrollbar snap-x snap-mandatory">
+                            <div className="w-full h-full shrink-0 snap-center flex items-center justify-center bg-black">
+                            <img src={imgsPC[0]} alt="" className="max-h-full max-w-full object-contain" />
+                            </div>
+                            <div className="w-full h-full shrink-0 snap-center flex items-center justify-center bg-black">
+                            <img src={imgsPC[1]} alt="" className="max-h-full max-w-full object-contain" />
+                            </div>
+                            </div>
                             ) : formDataPublicidad.url_video ? (
                               <video src={formDataPublicidad.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
                             ) : imagenPreview ? (
@@ -1757,7 +1753,7 @@ export default function MarketingPage() {
                             )}
                           </div>
                           {/* 2. LADO DERECHO: Fondo Negro + Texto + Botón */}
-                          <div className="relative w-[45%] h-full p-3 flex flex-col justify-center items-center text-center gap-1 bg-black overflow-hidden shrink-0">
+                          <div className="relative flex-1 h-full p-3 flex flex-col justify-center items-center text-center gap-1 bg-black overflow-hidden shrink-0">
                             {formDataPublicidad.url_fondo && (
                               <img src={formDataPublicidad.url_fondo} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 pointer-events-none" />
                             )}
