@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
@@ -484,16 +484,18 @@ export default function ProductosPage() {
   };
 
   const handleEditImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditData({ ...editData, imagen: reader.result });
-        toast.success('Imagen actualizada');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+const file = e.target.files[0];
+if (!file) return;
+if (!file.type.startsWith('image/')) { toast.error('Solo se permiten imágenes'); return; }
+if (file.size > 2 * 1024 * 1024) { toast.error('La imagen no debe pesar más de 2MB'); return; }
+const reader = new FileReader();
+reader.onloadend = () => {
+setEditData(prev => ({ ...prev, imagen: reader.result }));
+toast.success('Imagen actualizada');
+};
+reader.readAsDataURL(file);
+e.target.value = '';
+};
 
   const agregarItem = () => {
     setItems([...items, {
@@ -1731,6 +1733,25 @@ export default function ProductosPage() {
                           <label className="text-xs text-voltech-muted">Descripción</label>
                           <textarea value={editData.descripcion} onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm h-16" />
                         </div>
+                        <div>
+                          <label className="text-xs text-voltech-muted">🖼️ Imagen del Producto</label>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {editData.imagen ? (
+                              <img src={editData.imagen} alt="Preview" className="w-12 h-12 rounded-lg object-cover border border-voltech-border" />
+                            ) : (
+                              <div className="w-12 h-12 rounded-lg bg-voltech-dark border border-voltech-border flex items-center justify-center"><ImageIcon className="w-5 h-5 text-voltech-muted" /></div>
+                            )}
+                            <label className="px-3 py-1.5 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors cursor-pointer flex items-center gap-2">
+                              <Upload className="w-4 h-4" /> Subir
+                              <input type="file" accept="image/*" onChange={handleEditImageUpload} className="hidden" />
+                            </label>
+                            {editData.imagen && (
+                              <button type="button" onClick={() => setEditData({ ...editData, imagen: '' })} className="px-3 py-1.5 bg-voltech-error/20 text-voltech-error rounded-lg text-xs hover:bg-voltech-error/30 transition-colors flex items-center gap-1">
+                                <Trash2 className="w-3 h-3" /> Quitar
+                              </button>
+                            )}
+                          </div>
+                        </div>
                         <div className="flex gap-2 pt-2">
                           <button onClick={() => guardarEdicion(producto.id)} className="flex-1 bg-voltech-cyan text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-1"><Save className="w-4 h-4" /> Guardar</button>
                           <button onClick={cancelarEdicion} className="flex-1 bg-voltech-surface border border-voltech-border text-voltech-muted py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-1 hover:text-white"><X className="w-4 h-4" /> Cancelar</button>
@@ -1767,8 +1788,8 @@ export default function ProductosPage() {
                   <tr><td colSpan={tienePermiso('puedeVerInventarioCompleto') ? 12 : 10} className="text-center py-12 text-voltech-muted"><Package className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>No hay productos registrados</p><p className="text-xs mt-1">Haz clic en "Nuevo Producto" para comenzar</p></td></tr>
                 ) : (
                   productosFiltrados.map((producto) => (
-                    <>
-                      <tr key={producto.id} className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
+                    <Fragment key={producto.id}>
+                      <tr className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
                         {tienePermiso('puedeVerInventarioCompleto') && (<td className="px-4 py-3 text-center"><input type="checkbox" checked={selectedProducts.includes(producto.id)} onChange={() => toggleProductSelection(producto.id)} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" /></td>)}
                         <td className="px-4 py-3"><span className="text-xs font-mono whitespace-nowrap text-voltech-cyan">{producto.sku}</span></td>
                         <td className="px-4 py-3">
@@ -1829,6 +1850,25 @@ export default function ProductosPage() {
                                   <label className="block text-xs text-voltech-muted mb-1">Descripción</label>
                                   <textarea value={editData.descripcion} onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })} className="input-voltech w-full rounded px-3 py-2 text-sm h-20" />
                                 </div>
+                                <div className="md:col-span-3">
+                                  <label className="block text-xs text-voltech-muted mb-1">🖼️ Imagen del Producto</label>
+                                  <div className="flex items-center gap-3 flex-wrap">
+                                    {editData.imagen ? (
+                                      <img src={editData.imagen} alt="Preview" className="w-16 h-16 rounded-lg object-cover border border-voltech-border" />
+                                    ) : (
+                                      <div className="w-16 h-16 rounded-lg bg-voltech-dark border border-voltech-border flex items-center justify-center"><ImageIcon className="w-6 h-6 text-voltech-muted" /></div>
+                                    )}
+                                    <label className="px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors cursor-pointer flex items-center gap-2">
+                                      <Upload className="w-4 h-4" /> Subir imagen
+                                      <input type="file" accept="image/*" onChange={handleEditImageUpload} className="hidden" />
+                                    </label>
+                                    {editData.imagen && (
+                                      <button type="button" onClick={() => setEditData({ ...editData, imagen: '' })} className="px-3 py-2 bg-voltech-error/20 text-voltech-error rounded-lg text-xs hover:bg-voltech-error/30 transition-colors flex items-center gap-2">
+                                        <Trash2 className="w-4 h-4" /> Quitar
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                               <div className="flex gap-3 mt-4 pt-3 border-t border-voltech-border">
                                 <button onClick={() => guardarEdicion(producto.id)} className="flex-1 bg-voltech-cyan text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all"><Save className="w-4 h-4" /> Guardar Cambios</button>
@@ -1838,11 +1878,11 @@ export default function ProductosPage() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   ))
                 )}
                 </tbody>
-              </table>
+              </table>  
             </div>
             </div>
       ) : (

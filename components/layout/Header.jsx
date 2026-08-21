@@ -192,10 +192,30 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
           }
         } catch (e) { console.warn('visitas:', e); }
 
+        // ✅ Comisión acumulada = ganada - pagada (sube con ventas, baja con pagos)
+        let comisionesPagadas = 0;
+        try {
+          let comsPag = JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]').filter(c => c.estado === 'pagada');
+          if (supabase) {
+            const { data: comsData } = await supabase.from('comisiones_pendientes').select('*').eq('estado', 'pagada');
+            if (comsData && comsData.length) {
+              const m = new Map(comsPag.map(c => [c.id, c]));
+              comsData.forEach(c => m.set(c.id, c));
+              comsPag = Array.from(m.values());
+            }
+          }
+          comsPag.forEach(c => {
+            const n = normalizarNombre(c.miembro_nombre || '');
+            if (n === nombreNormalizado || n.includes(nombreNormalizado) || nombreNormalizado.includes(n)) {
+              comisionesPagadas += Number(c.monto_comision || 0);
+            }
+          });
+        } catch (e) {}
+
         setSalesStats({
           clics,
           ventas: ventasCount,
-          comisiones: comisionesTotal,
+          comisiones: Math.max(0, comisionesTotal - comisionesPagadas),
           vistasLink
         });
       }
@@ -329,13 +349,13 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
                         </div>
                         <div className="bg-voltech-dark/50 rounded-lg p-2">
                           <p className="text-lg font-bold text-voltech-cyan">${salesStats.comisiones.toFixed(2)}</p>
-                          <p className="text-[10px] text-voltech-muted">Comisiones</p>
+                          <p className="text-[10px] text-voltech-muted">Comisión Acum</p>
                         </div>
                       </div>
 
                       <button 
                         onClick={() => {
-                          router.push('/panel/dashboard-ventas');
+                          router.push('/panel/metas-comisiones');
                           setStatsOpen(false);
                         }}
                         className="w-full py-2 text-xs text-voltech-cyan hover:bg-voltech-cyan/10 rounded-lg transition-colors flex items-center justify-center gap-1"

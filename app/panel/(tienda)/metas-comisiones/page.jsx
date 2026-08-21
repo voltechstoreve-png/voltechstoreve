@@ -1018,7 +1018,13 @@ export default function MetasYComisionesPage() {
                                             <td className="py-2 px-2 text-right text-voltech-purple">{!esPropia ? `${r.porcentaje}%` : '-'}</td>
                                             <td className="py-2 px-2 text-right text-voltech-purple font-bold">{!esPropia ? `$${comRef.toFixed(2)}` : '-'}</td>
                                             <td className="py-2 px-2 text-center">{cupon ? <span className="text-voltech-warning">{cupon}</span> : <span className="text-voltech-muted">-</span>}</td>
-                                            <td className="py-2 px-2 text-center"><span className={`text-[10px] px-2 py-0.5 rounded-full ${esCuotas ? 'bg-voltech-cyan/20 text-voltech-cyan' : 'bg-voltech-muted/20 text-voltech-muted'}`}>{esCuotas ? 'Cuotas' : 'Contado'}</span></td>
+                                            <td className="py-2 px-2 text-center">
+                                              {pagadasSet.has(v.id) ? (
+                                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-voltech-success/20 text-voltech-success font-semibold">✓ Pagado</span>
+                                              ) : (
+                                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-voltech-warning/20 text-voltech-warning font-semibold">⏳ Pendiente</span>
+                                              )}
+                                            </td>
                                             <td className="py-2 px-2 text-center">
                                               {esPropia ? (
                                                 <button onClick={() => pedirPagoVenta(v, r, comVenta)} className="text-[10px] px-2 py-1 bg-voltech-cyan/20 text-voltech-cyan rounded hover:bg-voltech-cyan/30">Pedir pago</button>
