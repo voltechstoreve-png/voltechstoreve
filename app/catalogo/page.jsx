@@ -20,13 +20,10 @@ import WhatsAppIcon from '@/components/WhatsAppIcon';
 
 // ✅ Abre WhatsApp NATIVO en móvil o WhatsApp Web en PC (conserva emojis)
 const abrirWhatsAppNat = (numero, texto) => {
-  const limpio = String(numero || '').replace(/\D/g, '');
-  const cod = encodeURIComponent(texto);
-  const esMovil = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
-  const url = esMovil
-    ? `https://wa.me/${limpio}?text=${cod}`
-    : `https://web.whatsapp.com/send?phone=${limpio}&text=${cod}`;
-  window.open(url, '_blank');
+const limpio = String(numero || '').replace(/\D/g, '');
+const cod = encodeURIComponent(texto);
+// ✅ wa.me abre la APP en móvil y WhatsApp Web en PC (sin página intermedia)
+window.open(`https://wa.me/${limpio}?text=${cod}`, '_blank');
 };
 
 export default function CatalogoPage() {
@@ -144,6 +141,7 @@ useEffect(() => {
       let pubs = [], vts = [], mvConfig = null;
       
       if (supabase) {
+        try {
         const [{ data: pData }, { data: vData }, { data: mvData }, { data: settingsData }] = await Promise.all([
           supabase.from('publicidad').select('*').eq('estado', 'activo'),
           supabase.from('ventas').select('*'),
@@ -166,28 +164,29 @@ useEffect(() => {
         const telefonoSetting = settingsData?.find(s => s.clave === 'telefono_tienda' || s.clave === 'whatsapp_numero');
         const rawNumero = telefonoSetting?.valor || tiendaVal.whatsapp || tiendaVal.telefono || tiendaVal.whatsappUrl || '';
         if (rawNumero) {
-          setWhatsappNumero(normalizarWa(rawNumero));
+        setWhatsappNumero(normalizarWa(rawNumero));
         } else {
-          // ✅ PRIORIDAD 2: tabla equipo (Admin)
-          const { data: equipoData } = await supabase.from('equipo').select('*').eq('rol', 'Admin').limit(1);
-          if (equipoData && equipoData.length > 0 && equipoData[0].telefono) {
-            setWhatsappNumero(normalizarWa(equipoData[0].telefono));
-          }
+        // ✅ PRIORIDAD 2: tabla equipo (Admin)
+        const { data: equipoData } = await supabase.from('equipo').select('*').eq('rol', 'Admin').limit(1);
+        if (equipoData && equipoData.length > 0 && equipoData[0].telefono) {
+        setWhatsappNumero(normalizarWa(equipoData[0].telefono));
         }
-      }
-      
-        // ✅ Combina Supabase + localStorage (por si alguna publicidad no se sincronizó a la BD)
-        const localPubs = localStorage.getItem('voltech_publicidad');
-        if (localPubs) {
-        const arr = JSON.parse(localPubs).filter(p => p.estado === 'activo');
-        const porId = new Map(pubs.map(p => [p.id, p]));
-        arr.forEach(p => porId.set(p.id, p)); // la versión local (más reciente) gana
-        pubs = Array.from(porId.values());
-        }      if (vts.length === 0) {
-        const localVts = localStorage.getItem('voltech_ventas');
-        if (localVts) vts = JSON.parse(localVts);
-      }
-      if (!mvConfig) {
+        }
+        } catch (e) {
+        console.warn('⚠️ Supabase no disponible, usando respaldo local:', e.message);
+        }
+        }
+    // ✅ Combina SIEMPRE con el respaldo local (así aparecen aunque Supabase falle)
+    try {
+      const localPubs = JSON.parse(localStorage.getItem('voltech_publicidad') || '[]').filter(p => p.estado === 'activo');
+      const porId = new Map(pubs.map(p => [p.id, p]));
+      localPubs.forEach(p => porId.set(p.id, p));
+      pubs = Array.from(porId.values());
+    } catch (e) {}
+    if (vts.length === 0) {
+      const localVts = localStorage.getItem('voltech_ventas');
+      if (localVts) vts = JSON.parse(localVts);
+    }      if (!mvConfig) {
         const localMv = localStorage.getItem('voltech_mas_vendidos_config');
         if (localMv) mvConfig = JSON.parse(localMv);
       }
@@ -488,18 +487,36 @@ const calcularPrecioBs = (precioUsd) => {
     toast.success('Pedido enviado');
   };
 
-  const comprarRapido = (producto) => {
-    const precioInfo = getPrecioMostrar(producto);
-    let mensaje = `¡Hola! Quiero comprar: ${producto.plataforma || producto.producto}\n`;
-    if (precioInfo.tieneOferta) {
-      mensaje += `Precio: $${precioInfo.precioPrincipal.toFixed(2)} (OFERTA, antes $${precioInfo.precioTachado.toFixed(2)})\n`;
-    } else {
-      mensaje += `Precio: $${precioInfo.precioPrincipal.toFixed(2)}\n`;
-    }
-    mensaje += `Bs ${calcularPrecioBs(precioInfo.precioPrincipal)}\n\n¿Cómo procedo?`;
-    abrirWhatsAppNat(whatsappNumero, mensaje);
-  };
-
+const comprarRapido = (producto) => {
+const precioInfo = getPrecioMostrar(producto);
+let s = {}; try { s = JSON.parse(localStorage.getItem('voltech_settings') || '{}'); } catch (e) {}
+const wa = s.whatsapp || {};
+const esStreaming = producto.tipo === 'streaming' || (producto.categoria || '').toUpperCase() === 'STREAMING';
+const nombreItem = esStreaming ? (producto.plataforma || producto.producto || 'Plataforma') : (producto.producto || producto.plataforma || 'Producto');
+const urlProd = `${window.location.origin}/catalogo?producto=${producto.id}`;
+const plantillaGuardada = wa.plantilla_compra || '';
+// ✅ Si la plantilla guardada es la vieja ("oferta/descuento"), usa la nueva dinámica
+const plantilla = (plantillaGuardada && !plantillaGuardada.includes('aprovechar la oferta')) ? plantillaGuardada : `¡Hola! Te escribo del catálogo 👋 quiero comprar [TipoCompra]
+[Icono] [Producto]
+💰 [Precio]
+💵 [Bs]
+🔗 [Url]`;
+const cierre = wa.cierre_compra || 'Quiero comprar ✅';
+let mensaje = plantilla
+.split('[TipoCompra]').join(esStreaming ? 'esta plataforma streaming' : 'este producto')
+.split('[Icono]').join(esStreaming ? '🎬' : '📦')
+.split('[Plataforma]').join(nombreItem)
+.split('[Producto]').join(nombreItem)
+.split('[Precio]').join(`$${precioInfo.precioPrincipal.toFixed(2)}`)
+.split('[Bs]').join(`Bs ${calcularPrecioBs(precioInfo.precioPrincipal)}`)
+.split('[Url]').join(urlProd)
+.split('{{producto}}').join(nombreItem)
+.split('{{precio}}').join(`$${precioInfo.precioPrincipal.toFixed(2)}`)
+.split('{{bs}}').join(`Bs ${calcularPrecioBs(precioInfo.precioPrincipal)}`)
+.split('{{url}}').join(urlProd);
+mensaje = mensaje.includes('{{cierre}}') ? mensaje.split('{{cierre}}').join(cierre) : mensaje + '\n' + cierre;
+abrirWhatsAppNat(whatsappNumero, mensaje);
+};
   const categorias = [...new Set((productos || []).filter(p => p.categoria && p.categoria.toUpperCase() !== 'STREAMING').map(p => p.categoria).filter(Boolean))].sort();
   const marcas = [...new Set((productos || []).map(p => p.marca).filter(Boolean))].sort();
   const plataformas = [...new Set((productos || []).filter(p => p.tipo === 'streaming' && p.plataforma).map(p => p.plataforma).filter(Boolean))].sort();
@@ -738,19 +755,30 @@ const calcularPrecioBs = (precioUsd) => {
   };
 
   const registrarClickPub = async (pub) => {
-    try {
-      const nuevosClicks = (pub.clicks || 0) + 1;
-      setPublicidad(prev => prev.map(p => p.id === pub.id ? { ...p, clicks: nuevosClicks } : p));
-      if (supabase) await supabase.from('publicidad').update({ clicks: nuevosClicks }).eq('id', pub.id);
-    } catch (e) { console.error('Error registrando click:', e); }
-  };
+try {
+const nuevosClicks = (pub.clicks || 0) + 1;
+setPublicidad(prev => prev.map(p => p.id === pub.id ? { ...p, clicks: nuevosClicks } : p));
+if (supabase) await supabase.from('publicidad').update({ clicks: nuevosClicks }).eq('id', pub.id);
+} catch (e) { console.error('Error registrando click:', e); }
+};
+// ✅ Si la publi tiene miembros seleccionados, abre WhatsApp a uno AL AZAR con el mensaje guardado
+const manejarClickPub = (e, pub) => {
+registrarClickPub(pub);
+const destinos = pub.whatsapp_destinos || [];
+if (destinos.length > 0) {
+e.preventDefault();
+const al = destinos[Math.floor(Math.random() * destinos.length)];
+const msg = pub.mensaje_whatsapp || `¡Hola! 👋 Vi la publicidad "${pub.titulo}" y quiero más información.`;
+abrirWhatsAppNat(al.telefono, msg);
+}
+};
 
   const renderPubCard = (pub) => (
     <a 
       key={pub.id} 
       href={pub.url_destino || '#'} 
       target={pub.url_destino ? '_blank' : '_self'}
-      onClick={() => registrarClickPub(pub)}
+      onClick={(e) => manejarClickPub(e, pub)}
       className={`block ${cardBg} border ${cardBorder} rounded-xl overflow-hidden hover:border-voltech-cyan/50 transition-all grHoup`}
     >
       <div className="bg-voltech-dark relative overflow-hidden">
@@ -921,7 +949,7 @@ title="Ir al Panel de Ventas"
                     {pub.url_video ? (
                       <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
                     ) : pub.url_imagen ? (
-                      <img src={pub.url_imagen} alt={pub.titulo} className="w-full h-full object-contain" />
+                      <img src={pub.url_imagen} alt={pub.titulo} className="w-full h-full object-cover" />
                     ) : (
                       <ImageIcon className="w-12 h-12 opacity-40 text-voltech-muted" />
                     )}
@@ -932,7 +960,8 @@ title="Ir al Panel de Ventas"
                     <div className="relative z-10 h-full w-full flex flex-col items-center justify-center text-center gap-2 p-4">
                       <h2 className="font-bold text-white text-sm md:text-base drop-shadow leading-tight line-clamp-2">{pub.titulo}</h2>
                       {pub.descripcion && <p className="text-[10px] text-white/90 drop-shadow line-clamp-2">{pub.descripcion}</p>}
-                      {getPrecioPub(pub) && <p className="text-emerald-400 font-black text-base drop-shadow">{getPrecioPub(pub)}</p>}
+                      {pub.precio_original > 0 && <p className="text-gray-400 line-through text-sm drop-shadow">${Number(pub.precio_original).toFixed(2)}</p>}
+                      {getPrecioPub(pub) && <p className="text-emerald-400 font-black text-base drop-shadow">{getPrecioPub(pub)}{pub.descuento_pct > 0 && <span className="ml-2 text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full">−{pub.descuento_pct}%</span>}</p>}
                       <span className="inline-block px-4 py-2 font-bold text-xs uppercase tracking-wider rounded-lg shadow-lg" style={{ backgroundColor: pub.color_boton || '#22d3ee', color: '#0a0a0a' }}>
                         {pub.texto_boton || 'VER OFERTA'}
                       </span>
@@ -1017,9 +1046,17 @@ title="Ir al Panel de Ventas"
               </p>
             )}
             
+            {pub.precio_original > 0 && (
+              <p className="text-gray-400 line-through text-[10px] drop-shadow z-10">${Number(pub.precio_original).toFixed(2)}</p>
+            )}
             {getPrecioPub(pub) && (
-              <p className="text-emerald-400 font-black text-xs drop-shadow z-10">
+              <p className="text-emerald-400 font-black text-xs drop-shadow z-10 flex items-center gap-1 justify-center">
                 {getPrecioPub(pub)}
+                {pub.descuento_pct > 0 && (
+                  <span className="text-[8px] bg-red-500 text-white px-1 py-0.5 rounded-full font-black">
+                    −{pub.descuento_pct}%
+                  </span>
+                )}
               </p>
             )}
             

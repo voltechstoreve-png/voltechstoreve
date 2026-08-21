@@ -1827,7 +1827,7 @@ export default function ProductosPage() {
       )}
 
       {editandoId && tienePermiso('puedeVerInventarioCompleto') && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 w-full max-w-full overflow-x-hidden min-w-0 mx-auto bg-slate-900 md:bg-voltech-surface p-4 md:p-6 rounded-xl shadow-xl border border-slate-800 md:border-voltech-border md:sticky md:bottom-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 w-full max-w-full overflow-x-hidden min-w-0 mx-auto bg-slate-900 md:bg-voltech-surface p-4 md:p-6 rounded-xl shadow-xl border border-slate-800 md:border-voltech-border">
           <h3 className="text-lg font-bold text-white mb-4">Editando Producto</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-3">

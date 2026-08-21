@@ -81,6 +81,11 @@ function BurbujaMessenger({ texto, nombre }) {
   );
 }
 
+const PLANTILLA_COMPRA_DEFAULT = `¡Hola! Quiero comprar: {{producto}}
+Precio: {{precio}}
+Bs {{bs}}
+🔗 Ver producto: {{url}}
+¿Cómo procedo?`;
 export default function MarketingPage() {
   
   // ✅ ROLES: admin gestiona todo, socio gestiona, vendedor solo usa/ve
@@ -163,6 +168,10 @@ export default function MarketingPage() {
   const fileInputRef = useRef(null);
   const [modoDosImagenes, setModoDosImagenes] = useState(false);
   const [equipo, setEquipo] = useState([]);
+  const [plantillaCompra, setPlantillaCompra] = useState(PLANTILLA_COMPRA_DEFAULT);
+  useEffect(() => {
+  if (typeof window !== 'undefined') setPlantillaCompra(localStorage.getItem('voltech_plantilla_compra') || PLANTILLA_COMPRA_DEFAULT);
+  }, []);
   
   const [formDataPublicidad, setFormDataPublicidad] = useState({
     titulo: '', descripcion: '', url_destino: '', url_imagen: '', url_video: '', lado: 'izquierdo', posicion: 'sidebar',
@@ -173,7 +182,7 @@ export default function MarketingPage() {
     ubicacion_web: 'oculta', ubicacion_movil: 'arriba', url_fondo: '',
     texto_boton: 'VER OFERTA', color_boton: '#22d3ee',
     color_titulo: '#ffffff', color_descripcion: '#ffffff', color_precio: '#34d399',
-    whatsapp_destinos: []
+    whatsapp_destinos: [], precio_manual: '', descuento_pct: 0, cierre_whatsapp: 'Quiero comprar ✅'
   });
 
   const [masVendidosConfig, setMasVendidosConfig] = useState({
@@ -253,7 +262,7 @@ const cargarDatos = async () => {
 let plts = [], cpons = [], pubs = [], prods = [], clts = [], etqs = [], mvConfig = {};
 if (supabase) {
 const safe = (q) => q.then(r => r.data).catch(() => null);
-const [pData, cData, puData, prData, clData, etData, mvData, eqData] = await Promise.all([
+const [pData, cData, puData, prData, clData, etData, mvData, eqData, usData] = await Promise.all([
 safe(supabase.from('plantillas').select('*')),
 safe(supabase.from('cupones').select('*')),
 safe(supabase.from('publicidad').select('*')),
@@ -261,13 +270,21 @@ safe(supabase.from('productos').select('*')),
 safe(supabase.from('clientes').select('*')),
 safe(supabase.from('settings').select('valor').eq('clave', 'etiquetas').single()),
 safe(supabase.from('marketing_config').select('valor').eq('clave', 'mas_vendidos').single()),
+safe(supabase.from('equipo').select('*')),
 safe(supabase.from('usuarios').select('*')),
 ]);
 if (pData) plts = pData; if (cData) cpons = cData; if (puData) pubs = puData;
 if (prData) prods = prData; if (clData) clts = clData; if (etData?.valor) etqs = etData.valor;
 if (mvData?.valor) mvConfig = mvData.valor;
-if (eqData) setEquipo(eqData);
+// ✅ Combina el equipo desde 'usuarios' Y 'equipo' (sin duplicados por nombre)
+const porNombre = new Map();
+[...(usData || []), ...(eqData || [])].forEach(m => {
+if (m && m.nombre) {
+const k = String(m.nombre).toLowerCase();
+if (!porNombre.has(k)) porNombre.set(k, m);
 }
+});
+setEquipo(Array.from(porNombre.values()));}
 if (plts.length === 0) { const d = localStorage.getItem('voltech_plantillas'); if (d) plts = JSON.parse(d); }
 if (cpons.length === 0) { const d = localStorage.getItem('voltech_cupones'); if (d) cpons = JSON.parse(d); }
 if (pubs.length === 0) { const d = localStorage.getItem('voltech_publicidad'); if (d) pubs = JSON.parse(d); }
@@ -422,6 +439,28 @@ cargarDatos();
   // ✅ % de ancho dinámico: cuadrada 50% / banner 70%
   // ✅ Imágenes que se muestran en PC (1 o 2 según el switch)
   const imgsPC = (modoDosImagenes ? todasImagenes.slice(0, 2) : [imagenPreview]).filter(Boolean);
+// ✅ Precio base numérico + precio final con descuento
+const precioBaseNum = parseFloat(String(formDataPublicidad.precio_manual || '').replace(/[^0-9.]/g, '')) || 0;
+const descuentoPct = Math.min(100, Math.max(0, Number(formDataPublicidad.descuento_pct) || 0));
+const precioFinalNum = precioBaseNum * (1 - descuentoPct / 100);
+// ✅ Mensaje de WhatsApp que verá el cliente al tocar el botón
+const mensajePublicidadWA = (() => {
+  let m = `¡Hola! Te escribo del catálogo 👋 quiero aprovechar la oferta/descuento.\n\n`;
+  const prod = productos.find(p => `/catalogo?producto=${p.id}` === formDataPublicidad.url_destino);
+  if (prod) {
+    m += `🎬 *${prod.plataforma || prod.producto || 'Producto'}*\n`;
+    if (precioBaseNum > 0) {
+      m += descuentoPct > 0
+        ? `💰 Precio de oferta: *$${precioFinalNum.toFixed(2)}* (antes $${precioBaseNum.toFixed(2)})\n`
+        : `💰 Precio: *$${precioBaseNum.toFixed(2)}*\n`;
+    }
+    m += `🔗 ${typeof window !== 'undefined' ? window.location.origin : ''}/catalogo?producto=${prod.id}\n\n`;
+  } else if (formDataPublicidad.titulo) {
+    m += `📢 *${formDataPublicidad.titulo}*\n\n`;
+  }
+  m += formDataPublicidad.cierre_whatsapp || 'Quiero comprar ✅';
+  return m;
+})();
   // ✅ % dinámico de altura vertical para la tarjeta MÓVIL según la proporción de la imagen:
   // Cuadrada (≈1:1) → 70% imagen / 30% texto · Banner (≥1.5) → 50%/50% · Intermedio → proporcional (ej. 64%/36%)
   const imagePercent = portadaRatio <= 1.1 ? 70 : portadaRatio >= 1.5 ? 50 : Math.round(70 - ((portadaRatio - 1.1) / 0.4) * 20);
@@ -450,10 +489,11 @@ cargarDatos();
       fecha_inicio: '', duracion_dias: 30, fecha_fin: '', hora_inicio: '00:00', hora_fin: '23:59', prioridad: 'normal',
       mostrar_en: { inicio: true, catalogo: true, streaming: false, ofertas: false },
       dispositivos: { desktop: true, movil: true, tablet: true }, rotacion: 5, estado: 'activo',
-      ubicacion_web: 'oculta', ubicacion_movil: 'arriba', url_fondo: '',
+      ubicacion_web: 'arriba', ubicacion_movil: 'arriba', url_fondo: '',
       texto_boton: 'VER OFERTA', color_boton: '#22d3ee',
-      color_titulo: '#ffffff', color_descripcion: '#ffffff', color_precio: '#34d399'
-    });
+      color_titulo: '#ffffff', color_descripcion: '#ffffff', color_precio: '#34d399',
+      precio_manual: '', descuento_pct: 0, cierre_whatsapp: 'Quiero comprar ✅'
+  });
     setImagenPreview('');
     setImagenesExtra([]);
     setModoDosImagenes(false);
@@ -466,8 +506,15 @@ cargarDatos();
     if (!formDataPublicidad.titulo || !formDataPublicidad.url_imagen || !formDataPublicidad.fecha_inicio || !formDataPublicidad.fecha_fin) {
       return toast.error('Título, imagen y fechas son obligatorios');
     }
-    const nuevaPublicidad = { id: publicidadEditando ? publicidadEditando.id : `pub-${Date.now()}`, ...formDataPublicidad, imagenes: [formDataPublicidad.url_imagen, ...imagenesExtra].filter(Boolean), url_fondo: formDataPublicidad.url_fondo || '', fecha_creacion: new Date().toISOString() };
-    if (supabase) { const { error } = await supabase.from('publicidad').upsert(nuevaPublicidad, { onConflict: 'id' }); if (error) toast.error('Error: ' + error.message); }
+    const nuevaPublicidad = { id: publicidadEditando ? publicidadEditando.id : `pub-${Date.now()}`, ...formDataPublicidad, precio_manual: precioBaseNum > 0 ? `$${precioFinalNum.toFixed(2)}` : formDataPublicidad.precio_manual, precio_original: descuentoPct > 0 ? precioBaseNum : null, descuento_pct: descuentoPct, mensaje_whatsapp: mensajePublicidadWA, imagenes: [formDataPublicidad.url_imagen, ...imagenesExtra].filter(Boolean), url_fondo: formDataPublicidad.url_fondo || '', fecha_creacion: new Date().toISOString() };
+    if (supabase) {
+try {
+const { error } = await supabase.from('publicidad').upsert(nuevaPublicidad, { onConflict: 'id' });
+if (error) console.warn('No se sincronizó con Supabase:', error.message);
+} catch (e) {
+console.warn('Supabase no disponible, guardado solo en este navegador:', e.message);
+}
+}
     const actualizadas = publicidadEditando
       ? publicidad.map(p => p.id === publicidadEditando.id ? nuevaPublicidad : p)
       : [...publicidad.filter(p => p.id !== nuevaPublicidad.id), nuevaPublicidad];  
@@ -904,9 +951,8 @@ cargarDatos();
               </div>
             </div>
             )}
-
-            <div className="bg-voltech-surface border border-voltech-border rounded-xl">
-              <div className="p-6 border-b border-voltech-border"><h3 className="text-lg font-bold text-white flex items-center gap-2"><WhatsAppIcon className="w-5 h-5 text-[#25D366]" /> Mensajes Creados</h3></div>
+          <div className="bg-voltech-surface border border-voltech-border rounded-xl">
+          <div className="p-6 border-b border-voltech-border"><h3 className="text-lg font-bold text-white flex items-center gap-2"><WhatsAppIcon className="w-5 h-5 text-[#25D366]" /> Mensajes Creados</h3></div>
               {plantillas.filter(p => p.tipo === 'whatsapp').length === 0 ? (
                 <div className="p-12 text-center"><MessageSquare className="w-16 h-16 text-voltech-muted mx-auto mb-4 opacity-30" /><h3 className="text-lg font-semibold text-white mb-2">No hay mensajes</h3><p className="text-voltech-muted text-sm">Crea tu primer texto para WhatsApp</p></div>
               ) : (
@@ -1516,23 +1562,66 @@ cargarDatos();
                       )}
                     </div>                  
                     <div>
-                        <div className="mb-4">
-                      <label className="block text-sm font-medium text-voltech-muted mb-1">📲 Enviar a WhatsApp de (opcional)</label>
-                      <p className="text-xs text-voltech-muted mb-2">Si eliges miembros, el botón de la publicidad abrirá WhatsApp a uno al azar en vez de ir al producto.</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto">
-                        {equipo.map(m => {
-                          const sel = (formDataPublicidad.whatsapp_destinos || []).some(d => d.telefono === m.telefono);
-                          return (
-                            <label key={m.id} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer ${sel ? 'border-voltech-cyan bg-voltech-cyan/10' : 'border-voltech-border hover:bg-voltech-dark/40'}`}>
-                              <input type="checkbox" checked={sel} onChange={() => toggleDestino(m)} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" />
-                              <div className="min-w-0">
-                                <p className="text-sm text-white truncate">{m.nombre}</p>
-                                <p className="text-xs text-voltech-muted truncate">{m.telefono}</p>
-                              </div>
-                            </label>
-                          );
-                        })}
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                      <div>
+                      <label className="block text-sm font-medium text-voltech-muted mb-1">💰 Precio base ($)</label>
+                      <input type="number" step="0.01" min="0" value={precioBaseNum || ''} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, precio_manual: e.target.value ? `$${Number(e.target.value).toFixed(2)}` : ''})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="0.00" />
                       </div>
+                      <div>
+                      <label className="block text-sm font-medium text-voltech-muted mb-1">🏷️ Descuento (%)</label>
+                      <input type="number" min="0" max="100" value={formDataPublicidad.descuento_pct || 0} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, descuento_pct: parseInt(e.target.value) || 0})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="0" />
+                      </div>
+                      </div>
+                      {precioBaseNum > 0 && (
+                      <div className="mb-4 p-3 rounded-lg bg-voltech-dark/30 border border-voltech-border flex items-center gap-3">
+                      {descuentoPct > 0 ? (<>
+                      <span className="text-gray-400 line-through text-sm">${precioBaseNum.toFixed(2)}</span>
+                      <span className="text-emerald-400 font-black text-lg">${precioFinalNum.toFixed(2)}</span>
+                      <span className="text-[10px] font-bold bg-red-500 text-white px-2 py-0.5 rounded-full">−{descuentoPct}%</span>
+                      </>) : (
+                      <span className="text-emerald-400 font-black text-lg">${precioBaseNum.toFixed(2)}</span>
+                      )}
+                      </div>
+                      )}
+                      </div>
+                      <div>
+                      <div className="mb-4">
+                      <label className="block text-sm font-medium text-voltech-muted mb-1">📲 Enviar a WhatsApp de (opcional)</label>
+                      <p className="text-xs text-voltech-muted mb-2">Si eliges miembros, el botón abrirá WhatsApp a uno al azar.</p>
+                      <div className="border border-voltech-border rounded-lg overflow-hidden">
+                    <div className="grid grid-cols-[46px_1fr_1fr] gap-2 items-center px-3 py-2 bg-voltech-dark/60 border-b border-voltech-border">
+                    <span className="text-[10px] font-bold text-voltech-muted uppercase tracking-wider">Check</span>
+                    <span className="text-[10px] font-bold text-voltech-muted uppercase tracking-wider">Nombre</span>
+                    <span className="text-[10px] font-bold text-voltech-muted uppercase tracking-wider">Teléfono</span>
+                    </div>
+                    <div className="max-h-44 overflow-y-auto">
+                    {equipo.map(m => {
+                    const sel = (formDataPublicidad.whatsapp_destinos || []).some(d => d.telefono === m.telefono);
+                    return (
+                    <label key={m.id} className={`grid grid-cols-[46px_1fr_1fr] gap-2 items-center px-3 py-2.5 cursor-pointer border-b border-voltech-border/60 last:border-b-0 transition-colors ${sel ? 'bg-voltech-cyan/10' : 'hover:bg-voltech-dark/40'}`}>
+                    <input type="checkbox" checked={sel} onChange={() => toggleDestino(m)} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan justify-self-center" />
+                    <span className="text-sm text-white truncate">{m.nombre}</span>
+                    <span className="text-xs text-voltech-muted font-mono truncate">{m.telefono}</span>
+                    </label>
+                    );
+                    })}
+                    {equipo.length === 0 && (
+                    <p className="px-3 py-3 text-xs text-voltech-muted">No hay miembros en el equipo. Regístralos en Sistema → Equipo.</p>
+                    )}
+                    </div>
+                    </div>
+                    </div>
+                    <div className="mb-4">
+                    <label className="block text-sm font-medium text-voltech-muted mb-1">✍️ Cierre del mensaje de WhatsApp</label>
+                    <select value={formDataPublicidad.cierre_whatsapp} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, cierre_whatsapp: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                    <option value="Quiero comprar ✅">Quiero comprar ✅</option>
+                    <option value="Quiero más información 🙋">Quiero más información 🙋</option>
+                    <option value="Quiero aprovechar la oferta 🔥">Quiero aprovechar la oferta 🔥</option>
+                    </select>
+                    </div>
+                    <div className="mb-4">
+                    <label className="block text-sm font-medium text-voltech-muted mb-2">👁️ Vista previa del mensaje de WhatsApp</label>
+                    <BurbujaWA texto={mensajePublicidadWA} nombre="Cliente" />
                     </div>
                     <label className="block text-sm font-medium text-voltech-muted mb-2">🖼️ Imágenes del Banner * <span className="text-[10px]">(agrega todas las que quieras)</span></label>
                       <div onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }} onDrop={(e) => { e.preventDefault(); setIsDragOver(false); handleImagenesExtra(e.dataTransfer.files); }} onClick={() => fileInputRef.current?.click()} className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer ${isDragOver ? 'border-voltech-cyan bg-voltech-cyan/10' : 'border-voltech-border'}`}>
@@ -1550,7 +1639,7 @@ cargarDatos();
                                 <img src={img} alt={`Img ${i+1}`} className={`w-28 h-28 object-cover rounded-lg border-2 ${esPortada ? 'border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.6)]' : esFondo ? 'border-fuchsia-500 shadow-[0_0_10px_rgba(217,70,239,0.6)]' : 'border-voltech-border'}`} />
                                 <button type="button" title="Quitar" onClick={() => quitarImagen(img)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] hover:bg-red-600"><X className="w-3 h-3" /></button>
                               </div>
-<div className="flex gap-1 mt-1.5">
+                            <div className="flex gap-1 mt-1.5">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1722,7 +1811,8 @@ cargarDatos();
                             <div className="relative z-10 h-full w-full flex flex-col items-center justify-center text-center gap-2 p-4">
                               <h2 className="text-lg lg:text-xl font-extrabold text-white drop-shadow leading-tight line-clamp-2" style={{ color: formDataPublicidad.color_titulo || '#fff' }}>{formDataPublicidad.titulo || 'Título del anuncio'}</h2>
                               {formDataPublicidad.descripcion && <p className="text-xs drop-shadow line-clamp-2" style={{ color: formDataPublicidad.color_descripcion || '#fff' }}>{formDataPublicidad.descripcion}</p>}
-                              {formDataPublicidad.precio_manual && <p className="text-emerald-400 font-black text-lg drop-shadow" style={{ color: formDataPublicidad.color_precio || '#34d399' }}>{formDataPublicidad.precio_manual}</p>}
+                              {precioBaseNum > 0 && descuentoPct > 0 && <p className="text-gray-400 line-through text-sm drop-shadow">${precioBaseNum.toFixed(2)}</p>}
+                              {precioBaseNum > 0 && <p className="text-emerald-400 font-black text-lg drop-shadow" style={{ color: formDataPublicidad.color_precio || '#34d399' }}>${precioFinalNum.toFixed(2)}{descuentoPct > 0 && <span className="ml-2 text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full">−{descuentoPct}%</span>}</p>}
                               <span className="px-5 py-2 rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg" style={{ backgroundColor: formDataPublicidad.color_boton || '#22d3ee', color: '#0a0a0a' }}>{formDataPublicidad.texto_boton || 'VER OFERTA'}</span>
                             </div>
                           </div>
@@ -1765,10 +1855,11 @@ cargarDatos();
                                 {formDataPublicidad.descripcion}
                               </p>
                             )}
-                            {formDataPublicidad.precio_manual && (
-                              <p className="font-black text-xs drop-shadow z-10" style={{ color: formDataPublicidad.color_precio || '#34d399' }}>
-                                {formDataPublicidad.precio_manual}
-                              </p>
+                            {precioBaseNum > 0 && descuentoPct > 0 && <p className="text-gray-400 line-through text-[10px] drop-shadow z-10">${precioBaseNum.toFixed(2)}</p>}
+                            {precioBaseNum > 0 && (
+                            <p className="font-black text-xs drop-shadow z-10" style={{ color: formDataPublicidad.color_precio || '#34d399' }}>
+                            ${precioFinalNum.toFixed(2)}
+                            </p>
                             )}
                             <span
                               className="mt-1 px-3 py-1.5 rounded-lg font-black transition-transform active:scale-95 text-[9px] uppercase shadow-md z-10 truncate max-w-full"
