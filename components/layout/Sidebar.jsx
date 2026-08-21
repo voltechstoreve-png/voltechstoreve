@@ -1,42 +1,22 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from '@/app/context/ThemeContext';
 import { usePermissions } from '@/app/context/PermissionsContext';
 import { 
-  LayoutDashboard, 
-  Package, 
-  ShoppingCart, 
-  Users, 
-  TrendingUp, 
-  Megaphone, 
-  Gift, 
-  MessageSquare, 
-  Settings,
-  ChevronLeft,
-  Monitor,
-  Moon,
-  LogOut,
-  PlayCircle,
-  UserCog,
-  BarChart,      
-  Target,        
-  DollarSign,
-  Truck,
-  CreditCard,
-  Bell
+  Package, ShoppingCart, Users, Megaphone, Gift, MessageSquare, 
+  Settings, ChevronLeft, Monitor, Moon, LogOut, PlayCircle, UserCog,
+  BarChart, Target, DollarSign, Truck, CreditCard, Bell
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 
-export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }) {
+export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen, mounted }) {
   const pathname = usePathname();
   const { darkMode, setDarkMode } = useTheme();
-  
   const { usuarioActual, tienePermiso, esAdmin, esSocio } = usePermissions();
 
-  const finalIsOpen = sidebarOpen !== undefined ? sidebarOpen : isOpen;
+  // ✅ Mientras NO esté montado, SIEMPRE usa true (para coincidir con el SSR)
+  const finalIsOpen = !mounted ? true : (sidebarOpen !== undefined ? sidebarOpen : isOpen);
   const finalOnClose = setSidebarOpen ? () => setSidebarOpen(false) : onClose;
 
   const menuItems = [
@@ -107,22 +87,20 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }
         onClick={finalOnClose}
       />
 
-      {/* Mobile sidebar (drawer) */}
-      <motion.aside
-        initial={false}
-        animate={{ x: finalIsOpen ? 0 : -256 }}
-        className="md:hidden fixed inset-y-0 left-0 w-64 bg-voltech-surface border-r border-voltech-border z-50 overflow-hidden"
+      {/* Mobile sidebar (drawer) — sin Framer Motion */}
+      <aside
+        className={`md:hidden fixed inset-y-0 left-0 w-64 bg-voltech-surface border-r border-voltech-border z-50 overflow-hidden transition-transform duration-300 ${
+          finalIsOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
       >
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between p-4 border-b border-voltech-border">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+            <div
               className="text-xl font-extrabold bg-gradient-to-r from-voltech-cyan to-voltech-purple bg-clip-text text-transparent cursor-pointer"
               onClick={() => window.location.href = '/'}
             >
               VOLTECH
-            </motion.div>
+            </div>
             <button
               onClick={finalOnClose}
               className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors"
@@ -134,18 +112,13 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }
           <nav className="flex-1 overflow-y-auto p-4 space-y-6">
             {menuItemsFiltrados.map((section, sectionIndex) => (
               <div key={sectionIndex}>
-                <motion.h3
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-[10px] font-bold text-voltech-muted uppercase tracking-wider mb-2"
-                >
+                <h3 className="text-[10px] font-bold text-voltech-muted uppercase tracking-wider mb-2">
                   {section.section}
-                </motion.h3>
+                </h3>
                 <div className="space-y-1">
                   {section.items.map((item) => {
                     const isActive = pathname === item.path;
                     const Icon = item.icon;
-                    
                     return (
                       <Link
                         key={item.path}
@@ -199,25 +172,23 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }
             </button>
           </div>
         </div>
-      </motion.aside>
+      </aside>
 
-      {/* Desktop sidebar (estático) */}
-      <motion.aside
-        initial={false}
-        animate={{ width: finalIsOpen ? 256 : 0 }}
-        className="hidden md:block h-full bg-voltech-surface border-r border-voltech-border overflow-hidden transition-all duration-300 flex-shrink-0"
+      {/* Desktop sidebar — sin Framer Motion */}
+      <aside
+        className={`hidden md:block h-full bg-voltech-surface border-r border-voltech-border overflow-hidden transition-all duration-300 flex-shrink-0 ${
+          finalIsOpen ? 'w-64' : 'w-0'
+        }`}
       >
         <div className="flex flex-col h-full w-64">
           <div className="flex items-center justify-between p-4 border-b border-voltech-border">
             {finalIsOpen && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+              <div
                 className="text-xl font-extrabold bg-gradient-to-r from-voltech-cyan to-voltech-purple bg-clip-text text-transparent cursor-pointer"
                 onClick={() => window.location.href = '/'}
               >
                 VOLTECH
-              </motion.div>
+              </div>
             )}
             {finalIsOpen && (
               <button
@@ -233,19 +204,14 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }
             {menuItemsFiltrados.map((section, sectionIndex) => (
               <div key={sectionIndex}>
                 {finalIsOpen && (
-                  <motion.h3
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-[10px] font-bold text-voltech-muted uppercase tracking-wider mb-2"
-                  >
+                  <h3 className="text-[10px] font-bold text-voltech-muted uppercase tracking-wider mb-2">
                     {section.section}
-                  </motion.h3>
+                  </h3>
                 )}
                 <div className="space-y-1">
                   {section.items.map((item) => {
                     const isActive = pathname === item.path;
                     const Icon = item.icon;
-                    
                     return (
                       <div key={item.path} className="relative group">
                         <Link
@@ -258,13 +224,7 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }
                         >
                           <Icon className="w-5 h-5 flex-shrink-0" />
                           {finalIsOpen && (
-                            <motion.span
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              className="text-sm font-medium"
-                            >
-                              {item.name}
-                            </motion.span>
+                            <span className="text-sm font-medium">{item.name}</span>
                           )}
                         </Link>
                         
@@ -314,7 +274,7 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen }
             </button>
           </div>
         </div>
-      </motion.aside>
+      </aside>
     </>
   );
 }
