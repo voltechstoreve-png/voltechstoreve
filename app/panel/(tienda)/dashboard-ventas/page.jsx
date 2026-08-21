@@ -51,8 +51,8 @@ export default function DashboardVentasPage() {
         if (supabase) {
           console.log('🔄 Cargando desde Supabase...');
           const [{ data: vData, error: vError }, { data: vsData, error: vsError }, { data: cData }, { data: uData }, { data: comData }, { data: pData }] = await Promise.all([
-            supabase.from('ventas').select('*').order('fecharegistro', { ascending: false }),
-            supabase.from('ventas_streaming').select('*').order('fecharegistro', { ascending: false }),
+            supabase.from('ventas').select('*'),
+            supabase.from('ventas_streaming').select('*'),
             supabase.from('clientes').select('*'),
             supabase.from('usuarios').select('*'),
             supabase.from('comisiones_pendientes').select('*'),
@@ -68,6 +68,8 @@ export default function DashboardVentasPage() {
           usuarios = uData || [];
           coms = comData || [];
           prods = pData || [];
+          console.log('✅ Datos cargados:', ventas.length, 'productos,', ventasStreaming.length, 'streaming');
+          
           // ✅ SYNC: combina con respaldo local (por si Supabase está incompleto)
           try {
             const locV = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
@@ -75,14 +77,19 @@ export default function DashboardVentasPage() {
             const mV = new Map(ventas.map(x => [x.id, x]));
             locV.forEach(x => { if (x && x.id && !mV.has(x.id)) mV.set(x.id, x); });
             ventas = Array.from(mV.values());
+            
             const mVS = new Map(ventasStreaming.map(x => [x.id, x]));
             locVS.forEach(x => { if (x && x.id && !mVS.has(x.id)) mVS.set(x.id, x); });
             ventasStreaming = Array.from(mVS.values());
+            
             const mC = new Map(coms.map(x => [x.id, x]));
-            JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]').forEach(x => { if (x && x.id && !mC.has(x.id)) mC.set(x.id, x); });
+            JSON.parse(localStorage.getItem('voltech_comisiones_pendientes') || '[]').forEach(x => { 
+              if (x && x.id && !mC.has(x.id)) mC.set(x.id, x); 
+            });
             coms = Array.from(mC.values());
-          } catch (e) {}
-          console.log('✅ Datos cargados:', ventas.length, 'productos,', ventasStreaming.length, 'streaming');
+          } catch (e) {
+            console.warn('Error procesando datos locales:', e);
+          }
         } else {
           ventas = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
           ventasStreaming = JSON.parse(localStorage.getItem('voltech_ventas_streaming') || '[]');
