@@ -1700,21 +1700,43 @@ export default function ProductosPage() {
                         </button>
                         {tienePermiso('puedeVerInventarioCompleto') && (
                           <>
-                            {isEditing ? (
-                              <>
-                                <button onClick={() => guardarEdicion(producto.id)} className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg"><CheckCircle size={14} /></button>
-                                <button onClick={cancelarEdicion} className="p-1.5 bg-rose-500/20 text-rose-400 rounded-lg"><X size={14} /></button>
-                              </>
-                            ) : (
-                              <>
-                                <button onClick={() => abrirEdicion(producto)} className="p-1.5 text-slate-400 hover:text-cyan-400"><Edit size={14} /></button>
-                                <button onClick={() => eliminarProducto(producto.id)} className="p-1.5 text-slate-400 hover:text-rose-400"><Trash2 size={14} /></button>
-                              </>
-                            )}
+                            <button onClick={() => abrirEdicion(producto)} className="p-1.5 text-slate-400 hover:text-cyan-400" title="Editar"><Edit size={14} /></button>
+                            <button onClick={() => eliminarProducto(producto.id)} className="p-1.5 text-slate-400 hover:text-rose-400" title="Eliminar"><Trash2 size={14} /></button>
                           </>
                         )}
                       </div>
                     </div>
+
+                    {/* ✅ FORMULARIO INLINE DE EDICIÓN (MÓVIL) */}
+                    {editandoId === producto.id && tienePermiso('puedeVerInventarioCompleto') && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }} 
+                        animate={{ opacity: 1, height: 'auto' }} 
+                        className="bg-voltech-surface border-2 border-voltech-cyan rounded-xl p-4 space-y-3 mt-2"
+                      >
+                        <h4 className="text-sm font-bold text-voltech-cyan flex items-center gap-2">
+                          <Edit className="w-4 h-4" /> Editando: {producto.plataforma}
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs text-voltech-muted">Precio Detal ($)</label>
+                            <input type="number" step="0.01" value={editData.precioDetal} onChange={(e) => setEditData({ ...editData, precioDetal: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                          </div>
+                          <div>
+                            <label className="text-xs text-voltech-muted">Precio Oferta ($)</label>
+                            <input type="number" step="0.01" value={editData.precioOferta} onChange={(e) => setEditData({ ...editData, precioOferta: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs text-voltech-muted">Descripción</label>
+                          <textarea value={editData.descripcion} onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm h-16" />
+                        </div>
+                        <div className="flex gap-2 pt-2">
+                          <button onClick={() => guardarEdicion(producto.id)} className="flex-1 bg-voltech-cyan text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-1"><Save className="w-4 h-4" /> Guardar</button>
+                          <button onClick={cancelarEdicion} className="flex-1 bg-voltech-surface border border-voltech-border text-voltech-muted py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-1 hover:text-white"><X className="w-4 h-4" /> Cancelar</button>
+                        </div>
+                      </motion.div>
+                    )}
                   </div>
                 );
               })
@@ -1745,49 +1767,84 @@ export default function ProductosPage() {
                   <tr><td colSpan={tienePermiso('puedeVerInventarioCompleto') ? 12 : 10} className="text-center py-12 text-voltech-muted"><Package className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>No hay productos registrados</p><p className="text-xs mt-1">Haz clic en "Nuevo Producto" para comenzar</p></td></tr>
                 ) : (
                   productosFiltrados.map((producto) => (
-                    <tr key={producto.id} className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
-                      {tienePermiso('puedeVerInventarioCompleto') && (<td className="px-4 py-3 text-center"><input type="checkbox" checked={selectedProducts.includes(producto.id)} onChange={() => toggleProductSelection(producto.id)} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" /></td>)}
-                      <td className="px-4 py-3"><span className="text-xs font-mono whitespace-nowrap text-voltech-cyan">{producto.sku}</span></td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          {producto.imagen ? (<img src={producto.imagen} alt={producto.plataforma} className="w-10 h-10 rounded-lg object-cover" />) : (<div className="w-10 h-10 rounded-lg bg-voltech-dark flex items-center justify-center"><ImageIcon className="w-5 h-5 text-voltech-muted" /></div>)}
-                          <div><p className="text-sm font-medium text-white">{producto.plataforma}</p>{producto.esCombo && (<p className="text-xs text-voltech-purple">Combo: {producto.plataformasCombo?.join(', ')}</p>)}</div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">{producto.tipo === 'streaming' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-purple/20 text-voltech-purple flex items-center gap-1 w-fit whitespace-nowrap"><MonitorPlay className="w-3 h-3" />Streaming</span>) : producto.tipo === 'kit' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit whitespace-nowrap"><Gift className="w-3 h-3" />Kit</span>) : (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit whitespace-nowrap"><Package className="w-3 h-3" />Físico</span>)}</td>
-                      <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full font-medium ${getEstadoBadge(producto.estado)}`}>{producto.estado ? producto.estado.charAt(0).toUpperCase() + producto.estado.slice(1) : 'Nuevo'}</span></td>
-                      <td className="px-4 py-3 text-sm text-voltech-muted">{producto.categoria}</td>
-                      <td className="px-4 py-3 text-sm text-voltech-muted">{producto.marca || '—'}</td>
-                      <td className="px-4 py-3"><span className={`text-sm font-medium ${producto.cantidad === 0 ? 'text-voltech-error' : producto.cantidad <= 2 ? 'text-voltech-warning' : 'text-voltech-success'}`}>{producto.cantidad}</span></td>
-                      <td className="px-4 py-3">
-                        {producto.precioOferta > 0 && producto.estado === 'oferta' ? (
-                          <div className="flex flex-col"><span className="text-xs text-gray-400 line-through">$${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</span><span className="text-sm font-bold text-voltech-warning">${parseFloat(producto.precioOferta || 0).toFixed(2)}</span></div>
-                        ) : (<span className="text-sm text-white">$${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</span>)}
-                      </td>
-                      <td className="px-4 py-3">{tienePermiso('puedeVerInventarioCompleto') ? (<input type="number" step="0.01" value={producto.porcentaje_comision || 5} onChange={(e) => { const nuevosProductos = productos.map(p => p.id === producto.id ? { ...p, porcentaje_comision: parseFloat(e.target.value) } : p); setProductos(nuevosProductos); localStorage.setItem('voltech_productos', JSON.stringify(nuevosProductos)); }} className="input-voltech w-20 rounded-lg px-2 py-1 text-sm" />) : (<span className="text-sm text-voltech-muted">{producto.porcentaje_comision || 5}%</span>)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <button onClick={() => togglePublicado(producto.id)} className={`p-2 rounded-lg transition-colors ${producto.publicado ? 'bg-voltech-success/20 text-voltech-success hover:bg-voltech-success/30' : 'bg-voltech-dark text-voltech-muted hover:bg-voltech-border'}`} title={producto.publicado ? 'Ocultar de la tienda' : 'Publicar en la tienda'}>{producto.publicado ? <Globe className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
-                      </td>
-                      {tienePermiso('puedeVerInventarioCompleto') && (
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {editandoId === producto.id ? (<>
-                              <button onClick={() => guardarEdicion(producto.id)} className="p-2 rounded-lg bg-voltech-success/20 text-voltech-success hover:bg-voltech-success/30 transition-colors"><CheckCircle className="w-4 h-4" /></button>
-                              <button onClick={cancelarEdicion} className="p-2 rounded-lg bg-voltech-error/20 text-voltech-error hover:bg-voltech-error/30 transition-colors"><X className="w-4 h-4" /></button>
-                            </>) : (<>
-                              <button onClick={() => abrirEdicion(producto)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors" title="Editar"><Edit className="w-4 h-4" /></button>
-                              <button onClick={() => eliminarProducto(producto.id)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
-                            </>)}
+                    <>
+                      <tr key={producto.id} className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
+                        {tienePermiso('puedeVerInventarioCompleto') && (<td className="px-4 py-3 text-center"><input type="checkbox" checked={selectedProducts.includes(producto.id)} onChange={() => toggleProductSelection(producto.id)} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" /></td>)}
+                        <td className="px-4 py-3"><span className="text-xs font-mono whitespace-nowrap text-voltech-cyan">{producto.sku}</span></td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            {producto.imagen ? (<img src={producto.imagen} alt={producto.plataforma} className="w-10 h-10 rounded-lg object-cover" />) : (<div className="w-10 h-10 rounded-lg bg-voltech-dark flex items-center justify-center"><ImageIcon className="w-5 h-5 text-voltech-muted" /></div>)}
+                            <div><p className="text-sm font-medium text-white">{producto.plataforma}</p>{producto.esCombo && (<p className="text-xs text-voltech-purple">Combo: {producto.plataformasCombo?.join(', ')}</p>)}</div>
                           </div>
                         </td>
+                        <td className="px-4 py-3">{producto.tipo === 'streaming' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-purple/20 text-voltech-purple flex items-center gap-1 w-fit whitespace-nowrap"><MonitorPlay className="w-3 h-3" />Streaming</span>) : producto.tipo === 'kit' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit whitespace-nowrap"><Gift className="w-3 h-3" />Kit</span>) : (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit whitespace-nowrap"><Package className="w-3 h-3" />Físico</span>)}</td>
+                        <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full font-medium ${getEstadoBadge(producto.estado)}`}>{producto.estado ? producto.estado.charAt(0).toUpperCase() + producto.estado.slice(1) : 'Nuevo'}</span></td>
+                        <td className="px-4 py-3 text-sm text-voltech-muted">{producto.categoria}</td>
+                        <td className="px-4 py-3 text-sm text-voltech-muted">{producto.marca || '—'}</td>
+                        <td className="px-4 py-3"><span className={`text-sm font-medium ${producto.cantidad === 0 ? 'text-voltech-error' : producto.cantidad <= 2 ? 'text-voltech-warning' : 'text-voltech-success'}`}>{producto.cantidad}</span></td>
+                        <td className="px-4 py-3">
+                          {producto.precioOferta > 0 && producto.estado === 'oferta' ? (
+                            <div className="flex flex-col"><span className="text-xs text-gray-400 line-through">$${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</span><span className="text-sm font-bold text-voltech-warning">${parseFloat(producto.precioOferta || 0).toFixed(2)}</span></div>
+                          ) : (<span className="text-sm text-white">$${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</span>)}
+                        </td>
+                        <td className="px-4 py-3">{tienePermiso('puedeVerInventarioCompleto') ? (<input type="number" step="0.01" value={producto.porcentaje_comision || 5} onChange={(e) => { const nuevosProductos = productos.map(p => p.id === producto.id ? { ...p, porcentaje_comision: parseFloat(e.target.value) } : p); setProductos(nuevosProductos); localStorage.setItem('voltech_productos', JSON.stringify(nuevosProductos)); }} className="input-voltech w-20 rounded-lg px-2 py-1 text-sm" />) : (<span className="text-sm text-voltech-muted">{producto.porcentaje_comision || 5}%</span>)}</td>
+                        <td className="px-4 py-3 text-center">
+                          <button onClick={() => togglePublicado(producto.id)} className={`p-2 rounded-lg transition-colors ${producto.publicado ? 'bg-voltech-success/20 text-voltech-success hover:bg-voltech-success/30' : 'bg-voltech-dark text-voltech-muted hover:bg-voltech-border'}`} title={producto.publicado ? 'Ocultar de la tienda' : 'Publicar en la tienda'}>{producto.publicado ? <Globe className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
+                        </td>
+                        {tienePermiso('puedeVerInventarioCompleto') && (
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button onClick={() => abrirEdicion(producto)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors" title="Editar"><Edit className="w-4 h-4" /></button>
+                              <button onClick={() => eliminarProducto(producto.id)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+
+                      {/* ✅ FORMULARIO INLINE DE EDICIÓN (DESKTOP) */}
+                      {editandoId === producto.id && tienePermiso('puedeVerInventarioCompleto') && (
+                        <tr className="bg-voltech-cyan/5 border-b border-voltech-border">
+                          <td colSpan={tienePermiso('puedeVerInventarioCompleto') ? 12 : 10} className="p-4">
+                            <motion.div 
+                              initial={{ opacity: 0, y: -10 }} 
+                              animate={{ opacity: 1, y: 0 }}
+                              className="bg-voltech-surface border-2 border-voltech-cyan rounded-xl p-4"
+                            >
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-sm font-bold text-voltech-cyan flex items-center gap-2">
+                                  <Edit className="w-4 h-4" /> Editando: {producto.plataforma}
+                                </h4>
+                                <button onClick={cancelarEdicion} className="p-1 hover:bg-voltech-border rounded"><X className="w-4 h-4 text-voltech-muted" /></button>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                  <label className="block text-xs text-voltech-muted mb-1">Precio Detal ($)</label>
+                                  <input type="number" step="0.01" value={editData.precioDetal} onChange={(e) => setEditData({ ...editData, precioDetal: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded px-3 py-2 text-sm" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-voltech-muted mb-1">Precio Oferta ($)</label>
+                                  <input type="number" step="0.01" value={editData.precioOferta} onChange={(e) => setEditData({ ...editData, precioOferta: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded px-3 py-2 text-sm" />
+                                </div>
+                                <div className="md:col-span-3">
+                                  <label className="block text-xs text-voltech-muted mb-1">Descripción</label>
+                                  <textarea value={editData.descripcion} onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })} className="input-voltech w-full rounded px-3 py-2 text-sm h-20" />
+                                </div>
+                              </div>
+                              <div className="flex gap-3 mt-4 pt-3 border-t border-voltech-border">
+                                <button onClick={() => guardarEdicion(producto.id)} className="flex-1 bg-voltech-cyan text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all"><Save className="w-4 h-4" /> Guardar Cambios</button>
+                                <button onClick={cancelarEdicion} className="px-6 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white transition-all flex items-center justify-center gap-2"><X className="w-4 h-4" /> Cancelar</button>
+                              </div>
+                            </motion.div>
+                          </td>
+                        </tr>
                       )}
-                    </tr>
+                    </>
                   ))
                 )}
-              </tbody>
-            </table>
-          </div>
-          </div>
+                </tbody>
+              </table>
+            </div>
+            </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {productosFiltrados.length === 0 ? (
@@ -1824,42 +1881,6 @@ export default function ProductosPage() {
             ))
           )}
         </div>
-      )}
-
-      {editandoId && tienePermiso('puedeVerInventarioCompleto') && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 w-full max-w-full overflow-x-hidden min-w-0 mx-auto bg-slate-900 md:bg-voltech-surface p-4 md:p-6 rounded-xl shadow-xl border border-slate-800 md:border-voltech-border">
-          <h3 className="text-lg font-bold text-white mb-4">Editando Producto</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-3">
-              <label className="block text-xs text-voltech-muted mb-1 ml-1">Imagen/Video</label>
-              <div className="flex items-center gap-4">
-                <label className="flex-1 cursor-pointer">
-                  <div className="border-2 border-dashed border-voltech-border rounded-lg p-4 text-center hover:border-voltech-cyan transition-colors">
-                    {editData.imagen ? (<div className="flex items-center gap-3"><img src={editData.imagen} alt="Preview" className="w-16 h-16 rounded-lg object-cover" /><span className="text-sm text-voltech-muted">Cambiar imagen</span></div>) : (<div className="flex items-center justify-center gap-2 text-voltech-muted"><Upload className="w-5 h-5" /><span className="text-sm">Haz clic para subir imagen/video</span></div>)}
-                  </div>
-                  <input type="file" accept="image/*,video/*" onChange={handleEditImageUpload} className="hidden" />
-                </label>
-                {editData.imagen && (<a href={editData.imagen} target="_blank" rel="noopener noreferrer" className="p-3 bg-voltech-dark border border-voltech-border rounded-lg hover:border-voltech-cyan transition-colors"><Eye className="w-5 h-5 text-voltech-cyan" /></a>)}
-              </div>
-            </div>
-            <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Detal ($)</label><input type="number" step="0.01" value={editData.precioDetal} onChange={(e) => setEditData({ ...editData, precioDetal: parseFloat(e.target.value) })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
-            <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Oferta ($)</label><input type="number" step="0.01" value={editData.precioOferta} onChange={(e) => setEditData({ ...editData, precioOferta: parseFloat(e.target.value) })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
-            <div>
-              <label className="block text-xs text-voltech-muted mb-1 ml-1">Estado</label>
-              <div className="flex gap-2">{['nuevo', 'oferta', 'kit', 'agotado'].map((estado) => (<button key={estado} onClick={() => setEditData({ ...editData, estado })} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${editData.estado === estado ? estado === 'nuevo' ? 'bg-voltech-success text-white' : estado === 'oferta' ? 'bg-voltech-warning text-white' : estado === 'kit' ? 'bg-voltech-cyan text-white' : 'bg-voltech-error text-white' : 'bg-voltech-dark border border-voltech-border text-voltech-muted hover:border-voltech-muted'}`}>{estado.charAt(0).toUpperCase() + estado.slice(1)}</button>))}</div>
-            </div>
-            <div className="lg:col-span-3"><label className="block text-xs text-voltech-muted mb-1 ml-1">Descripción</label><textarea value={editData.descripcion} onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-20 resize-none" placeholder="Descripción corta del producto..." /></div>
-            <div className="lg:col-span-3">
-              <label className="block text-xs text-voltech-muted mb-1 ml-1">Descripción Detallada (para Chatbot)</label>
-              <textarea value={editData.descripcion_detallada || ''} onChange={(e) => setEditData({ ...editData, descripcion_detallada: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-24 resize-none" placeholder="Ej: Batería de 5000mAh, carga rápida 25W, resistencia al agua IP68, incluye cargador y cable USB-C..." />
-              <p className="text-xs text-voltech-muted mt-1">Información técnica detallada para que el chatbot responda preguntas</p>
-            </div>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 mt-4 w-full">
-            <button onClick={() => guardarEdicion(editandoId)} className="flex-1 btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"><Save className="w-5 h-5" />Guardar Cambios</button>
-            <button onClick={cancelarEdicion} className="w-full sm:w-auto px-6 py-3 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-error transition-all flex items-center justify-center gap-2"><X className="w-4 h-4" />Cancelar</button>
-          </div>
-        </motion.div>
       )}
 
       <AnimatePresence>
