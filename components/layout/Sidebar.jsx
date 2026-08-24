@@ -74,7 +74,7 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen, 
 
   const handleLogout = () => {
     localStorage.removeItem('voltech_user');
-    window.location.href = '/login';
+    window.location.href = '/portal';
   };
 
   return (
