@@ -88,6 +88,7 @@ export default function CatalogoPage() {
   
 const [showTermsModal, setShowTermsModal] = useState(false);
 const [terminosAceptados, setTerminosAceptados] = useState(false);
+const [verTerminosCompletos, setVerTerminosCompletos] = useState(false);
 const [showMobileMenu, setShowMobileMenu] = useState(false);
 const [showUserMenu, setShowUserMenu] = useState(false);
 const bannerRef = useRef(null);
@@ -444,9 +445,20 @@ const calcularPrecioBs = (precioUsd) => {
       const gratisDesde = settings.envios?.deliveryGratisDesde || 5;
       return subtotal >= gratisDesde ? 0 : 2;
     }
-    if (deliveryMethod === 'nacional') return settings.envios?.costoEnvioNacional || 3;
-    return 0;
-  };
+if (deliveryMethod === 'nacional') {
+// ✅ NACIONAL: GRATIS si supera el monto mínimo; si no, COBRO A DESTINO (no se suma al total)
+return 0;
+}
+return 0;
+};
+// ✅ Helper: estado del envío nacional
+const envioNacionalInfo = () => {
+const subtotal = cart.reduce((sum, item) => sum + ((getPrecioMostrar(item).precioPrincipal || 0) * item.cantidad), 0);
+const gratisDesde = Number(settings.envios?.montoMinimoEnvioGratis || 50);
+const costo = Number(settings.envios?.costoEnvioNacional || 3);
+if (subtotal >= gratisDesde) return { gratis: true, texto: 'GRATIS' };
+return { gratis: false, costo, texto: `Cobro a destino ($${costo.toFixed(2)})` };
+};
 
   const calculateTotal = () => {
     let subtotal = cart.reduce((sum, item) => sum + (getPrecioMostrar(item).precioPrincipal * item.cantidad), 0);
@@ -482,7 +494,14 @@ const calcularPrecioBs = (precioUsd) => {
     if (autoReferrer) {
       mensaje += `\n Referido por: ${autoReferrer}`;
     }
-    mensaje += `\n Envío: ${envio === 0 ? 'GRATIS' : '$' + envio.toFixed(2)}`;
+    if (deliveryMethod === 'nacional') {
+    const infoNac = envioNacionalInfo();
+    mensaje += `
+    Envío Nacional: ${infoNac.gratis ? 'GRATIS' : infoNac.texto + ' (lo pagas al recibir)'}`;
+    } else {
+    mensaje += `
+    Envío: ${envio === 0 ? 'GRATIS' : '$' + envio.toFixed(2)}`;
+    }
     mensaje += `\n💵 TOTAL: $${total.toFixed(2)} (Bs ${calcularPrecioBs(total)})\n`;
     
     if (!tieneSoloProductosDigitales) {
@@ -1665,7 +1684,7 @@ productosAgrupados.map(([cat, items]) => (
                 <p><strong className="text-white">Retiro en:</strong></p>
                 {puntosEntrega.length > 0 ? puntosEntrega.map((p, i) => <p key={i}>• {p}</p>) : <p>Consultar puntos disponibles</p>}
                 <p className="mt-3"><strong className="text-white">Delivery:</strong> GRATIS desde ${settings.envios?.deliveryGratisDesde || 5}</p>
-                <p><strong className="text-white">Envío Nacional:</strong> ${settings.envios?.costoEnvioNacional || 3}</p>
+                <p><strong className="text-white">Envío Nacional:</strong> {settings.envios?.descripcionEnvioNacional || `cobro a destino · GRATIS desde $${settings.envios?.montoMinimoEnvioGratis || 50}`}</p>
               </div>
             </div>
             <div>
@@ -1969,7 +1988,12 @@ productosAgrupados.map(([cat, items]) => (
                         )}
 
                         {deliveryMethod === 'nacional' && (
-                          <div className="mt-3 space-y-2">
+                            <div className="mt-3 space-y-2">
+                            <div className={`p-2.5 rounded-lg text-[10px] leading-relaxed border ${envioNacionalInfo().gratis ? (darkMode ? 'bg-green-900/20 text-green-300 border-green-800' : 'bg-green-50 text-green-700 border-green-200') : (darkMode ? 'bg-yellow-900/20 text-yellow-300 border-yellow-800' : 'bg-yellow-50 text-yellow-700 border-yellow-200')}`}>
+                            🚚 {envioNacionalInfo().gratis
+                            ? `¡Envío nacional GRATIS por tu compra de $${settings.envios?.montoMinimoEnvioGratis || 50} o más!`
+                            : (settings.envios?.descripcionEnvioNacional || `Envíos menores a $${settings.envios?.montoMinimoEnvioGratis || 50}: cobro a destino`)}
+                            </div>
                             <select value={agenciaEnvio} onChange={(e) => setAgenciaEnvio(e.target.value)} className={`w-full px-3 py-2 border rounded-lg text-sm ${inputBg}`}>
                               <option value="MRW" className="text-slate-900 bg-white">MRW</option>
                               <option value="ZOOM" className="text-slate-900 bg-white">ZOOM</option>
@@ -2072,7 +2096,8 @@ productosAgrupados.map(([cat, items]) => (
                                   {!hayStreaming && hayFisicos && ' para productos físicos'}
                                 </span>
                               </label>
-<div className={`mt-2 text-[10px] ${mutedText} border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'} pt-2 space-y-2`}>
+<div className={`mt-2 text-[10px] ${mutedText} border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'} pt-2`}>
+<div className={`${verTerminosCompletos ? 'max-h-56 overflow-y-auto pr-1' : 'max-h-14 overflow-hidden'} space-y-2`}>
 {(hayFisicos || (!hayStreaming && !hayFisicos)) && terminosFisicos && (
 <div>
 <p className="font-semibold text-purple-600 mb-1">📦 Productos Físicos:</p>
@@ -2085,6 +2110,14 @@ productosAgrupados.map(([cat, items]) => (
 <p className="whitespace-pre-line">{terminosStreaming}</p>
 </div>
 )}
+</div>
+<button
+type="button"
+onClick={() => setVerTerminosCompletos(!verTerminosCompletos)}
+className="mt-1.5 text-purple-600 font-semibold hover:underline"
+>
+{verTerminosCompletos ? '▲ Ver menos' : '▼ Ver más'}
+</button>
 </div>                            </div>
                           );
                         })()}
@@ -2096,7 +2129,7 @@ productosAgrupados.map(([cat, items]) => (
                         <span>-${appliedCoupon.descuentoCalculado.toFixed(2)}</span>
                         </div>
                         )}
-                        <div className="flex justify-between"><span className={mutedText}>Envío:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>{calcularEnvio() === 0 ? 'GRATIS' : '$' + calcularEnvio().toFixed(2)}</span></div>
+                        <div className="flex justify-between"><span className={mutedText}>Envío:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>{deliveryMethod === 'nacional' ? (envioNacionalInfo().gratis ? 'GRATIS' : envioNacionalInfo().texto) : (calcularEnvio() === 0 ? 'GRATIS' : '$' + calcularEnvio().toFixed(2))}</span></div>
                         <div className={`flex justify-between font-bold text-lg border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'} pt-2 mt-2`}><span className={darkMode ? 'text-white' : 'text-slate-900'}>Total:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>${calculateTotal().toFixed(2)}</span></div>
                         <div className="flex justify-between"><span className={mutedText}>Bs:</span><span className={mutedText}>Bs {calcularPrecioBs(calculateTotal())}</span></div>
                       </div>
