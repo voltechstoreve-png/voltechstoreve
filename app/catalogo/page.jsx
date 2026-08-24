@@ -1020,19 +1020,30 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
                   onClick={() => registrarClickPub(pub)} 
                   className="relative w-full h-[280px] rounded-2xl overflow-hidden border border-voltech-border bg-black shadow-xl flex"
                 >
-                  <div 
-                    className="h-full max-w-[70%] bg-black flex items-center justify-center overflow-hidden" 
-                    style={{ aspectRatio: `${aspect}` }}
-                  >
-                    {pub.url_video ? (
-                      <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
-                    ) : pub.url_imagen ? (
-                      <img src={pub.url_imagen} alt={pub.titulo} className="w-full h-full object-cover" />
-                    ) : (
-                      <ImageIcon className="w-12 h-12 opacity-40 text-voltech-muted" />
-                    )}
-                  </div>
-                  <div className="relative h-full flex-1 bg-black">
+        {(pub.imagenes?.length >= 2 || pub.tipo_disposicion === '35_35_30' || pub.url_imagen_2) ? (
+        <div className="h-full w-[70%] bg-black flex overflow-hidden">
+        <div className="w-1/2 h-full bg-black overflow-hidden">
+        <img src={pub.imagenes?.[0] || pub.url_imagen} alt={pub.titulo} className="w-full h-full object-cover" />
+        </div>
+        <div className="w-1/2 h-full bg-black overflow-hidden">
+        <img src={pub.imagenes?.[1] || pub.url_imagen_2} alt={pub.titulo} className="w-full h-full object-cover" />
+        </div>
+        </div>
+        ) : (
+        <div
+        className="h-full max-w-[70%] bg-black flex items-center justify-center overflow-hidden"
+        style={{ aspectRatio: `${aspect}` }}
+        >
+        {pub.url_video ? (
+        <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+        ) : pub.url_imagen ? (
+        <img src={pub.url_imagen} alt={pub.titulo} className="w-full h-full object-cover" />
+        ) : (
+        <ImageIcon className="w-12 h-12 opacity-40 text-voltech-muted" />
+        )}
+        </div>
+        )}         
+         <div className="relative h-full flex-1 bg-black">
                     {pub.url_fondo && <img src={pub.url_fondo} alt="" className="absolute inset-0 w-full h-full object-cover" />}
                     <div className="absolute inset-0 bg-black/60"></div>
                     <div className="relative z-10 h-full w-full flex flex-col items-center justify-center text-center gap-2 p-4">
@@ -1089,14 +1100,14 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
           className="shrink-0 w-full snap-start rounded-2xl overflow-hidden bg-black border border-slate-800/80 flex flex-row items-center h-44 shadow-2xl"
         >
           {/* 1. LADO IZQUIERDO: Multimedia (Sin padding blanco, encaje directo) */}
-          <div className="h-full max-w-[70%] relative flex items-center justify-center bg-black overflow-hidden shrink-0" style={{ aspectRatio: `${ratios[pub.id] || 1}` }}>
-            {(pub.tipo_disposicion === '35_35_30' || (pub.imagenes && pub.imagenes.length >= 2)) ? (
+            <div className={`${(pub.tipo_disposicion === '35_35_30' || pub.imagenes?.length >= 2 || pub.url_imagen_2) ? 'h-full w-[70%] max-w-[70%]' : 'h-full max-w-[70%]'} relative flex items-center justify-center bg-black overflow-hidden shrink-0`} style={(pub.tipo_disposicion === '35_35_30' || pub.imagenes?.length >= 2 || pub.url_imagen_2) ? undefined : { aspectRatio: `${ratios[pub.id] || 1}` }}>
+            {(pub.tipo_disposicion === '35_35_30' || pub.imagenes?.length >= 2 || pub.url_imagen_2) ? (
             <div className="w-full h-full flex overflow-x-auto overflow-y-hidden no-scrollbar snap-x snap-mandatory">
-            <div className="w-full h-full shrink-0 snap-center flex items-center justify-center bg-black">
-            <img src={(pub.imagenes && pub.imagenes[0]) || pub.url_imagen} alt="" className="max-h-full max-w-full object-contain" />
+            <div className="w-full h-full shrink-0 snap-center bg-black">
+            <img src={(pub.imagenes && pub.imagenes[0]) || pub.url_imagen} alt="" className="w-full h-full object-cover" />
             </div>
-            <div className="w-full h-full shrink-0 snap-center flex items-center justify-center bg-black">
-            <img src={(pub.imagenes && pub.imagenes[1]) || pub.url_imagen_2} alt="" className="max-h-full max-w-full object-contain" />
+            <div className="w-full h-full shrink-0 snap-center bg-black">
+            <img src={(pub.imagenes && pub.imagenes[1]) || pub.url_imagen_2} alt="" className="w-full h-full object-cover" />
             </div>
             </div>
             ) : pub.url_video ? (
