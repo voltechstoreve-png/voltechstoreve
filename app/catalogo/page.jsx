@@ -209,8 +209,11 @@ useEffect(() => {
       setVentas(vts);
       setMasVendidosConfig(mvConfig);
     };
-    cargarDatosExtras();
-  }, []);
+cargarDatosExtras();
+const handleActualizacion = () => cargarDatosExtras();
+window.addEventListener('voltech-data-updated', handleActualizacion);
+return () => window.removeEventListener('voltech-data-updated', handleActualizacion);
+}, []);
 
   useEffect(() => {
     if (productos.length === 0) return;
@@ -292,21 +295,24 @@ useEffect(() => {
     return () => clearInterval(interval);
   }, [sorteoActivo]);
 
-  const productosMasVendidos = useMemo(() => {
-    if (!productos.length) return [];
-    const conteo = {};
-    if (ventas.length > 0) {
-      ventas.forEach(v => {
-        if (v.productos && Array.isArray(v.productos)) {
-          v.productos.forEach(p => {
-            conteo[p.productoId] = (conteo[p.productoId] || 0) + (p.cantidad || 1);
-          });
-        }
-      });
-    }
-    return [...productos].sort((a, b) => (conteo[b.id] || 0) - (conteo[a.id] || 0)).slice(0, 6);
-  }, [productos, ventas]);
-
+const productosMasVendidos = useMemo(() => {
+if (!productos.length) return [];
+const conteo = {};
+(ventas || []).forEach(v => {
+if (v.productos && Array.isArray(v.productos)) {
+v.productos.forEach(p => {
+conteo[p.productoId] = (conteo[p.productoId] || 0) + (Number(p.cantidad) || 1);
+});
+}
+});
+// ✅ SOLO productos que tengan ventas reales; si aún no hay ventas, muestra publicados
+const conVentas = productos.filter(p => (conteo[p.id] || 0) > 0);
+const base = conVentas.length > 0 ? conVentas : productos.filter(p => p.publicado);
+return base
+.map(p => ({ ...p, vendidos: conteo[p.id] || 0 }))
+.sort((a, b) => b.vendidos - a.vendidos)
+.slice(0, masVendidosConfig?.cantidad_maxima || 6);
+}, [productos, ventas, masVendidosConfig]);
   const tieneSoloProductosDigitales = cart.length > 0 && cart.every(item => item.tipo === 'streaming' || item.categoria?.toUpperCase() === 'STREAMING');
   
   const getPrecioPub = (pub) => {
@@ -1127,7 +1133,7 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
                   <p className={`text-xs font-semibold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto}</p>
                   <p className={`text-xs ${mutedText}`}>${pi.precioPrincipal?.toFixed(2)}</p>
                 </div>
-                <Trophy className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+                {p.vendidos > 0 ? <span className="text-[9px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded-full font-bold flex-shrink-0">🔥 {p.vendidos}</span> : <Trophy className="w-4 h-4 text-yellow-500 flex-shrink-0" />}
               </div>
             ); 
           })}
@@ -1183,7 +1189,7 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
                             <p className={`text-xs font-semibold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto}</p>
                             <p className={`text-[10px] ${mutedText}`}>${precioInfo.precioPrincipal?.toFixed(2)}</p>
                           </div>
-                          <Trophy className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+                          {p.vendidos > 0 ? <span className="text-[9px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded-full font-bold flex-shrink-0">🔥 {p.vendidos} vendidos</span> : <Trophy className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />}
                         </div>
                       );
                     })}
