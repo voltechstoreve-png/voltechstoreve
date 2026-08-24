@@ -142,7 +142,7 @@ useEffect(() => {
 
   useEffect(() => {
     const cargarDatosExtras = async () => {
-      let pubs = [], vts = [], mvConfig = null;
+      let pubs = [], vts = [], mvConfig = null, ops = [];
       
       if (supabase) {
         try {
@@ -176,7 +176,11 @@ useEffect(() => {
         setWhatsappNumero(normalizarWa(equipoData[0].telefono));
         }
         }
-        } catch (e) {
+        // ✅ OPINIONES desde Supabase (visibles para todo el público)
+        try {
+        const { data: opData } = await supabase.from('opiniones').select('*');
+        if (opData && opData.length > 0) ops = opData;
+        } catch (opErr) { console.warn('⚠️ Opiniones no disponibles en Supabase:', opErr.message); }        } catch (e) {
         console.warn('⚠️ Supabase no disponible, usando respaldo local:', e.message);
         }
         }
@@ -206,15 +210,18 @@ useEffect(() => {
         return true;
       });
 
-      setPublicidad(filtradas);
-      setVentas(vts);
-      setMasVendidosConfig(mvConfig);
-    };
-cargarDatosExtras();
-const handleActualizacion = () => cargarDatosExtras();
-window.addEventListener('voltech-data-updated', handleActualizacion);
-return () => window.removeEventListener('voltech-data-updated', handleActualizacion);
-}, []);
+  setPublicidad(filtradas);
+  setVentas(vts);
+  setMasVendidosConfig(mvConfig);
+  if (ops.length > 0) {
+  setOpiniones(ops);
+  localStorage.setItem('voltech_opiniones', JSON.stringify(ops));
+  }
+  };cargarDatosExtras();
+  const handleActualizacion = () => cargarDatosExtras();
+  window.addEventListener('voltech-data-updated', handleActualizacion);
+  return () => window.removeEventListener('voltech-data-updated', handleActualizacion);
+  }, []);
 
   useEffect(() => {
     if (productos.length === 0) return;
@@ -663,7 +670,7 @@ abrirWhatsAppNat(whatsappNumero, mensaje);
     toast.success('Tickets copiados');
   };
 
-  const handleSubmitOpinion = (e) => {
+  const handleSubmitOpinion = async (e) => {
     e.preventDefault();
     if (!formDataOpinion.nombre || !formDataOpinion.comentario) { toast.error('Nombre y comentario son obligatorios'); return; }
     
@@ -688,6 +695,11 @@ abrirWhatsAppNat(whatsappNumero, mensaje);
     opinionesExistentes.push(nuevaOpinion);
     localStorage.setItem('voltech_opiniones', JSON.stringify(opinionesExistentes));
     setOpiniones(opinionesExistentes);
+    // ✅ GUARDAR EN SUPABASE (así llega al panel y al público)
+    if (supabase) {
+    const { error: opErr } = await supabase.from('opiniones').insert(nuevaOpinion);
+    if (opErr) console.warn('⚠️ No se guardó la opinión en Supabase:', opErr.message);
+    }
     setFormDataOpinion({ nombre: '', telefono: '', rating: 5, comentario: '', producto: '', foto: null, donde_nos_conocio: '' });
     setShowOpinionForm(false);
     toast.success('Opinión enviada. Será publicada tras aprobación.');
