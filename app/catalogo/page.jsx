@@ -11,7 +11,8 @@ import {
   Sun, Moon, Play, Clock, Zap, Truck,
   Sparkles, Trophy, AlertCircle, Ticket, Copy, Users, LayoutDashboard, LogIn,
   MessageSquare, ThumbsUp, Upload, Percent, Share2,
-  Image as ImageIcon, FileText, Info, Menu, ChevronDown
+  Image as ImageIcon, FileText, Info, Menu, ChevronDown,
+User, Settings, LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -86,7 +87,9 @@ export default function CatalogoPage() {
   const [whatsappNumero, setWhatsappNumero] = useState('584125378515'); // Número por defecto
   
 const [showTermsModal, setShowTermsModal] = useState(false);
+const [terminosAceptados, setTerminosAceptados] = useState(false);
 const [showMobileMenu, setShowMobileMenu] = useState(false);
+const [showUserMenu, setShowUserMenu] = useState(false);
 const bannerRef = useRef(null);
 const [bannerIdx, setBannerIdx] = useState(0);
 const [isPaused, setIsPaused] = useState(false);
@@ -238,9 +241,10 @@ useEffect(() => {
     }
   }, [productos]);
 
-  useEffect(() => { 
-    localStorage.setItem('voltech_cart', JSON.stringify(cart)); 
-  }, [cart]);
+    useEffect(() => {
+    localStorage.setItem('voltech_cart', JSON.stringify(cart));
+    setTerminosAceptados(false);
+    }, [cart]);
 
   // ✅ NUEVO: Contar visitas públicas (NO cuenta logueados), 1 por sesión
   useEffect(() => {
@@ -445,9 +449,10 @@ const calcularPrecioBs = (precioUsd) => {
   };
 
   const finalizarPedido = () => {
-    if (cart.length === 0) { toast.error('Carrito vacío'); return; }
-    if (!paymentMethod) { toast.error('Selecciona método de pago'); return; }
-    if (!tieneSoloProductosDigitales) {
+      if (cart.length === 0) { toast.error('Carrito vacío'); return; }
+      if (!paymentMethod) { toast.error('Selecciona método de pago'); return; }
+      if (!terminosAceptados) { toast.error('Debes aceptar los Términos y Condiciones para finalizar tu pedido'); return; }
+      if (!tieneSoloProductosDigitales) {
       if (deliveryMethod === 'retiro' && !selectedAddress) { toast.error('Selecciona punto de retiro'); return; }
       if (deliveryMethod === 'delivery' && !customerLocation) { toast.error('Ingresa tu ubicación'); return; }
       if (deliveryMethod === 'nacional' && !oficinaDestino) { toast.error('Ingresa la oficina destino'); return; }
@@ -722,15 +727,16 @@ abrirWhatsAppNat(whatsappNumero, mensaje);
       const precioInfo = getPrecioMostrar(p);
       return (
       <div key={p.id || p.producto || `prod-${idx}`} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between cursor-pointer group`}>
-        <div className="aspect-square bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center overflow-hidden relative">
+        <div className="aspect-square bg-slate-900 flex items-center justify-center overflow-hidden relative">
           {p.imagen ? (
-            <img src={p.imagen} alt={p.producto} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} />
+            <img src={p.imagen} alt={p.producto} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} />
           ) : (
             <Package className="w-12 h-12 text-slate-300" />
           )}
           {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">OFERTA</div>}
           {p.tipo === 'kit' && <div className="absolute top-2 left-2 bg-voltech-cyan text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">KIT</div>}
-        </div>
+          {p.disponibilidad === 'bajo_pedido' && <div className="absolute bottom-2 left-2 bg-amber-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-md">🛒 BAJO PEDIDO</div>}
+          </div>
         <div className="p-3 flex flex-col flex-1">
           <div className="mb-1"><p className={`text-[10px] font-medium uppercase tracking-wide ${mutedText} truncate`}>{p.marca} • {p.categoria}</p></div>
           <h3 className={`font-semibold text-sm mb-2 line-clamp-2 leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto}</h3>
@@ -741,12 +747,9 @@ abrirWhatsAppNat(whatsappNumero, mensaje);
               <p className={`text-xs font-medium ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
             </div>
             <div className="flex gap-1.5 pt-1">
-              <button onClick={(e) => { e.stopPropagation(); comprarRapido(p); }} className="flex-1 bg-green-500 text-white py-2 rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors flex items-center justify-center gap-1">
-                <MessageCircle className="w-3 h-3 flex-shrink-0" /> WhatsApp
-              </button>
-              <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="flex-1 bg-purple-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-1">
-                <ShoppingCart className="w-3 h-3 flex-shrink-0" /> Carrito
-              </button>
+            <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="w-full bg-purple-600 text-white py-2 rounded-lg text-xs font-semibold hover:bg-purple-700 transition-colors flex items-center justify-center gap-1">
+            <ShoppingCart className="w-3 h-3 flex-shrink-0" /> Agregar al Carrito
+            </button>
             </div>
           </div>
         </div>
@@ -856,15 +859,16 @@ abrirWhatsAppNat(al.telefono, msg);
                 {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
               
-              {currentUser && (
-                currentUser.rol?.toLowerCase() === 'admin' || 
-                currentUser.rol?.toLowerCase() === 'vendedor' || 
-                currentUser.rol?.toLowerCase() === 'socio'
-              ) && (
+{currentUser && (
+currentUser.rol?.toLowerCase() === 'admin' ||
+currentUser.rol?.toLowerCase() === 'vendedor' ||
+currentUser.rol?.toLowerCase() === 'socio'
+) && (
+<div className="relative">
 <button
-onClick={() => window.location.href = '/panel/dashboard-ventas'}
+onClick={() => setShowUserMenu(!showUserMenu)}
 className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-800/50 transition-colors"
-title="Ir al Panel de Ventas"
+title="Menú de usuario"
 >
 <div className="w-9 h-9 rounded-full bg-cyan-400 flex items-center justify-center text-slate-900 font-bold text-sm">
 {(currentUser.nombre || 'U').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
@@ -873,9 +877,46 @@ title="Ir al Panel de Ventas"
 <p className="text-sm font-semibold text-white leading-tight">{currentUser.nombre}</p>
 <p className="text-xs text-slate-400">{currentUser.rol}</p>
 </div>
-<ChevronDown className="w-4 h-4 text-slate-400" />
+<ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
 </button>
-              )}
+<AnimatePresence>
+{showUserMenu && (
+<>
+<div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
+<motion.div
+initial={{ opacity: 0, y: -8 }}
+animate={{ opacity: 1, y: 0 }}
+exit={{ opacity: 0, y: -8 }}
+className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden"
+>
+<div className="p-3 border-b border-slate-700">
+<p className="text-sm font-semibold text-white">{currentUser.nombre}</p>
+<p className="text-xs text-slate-400 truncate">{currentUser.email || 'sin correo'}</p>
+</div>
+<div className="py-1">
+<button onClick={() => { setShowUserMenu(false); window.location.href = '/panel/dashboard-ventas'; }} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
+<LayoutDashboard className="w-4 h-4" /> Ir al Panel
+</button>
+<button onClick={() => { setShowUserMenu(false); window.location.href = '/panel/perfil'; }} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
+<User className="w-4 h-4" /> Mi Perfil
+</button>
+{(currentUser.rol?.toLowerCase() === 'admin' || currentUser.rol?.toLowerCase() === 'socio') && (
+<button onClick={() => { setShowUserMenu(false); window.location.href = '/panel/configuracion'; }} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
+<Settings className="w-4 h-4" /> Configuración
+</button>
+)}
+</div>
+<div className="border-t border-slate-700 py-1">
+<button onClick={() => { localStorage.removeItem('voltech_user'); window.location.href = '/'; }} className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-slate-800 transition-colors">
+<LogOut className="w-4 h-4" /> Cerrar Sesión
+</button>
+</div>
+</motion.div>
+</>
+)}
+</AnimatePresence>
+</div>
+)}
               {!currentUser && (
                 <button onClick={() => setShowCart(true)} className={`relative p-2 ${darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}>
                   <ShoppingCart className="w-6 h-6" />
@@ -1195,7 +1236,8 @@ productosAgrupados.map(([cat, items]) => (
           <Play className="w-10 h-10 text-white/80" />
         )}
         {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md z-10">OFERTA</div>}
-      </div>
+        {p.disponibilidad === 'bajo_pedido' && <div className="absolute bottom-2 left-2 bg-amber-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-md z-10">🛒 BAJO PEDIDO</div>}
+        </div>
       <div className="p-3 flex flex-col flex-1">
         <h3 className={`font-semibold text-sm mb-2 line-clamp-2 leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.plataforma}</h3>
         <div className="mt-auto space-y-2">
@@ -1205,21 +1247,17 @@ productosAgrupados.map(([cat, items]) => (
             <p className={`text-xs font-medium ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
           </div>
           <div className="flex items-center gap-1.5 w-full mt-auto pt-3">
-            <button onClick={(e) => { e.stopPropagation(); comprarRapido(p); }} className="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs py-2 px-2 rounded-xl transition-all shadow-sm">
-              <WhatsAppIcon className="w-4 h-4 shrink-0 fill-current" />
-              <span className="truncate">Comprar</span>
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="shrink-0 inline-flex items-center justify-center gap-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs py-2 px-2.5 rounded-xl transition-all">
-              <ShoppingCart className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Carrito</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-})}
-                  {streamingFiltrados.length === 0 && <div className={`text-center py-20 col-span-full ${mutedText}`}><Play className="w-16 h-16 mx-auto mb-3 opacity-30" /><p className="text-lg">No hay plataformas disponibles</p></div>}
+        <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="w-full inline-flex items-center justify-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs py-2 px-2 rounded-xl transition-all shadow-sm">
+                <ShoppingCart className="w-4 h-4 shrink-0" />
+                <span>Agregar al Carrito</span>
+                </button>
+                </div>
+                </div>
+                </div>
+                </div>
+                );
+                })}
+                {streamingFiltrados.length === 0 && <div className={`text-center py-20 col-span-full ${mutedText}`}><Play className="w-16 h-16 mx-auto mb-3 opacity-30" /><p className="text-lg">No hay plataformas disponibles</p></div>}
                 </div>
               </div>
             )}
@@ -1245,20 +1283,16 @@ productosAgrupados.map(([cat, items]) => (
                               <p className={`text-xs ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
                             </div>
                             <div className="flex items-center gap-1.5 w-full mt-auto pt-3">
-                              <button onClick={(e) => { e.stopPropagation(); comprarRapido(p); }} className="flex-1 inline-flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs py-2 px-2 rounded-xl transition-all shadow-sm">
-                                <WhatsAppIcon className="w-4 h-4 shrink-0 fill-current" />
-                                <span className="truncate">WhatsApp</span>
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="inline-flex items-center justify-center gap-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs py-2 px-2.5 rounded-xl transition-all shrink-0">
+                                <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="w-full inline-flex items-center justify-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs py-2 px-2 rounded-xl transition-all shadow-sm">
                                 <ShoppingCart className="w-4 h-4 shrink-0" />
-                                <span className="hidden sm:inline">Carrito</span>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
+                                <span>Agregar al Carrito</span>
+                                </button>
+                                </div>
+                              </div>
+                              </div>
+                              );
+                              })
+                            ) : (
                     <div className="col-span-full text-center py-20">
                       <Zap className={`w-16 h-16 mx-auto mb-3 opacity-30 ${mutedText}`} />
                       <p className={`text-lg ${mutedText}`}>No hay ofertas disponibles</p>
@@ -1702,12 +1736,12 @@ productosAgrupados.map(([cat, items]) => (
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
                 <div className="space-y-4">
-                  <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative ${selectedProduct.tipo === 'streaming' ? 'bg-black' : 'bg-white'}`}>
+                  <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative ${selectedProduct.tipo === 'streaming' ? 'bg-black' : 'bg-transparent'}`}>
                     {selectedProduct.imagen ? (
                       <img 
                         src={selectedProduct.imagen} 
                         alt={selectedProduct.producto || selectedProduct.plataforma} 
-                        className="w-full h-full object-contain max-h-[280px]"
+                        className="w-full h-auto max-h-[420px] object-contain mx-auto"
                         onError={(e) => {
                           e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iIzFhMWUyOSIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2MzY2ZjEiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5TaW4gSW1hZ2VuPC90ZXh0Pjwvc3ZnPg==';
                         }}
@@ -1716,9 +1750,12 @@ productosAgrupados.map(([cat, items]) => (
                       <Package className="w-24 h-24 text-slate-300" />
                     )}
                     {getPrecioMostrar(selectedProduct).tieneOferta && (
-                      <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">OFERTA</div>
-                    )}
-                  </div>
+                <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">OFERTA</div>
+                )}
+                {selectedProduct.disponibilidad === 'bajo_pedido' && (
+                <div className="absolute bottom-4 left-4 bg-amber-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md">🛒 BAJO PEDIDO</div>
+                )}
+                </div>
                   {selectedProduct.colores && selectedProduct.colores.length > 0 && (
                     <div className="flex gap-2 justify-center">
                       {selectedProduct.colores.map((color, idx) => (
@@ -1747,9 +1784,14 @@ productosAgrupados.map(([cat, items]) => (
                   <div className="text-sm text-voltech-muted space-y-2">
                     <p>{selectedProduct.descripcion || 'Sin descripción disponible.'}</p>
                     {selectedProduct.tipo === 'streaming' && selectedProduct.duracion && (
-                      <p className="flex items-center gap-2"><Clock className="w-4 h-4" /> Duración: {selectedProduct.duracion}</p>
+                    <p className="flex items-center gap-2"><Clock className="w-4 h-4" /> Duración: {selectedProduct.duracion}</p>
                     )}
-                  </div>
+                    {selectedProduct.disponibilidad === 'bajo_pedido' && (
+                    <p className="flex items-center gap-2 text-amber-500 text-xs mt-1">
+                    <ShoppingCart className="w-4 h-4" /> Se compra al momento · entrega 24-48h
+                    </p>
+                    )}
+                    </div>
 
                   {/* ✅ NUEVO: Mostrar contenido del Kit o descripción detallada */}
                   {selectedProduct.tipo === 'kit' && selectedProduct.productos_kit && selectedProduct.productos_kit.length > 0 ? (
@@ -1788,21 +1830,14 @@ productosAgrupados.map(([cat, items]) => (
                   )}
 
                   <div className="flex items-center gap-2 w-full mt-auto pt-3">
-                    <button 
-                      onClick={() => { comprarRapido(selectedProduct); setSelectedProduct(null); }} 
-                      className="flex-1 py-2 px-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-colors"
-                    >
-                      <WhatsAppIcon className="w-4 h-4 shrink-0" />
-                      <span className="truncate"><span className="hidden sm:inline">Comprar por </span>WhatsApp</span>
-                    </button>
-                    <button 
-                      onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }} 
-                      className="flex-1 py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-colors"
-                    >
-                      <ShoppingCart className="w-4 h-4 shrink-0" />
-                      <span className="truncate"><span className="hidden sm:inline">Agregar al </span>Carrito</span>
-                    </button>
-                  </div>
+                  <button
+                  onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }}
+                  className="w-full py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                  <ShoppingCart className="w-4 h-4 shrink-0" />
+                  <span>Agregar al Carrito</span>
+                  </button>
+                </div>
                 </div>
               </div>
             </motion.div>
@@ -2003,18 +2038,63 @@ productosAgrupados.map(([cat, items]) => (
                       )}
                     </div>
 
-                    <div className={`border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'} pt-4 mb-4 space-y-1 text-sm`}>
-                      <div className="flex justify-between"><span className={mutedText}>Subtotal:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>${cart.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0).toFixed(2)}</span></div>
-                      {appliedCoupon && (
+                    {(() => {
+                          const hayStreaming = cart.some(item => item.tipo === 'streaming' || (item.categoria || '').toUpperCase() === 'STREAMING');
+                          const hayFisicos = cart.some(item => item.tipo !== 'streaming' && (item.categoria || '').toUpperCase() !== 'STREAMING');
+                          const terminosFisicos = settings.politicas?.terminos || '';
+                          const terminosStreaming = settings.politicas?.terminos_streaming || '';
+                          return (
+                            <div className={`mb-4 p-3 rounded-lg border ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                              <label className="flex items-start gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={terminosAceptados}
+                                  onChange={(e) => setTerminosAceptados(e.target.checked)}
+                                  className="w-4 h-4 rounded border-slate-600 text-purple-600 focus:ring-purple-500 mt-0.5 flex-shrink-0"
+                                />
+                                <span className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-700'} leading-relaxed`}>
+                                  He leído y acepto los{' '}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); setShowTermsModal(true); }}
+                                    className="text-purple-600 font-semibold hover:underline"
+                                  >
+                                    Términos y Condiciones
+                                  </button>
+                                  {hayStreaming && hayFisicos && ' (aplican tanto para productos físicos como digitales)'}
+                                  {hayStreaming && !hayFisicos && ' para productos streaming'}
+                                  {!hayStreaming && hayFisicos && ' para productos físicos'}
+                                </span>
+                              </label>
+                              <div className={`mt-2 text-[10px] ${mutedText} max-h-24 overflow-y-auto border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'} pt-2 space-y-2`}>
+                                {(hayFisicos || (!hayStreaming && !hayFisicos)) && terminosFisicos && (
+                                  <div>
+                                    <p className="font-semibold text-purple-600 mb-1">📦 Productos Físicos:</p>
+                                    <p className="whitespace-pre-line">{terminosFisicos.substring(0, 300)}...</p>
+                                  </div>
+                                )}
+                                {hayStreaming && terminosStreaming && (
+                                  <div>
+                                    <p className="font-semibold text-purple-600 mb-1">📺 Streaming:</p>
+                                    <p className="whitespace-pre-line">{terminosStreaming.substring(0, 300)}...</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                        <div className={`border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'} pt-4 mb-4 space-y-1 text-sm`}>
+                        <div className="flex justify-between"><span className={mutedText}>Subtotal:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>${cart.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0).toFixed(2)}</span></div>
+                        {appliedCoupon && (
                         <div className="flex justify-between text-green-600">
-                          <span>Descuento ({appliedCoupon.codigo}):</span>
-                          <span>-${appliedCoupon.descuentoCalculado.toFixed(2)}</span>
+                        <span>Descuento ({appliedCoupon.codigo}):</span>
+                        <span>-${appliedCoupon.descuentoCalculado.toFixed(2)}</span>
                         </div>
-                      )}
-                      <div className="flex justify-between"><span className={mutedText}>Envío:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>{calcularEnvio() === 0 ? 'GRATIS' : '$' + calcularEnvio().toFixed(2)}</span></div>
-                      <div className={`flex justify-between font-bold text-lg border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'} pt-2 mt-2`}><span className={darkMode ? 'text-white' : 'text-slate-900'}>Total:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>${calculateTotal().toFixed(2)}</span></div>
-                      <div className="flex justify-between"><span className={mutedText}>Bs:</span><span className={mutedText}>Bs {calcularPrecioBs(calculateTotal())}</span></div>
-                    </div>
+                        )}
+                        <div className="flex justify-between"><span className={mutedText}>Envío:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>{calcularEnvio() === 0 ? 'GRATIS' : '$' + calcularEnvio().toFixed(2)}</span></div>
+                        <div className={`flex justify-between font-bold text-lg border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'} pt-2 mt-2`}><span className={darkMode ? 'text-white' : 'text-slate-900'}>Total:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>${calculateTotal().toFixed(2)}</span></div>
+                        <div className="flex justify-between"><span className={mutedText}>Bs:</span><span className={mutedText}>Bs {calcularPrecioBs(calculateTotal())}</span></div>
+                      </div>
 
                     <button onClick={finalizarPedido} className="w-full py-2.5 px-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-md mb-2">
                       <WhatsAppIcon className="w-4 h-4 shrink-0" />

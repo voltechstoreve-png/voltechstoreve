@@ -66,7 +66,7 @@ export default function AjustesPage() {
       { id: 'binance', nombre: 'Binance', activo: true },
     ],
     envios: { puntosEntrega: ['Plaza Venezuela', 'Sambil Chacao', 'CC Ciudad Caracas', 'Metro Los Símbolos'], deliveryGratisDesde: 5.00, costoEnvioNacional: 3.00, montoMinimoEnvioGratis: 50.00, descripcionEnvioNacional: 'Envíos menores a $50: cobro a destino', tiempo: '24-48 horas', notas: 'Los envíos se realizan de lunes a viernes' },
-    politicas: { terminos: '1. POLÍTICA DE PAGO ANTICIPADO: Para garantizar la disponibilidad de inventario y el procesamiento logístico con nuestros proveedores, todo despacho se gestionará exclusivamente previa recepción y conciliación del pago total.\n2. PRESENTACIÓN: Es obligatorio presentar este comprobante para cualquier reclamo.\n3. TIEMPO DE GARANTÍA: El producto tiene una garantía de 3 días continuos.\n4. EXCLUSIONES: No cubre daños físicos, humedad, sobrecargas o sellos removidos.\n5. EMPAQUE: Es obligatorio conservar la caja y accesorios originales en buen estado.\n6. GESTIÓN DE CAMBIOS: Sujeto a revisión técnica(24-48h). Es condición indispensable la entrega del producto defectuoso en su empaque original; no se entregará un reemplazo sin la verificación previa del equipo anterior.\n7. REEMBOLSOS Y CONFORMIDAD: Al recibir, el cliente acepta el estado del producto. Bajo ninguna circunstancia se realizará la devolución de dinero; se procederá exclusivamente al cambio por un producto igual o de similares características.', privacidad: 'Tus datos están protegidos y no serán compartidos con terceros.' },
+    politicas: { terminos: '1. POLÍTICA DE PAGO ANTICIPADO: Para garantizar la disponibilidad de inventario y el procesamiento logístico con nuestros proveedores, todo despacho se gestionará exclusivamente previa recepción y conciliación del pago total.\n2. PRESENTACIÓN: Es obligatorio presentar este comprobante para cualquier reclamo.\n3. TIEMPO DE GARANTÍA: El producto tiene una garantía de 3 días continuos.\n4. EXCLUSIONES: No cubre daños físicos, humedad, sobrecargas o sellos removidos.\n5. EMPAQUE: Es obligatorio conservar la caja y accesorios originales en buen estado.\n6. GESTIÓN DE CAMBIOS: Sujeto a revisión técnica(24-48h). Es condición indispensable la entrega del producto defectuoso en su empaque original; no se entregará un reemplazo sin la verificación previa del equipo anterior.\n7. REEMBOLSOS Y CONFORMIDAD: Al recibir, el cliente acepta el estado del producto. Bajo ninguna circunstancia se realizará la devolución de dinero; se procederá exclusivamente al cambio por un producto igual o de similares características.', terminos_streaming: '1. ENTREGA DIGITAL: Las cuentas y suscripciones se entregan vía WhatsApp o correo electrónico en un plazo máximo de 15 minutos tras confirmar el pago.\n2. DURACIÓN: El tiempo de la suscripción comienza a contar desde el momento de la entrega de credenciales.\n3. GARANTÍA DE CUENTA: Ofrecemos garantía completa durante toda la duración contratada. Si la cuenta presenta fallas, se reemplaza de inmediato sin costo.\n4. MAL USO: Queda anulado el soporte si el cliente comparte credenciales, modifica la contraseña o el correo asociado, o incumple las normas de la plataforma (Netflix, Disney+, HBO, etc.).\n5. DEVOLUCIONES: No se realizan reembolsos una vez entregadas las credenciales. Solo aplica cambio de cuenta por fallas técnicas comprobadas.\n6. PAGO ANTICIPADO: Todas las plataformas streaming se entregan únicamente tras la verificación del pago. Sin excepciones.', privacidad: 'Tus datos están protegidos y no serán compartidos con terceros.' },
     colores: { primario: '#00ff88', secundario: '#8b5cf6', acento: '#06b6d4', fondo: '#0a0a0f', texto: '#ffffff', difuminado: 'horizontal' },
     whatsapp: { plantilla_compra: PLANTILLA_COMPRA_DEFAULT, cierre_compra: 'Quiero comprar ✅' },
   });
@@ -75,6 +75,7 @@ export default function AjustesPage() {
   const [nuevoMetodo, setNuevoMetodo] = useState('');
   const [nuevaCartera, setNuevaCartera] = useState('');
   const [mostrarTerminos, setMostrarTerminos] = useState(false);
+  const [mostrarTerminosStreaming, setMostrarTerminosStreaming] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [logoPreview, setLogoPreview] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
@@ -451,16 +452,54 @@ export default function AjustesPage() {
         )}
 
         {activeTab === 'terminos' && (
-          <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6 space-y-4">
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-voltech-muted">Editar términos:</label>
-              <button onClick={() => setMostrarTerminos(!mostrarTerminos)} className="text-voltech-cyan">{mostrarTerminos ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button>
+          <div className="space-y-6">
+            {/* 📦 TÉRMINOS GENERALES (FÍSICOS Y KITS) */}
+            <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-voltech-border pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-voltech-cyan/20"><Store className="w-4 h-4 text-voltech-cyan" /></div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">📦 Términos Generales</h3>
+                    <p className="text-xs text-voltech-muted">Para productos físicos y kits · Se muestra en el carrito al finalizar pedido</p>
+                  </div>
+                </div>
+                <button onClick={() => setMostrarTerminos(!mostrarTerminos)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-cyan">
+                  {mostrarTerminos ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {mostrarTerminos ? (
+                <textarea value={settings.politicas.terminos} onChange={(e) => updateSetting('politicas', 'terminos', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm min-h-[220px] font-mono" />
+              ) : (
+                <div className="p-4 bg-voltech-dark/50 border border-voltech-border rounded-lg max-h-[220px] overflow-y-auto"><p className="text-xs text-voltech-muted font-mono whitespace-pre-wrap">{settings.politicas.terminos}</p></div>
+              )}
             </div>
-            {mostrarTerminos ? (
-              <textarea value={settings.politicas.terminos} onChange={(e) => updateSetting('politicas', 'terminos', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm min-h-[200px]" />
-            ) : (
-              <div className="p-4 bg-voltech-dark/50 border border-voltech-border rounded-lg"><p className="text-xs text-voltech-muted font-mono whitespace-pre-wrap">{settings.politicas.terminos}</p></div>
-            )}
+
+            {/* 📺 TÉRMINOS STREAMING (DIGITALES) */}
+            <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-voltech-border pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-voltech-purple/20"><Store className="w-4 h-4 text-voltech-purple" /></div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">📺 Términos Streaming</h3>
+                    <p className="text-xs text-voltech-muted">Para plataformas digitales · Se muestra en el carrito cuando solo hay streaming</p>
+                  </div>
+                </div>
+                <button onClick={() => setMostrarTerminosStreaming(!mostrarTerminosStreaming)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-purple">
+                  {mostrarTerminosStreaming ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {mostrarTerminosStreaming ? (
+                <textarea value={settings.politicas.terminos_streaming || ''} onChange={(e) => updateSetting('politicas', 'terminos_streaming', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm min-h-[220px] font-mono" placeholder="Escribe aquí los términos para productos streaming..." />
+              ) : (
+                <div className="p-4 bg-voltech-dark/50 border border-voltech-border rounded-lg max-h-[220px] overflow-y-auto"><p className="text-xs text-voltech-muted font-mono whitespace-pre-wrap">{settings.politicas.terminos_streaming || 'Aún no hay términos streaming configurados.'}</p></div>
+              )}
+            </div>
+
+            {/* 🔒 POLÍTICA DE PRIVACIDAD */}
+            <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6 space-y-4">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">🔒 Política de Privacidad</h3>
+              <textarea value={settings.politicas.privacidad} onChange={(e) => updateSetting('politicas', 'privacidad', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm min-h-[100px]" />
+            </div>
           </div>
         )}
 

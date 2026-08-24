@@ -4,15 +4,15 @@
   import Link from 'next/link';
   import { supabase } from '@/lib/supabase';
   import { usePermissions } from '@/app/context/PermissionsContext';
-  import { 
-    Plus, Search, Edit, Trash2, X, Package, DollarSign, TrendingUp,
-    AlertTriangle, CheckCircle, Image as ImageIcon, Save, Minus,
-    Upload, Eye, EyeOff, Globe, LayoutGrid, Table, Download,
-    Database, MonitorPlay, Tag, Layers, Calendar, Percent, Gift,
-    ChevronDown, MoreVertical, Filter
-  } from 'lucide-react';
-  import { motion, AnimatePresence } from 'framer-motion';
+ import { 
+  Plus, Search, Edit, Trash2, X, Package, DollarSign, TrendingUp,
+  AlertTriangle, CheckCircle, Image as ImageIcon, Save, Minus,
+  Upload, Eye, EyeOff, Globe, LayoutGrid, Table, Download,
+  Database, MonitorPlay, Tag, Layers, Calendar, Percent, Gift,
+  ChevronDown, MoreVertical, Filter, ShoppingCart
+} from 'lucide-react';
   import toast, { Toaster } from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
 
   // ✅ COMPONENTE CUSTOM SELECT UNIFICADO CON PALETA VOLTECH
   const CustomSelect = ({ label, value, onChange, options, placeholder = '-- Selecciona --', disabled = false, className = '' }) => {
@@ -122,6 +122,7 @@
     const [items, setItems] = useState([{
       id: crypto.randomUUID(),
       tipo: 'fisico',
+      disponibilidad: 'stock',
       imagen: '',
       imagenFile: null,
       sku: '',
@@ -368,6 +369,15 @@
 
       item[name] = value;
 
+      if (name === 'disponibilidad' && value === 'bajo_pedido') {
+        item.metodoPago = 'por_comprar';
+        item.cartera = 'por_comprar';
+        item.cantidad = 0;
+      } else if (name === 'disponibilidad' && value === 'stock' && item.metodoPago === 'por_comprar') {
+        item.metodoPago = 'efectivo';
+        item.cartera = '';
+      }
+
       if (item.tipo === 'fisico') {
         if (name === 'plataforma' && value) {
           const registros = productos.filter(p => p.tipo === 'fisico' && normalizarTexto(p.plataforma) === normalizarTexto(value));
@@ -558,6 +568,7 @@
       setItems([...items, {
         id: crypto.randomUUID(),
         tipo: 'fisico',
+        disponibilidad: 'stock',  
         imagen: '',
         imagenFile: null,
         sku: '',
@@ -877,8 +888,8 @@
             toast.error(`El item ${i + 1} está incompleto: nombre, categoría y marca son obligatorios`);
             return;
           }
-          if (!(parseFloat(it.cantidad) > 0)) {
-            toast.error(`El item ${i + 1} debe tener una cantidad mayor a 0`);
+          if (it.disponibilidad !== 'bajo_pedido' && !(parseFloat(it.cantidad) > 0)) {
+            toast.error(`El item ${i + 1}: cantidad mayor a 0, o márcalo como "Compra al momento"`);
             return;
           }
           if (!((parseFloat(it.precioDetal) > 0) || (parseFloat(it.precioOferta) > 0))) {
@@ -916,6 +927,7 @@
         const imagenesArr = Array.from(new Set([item.imagen, ...(item.imagenes || [])].filter(Boolean)));
         const productoData = {
           tipo: item.tipo,
+          disponibilidad: item.disponibilidad || 'stock',
           imagen: item.imagen || null,
           sku: item.sku,
           fecha: item.fecha,
@@ -1027,6 +1039,7 @@
           setItems([{
             id: crypto.randomUUID(),
             tipo: 'fisico',
+            disponibilidad: 'stock',
             imagen: '',
             imagenFile: null,
             sku: '',
@@ -1431,6 +1444,21 @@
                         </div>
                       </div>
 
+                      <div className="mb-4">
+                        <label className="block text-xs text-voltech-muted mb-2 ml-1">📦 Disponibilidad / Stock</label>
+                        <div className="grid grid-cols-2 gap-1.5 w-full">
+                          <button type="button" onClick={() => handleChange(itemIndex, 'disponibilidad', 'stock')} className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all text-xs md:text-sm ${item.disponibilidad !== 'bajo_pedido' ? 'bg-voltech-success/20 border-voltech-success text-voltech-success' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-success'}`}>
+                            <Package className="w-4 h-4 shrink-0" /><span className="truncate">📦 Stock físico</span>
+                          </button>
+                          <button type="button" onClick={() => handleChange(itemIndex, 'disponibilidad', 'bajo_pedido')} className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all text-xs md:text-sm ${item.disponibilidad === 'bajo_pedido' ? 'bg-voltech-warning/20 border-voltech-warning text-voltech-warning' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-warning'}`}>
+                            <ShoppingCart className="w-4 h-4 shrink-0" /><span className="truncate">🛒 Compra al momento</span>
+                          </button>
+                        </div>
+                        {item.disponibilidad === 'bajo_pedido' && (
+                          <p className="text-[10px] text-voltech-warning mt-1">ℹ️ Se publicará en el catálogo aunque el stock sea 0. Lo compras al proveedor cuando se venda.</p>
+                        )}
+                      </div>
+
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                               <div className="lg:col-span-3">
                         <label className="block text-xs text-voltech-muted mb-1 ml-1">
@@ -1653,7 +1681,7 @@
                                 label="Método de Pago"
                                 value={item.metodoPago}
                                 onChange={(value) => handleChange(itemIndex, 'metodoPago', value)}
-                                options={opcionesMetodosPago}
+                                options={[...opcionesMetodosPago, { value: 'por_comprar', label: '🛒 Se compra al momento' }]}
                               />
                             </div>
                             <div>
@@ -1661,7 +1689,7 @@
                                 label="Cartera"
                                 value={item.cartera}
                                 onChange={(value) => handleChange(itemIndex, 'cartera', value)}
-                                options={[{ value: '', label: '-- Selecciona --' }, ...carteras.map(c => ({ value: c.nombre, label: c.nombre }))]}
+                                options={[{ value: '', label: '-- Selecciona --' }, ...carteras.map(c => ({ value: c.nombre, label: c.nombre })), { value: 'por_comprar', label: '🛒 Por comprar (al momento)' }]}
                               />
                             </div>
                             {tienePermiso('puedeVerInventarioCompleto') && (
@@ -1928,7 +1956,10 @@
                           <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full font-medium ${getEstadoBadge(producto.estado)}`}>{producto.estado ? producto.estado.charAt(0).toUpperCase() + producto.estado.slice(1) : 'Nuevo'}</span></td>
                           <td className="px-4 py-3 text-sm text-voltech-muted">{producto.categoria}</td>
                           <td className="px-4 py-3 text-sm text-voltech-muted">{producto.marca || '—'}</td>
-                          <td className="px-4 py-3"><span className={`text-sm font-medium ${producto.cantidad === 0 ? 'text-voltech-error' : producto.cantidad <= 2 ? 'text-voltech-warning' : 'text-voltech-success'}`}>{producto.cantidad}</span></td>
+                          <td className="px-4 py-3">
+                            <span className={`text-sm font-medium ${producto.cantidad === 0 ? 'text-voltech-error' : producto.cantidad <= 2 ? 'text-voltech-warning' : 'text-voltech-success'}`}>{producto.cantidad}</span>
+                            {producto.disponibilidad === 'bajo_pedido' && <span className="ml-1 text-[9px] px-1.5 py-0.5 rounded-full bg-voltech-warning/20 text-voltech-warning">🛒 Al momento</span>}
+                          </td>
                           <td className="px-4 py-3">
                             {producto.precioOferta > 0 && producto.estado === 'oferta' ? (
                               <div className="flex flex-col"><span className="text-xs text-gray-400 line-through">$${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</span><span className="text-sm font-bold text-voltech-warning">${parseFloat(producto.precioOferta || 0).toFixed(2)}</span></div>
