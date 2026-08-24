@@ -1,0 +1,16 @@
+{
+  "name": "VOLTECH STORE VE — Panel",
+  "short_name": "VOLTECH",
+  "description": "Catálogo y panel de gestión de VOLTECH STORE",
+  "lang": "es",
+  "start_url": "/panel/dashboard-ventas",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "192x192 512x512", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

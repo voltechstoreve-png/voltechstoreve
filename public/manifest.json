@@ -1,10 +1,13 @@
 {
-  "name": "VoltechStoreve",
-  "short_name": "Voltech",
-  "description": "La mejor tecnología y entretenimientos digital al alcance de un clic.",
-  "start_url": "/",
+  "name": "VOLTECH STORE VE",
+  "short_name": "VOLTECH",
+  "description": "Catálogo y panel de gestión de VOLTECH STORE",
+  "lang": "es",
+  "start_url": "/panel/dashboard-ventas",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0a0a12",
+  "orientation": "portrait",
+  "background_color": "#0a0a0f",
   "theme_color": "#00d4ff",
   "icons": [
     {
