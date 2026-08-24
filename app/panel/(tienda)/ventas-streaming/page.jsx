@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, Fragment } from 'react';
+import React, { useState, useEffect, useRef, Fragment, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
 import { useNotificaciones } from '@/app/context/NotificationContext';
@@ -39,6 +39,7 @@ export default function VentasStreamingPage() {
   const [currentUser, setCurrentUser] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [verTodo, setVerTodo] = useState(true);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showPlataformasModal, setShowPlataformasModal] = useState(false);
   const [selectedVenta, setSelectedVenta] = useState(null);
@@ -161,11 +162,7 @@ export default function VentasStreamingPage() {
           ]);
           
           if (v) {
-            let ventasData = v;
-            if (esVendedor && !esAdmin && !esSocio && usuarioActual?.nombre) {
-              ventasData = v.filter(vt => (vt.vendedor || '').toLowerCase() === (usuarioActual.nombre || '').toLowerCase());
-            }
-            setVentas(ventasData);
+            setVentas(v);
           }
           if (c) {
             // ✅ SINCRONIZACIÓN: cuentas usadas en ventas quedan ocupadas y con el perfil del cliente
@@ -891,7 +888,13 @@ export default function VentasStreamingPage() {
     }
   };
 
-  const ventasFiltradas = ventas.filter(v =>
+  // ✅ VISIBILIDAD: Admin alterna "Ver todo / Solo mío"; Socio y Vendedor solo ven sus ventas
+  const ventasVisibles = useMemo(() => {
+    if (esAdmin && verTodo) return ventas;
+    return ventas.filter(vt => (vt.vendedor || '').toLowerCase() === (usuarioActual?.nombre || '').toLowerCase());
+  }, [ventas, verTodo, esAdmin, usuarioActual]);
+
+  const ventasFiltradas = ventasVisibles.filter(v =>
     v.cliente?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     v.plataformas?.some(p => p.plataforma?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
@@ -982,7 +985,7 @@ export default function VentasStreamingPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 w-full">
         <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
           <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-cyan/10 md:bg-voltech-cyan/20 text-voltech-cyan shrink-0 flex items-center justify-center"><MonitorPlay className="w-5 h-5" /></div>
-          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Ventas Activas</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{ventas.filter(v => v.estado === 'activa').length}</p></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Ventas Activas</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{ventasVisibles.filter(v => v.estado === 'activa').length}</p></div>
         </div>
         <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
           <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-success/10 md:bg-voltech-success/20 text-voltech-success shrink-0 flex items-center justify-center"><Database className="w-5 h-5" /></div>
@@ -990,11 +993,11 @@ export default function VentasStreamingPage() {
         </div>
         <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
           <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-warning/10 md:bg-voltech-warning/20 text-voltech-warning shrink-0 flex items-center justify-center"><AlertTriangle className="w-5 h-5" /></div>
-          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Por Vencer (7 días)</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{ventas.filter(v => v.plataformas?.some(p => { const d = calcularDiasRestantes(p.fechaVencimiento); return d <= 7 && d >= 0; }) && v.estado === 'activa').length}</p></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Por Vencer (7 días)</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{ventasVisibles.filter(v => v.plataformas?.some(p => { const d = calcularDiasRestantes(p.fechaVencimiento); return d <= 7 && d >= 0; }) && v.estado === 'activa').length}</p></div>
         </div>
         <div className="bg-slate-900/60 md:bg-voltech-surface border border-slate-800/80 md:border-voltech-border rounded-2xl md:rounded-xl p-3.5 md:p-4 flex items-center gap-3">
           <div className="p-2.5 md:p-2 rounded-xl md:rounded-lg bg-voltech-purple/10 md:bg-voltech-purple/20 text-voltech-purple shrink-0 flex items-center justify-center"><DollarSign className="w-5 h-5" /></div>
-          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Ingresos del Mes</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">${ventas.filter(v => v.fecharegistro?.startsWith(new Date().toISOString().slice(0, 7))).reduce((acc, v) => acc + (v.total || 0), 0).toFixed(2)}</p></div>
+          <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Ingresos del Mes</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">${ventasVisibles.filter(v => v.fecharegistro?.startsWith(new Date().toISOString().slice(0, 7))).reduce((acc, v) => acc + (v.total || 0), 0).toFixed(2)}</p></div>
         </div>
       </div>
 
@@ -1093,7 +1096,15 @@ export default function VentasStreamingPage() {
 
           <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
             <div className="p-4 border-b border-voltech-border flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-              <h3 className="text-lg font-bold text-white">Historial de Ventas</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-lg font-bold text-white">Historial de Ventas</h3>
+                {esAdmin && (
+                  <div className="flex rounded-lg overflow-hidden border border-voltech-border">
+                    <button onClick={() => setVerTodo(true)} className={`px-3 py-1.5 text-xs font-medium transition-colors ${verTodo ? 'bg-voltech-cyan/20 text-voltech-cyan' : 'bg-voltech-dark text-voltech-muted hover:text-white'}`}>👁 Ver todo</button>
+                    <button onClick={() => setVerTodo(false)} className={`px-3 py-1.5 text-xs font-medium transition-colors ${!verTodo ? 'bg-voltech-cyan/20 text-voltech-cyan' : 'bg-voltech-dark text-voltech-muted hover:text-white'}`}>👤 Solo mío</button>
+                  </div>
+                )}
+              </div>
               <div className="relative w-full md:w-64"><Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500/50" /></div>
             </div>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import ModalWhatsApp from '@/components/ModalWhatsApp';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -33,6 +33,7 @@ export default function VentasProductosPage() {
   
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [verTodo, setVerTodo] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
   const [showWhatsappModal, setShowWhatsappModal] = useState(null);
   const [whatsappMode, setWhatsappMode] = useState('gracias');
@@ -138,10 +139,6 @@ export default function VentasProductosPage() {
           }
         }
 
-        if (esVendedor && usuarioActual?.nombre) {
-          vts = vts.filter(v => v.vendedor?.toLowerCase() === usuarioActual.nombre.toLowerCase());
-        }
-
         setVentas(vts);
         setProductos(prods);
         setClientes(clts);
@@ -166,7 +163,7 @@ export default function VentasProductosPage() {
   }, [esVendedor, usuarioActual]);
 
   const tasaBCV = settings.tasaBCV || 36.5;
-  const vendedores = equipo.filter(m => m.activo && (m.rol === 'vendedor' || m.rol === 'admin' || m.rol === 'Admin'));
+  const vendedores = equipo.filter(m => m.activo && (m.rol === 'vendedor' || m.rol === 'admin' || m.rol === 'Admin' || m.rol === 'socio'));
   const productosDisponibles = productos.filter(p => {
   const stock = Number(p.cantidad || 0);
   const tipo = (p.tipo || '').toLowerCase();
@@ -630,7 +627,7 @@ export default function VentasProductosPage() {
     setFormData({
       numeroOrden: generarNumeroOrden(), 
       fecha: new Date().toISOString().split('T')[0],
-      vendedor: esVendedor ? (usuarioActual?.nombre || '') : '',
+      vendedor: (esVendedor || esSocio) ? (usuarioActual?.nombre || '') : '',
       cliente: '', 
       telefono: '',
       productos: [{ 
@@ -910,11 +907,17 @@ export default function VentasProductosPage() {
       setShowWhatsappModal(null);
   };
 
-  const ventasHoy = ventas.filter(v => v.fecha === new Date().toISOString().split('T')[0]);
+  // ✅ VISIBILIDAD: Admin alterna "Ver todo / Solo mío"; Socio y Vendedor solo ven sus ventas
+  const ventasVisibles = useMemo(() => {
+    if (esAdmin && verTodo) return ventas;
+    return ventas.filter(v => (v.vendedor || '').toLowerCase() === (usuarioActual?.nombre || '').toLowerCase());
+  }, [ventas, verTodo, esAdmin, usuarioActual]);
+
+  const ventasHoy = ventasVisibles.filter(v => v.fecha === new Date().toISOString().split('T')[0]);
   const totalIngresosHoy = ventasHoy.reduce((acc, v) => acc + Number(v.montoAbonado || v.total || 0), 0);
-  const totalPendiente = ventas.reduce((acc, v) => acc + Number(v.montoPendiente || 0), 0);
-  const totalProductosVendidos = ventas.reduce((acc, v) => acc + v.productos.reduce((a, p) => a + Number(p.cantidad || 1), 0), 0);
-  const ventasFiltradas = ventas.filter(v => v.cliente.toLowerCase().includes(searchTerm.toLowerCase()) || v.productos.some(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase())));
+  const totalPendiente = ventasVisibles.reduce((acc, v) => acc + Number(v.montoPendiente || 0), 0);
+  const totalProductosVendidos = ventasVisibles.reduce((acc, v) => acc + v.productos.reduce((a, p) => a + Number(p.cantidad || 1), 0), 0);
+  const ventasFiltradas = ventasVisibles.filter(v => v.cliente.toLowerCase().includes(searchTerm.toLowerCase()) || v.productos.some(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase())));
 
   return (
         <div className="space-y-6">
@@ -977,7 +980,7 @@ export default function VentasProductosPage() {
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Fecha *</label><input type="date" value={formData.fecha} onChange={(e) => setFormData({ ...formData, fecha: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                   <div>
                     <label className="block text-xs text-voltech-muted mb-1 ml-1">Vendedor *</label>
-                    <select value={formData.vendedor} onChange={(e) => setFormData({ ...formData, vendedor: e.target.value })} disabled={esVendedor} className={`input-voltech w-full rounded-lg px-4 py-2 text-sm ${esVendedor ? 'bg-voltech-dark/50 cursor-not-allowed' : ''}`}>
+                    <select value={formData.vendedor} onChange={(e) => setFormData({ ...formData, vendedor: e.target.value })} disabled={esVendedor || esSocio} className={`input-voltech w-full rounded-lg px-4 py-2 text-sm ${esVendedor || esSocio ? 'bg-voltech-dark/50 cursor-not-allowed' : ''}`}>
                       <option value="">-- Selecciona --</option>
                       {vendedores.map(v => (<option key={v.id} value={v.nombre}>{v.nombre} ({v.rol})</option>))}
                     </select>
@@ -1280,7 +1283,15 @@ export default function VentasProductosPage() {
 
       <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
         <div className="p-4 border-b border-voltech-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h3 className="text-lg font-bold text-white">Historial de Ventas</h3>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-lg font-bold text-white">Historial de Ventas</h3>
+            {esAdmin && (
+              <div className="flex rounded-lg overflow-hidden border border-voltech-border">
+                <button onClick={() => setVerTodo(true)} className={`px-3 py-1.5 text-xs font-medium transition-colors ${verTodo ? 'bg-voltech-cyan/20 text-voltech-cyan' : 'bg-voltech-dark text-voltech-muted hover:text-white'}`}>👁 Ver todo</button>
+                <button onClick={() => setVerTodo(false)} className={`px-3 py-1.5 text-xs font-medium transition-colors ${!verTodo ? 'bg-voltech-cyan/20 text-voltech-cyan' : 'bg-voltech-dark text-voltech-muted hover:text-white'}`}>👤 Solo mío</button>
+              </div>
+            )}
+          </div>
           <div className="relative w-full sm:flex-1 sm:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
             <input type="text" placeholder="Buscar por cliente o producto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-voltech w-full rounded-lg pl-10 pr-4 py-2 text-sm" />
