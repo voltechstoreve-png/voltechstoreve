@@ -16,6 +16,7 @@ function RegistroContent() {
   const [invitationValid, setInvitationValid] = useState(false);
   const [invitationData, setInvitationData] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [registroExitoso, setRegistroExitoso] = useState(false);
   const [formData, setFormData] = useState({
     nombre: '',
     email: '',
@@ -134,8 +135,8 @@ function RegistroContent() {
       telefono: formData.telefono,
       password: formData.password,
       rol: invitationData ? invitationData.rol : 'vendedor',
-      activo: true,
-      aprobado: true,
+      activo: false,
+      aprobado: false,
       registrado: true,
       fechaRegistro: new Date().toISOString()
     };
@@ -179,17 +180,32 @@ function RegistroContent() {
     }
 
     localStorage.setItem('voltech_equipo', JSON.stringify(equipo));
-    localStorage.setItem('voltech_user', JSON.stringify({
-      nombre: formData.nombre,
-      email: emailLower,
-      rol: userData.rol
-    }));
 
-    toast.success('¡Registro exitoso! Bienvenido a VOLTECH');
-    setTimeout(() => {
-      router.push('/panel/dashboard');
-    }, 1500);
+    toast.success('¡Registro recibido! Tu cuenta está pendiente de aprobación.');
+    setRegistroExitoso(true);
   };
+
+  if (registroExitoso) {
+    return (
+      <div className="min-h-screen bg-voltech-dark flex items-center justify-center p-4">
+        <div className="bg-voltech-surface border border-voltech-border rounded-2xl p-4 sm:p-8 max-w-md w-full text-center">
+          <CheckCircle className="w-12 h-12 sm:w-16 sm:h-16 text-voltech-success mx-auto mb-4" />
+          <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">¡Registro recibido!</h1>
+          <p className="text-xs sm:text-sm text-voltech-muted mb-6">
+            Tu cuenta fue creada y está <strong>esperando autorización</strong> del administrador.
+            Te avisaremos cuando esté aprobada para que puedas ingresar.
+          </p>
+          <button
+            onClick={() => router.push('/portal')}
+            className="w-full btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"
+          >
+            Ir al Login
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!invitationValid) {
     return (
@@ -199,7 +215,7 @@ function RegistroContent() {
           <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">Invitación Inválida</h1>
           <p className="text-xs sm:text-sm text-voltech-muted mb-6">El link de invitación no es válido o ha expirado.</p>
           <button
-            onClick={() => router.push('/login')}
+            onClick={() => router.push('/portal')}
             className="w-full btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"
           >
             Ir al Login

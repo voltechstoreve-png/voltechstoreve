@@ -187,7 +187,7 @@ export default function LoginPage() {
         localStorage.setItem('voltech_user', JSON.stringify(data));
         toast.success('¡Bienvenido de vuelta! Redirigiendo...');
         setTimeout(() => {
-          window.location.href = '/panel/dashboard';
+          window.location.href = '/panel/dashboard-ventas';
         }, 1500);
       } else {
         localStorage.setItem('voltech_user', JSON.stringify({
@@ -198,7 +198,7 @@ export default function LoginPage() {
         }));
         toast.success('¡Bienvenido de vuelta! Redirigiendo... (Modo Local)');
         setTimeout(() => {
-          window.location.href = '/panel/dashboard';
+          window.location.href = '/panel/dashboard-ventas';
         }, 1500);
       }
     } else {

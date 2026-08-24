@@ -2066,21 +2066,20 @@ productosAgrupados.map(([cat, items]) => (
                                   {!hayStreaming && hayFisicos && ' para productos físicos'}
                                 </span>
                               </label>
-                              <div className={`mt-2 text-[10px] ${mutedText} max-h-24 overflow-y-auto border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'} pt-2 space-y-2`}>
-                                {(hayFisicos || (!hayStreaming && !hayFisicos)) && terminosFisicos && (
-                                  <div>
-                                    <p className="font-semibold text-purple-600 mb-1">📦 Productos Físicos:</p>
-                                    <p className="whitespace-pre-line">{terminosFisicos.substring(0, 300)}...</p>
-                                  </div>
-                                )}
-                                {hayStreaming && terminosStreaming && (
-                                  <div>
-                                    <p className="font-semibold text-purple-600 mb-1">📺 Streaming:</p>
-                                    <p className="whitespace-pre-line">{terminosStreaming.substring(0, 300)}...</p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
+<div className={`mt-2 text-[10px] ${mutedText} border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'} pt-2 space-y-2`}>
+{(hayFisicos || (!hayStreaming && !hayFisicos)) && terminosFisicos && (
+<div>
+<p className="font-semibold text-purple-600 mb-1">📦 Productos Físicos:</p>
+<p className="whitespace-pre-line">{terminosFisicos}</p>
+</div>
+)}
+{hayStreaming && terminosStreaming && (
+<div>
+<p className="font-semibold text-purple-600 mb-1">📺 Streaming:</p>
+<p className="whitespace-pre-line">{terminosStreaming}</p>
+</div>
+)}
+</div>                            </div>
                           );
                         })()}
                         <div className={`border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'} pt-4 mb-4 space-y-1 text-sm`}>
