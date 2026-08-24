@@ -186,12 +186,10 @@ useEffect(() => {
         }
     // ✅ Combina SIEMPRE con el respaldo local (así aparecen aunque Supabase falle)
     try {
-      const localPubs = JSON.parse(localStorage.getItem('voltech_publicidad') || '[]').filter(p => p.estado === 'activo');
-      const porId = new Map(pubs.map(p => [p.id, p]));
-      localPubs.forEach(p => porId.set(p.id, p));
-      pubs = Array.from(porId.values());
+    const localPubs = JSON.parse(localStorage.getItem('voltech_publicidad') || '[]').filter(p => p.estado === 'activo');
+    if (pubs.length === 0) pubs = localPubs;
     } catch (e) {}
-    if (vts.length === 0) {
+        if (vts.length === 0) {
       const localVts = localStorage.getItem('voltech_ventas');
       if (localVts) vts = JSON.parse(localVts);
     }      if (!mvConfig) {
@@ -1006,13 +1004,15 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
       {/* 🖥️ DESKTOP: Mantiene altura fija pero ajusta la imagen con su Aspect Ratio natural */}
       <div className="hidden lg:block relative">
         {pubsActivas.length > 0 && (
-          <div className="grid grid-cols-2 gap-4 w-full">
-            {[0, 1].map(offset => {
+          <div className={`grid gap-4 w-full ${pubsActivas.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            {(pubsActivas.length === 1 ? [0] : [0, 1]).map(offset => {
               const pub = pubsActivas[(bannerIdx + offset) % pubsActivas.length];
-              if (!pub) return null;
-              const aspect = ratios[pub.id] || 1;
-
-              return (
+                if (!pub) return null;
+                const aspect = ratios[pub.id] || 1;
+                const img1 = (pub.imagenes && pub.imagenes[0]) || pub.url_imagen;
+                const img2 = (pub.imagenes && pub.imagenes[1]) || pub.url_imagen_2;
+                const esModo2 = (pub.modo_2_imagenes === true || pub.modo2Imagenes === true || pub.tipo_disposicion === '35_35_30') && !!img2 && img2 !== img1;
+                return (
                 <a 
                   key={pub.id + '-' + offset} 
                   href={pub.url_destino || '#'} 
@@ -1020,30 +1020,26 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
                   onClick={() => registrarClickPub(pub)} 
                   className="relative w-full h-[280px] rounded-2xl overflow-hidden border border-voltech-border bg-black shadow-xl flex"
                 >
-        {(pub.imagenes?.length >= 2 || pub.tipo_disposicion === '35_35_30' || pub.url_imagen_2) ? (
-        <div className="h-full w-[70%] bg-black flex overflow-hidden">
-        <div className="w-1/2 h-full bg-black overflow-hidden">
-        <img src={pub.imagenes?.[0] || pub.url_imagen} alt={pub.titulo} className="w-full h-full object-cover" />
-        </div>
-        <div className="w-1/2 h-full bg-black overflow-hidden">
-        <img src={pub.imagenes?.[1] || pub.url_imagen_2} alt={pub.titulo} className="w-full h-full object-cover" />
-        </div>
-        </div>
-        ) : (
-        <div
-        className="h-full max-w-[70%] bg-black flex items-center justify-center overflow-hidden"
-        style={{ aspectRatio: `${aspect}` }}
-        >
-        {pub.url_video ? (
-        <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
-        ) : pub.url_imagen ? (
-        <img src={pub.url_imagen} alt={pub.titulo} className="w-full h-full object-cover" />
-        ) : (
-        <ImageIcon className="w-12 h-12 opacity-40 text-voltech-muted" />
-        )}
-        </div>
-        )}         
-         <div className="relative h-full flex-1 bg-black">
+                {esModo2 ? (
+                <div className="h-full w-[70%] bg-black flex overflow-hidden">
+                <div className="w-1/2 h-full bg-black overflow-hidden"><img src={img1} alt={pub.titulo} className="w-full h-full object-cover" /></div>
+                <div className="w-1/2 h-full bg-black overflow-hidden"><img src={img2} alt={pub.titulo} className="w-full h-full object-cover" /></div>
+                </div>
+                ) : (
+                <div
+                className="h-full max-w-[70%] bg-black flex items-center justify-center overflow-hidden"
+                style={{ aspectRatio: `${aspect}` }}
+                >
+                {pub.url_video ? (
+                <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+                ) : img1 ? (
+                <img src={img1} alt={pub.titulo} className="w-full h-full object-cover" />
+                ) : (
+                <ImageIcon className="w-12 h-12 opacity-40 text-voltech-muted" />
+                )}
+                </div>
+                )}        
+                  <div  className="relative h-full flex-1 bg-black">
                     {pub.url_fondo && <img src={pub.url_fondo} alt="" className="absolute inset-0 w-full h-full object-cover" />}
                     <div className="absolute inset-0 bg-black/60"></div>
                     <div className="relative z-10 h-full w-full flex flex-col items-center justify-center text-center gap-2 p-4">
@@ -1086,12 +1082,14 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
       if (pub.tipo_disposicion === '35_35_30') {
         pctMedia = 'w-[70%]';
         pctTexto = 'w-[30%]';
-      } else if (pub.tipo_disposicion === '70_30') {
+        } else if (pub.tipo_disposicion === '70_30') {
         pctMedia = 'w-[70%]';
         pctTexto = 'w-[30%]';
-      }
-
-      return (
+        }
+        const img1 = (pub.imagenes && pub.imagenes[0]) || pub.url_imagen;
+        const img2 = (pub.imagenes && pub.imagenes[1]) || pub.url_imagen_2;
+        const esModo2 = (pub.modo_2_imagenes === true || pub.modo2Imagenes === true || pub.tipo_disposicion === '35_35_30') && !!img2 && img2 !== img1;
+        return (
         <a 
           key={pub.id} 
           href={pub.url_destino || '#'} 
@@ -1101,7 +1099,7 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
         >
           {/* 1. LADO IZQUIERDO: Multimedia (Sin padding blanco, encaje directo) */}
             <div className={`${(pub.tipo_disposicion === '35_35_30' || pub.imagenes?.length >= 2 || pub.url_imagen_2) ? 'h-full w-[70%] max-w-[70%]' : 'h-full max-w-[70%]'} relative flex items-center justify-center bg-black overflow-hidden shrink-0`} style={(pub.tipo_disposicion === '35_35_30' || pub.imagenes?.length >= 2 || pub.url_imagen_2) ? undefined : { aspectRatio: `${ratios[pub.id] || 1}` }}>
-            {(pub.tipo_disposicion === '35_35_30' || pub.imagenes?.length >= 2 || pub.url_imagen_2) ? (
+            {esModo2 ? (
             <div className="w-full h-full flex overflow-x-auto overflow-y-hidden no-scrollbar snap-x snap-mandatory">
             <div className="w-full h-full shrink-0 snap-center bg-black">
             <img src={(pub.imagenes && pub.imagenes[0]) || pub.url_imagen} alt="" className="w-full h-full object-cover" />

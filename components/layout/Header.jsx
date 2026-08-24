@@ -237,7 +237,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
       localStorage.removeItem('voltech_user');
       toast.success('Sesión cerrada correctamente');
       setTimeout(() => {
-        router.push('/login');
+        router.push('/portal');
       }, 1000);
     }
   };
