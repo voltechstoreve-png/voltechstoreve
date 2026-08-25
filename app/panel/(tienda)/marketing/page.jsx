@@ -396,14 +396,32 @@ cargarDatos();
     setTextoMarketplace(mensaje.trim());
   }, [productoMarketplace, precioPromocionMarketplace, plantillaMarketplaceSeleccionada, plantillaContactoMpSeleccionada, plantillas]);
 
-  const handleImageUpload = (file) => {
+    // ✅ Comprime a JPEG (máx 1280px) para que el upsert a Supabase no falle por peso
+    const comprimirImagen = (dataUrl) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+    const max = 1280;
+    const scale = Math.min(1, max / Math.max(img.width, img.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    resolve(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+    });
+    const handleImageUpload = (file) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) { toast.error('Solo se permiten imágenes'); return; }
     if (file.size > 5 * 1024 * 1024) { toast.error('La imagen no debe pesar más de 5MB'); return; }
     const reader = new FileReader();
-    reader.onloadend = () => { setImagenPreview(reader.result); setFormDataPublicidad({...formDataPublicidad, url_imagen: reader.result}); };
+    reader.onloadend = async () => { const url = await comprimirImagen(reader.result); setImagenPreview(url); setFormDataPublicidad(prev => ({...prev, url_imagen: url})); };
     reader.readAsDataURL(file);
-  };
+    };
 
   // ✅ Cargar VARIAS imágenes; la primera se vuelve PORTADA automáticamente
   const handleImagenesExtra = (files) => {
@@ -411,10 +429,11 @@ cargarDatos();
       if (!file.type.startsWith('image/')) { toast.error('Solo se permiten imágenes'); return; }
       if (file.size > 5 * 1024 * 1024) { toast.error('Cada imagen máximo 5MB'); return; }
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagenesExtra(prev => [...prev, reader.result]);
-        setImagenPreview(prev => prev || reader.result);
-        setFormDataPublicidad(prev => prev.url_imagen ? prev : { ...prev, url_imagen: reader.result });
+      reader.onloadend = async () => {
+      const url = await comprimirImagen(reader.result);
+      setImagenesExtra(prev => [...prev, url]);
+      setImagenPreview(prev => prev || url);
+      setFormDataPublicidad(prev => prev.url_imagen ? prev : { ...prev, url_imagen: url });
       };
       reader.readAsDataURL(file);
     });
@@ -521,11 +540,14 @@ cargarDatos();
     if (!(formDataPublicidad.saludo_whatsapp || '').trim() || !(formDataPublicidad.cierre_whatsapp || '').trim() || !(formDataPublicidad.url_destino || '').trim()) {
     return toast.error('El saludo, la URL de destino y el cierre del mensaje son obligatorios');
 }
-    const nuevaPublicidad = { id: publicidadEditando ? publicidadEditando.id : `pub-${Date.now()}`, ...formDataPublicidad, modo_2_imagenes: modoDosImagenes, precio_manual: precioBaseNum > 0 ? `$${precioFinalNum.toFixed(2)}` : formDataPublicidad.precio_manual, precio_original: descuentoPct > 0 ? precioBaseNum : null, descuento_pct: descuentoPct, mensaje_whatsapp: mensajePublicidadWA, imagenes: [formDataPublicidad.url_imagen, ...imagenesExtra].filter(Boolean), url_fondo: formDataPublicidad.url_fondo || '', fecha_creacion: new Date().toISOString() };
+const portadaComp = await comprimirImagen(formDataPublicidad.url_imagen);
+const extrasComp = [];
+for (const im of imagenesExtra) { if (im && im !== formDataPublicidad.url_imagen) extrasComp.push(await comprimirImagen(im)); }
+const nuevaPublicidad = { id: publicidadEditando ? publicidadEditando.id : `pub-${Date.now()}`, ...formDataPublicidad, url_imagen: portadaComp, precio_manual: precioBaseNum > 0 ? `$${precioFinalNum.toFixed(2)}` : formDataPublicidad.precio_manual, precio_original: descuentoPct > 0 ? precioBaseNum : null, descuento_pct: descuentoPct, mensaje_whatsapp: mensajePublicidadWA, imagenes: [portadaComp, ...extrasComp].filter(Boolean), url_fondo: formDataPublicidad.url_fondo || '', fecha_creacion: new Date().toISOString() };
     if (supabase) {
 try {
 const { error } = await supabase.from('publicidad').upsert(nuevaPublicidad, { onConflict: 'id' });
-if (error) console.warn('No se sincronizó con Supabase:', error.message);
+if (error) { console.error('No se sincronizó con Supabase:', error.message); toast.error('⚠️ Supabase: ' + error.message); }
 } catch (e) {
 console.warn('Supabase no disponible, guardado solo en este navegador:', e.message);
 }
