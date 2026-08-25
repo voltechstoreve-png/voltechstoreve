@@ -1008,12 +1008,13 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
           <div className={`grid gap-4 w-full ${pubsActivas.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
             {(pubsActivas.length === 1 ? [0] : [0, 1]).map(offset => {
               const pub = pubsActivas[(bannerIdx + offset) % pubsActivas.length];
-                if (!pub) return null;
-                const aspect = ratios[pub.id] || 1;
-                const img1 = (pub.imagenes && pub.imagenes[0]) || pub.url_imagen;
-                const img2 = (pub.imagenes && pub.imagenes[1]) || pub.url_imagen_2;
-                const esModo2 = (pub.modo_2_imagenes === true || pub.modo2Imagenes === true || pub.tipo_disposicion === '35_35_30') && !!img2 && img2 !== img1;
-                return (
+              if (!pub) return null;
+              const aspect = ratios[pub.id] || 1;
+              const img1 = (pub.imagenes && pub.imagenes[0]) || pub.url_imagen;
+              const img2 = (pub.imagenes && pub.imagenes[1]) || pub.url_imagen_2;
+              const esModo2 = (pub.modo_2_imagenes === true || pub.modo2Imagenes === true || pub.tipo_disposicion === '35_35_30') && !!img2 && img2 !== img1;
+              
+              return (
                 <a 
                   key={pub.id + '-' + offset} 
                   href={pub.url_destino || '#'} 
@@ -1021,26 +1022,27 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
                   onClick={() => registrarClickPub(pub)} 
                   className="relative w-full h-[280px] rounded-2xl overflow-hidden border border-voltech-border bg-black shadow-xl flex"
                 >
-                {esModo2 ? (
-                <div className="h-full w-[70%] bg-black flex overflow-hidden">
-                <div className="w-1/2 h-full bg-black overflow-hidden"><img src={img1} alt={pub.titulo} className="w-full h-full object-cover" /></div>
-                <div className="w-1/2 h-full bg-black overflow-hidden"><img src={img2} alt={pub.titulo} className="w-full h-full object-cover" /></div>
-                </div>
-                ) : (
-                <div
-                className="h-full max-w-[70%] bg-black flex items-center justify-center overflow-hidden"
-                style={{ aspectRatio: `${aspect}` }}
-                >
-                {pub.url_video ? (
-                <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
-                ) : img1 ? (
-                <img src={img1} alt={pub.titulo} className="w-full h-full object-cover" />
-                ) : (
-                <ImageIcon className="w-12 h-12 opacity-40 text-voltech-muted" />
-                )}
-                </div>
-                )}        
-                  <div  className="relative h-full flex-1 bg-black">
+                  {esModo2 ? (
+                    <div className="h-full w-[70%] bg-black flex overflow-hidden">
+                      <div className="w-1/2 h-full bg-black overflow-hidden"><img src={img1} alt={pub.titulo} className="w-full h-full object-cover" /></div>
+                      <div className="w-1/2 h-full bg-black overflow-hidden"><img src={img2} alt={pub.titulo} className="w-full h-full object-cover" /></div>
+                    </div>
+                  ) : (
+                    <div
+                      className="h-full max-w-[70%] bg-black flex items-center justify-center overflow-hidden"
+                      style={{ aspectRatio: `${aspect}` }}
+                    >
+                      {pub.url_video ? (
+                        <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+                      ) : img1 ? (
+                        <img src={img1} alt={pub.titulo} className="w-full h-full object-cover" />
+                      ) : (
+                        <ImageIcon className="w-12 h-12 opacity-40 text-voltech-muted" />
+                      )}
+                    </div>
+                  )}        
+                  
+                  <div className="relative h-full flex-1 bg-black">
                     {pub.url_fondo && <img src={pub.url_fondo} alt="" className="absolute inset-0 w-full h-full object-cover" />}
                     <div className="absolute inset-0 bg-black/60"></div>
                     <div className="relative z-10 h-full w-full flex flex-col items-center justify-center text-center gap-2 p-4">
@@ -1072,133 +1074,125 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
         )}
       </div>
 
-{/* 📱 MÓVIL: Banner Único Horizontal con Look Estilo PC (HBO MAX / Netflix) */}
-<div className="lg:hidden relative mb-6" onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)} onTouchStart={() => setIsPaused(true)} onTouchEnd={() => setIsPaused(false)}>
-  <div ref={bannerRef} onScroll={onBannerScroll} className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory rounded-2xl">
-    {pubsActivas.map(pub => {
-      // Cálculo de proporciones exactas según tipo
-      let pctMedia = 'w-[55%]';
-      let pctTexto = 'w-[45%]';
-
-      if (pub.tipo_disposicion === '35_35_30') {
-        pctMedia = 'w-[70%]';
-        pctTexto = 'w-[30%]';
-        } else if (pub.tipo_disposicion === '70_30') {
-        pctMedia = 'w-[70%]';
-        pctTexto = 'w-[30%]';
-        }
-        const img1 = (pub.imagenes && pub.imagenes[0]) || pub.url_imagen;
-        const img2 = (pub.imagenes && pub.imagenes[1]) || pub.url_imagen_2;
-        const esModo2 = (pub.modo_2_imagenes === true || pub.modo2Imagenes === true || pub.tipo_disposicion === '35_35_30') && !!img2 && img2 !== img1;
-        return (
-        <a 
-          key={pub.id} 
-          href={pub.url_destino || '#'} 
-          target={pub.url_destino ? '_blank' : '_self'} 
-          onClick={() => registrarClickPub(pub)} 
-          className="shrink-0 w-full snap-start rounded-2xl overflow-hidden bg-black border border-slate-800/80 flex flex-row items-center h-44 shadow-2xl"
-        >
-          {/* 1. LADO IZQUIERDO: Multimedia (Sin padding blanco, encaje directo) */}
-            <div className={`${(pub.tipo_disposicion === '35_35_30' || pub.imagenes?.length >= 2 || pub.url_imagen_2) ? 'h-full w-[70%] max-w-[70%]' : 'h-full max-w-[70%]'} relative flex items-center justify-center bg-black overflow-hidden shrink-0`} style={(pub.tipo_disposicion === '35_35_30' || pub.imagenes?.length >= 2 || pub.url_imagen_2) ? undefined : { aspectRatio: `${ratios[pub.id] || 1}` }}>
-            {esModo2 ? (
-            <div className="w-full h-full flex overflow-x-auto overflow-y-hidden no-scrollbar snap-x snap-mandatory">
-            <div className="w-full h-full shrink-0 snap-center bg-black">
-            <img src={(pub.imagenes && pub.imagenes[0]) || pub.url_imagen} alt="" className="w-full h-full object-cover" />
-            </div>
-            <div className="w-full h-full shrink-0 snap-center bg-black">
-            <img src={(pub.imagenes && pub.imagenes[1]) || pub.url_imagen_2} alt="" className="w-full h-full object-cover" />
-            </div>
-            </div>
-            ) : pub.url_video ? (
-              <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
-            ) : pub.url_imagen ? (
-              <img src={pub.url_imagen} alt={pub.titulo} className="w-full h-full object-cover" />
-            ) : (
-              <ImageIcon className="w-8 h-8 opacity-40 text-voltech-muted" />
-            )}
-          </div>
-
-          {/* 2. LADO DERECHO: Fondo Negro Puro + Texto + Botón */}
-          <div className="relative flex-1 h-full p-3 flex flex-col justify-center items-center text-center gap-1 bg-black overflow-hidden shrink-0">
-            {pub.url_fondo && (
-              <img src={pub.url_fondo} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 pointer-events-none" />
-            )}
+      {/* 📱 MÓVIL: Banner Único Horizontal con Look Estilo PC (HBO MAX / Netflix) */}
+      <div className="lg:hidden relative mb-6" onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)} onTouchStart={() => setIsPaused(true)} onTouchEnd={() => setIsPaused(false)}>
+        <div ref={bannerRef} onScroll={onBannerScroll} className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory rounded-2xl">
+          {pubsActivas.map(pub => {
+            const img1 = (pub.imagenes && pub.imagenes[0]) || pub.url_imagen;
+            const img2 = (pub.imagenes && pub.imagenes[1]) || pub.url_imagen_2;
+            const esModo2 = (pub.modo_2_imagenes === true || pub.modo2Imagenes === true || pub.tipo_disposicion === '35_35_30') && !!img2 && img2 !== img1;
             
-            <p className="text-xs font-black text-white tracking-wide uppercase drop-shadow leading-tight line-clamp-2 w-full z-10">
-              {pub.titulo}
-            </p>
-            
-            {pub.descripcion && (
-              <p className="text-[10px] text-slate-300 drop-shadow line-clamp-1 z-10">
-                {pub.descripcion}
-              </p>
-            )}
-            
-            {pub.precio_original > 0 && (
-              <p className="text-gray-400 line-through text-[10px] drop-shadow z-10">${Number(pub.precio_original).toFixed(2)}</p>
-            )}
-            {getPrecioPub(pub) && (
-              <p className="text-emerald-400 font-black text-xs drop-shadow z-10 flex items-center gap-1 justify-center">
-                {getPrecioPub(pub)}
-                {pub.descuento_pct > 0 && (
-                  <span className="text-[8px] bg-red-500 text-white px-1 py-0.5 rounded-full font-black">
-                    −{pub.descuento_pct}%
-                  </span>
-                )}
-              </p>
-            )}
-            
-            <span 
-              className="mt-1 px-3 py-1.5 rounded-lg font-black transition-transform active:scale-95 text-[9px] uppercase shadow-md z-10 truncate max-w-full" 
-              style={{ backgroundColor: pub.color_boton || '#22d3ee', color: '#0a0a0a' }}
-            >
-              {pub.texto_boton || 'VER OFERTA'}
-            </span>
-          </div>
-        </a>
-      );
-    })}
-
-    {mvMovilActivo && (
-      <div className={`shrink-0 w-full snap-start rounded-2xl overflow-hidden border ${cardBorder} ${cardBg} p-4`}>
-        <h3 className={`text-sm font-bold mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>🔥 {masVendidosConfig?.titulo || 'Los Favoritos de Nuestros Clientes'}</h3>
-        <div className="space-y-2">
-          {productosMasVendidos.slice(0, masVendidosConfig?.cantidad_maxima || 3).map(p => { 
-            const pi = getPrecioMostrar(p); 
             return (
-              <div key={p.id} onClick={() => setSelectedProduct(p)} className={`flex items-center gap-3 p-2 rounded-lg border ${cardBorder} hover:border-voltech-cyan/50 cursor-pointer transition-all`}>
-                <div className="w-12 h-12 rounded bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-                  {p.imagen ? <img src={p.imagen} alt={p.producto} className="w-full h-full object-contain" /> : <Package className="w-5 h-5 text-slate-300" />}
+              <a 
+                key={pub.id} 
+                href={pub.url_destino || '#'} 
+                target={pub.url_destino ? '_blank' : '_self'} 
+                onClick={() => registrarClickPub(pub)} 
+                className="shrink-0 w-full snap-start rounded-2xl overflow-hidden bg-black border border-slate-800/80 flex flex-row items-center h-44 shadow-2xl"
+              >
+                {/* 1. LADO IZQUIERDO: Multimedia */}
+                <div className={`${(pub.tipo_disposicion === '35_35_30' || pub.imagenes?.length >= 2 || pub.url_imagen_2) ? 'h-full w-[70%] max-w-[70%]' : 'h-full max-w-[70%]'} relative flex items-center justify-center bg-black overflow-hidden shrink-0`} style={(pub.tipo_disposicion === '35_35_30' || pub.imagenes?.length >= 2 || pub.url_imagen_2) ? undefined : { aspectRatio: `${ratios[pub.id] || 1}` }}>
+                  {esModo2 ? (
+                    <div className="w-full h-full flex overflow-x-auto overflow-y-hidden no-scrollbar snap-x snap-mandatory">
+                      <div className="w-full h-full shrink-0 snap-center bg-black">
+                        <img src={(pub.imagenes && pub.imagenes[0]) || pub.url_imagen} alt="" className="w-full h-full object-cover" />
+                      </div>
+                      <div className="w-full h-full shrink-0 snap-center bg-black">
+                        <img src={(pub.imagenes && pub.imagenes[1]) || pub.url_imagen_2} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    </div>
+                  ) : pub.url_video ? (
+                    <video src={pub.url_video} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+                  ) : pub.url_imagen ? (
+                    <img src={pub.url_imagen} alt={pub.titulo} className="w-full h-full object-cover" />
+                  ) : (
+                    <ImageIcon className="w-8 h-8 opacity-40 text-voltech-muted" />
+                  )}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-xs font-semibold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto}</p>
-                  <p className={`text-xs ${mutedText}`}>${pi.precioPrincipal?.toFixed(2)}</p>
-                </div>
-                {p.vendidos > 0 ? <span className="text-[9px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded-full font-bold flex-shrink-0">🔥 {p.vendidos}</span> : <Trophy className="w-4 h-4 text-yellow-500 flex-shrink-0" />}
-              </div>
-            ); 
-          })}
-        </div>
-        <div className={`mt-3 space-y-0.5 text-[10px] ${mutedText}`}>
-          {masVendidosConfig?.descripcion_1 && <p>{masVendidosConfig.descripcion_1}</p>}
-          {masVendidosConfig?.descripcion_2 && <p>{masVendidosConfig.descripcion_2}</p>}
-        </div>
-      </div>
-    )}
-  </div>
 
-  {totalSlides > 1 && (
-    <div className="mt-2.5 flex justify-center gap-1.5 z-10">
-      {Array.from({ length: totalSlides }).map((_, i) => (
-        <span key={i} className={`h-1.5 rounded-full transition-all ${i === bannerIdx ? 'w-6 bg-voltech-cyan' : 'w-2 bg-slate-700'}`} />
-      ))}
+                {/* 2. LADO DERECHO: Fondo Negro Puro + Texto + Botón */}
+                <div className="relative flex-1 h-full p-3 flex flex-col justify-center items-center text-center gap-1 bg-black overflow-hidden shrink-0">
+                  {pub.url_fondo && (
+                    <img src={pub.url_fondo} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 pointer-events-none" />
+                  )}
+                  
+                  <p className="text-xs font-black text-white tracking-wide uppercase drop-shadow leading-tight line-clamp-2 w-full z-10">
+                    {pub.titulo}
+                  </p>
+                  
+                  {pub.descripcion && (
+                    <p className="text-[10px] text-slate-300 drop-shadow line-clamp-1 z-10">
+                      {pub.descripcion}
+                    </p>
+                  )}
+                  
+                  {pub.precio_original > 0 && (
+                    <p className="text-gray-400 line-through text-[10px] drop-shadow z-10">${Number(pub.precio_original).toFixed(2)}</p>
+                  )}
+                  {getPrecioPub(pub) && (
+                    <p className="text-emerald-400 font-black text-xs drop-shadow z-10 flex items-center gap-1 justify-center">
+                      {getPrecioPub(pub)}
+                      {pub.descuento_pct > 0 && (
+                        <span className="text-[8px] bg-red-500 text-white px-1 py-0.5 rounded-full font-black">
+                          −{pub.descuento_pct}%
+                        </span>
+                      )}
+                    </p>
+                  )}
+
+                  <span
+                    className="mt-1 px-3 py-1.5 rounded-lg font-black transition-transform active:scale-95 text-[9px] uppercase shadow-md z-10 truncate max-w-full"
+                    style={{ backgroundColor: pub.color_boton || '#22d3ee', color: '#0a0a0a' }}
+                  >
+                    {pub.texto_boton || 'VER OFERTA'}
+                  </span>
+                </div>
+              </a>
+            );
+          })}
+          
+          {/* Slide de Más Vendidos en Móvil (si aplica) */}
+          {mvMovilActivo && (
+            <div className={`shrink-0 w-full snap-start rounded-2xl overflow-hidden border ${cardBorder} ${cardBg} p-4`}>
+              <h3 className={`text-sm font-bold mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>🔥 {masVendidosConfig?.titulo || 'Los Favoritos de Nuestros Clientes'}</h3>
+              <div className="space-y-2">
+                {productosMasVendidos.slice(0, masVendidosConfig?.cantidad_maxima || 3).map(p => {
+                  const pi = getPrecioMostrar(p);
+                  return (
+                    <div key={p.id} onClick={() => setSelectedProduct(p)} className={`flex items-center gap-3 p-2 rounded-lg border ${cardBorder} hover:border-voltech-cyan/50 cursor-pointer transition-all`}>
+                      <div className="w-12 h-12 rounded bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                        {p.imagen ? <img src={p.imagen} alt={p.producto} className="w-full h-full object-contain" /> : <Package className="w-5 h-5 text-slate-300" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs font-semibold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto}</p>
+                        <p className={`text-xs ${mutedText}`}>${pi.precioPrincipal?.toFixed(2)}</p>
+                      </div>
+                      {p.vendidos > 0 ? <span className="text-[9px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded-full font-bold flex-shrink-0">🔥 {p.vendidos}</span> : <Trophy className="w-4 h-4 text-yellow-500 flex-shrink-0" />}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className={`mt-3 space-y-0.5 text-[10px] ${mutedText}`}>
+                {masVendidosConfig?.descripcion_1 && <p>{masVendidosConfig.descripcion_1}</p>}
+                {masVendidosConfig?.descripcion_2 && <p>{masVendidosConfig.descripcion_2}</p>}
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Indicadores (Puntitos) */}
+        {totalSlides > 1 && (
+          <div className="mt-2.5 flex justify-center gap-1.5 z-10">
+            {Array.from({ length: totalSlides }).map((_, i) => (
+              <span key={i} className={`h-1.5 rounded-full transition-all ${i === bannerIdx ? 'w-6 bg-voltech-cyan' : 'w-2 bg-slate-700'}`} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
-  )}
-</div>
-</div>
   );
-})()}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
+})()}      
+<div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
           
           {/* ✅ SIDEBAR IZQUIERDO: SOLO si hay publicidad activa */}
           <aside className="hidden lg:block col-span-1 lg:col-span-2 space-y-4 order-2 lg:order-1">

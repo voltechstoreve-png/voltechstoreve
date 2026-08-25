@@ -1913,7 +1913,7 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                         <div>
                           <h4 className="text-lg font-bold text-white">{pub.titulo}</h4>
                           <div className="flex gap-4 mt-2 text-sm flex-wrap">
-                            <span className={pub.estado === 'activo' ? 'text-voltech-success' : 'text-voltech-muted'}>{pub.estado === 'activo' ? 'Activo' : 'Inactivo'}</span>
+                            {(() => { const vencida = pub.fecha_fin && new Date(pub.fecha_fin + 'T23:59') < new Date(); return (<span className={vencida ? 'text-voltech-error font-bold' : pub.estado === 'activo' ? 'text-voltech-success' : 'text-voltech-muted'}>{vencida ? '⏰ Vencida' : pub.estado === 'activo' ? 'Activo' : 'Inactivo'}</span>); })()}
                             <span className="text-voltech-muted">{new Date(pub.fecha_inicio).toLocaleDateString('es-VE')} - {new Date(pub.fecha_fin).toLocaleDateString('es-VE')}</span>
                             <span className="text-voltech-cyan font-semibold">👆 {pub.clicks || 0} clicks</span>
                             <span className="text-voltech-success font-bold">💵 ${((pub.clicks || 0) * (pub.costo_por_click || 0)).toFixed(2)}</span>
