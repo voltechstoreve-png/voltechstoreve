@@ -186,14 +186,14 @@ useEffect(() => {
         }
         // ✅ Si Supabase no trajo nada (RLS, error o sin conexión), usa el respaldo local
         if (pubs.length === 0) {
-        try {
+        try { 
         pubs = JSON.parse(localStorage.getItem('voltech_publicidad') || '[]').filter(p => p.estado === 'activo');
         } catch (e) {}
-}
+        } 
         if (vts.length === 0) {
       const localVts = localStorage.getItem('voltech_ventas');
       if (localVts) vts = JSON.parse(localVts);
-    }      if (!mvConfig) {
+     }      if (!mvConfig) {
         const localMv = localStorage.getItem('voltech_mas_vendidos_config');
         if (localMv) mvConfig = JSON.parse(localMv);
       }
@@ -1012,7 +1012,7 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
               const aspect = ratios[pub.id] || 1;
               const img1 = (pub.imagenes && pub.imagenes[0]) || pub.url_imagen;
               const img2 = (pub.imagenes && pub.imagenes[1]) || pub.url_imagen_2;
-              const esModo2 = (pub.modo_2_imagenes === true || pub.modo2Imagenes === true || pub.tipo_disposicion === '35_35_30') && !!img2 && img2 !== img1;
+              const esModo2 = (pub.modo_2_imagenes === true || pub.modo2Imagenes === true || pub.tipo_disposicion === '35_35_30' || (pub.imagenes && pub.imagenes.length >= 2)) && !!img2 && img2 !== img1;
               
               return (
                 <a 

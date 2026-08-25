@@ -521,7 +521,7 @@ cargarDatos();
     if (!(formDataPublicidad.saludo_whatsapp || '').trim() || !(formDataPublicidad.cierre_whatsapp || '').trim() || !(formDataPublicidad.url_destino || '').trim()) {
     return toast.error('El saludo, la URL de destino y el cierre del mensaje son obligatorios');
 }
-    const nuevaPublicidad = { id: publicidadEditando ? publicidadEditando.id : `pub-${Date.now()}`, ...formDataPublicidad, precio_manual: precioBaseNum > 0 ? `$${precioFinalNum.toFixed(2)}` : formDataPublicidad.precio_manual, precio_original: descuentoPct > 0 ? precioBaseNum : null, descuento_pct: descuentoPct, mensaje_whatsapp: mensajePublicidadWA, imagenes: [formDataPublicidad.url_imagen, ...imagenesExtra].filter(Boolean), url_fondo: formDataPublicidad.url_fondo || '', fecha_creacion: new Date().toISOString() };
+    const nuevaPublicidad = { id: publicidadEditando ? publicidadEditando.id : `pub-${Date.now()}`, ...formDataPublicidad, modo_2_imagenes: modoDosImagenes, precio_manual: precioBaseNum > 0 ? `$${precioFinalNum.toFixed(2)}` : formDataPublicidad.precio_manual, precio_original: descuentoPct > 0 ? precioBaseNum : null, descuento_pct: descuentoPct, mensaje_whatsapp: mensajePublicidadWA, imagenes: [formDataPublicidad.url_imagen, ...imagenesExtra].filter(Boolean), url_fondo: formDataPublicidad.url_fondo || '', fecha_creacion: new Date().toISOString() };
     if (supabase) {
 try {
 const { error } = await supabase.from('publicidad').upsert(nuevaPublicidad, { onConflict: 'id' });
@@ -1925,7 +1925,7 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                             <button onClick={() => enviarResumenPub(pub)} className="p-2 hover:bg-voltech-success/20 rounded-lg text-voltech-success" title="Enviar resumen al anunciante">
                               <WhatsAppIcon className="w-4 h-4" />
                             </button>
-                            <button onClick={() => { setPublicidadEditando(pub); setImagenPreview(pub.url_imagen || ''); setImagenesExtra((pub.imagenes || []).slice(1)); setFormDataPublicidad(prev => ({ ...prev, ...pub, ubicacion_web: pub.ubicacion_web || 'oculta', ubicacion_movil: pub.ubicacion_movil || 'arriba' })); setShowPublicidadForm(true); }} className="p-2 hover:bg-voltech-cyan/20 rounded-lg text-voltech-cyan">
+                            <button onClick={() => { setPublicidadEditando(pub); setImagenPreview(pub.url_imagen || ''); setImagenesExtra((pub.imagenes || []).slice(1)); setModoDosImagenes(!!pub.modo_2_imagenes); setFormDataPublicidad(prev => ({ ...prev, ...pub, ubicacion_web: pub.ubicacion_web || 'oculta', ubicacion_movil: pub.ubicacion_movil || 'arriba' })); setShowPublicidadForm(true); }} className="p-2 hover:bg-voltech-cyan/20 rounded-lg text-voltech-cyan">
                               <Edit3 className="w-4 h-4" />
                             </button>
                             <button onClick={async () => { 
