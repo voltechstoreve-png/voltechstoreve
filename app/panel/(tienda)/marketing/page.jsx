@@ -182,9 +182,10 @@ export default function MarketingPage() {
     ubicacion_web: 'oculta', ubicacion_movil: 'arriba', url_fondo: '',
     texto_boton: 'VER OFERTA', color_boton: '#22d3ee',
     color_titulo: '#ffffff', color_descripcion: '#ffffff', color_precio: '#34d399',
-    whatsapp_destinos: [], precio_manual: '', descuento_pct: 0, cierre_whatsapp: 'Quiero comprar ✅'
-  });
-
+    whatsapp_destinos: [], precio_manual: '', descuento_pct: 0,
+    saludo_whatsapp: '¡Hola! Te escribo del catálogo 👋',
+    cierre_whatsapp: 'Quiero comprar ✅'
+    });
   const [masVendidosConfig, setMasVendidosConfig] = useState({
     activo: false, titulo: '🔥 Los Favoritos de Nuestros Clientes', cantidad_maxima: 3,
     descripcion_1: '🚚 Envíos rápidos a todo el país en 24-48h',
@@ -439,29 +440,37 @@ cargarDatos();
   // ✅ % de ancho dinámico: cuadrada 50% / banner 70%
   // ✅ Imágenes que se muestran en PC (1 o 2 según el switch)
   const imgsPC = (modoDosImagenes ? todasImagenes.slice(0, 2) : [imagenPreview]).filter(Boolean);
-// ✅ Precio base numérico + precio final con descuento
-const precioBaseNum = parseFloat(String(formDataPublicidad.precio_manual || '').replace(/[^0-9.]/g, '')) || 0;
-const descuentoPct = Math.min(100, Math.max(0, Number(formDataPublicidad.descuento_pct) || 0));
-const precioFinalNum = precioBaseNum * (1 - descuentoPct / 100);
-// ✅ Mensaje de WhatsApp que verá el cliente al tocar el botón
-const mensajePublicidadWA = (() => {
-  let m = `¡Hola! Te escribo del catálogo 👋 quiero aprovechar la oferta/descuento.\n\n`;
-  const prod = productos.find(p => `/catalogo?producto=${p.id}` === formDataPublicidad.url_destino);
-  if (prod) {
-    m += `🎬 *${prod.plataforma || prod.producto || 'Producto'}*\n`;
-    if (precioBaseNum > 0) {
-      m += descuentoPct > 0
-        ? `💰 Precio de oferta: *$${precioFinalNum.toFixed(2)}* (antes $${precioBaseNum.toFixed(2)})\n`
-        : `💰 Precio: *$${precioBaseNum.toFixed(2)}*\n`;
-    }
-    m += `🔗 ${typeof window !== 'undefined' ? window.location.origin : ''}/catalogo?producto=${prod.id}\n\n`;
-  } else if (formDataPublicidad.titulo) {
-    m += `📢 *${formDataPublicidad.titulo}*\n\n`;
+  // ✅ Precio base numérico + precio final con descuento
+  const precioBaseNum = parseFloat(String(formDataPublicidad.precio_manual || '').replace(/[^0-9.]/g, '')) || 0;
+  const descuentoPct = Math.min(100, Math.max(0, Number(formDataPublicidad.descuento_pct) || 0));
+  const precioFinalNum = precioBaseNum * (1 - descuentoPct / 100);
+  // ✅ Mensaje de WhatsApp que verá el cliente al tocar el botón
+  const mensajePublicidadWA = (() => {
+  const saludo = (formDataPublicidad.saludo_whatsapp || '').trim() || '¡Hola! Te escribo del catálogo 👋';
+  const titulo = (formDataPublicidad.titulo || '').trim();
+  const cierre = (formDataPublicidad.cierre_whatsapp || '').trim() || 'Quiero comprar ✅';
+  // ✅ URL completa de la publicidad (manual o de producto)
+  let url = '';
+  if (typeof window !== 'undefined' && formDataPublicidad.url_destino) {
+  url = formDataPublicidad.url_destino.startsWith('http')
+  ? formDataPublicidad.url_destino
+  : `${window.location.origin}${formDataPublicidad.url_destino.startsWith('/') ? '' : '/'}${formDataPublicidad.url_destino}`;
   }
-  m += formDataPublicidad.cierre_whatsapp || 'Quiero comprar ✅';
+  let m = `${saludo}
+  📢 *${titulo}*
+  `;
+  if (precioBaseNum > 0) {
+  m += descuentoPct > 0
+  ? `💰 Precio de oferta: *$${precioFinalNum.toFixed(2)}* (antes $${precioBaseNum.toFixed(2)})
+  `
+  : `💰 Precio: *$${precioBaseNum.toFixed(2)}*
+  `;
+  }
+  if (url) m += `🔗 ${url}
+  `;
+  m += cierre;
   return m;
-})();
-  // ✅ % dinámico de altura vertical para la tarjeta MÓVIL según la proporción de la imagen:
+  })();  // ✅ % dinámico de altura vertical para la tarjeta MÓVIL según la proporción de la imagen:
   // Cuadrada (≈1:1) → 70% imagen / 30% texto · Banner (≥1.5) → 50%/50% · Intermedio → proporcional (ej. 64%/36%)
   const imagePercent = portadaRatio <= 1.1 ? 70 : portadaRatio >= 1.5 ? 50 : Math.round(70 - ((portadaRatio - 1.1) / 0.4) * 20);
   const textPercent = 100 - imagePercent;
@@ -492,8 +501,11 @@ const mensajePublicidadWA = (() => {
       ubicacion_web: 'arriba', ubicacion_movil: 'arriba', url_fondo: '',
       texto_boton: 'VER OFERTA', color_boton: '#22d3ee',
       color_titulo: '#ffffff', color_descripcion: '#ffffff', color_precio: '#34d399',
-      precio_manual: '', descuento_pct: 0, cierre_whatsapp: 'Quiero comprar ✅'
-  });
+      precio_manual: '', descuento_pct: 0,
+    saludo_whatsapp: '¡Hola! Te escribo del catálogo 👋',
+    cierre_whatsapp: 'Quiero comprar ✅'
+    });
+    setImagenPreview('');
     setImagenPreview('');
     setImagenesExtra([]);
     setModoDosImagenes(false);
@@ -504,8 +516,11 @@ const mensajePublicidadWA = (() => {
   const guardarPublicidad = async () => {
     if (!esAdmin) return toast.error('Solo el administrador puede gestionar publicidad');
     if (!formDataPublicidad.titulo || !formDataPublicidad.url_imagen || !formDataPublicidad.fecha_inicio || !formDataPublicidad.fecha_fin) {
-      return toast.error('Título, imagen y fechas son obligatorios');
+    return toast.error('Título, imagen y fechas son obligatorios');
     }
+    if (!(formDataPublicidad.saludo_whatsapp || '').trim() || !(formDataPublicidad.cierre_whatsapp || '').trim() || !(formDataPublicidad.url_destino || '').trim()) {
+    return toast.error('El saludo, la URL de destino y el cierre del mensaje son obligatorios');
+}
     const nuevaPublicidad = { id: publicidadEditando ? publicidadEditando.id : `pub-${Date.now()}`, ...formDataPublicidad, precio_manual: precioBaseNum > 0 ? `$${precioFinalNum.toFixed(2)}` : formDataPublicidad.precio_manual, precio_original: descuentoPct > 0 ? precioBaseNum : null, descuento_pct: descuentoPct, mensaje_whatsapp: mensajePublicidadWA, imagenes: [formDataPublicidad.url_imagen, ...imagenesExtra].filter(Boolean), url_fondo: formDataPublicidad.url_fondo || '', fecha_creacion: new Date().toISOString() };
     if (supabase) {
 try {
@@ -1612,14 +1627,18 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                     </div>
                     </div>
                     <div className="mb-4">
-                    <label className="block text-sm font-medium text-voltech-muted mb-1">✍️ Cierre del mensaje de WhatsApp</label>
-                    <select value={formDataPublicidad.cierre_whatsapp} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, cierre_whatsapp: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                    <option value="Quiero comprar ✅">Quiero comprar ✅</option>
-                    <option value="Quiero más información 🙋">Quiero más información 🙋</option>
-                    <option value="Quiero aprovechar la oferta 🔥">Quiero aprovechar la oferta 🔥</option>
-                    </select>
+                    <label className="block text-sm font-medium text-voltech-muted mb-1">👋 Saludo del mensaje *</label>
+                    <input type="text" value={formDataPublicidad.saludo_whatsapp || ''} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, saludo_whatsapp: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Ej: ¡Hola! Te escribo del catálogo 👋" />
                     </div>
                     <div className="mb-4">
+                    <label className="block text-sm font-medium text-voltech-muted mb-1">✍️ Cierre del mensaje *</label>
+                    <input type="text" value={formDataPublicidad.cierre_whatsapp || ''} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, cierre_whatsapp: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Ej: Quiero comprar ✅" />
+                    <div className="flex gap-1 mt-2 flex-wrap">
+                    {['Quiero comprar ✅', 'Quiero más información 🙋', 'Quiero aprovechar la oferta 🔥'].map(c => (
+                    <button key={c} type="button" onClick={() => setFormDataPublicidad({...formDataPublicidad, cierre_whatsapp: c})} className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${formDataPublicidad.cierre_whatsapp === c ? 'bg-voltech-cyan text-voltech-dark' : 'bg-voltech-border/50 text-voltech-muted hover:bg-voltech-border'}`}>{c}</button>
+                    ))}
+                    </div>
+                    </div>                    <div className="mb-4">
                     <label className="block text-sm font-medium text-voltech-muted mb-2">👁️ Vista previa del mensaje de WhatsApp</label>
                     <BurbujaWA texto={mensajePublicidadWA} nombre="Cliente" />
                     </div>
