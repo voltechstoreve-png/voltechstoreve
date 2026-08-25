@@ -184,12 +184,12 @@ useEffect(() => {
         console.warn('⚠️ Supabase no disponible, usando respaldo local:', e.message);
         }
         }
-        // ✅ El respaldo local SOLO se usa si Supabase no está configurado (evita que reaparezcan publis borradas)
-        if (!supabase) {
+        // ✅ Si Supabase no trajo nada (RLS, error o sin conexión), usa el respaldo local
+        if (pubs.length === 0) {
         try {
         pubs = JSON.parse(localStorage.getItem('voltech_publicidad') || '[]').filter(p => p.estado === 'activo');
         } catch (e) {}
-        }
+}
         if (vts.length === 0) {
       const localVts = localStorage.getItem('voltech_ventas');
       if (localVts) vts = JSON.parse(localVts);
