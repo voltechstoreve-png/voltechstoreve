@@ -91,6 +91,8 @@ const [terminosAceptados, setTerminosAceptados] = useState(false);
 const [verTerminosCompletos, setVerTerminosCompletos] = useState(false);
 const [showMobileMenu, setShowMobileMenu] = useState(false);
 const [showUserMenu, setShowUserMenu] = useState(false);
+const [clienteNombre, setClienteNombre] = useState('');
+const [clienteTelefono, setClienteTelefono] = useState('');
 const bannerRef = useRef(null);
 const [bannerIdx, setBannerIdx] = useState(0);
 const [isPaused, setIsPaused] = useState(false);
@@ -472,10 +474,10 @@ return { gratis: false, costo, texto: `Cobro a destino ($${costo.toFixed(2)})` }
     return Math.max(0, subtotal - descuento + calcularEnvio());
   };
 
-  const finalizarPedido = () => {
+  const finalizarPedido = async () => {
       if (cart.length === 0) { toast.error('Carrito vacío'); return; }
-      if (!paymentMethod) { toast.error('Selecciona método de pago'); return; }
-      if (!terminosAceptados) { toast.error('Debes aceptar los Términos y Condiciones para finalizar tu pedido'); return; }
+      if (!clienteNombre.trim() || !clienteTelefono.trim()) { toast.error('Ingresa tu nombre y teléfono para procesar el pedido'); return; }
+      if (!paymentMethod) { toast.error('Selecciona método de pago'); return; }      if (!terminosAceptados) { toast.error('Debes aceptar los Términos y Condiciones para finalizar tu pedido'); return; }
       if (!tieneSoloProductosDigitales) {
       if (deliveryMethod === 'retiro' && !selectedAddress) { toast.error('Selecciona punto de retiro'); return; }
       if (deliveryMethod === 'delivery' && !customerLocation) { toast.error('Ingresa tu ubicación'); return; }
@@ -517,11 +519,54 @@ return { gratis: false, costo, texto: `Cobro a destino ($${costo.toFixed(2)})` }
     } else {
       mensaje += `\n Entrega: Digital / WhatsApp`;
     }
-    mensaje += `\n💳 Pago: ${paymentMethod}`;
-
+    mensaje += `
+    💳 Pago: ${paymentMethod}`;
+    // ✅ SINCRONIZA: crea el pedido en el panel como PENDIENTE (origen WEB)
+    try {
+      if (supabase) {
+        const hoy = new Date();
+        const dia = String(hoy.getDate()).padStart(2, '0');
+        const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+        const fechaHoy = hoy.toISOString().split('T')[0];
+        // Vendedor: referido interno o aleatorio del equipo
+        let vendedorWeb = '';
+        const { data: eq } = await supabase.from('usuarios').select('*').eq('activo', true);
+        const equipoActivo = eq || [];
+        if (autoReferrer) {
+          vendedorWeb = (equipoActivo.find(m => `VOLTECHSTORE-${(m.nombre || '').substring(0, 5).toUpperCase()}-${String(m.id).slice(-4)}` === autoReferrer) || {}).nombre || '';
+        }
+        if (!vendedorWeb && equipoActivo.length) vendedorWeb = equipoActivo[Math.floor(Math.random() * equipoActivo.length)].nombre;
+        const fisicos = cart.filter(i => i.tipo !== 'streaming' && (i.categoria || '').toUpperCase() !== 'STREAMING');
+        const streamings = cart.filter(i => i.tipo === 'streaming' || (i.categoria || '').toUpperCase() === 'STREAMING');
+        if (fisicos.length) {
+          const { count: cF } = await supabase.from('ventas').select('*', { count: 'exact', head: true }).eq('fecha', fechaHoy).eq('origen', 'web');
+          const subF = fisicos.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0);
+          await supabase.from('ventas').insert({
+            id: `web-${Date.now()}`, numeroOrden: `W-${dia}-${mes}-${String((cF || 0) + 1).padStart(3, '0')}`, fecha: fechaHoy,
+            vendedor: vendedorWeb, cliente: clienteNombre.trim(), telefono: clienteTelefono.trim(),
+            productos: fisicos.map(i => ({ productoId: i.id, sku: i.sku || '', nombre: i.producto || i.plataforma, categoria: i.categoria, marca: i.marca, cantidad: i.cantidad, precioUnitario: getPrecioMostrar(i).precioPrincipal, total: (getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad, tipo: 'fisico', esKit: false })),
+            subtotal: subF, total: subF, total_con_descuento: subF, descuento_aplicado: 0,
+            enCuotas: false, montoAbonado: 0, montoPendiente: subF, metodoPago: paymentMethod, carteraId: '',
+            porcentaje_comision: 5, estado: 'pendiente', origen: 'web', stock_descontado: false,
+            fechaRegistro: new Date().toISOString(), tipo: 'producto'
+          });
+        }
+        if (streamings.length) {
+          const { count: cS } = await supabase.from('ventas_streaming').select('*', { count: 'exact', head: true }).eq('fecha', fechaHoy).eq('origen', 'web');
+          const subS = streamings.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0);
+          await supabase.from('ventas_streaming').insert({
+            id: `webs-${Date.now()}`, numeroOrden: `W-${dia}-${mes}-${String((cS || 0) + 1).padStart(3, '0')}`, fecha: fechaHoy,
+            vendedor: vendedorWeb, cliente: clienteNombre.trim(), telefono: clienteTelefono.trim(),
+            plataformas: streamings.map(i => ({ plataforma: i.plataforma || i.producto, cantidad: i.cantidad, precioDetal: getPrecioMostrar(i).precioPrincipal, fechaVencimiento: '', diasDisponibles: 30 })),
+            subtotal: subS, total: subS, metodoPago: paymentMethod, cartera: '',
+            estado: 'pendiente', origen: 'web', fechaRegistro: new Date().toISOString()
+          });
+        }
+      }
+    } catch (e) { console.warn('⚠️ No se sincronizó el pedido:', e.message); }
     abrirWhatsAppNat(whatsappNumero, mensaje);
-    toast.success('Pedido enviado');
-  };
+    toast.success('Pedido enviado ✅ Lo verás en el panel como Pendiente');
+    };
 
 const comprarRapido = (producto) => {
 const precioInfo = getPrecioMostrar(producto);
@@ -2028,8 +2073,13 @@ productosAgrupados.map(([cat, items]) => (
                       </div>
                     )}
 
+                    <div className="mb-4 grid grid-cols-1 gap-2">
+                    <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}> Tus Datos *</label>
+                    <input type="text" value={clienteNombre} onChange={(e) => setClienteNombre(e.target.value)} placeholder="Nombre y apellido *" className={`w-full px-3 py-2 border rounded-lg text-sm ${inputBg}`} />
+                    <input type="tel" value={clienteTelefono} onChange={(e) => setClienteTelefono(e.target.value)} placeholder="Teléfono (WhatsApp) *" className={`w-full px-3 py-2 border rounded-lg text-sm ${inputBg}`} />
+                    </div>
                     <div className="mb-4">
-                      <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}> Método de Pago</label>
+                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}> Método de Pago</label>
                       <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className={`w-full px-3 py-2 border rounded-lg text-sm ${inputBg}`}>
                         <option value="">Selecciona método</option>
                         {metodosPagoActivos.map(m => <option key={m} value={m} className="text-slate-900 bg-white">{m.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>)}

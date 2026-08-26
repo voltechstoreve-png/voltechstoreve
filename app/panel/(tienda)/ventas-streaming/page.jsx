@@ -93,6 +93,7 @@ export default function VentasStreamingPage() {
   const [errorCupon, setErrorCupon] = useState('');
 
   const [formDataNueva, setFormDataNueva] = useState({
+    numeroOrden: generarNumeroOrden('manual'),
     fecha: new Date().toISOString().split('T')[0],
     vendedor: '', cliente: '', telefono: '',
     metodoPago: 'efectivo',
@@ -294,6 +295,17 @@ export default function VentasStreamingPage() {
     return () => clearInterval(intervalo);
   }, [ventas, configRecordatorios, agregarNotificacion]);
 
+  // ✅ M = manual (panel), W = web (catálogo)
+  const generarNumeroOrden = (origen = 'manual') => {
+    const hoy = new Date();
+    const dia = String(hoy.getDate()).padStart(2, '0');
+    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+    const prefijo = origen === 'web' ? 'W' : 'M';
+    const ventasHoy = ventas.filter(v => v.fecha === hoy.toISOString().split('T')[0] && (v.origen || 'manual') === origen);
+    const consecutivo = String(ventasHoy.length + 1).padStart(3, '0');
+    return `${prefijo}-${dia}-${mes}-${consecutivo}`;
+  };
+
   const calcularFechaVencimiento = (fechaInicio, dias) => {
     if (!fechaInicio || !dias) return '';
     const fecha = new Date(fechaInicio);
@@ -424,6 +436,7 @@ export default function VentasStreamingPage() {
       const total = subtotal - descuentoAplicado;
       const nuevaVenta = {
         id: editingId || crypto.randomUUID(),
+        numeroOrden: formDataNueva.numeroOrden || generarNumeroOrden('manual'),
         fecha: formDataNueva.fecha,
         vendedor: formDataNueva.vendedor,
         cliente: formDataNueva.cliente,
@@ -436,6 +449,7 @@ export default function VentasStreamingPage() {
         descuento_aplicado: descuentoAplicado,
         total_con_descuento: total,
         estado: 'activa',
+        origen: 'manual',
         fecharegistro: new Date().toISOString(),
         registradopor: currentUser?.nombre || 'Admin',
         cuentaasignada: formDataNueva.cuentaAsignada,
@@ -498,7 +512,7 @@ export default function VentasStreamingPage() {
           tipo: 'nueva_venta_streaming',
           titulo: '📺 Nueva Venta Streaming',
           mensaje: `Venta de $${Number(total).toFixed(2)} a ${formDataNueva.cliente}`,
-          detalle: `Vendedor: ${formDataNueva.vendedor} | Plataformas: ${formDataNueva.plataformas.map(p => p.plataforma).join(', ')}`,
+          detalle: `Orden: ${nuevaVenta.numeroOrden} | Vendedor: ${formDataNueva.vendedor} | ${formDataNueva.plataformas.map(p => p.plataforma).join(', ')}`,
           usuario_id: 'admin'
         });
       }
@@ -818,7 +832,13 @@ export default function VentasStreamingPage() {
   };
 
   const editarVenta = (venta) => {
-    setFormDataNueva({ ...venta, fecha: venta.fecha, plataformas: venta.plataformas || [] });
+    setFormDataNueva({ 
+      ...venta, 
+      numeroOrden: venta.numeroOrden || generarNumeroOrden('manual'),
+      fecha: venta.fecha, 
+      metodoPago: venta.metodopago || venta.metodoPago || 'efectivo',
+      plataformas: venta.plataformas || [] 
+    });
     setEditingId(venta.id);
     setActiveTab('nueva');
     setShowFormNueva(true);
@@ -888,6 +908,7 @@ export default function VentasStreamingPage() {
   const resetForm = (tipo) => {
     if (tipo === 'nueva') {
       setFormDataNueva({
+        numeroOrden: generarNumeroOrden('manual'),
         fecha: new Date().toISOString().split('T')[0], vendedor: '', cliente: '', telefono: '',
         metodoPago: 'efectivo', cartera: 'Caja Principal',
         plataformas: [{ plataforma: '', fechaVencimiento: '', diasDisponibles: 30, precioMayor: 0, precioDetal: 0 }],
@@ -1046,6 +1067,7 @@ export default function VentasStreamingPage() {
                     <button onClick={() => setShowFormNueva(false)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted"><X className="w-5 h-5" /></button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 pb-6 border-b border-voltech-border">
+                    <div><label className="block text-xs text-voltech-muted mb-1 ml-1">N° Orden</label><input type="text" value={formDataNueva.numeroOrden} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-mono text-voltech-cyan bg-voltech-dark/50" /></div>
                     <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Fecha *</label><input type="date" value={formDataNueva.fecha} onChange={(e) => setFormDataNueva({ ...formDataNueva, fecha: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                     <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Vendedor *</label><select value={formDataNueva.vendedor} onChange={(e) => setFormDataNueva({ ...formDataNueva, vendedor: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="">-- Selecciona --</option>{equipo.filter(m => m.activo).map(m => (<option key={m.id} value={m.nombre}>{m.nombre} ({m.rol})</option>))}</select></div>
                     <div className="relative"><label className="block text-xs text-voltech-muted mb-1 ml-1">Comprador *</label><input ref={clienteInputRef} type="text" value={formDataNueva.cliente} onChange={(e) => handleClienteChange(e.target.value)} onFocus={() => { if (sugerenciasClientes.length > 0) setShowSugerencias(true); }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Buscar cliente..." />
@@ -1154,7 +1176,11 @@ export default function VentasStreamingPage() {
                         <span className={`text-[10px] px-2 py-0.5 rounded-full ${diasRestantes <= 3 ? 'bg-rose-500/20 text-rose-300' : diasRestantes <= 7 ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>Vence: {diasRestantes} días</span>
                       </div>
                       <div className="pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-2 text-[11px]">
-                        <div><span className="text-slate-400 block">Fecha:</span><span className="text-slate-200 font-mono">{venta.fecha}</span></div>
+                        <div>
+                          <span className="text-slate-400 block">Fecha:</span>
+                          <span className="text-slate-200 font-mono">{venta.fecha}</span>
+                          <span className={`ml-1 text-[9px] px-1 py-0.5 rounded-full font-bold ${(venta.origen || 'manual') === 'web' ? 'bg-sky-500/20 text-sky-300' : 'bg-slate-500/20 text-slate-300'}`}>{(venta.origen || 'manual') === 'web' ? '🌐' : '✍️'}</span>
+                        </div>
                         <div><span className="text-slate-400 block">Comisión:</span><span className="text-indigo-300 font-bold">${Number(getComisionVenta(venta)).toFixed(2)}</span></div>
                         <div><span className="text-slate-400 block">Método:</span><span className="text-slate-200 capitalize">{(venta.metodopago || '').replace('_', ' ') || 'N/A'}</span></div>
                         <div><span className="text-slate-400 block">Cuentas:</span><span className="text-cyan-400 font-medium">{cuentasAsignadas}/{totalPlataformas} asignadas</span></div>
@@ -1235,7 +1261,15 @@ export default function VentasStreamingPage() {
                     return (
                       <Fragment key={venta.id}>
                         <tr className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
-                          <td className="px-4 py-3 text-xs font-mono whitespace-nowrap text-voltech-muted pr-3">{venta.fecha}</td>
+                          <td className="px-4 py-3 text-xs font-mono whitespace-nowrap text-voltech-muted pr-3">
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-1.5">
+                                {venta.fecha}
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${(venta.origen || 'manual') === 'web' ? 'bg-sky-500/20 text-sky-300' : 'bg-slate-500/20 text-slate-300'}`}>{(venta.origen || 'manual') === 'web' ? '🌐 WEB' : '✍️ MAN'}</span>
+                              </div>
+                              {venta.numeroOrden && <span className="text-[10px] text-voltech-cyan">{venta.numeroOrden}</span>}
+                            </div>
+                          </td>
                           <td className="px-4 py-3"><p className="text-sm font-medium text-white">{venta.cliente}</p><p className="text-xs text-voltech-muted">{venta.telefono}</p></td>
                           <td className="px-4 py-3">
                             <div>

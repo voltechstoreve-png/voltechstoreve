@@ -53,13 +53,15 @@ export default function VentasProductosPage() {
     precioBs: 0, cantidad: 1, tipo: 'fisico', metodoPago: 'efectivo', cartera: '',
   });
 
-  const generarNumeroOrden = () => {
+  // ✅ M = manual, W = web (catálogo)
+  const generarNumeroOrden = (origen = 'manual') => {
     const hoy = new Date();
     const dia = String(hoy.getDate()).padStart(2, '0');
     const mes = String(hoy.getMonth() + 1).padStart(2, '0');
-    const ventasHoy = ventas.filter(v => v.fecha === hoy.toISOString().split('T')[0]);
+    const prefijo = origen === 'web' ? 'W' : 'M';
+    const ventasHoy = ventas.filter(v => v.fecha === hoy.toISOString().split('T')[0] && (v.origen || 'manual') === origen);
     const consecutivo = String(ventasHoy.length + 1).padStart(3, '0');
-    return `${dia}-${mes}-${consecutivo}`;
+    return `${prefijo}-${dia}-${mes}-${consecutivo}`;
   };
 
   const [formData, setFormData] = useState({
@@ -538,7 +540,9 @@ export default function VentasProductosPage() {
         porcentaje_comision: formData.porcentaje_comision,
         estado: formData.enCuotas && montoPendiente > 0 ? 'pendiente' : 'pagado',
         fechaRegistro: new Date().toISOString(),
-        tipo: 'producto'
+        tipo: 'producto',
+        origen: 'manual',
+        stock_descontado: true
       };
 
       let productosActualizados = [...productos];
@@ -655,7 +659,22 @@ export default function VentasProductosPage() {
 
   const marcarPagado = async (venta) => {
     try {
-      const ventaActualizada = { ...venta, estado: 'pagado', montoPendiente: 0, montoAbonado: Number(venta.total || 0), fechaPago: new Date().toISOString().split('T')[0] };
+      const debeDescontar = (venta.origen || 'manual') === 'web' && !venta.stock_descontado;
+      let productosActualizados = [...productos];
+      if (debeDescontar) {
+        for (const prod of venta.productos || []) {
+          if (prod.esKit && prod.productosIncluidos?.length) {
+            for (const pk of prod.productosIncluidos) {
+              const idx = productosActualizados.findIndex(p => String(p.id) === String(pk.producto_id));
+              if (idx !== -1) productosActualizados[idx] = { ...productosActualizados[idx], cantidad: Math.max(0, productosActualizados[idx].cantidad - (pk.cantidad * prod.cantidad)) };
+            }
+          } else {
+            const idx = productosActualizados.findIndex(p => String(p.id) === String(prod.productoId));
+            if (idx !== -1) productosActualizados[idx] = { ...productosActualizados[idx], cantidad: Math.max(0, productosActualizados[idx].cantidad - prod.cantidad) };
+          }
+        }
+      }
+      const ventaActualizada = { ...venta, estado: 'pagado', montoPendiente: 0, montoAbonado: Number(venta.total || 0), fechaPago: new Date().toISOString().split('T')[0], stock_descontado: true };
       const ventasActualizadas = ventas.map(v => String(v.id) === String(venta.id) ? ventaActualizada : v);
       
       if (supabase) {
@@ -663,12 +682,15 @@ export default function VentasProductosPage() {
           estado: 'pagado', 
           montoPendiente: 0, 
           montoAbonado: Number(venta.total || 0), 
-          fechaPago: ventaActualizada.fechaPago 
+          fechaPago: ventaActualizada.fechaPago,
+          stock_descontado: true
         }).eq('id', venta.id);
+        if (debeDescontar) for (const p of productosActualizados) await supabase.from('productos').update({ cantidad: p.cantidad }).eq('id', p.id);
       }
       
       setVentas(ventasActualizadas);
-      toast.success('Venta marcada como pagada');
+      setProductos(productosActualizados);
+      toast.success('Venta marcada como pagada' + (debeDescontar ? ' (stock descontado)' : ''));
       window.dispatchEvent(new Event('voltech-data-updated'));
     } catch (error) {
       console.error('Error marcando como pagado:', error);
@@ -681,8 +703,9 @@ export default function VentasProductosPage() {
     
     try {
       let productosActualizados = [...productos];
+      const debeDevolver = (venta.origen || 'manual') === 'manual' || venta.stock_descontado;
       
-      for (const prod of venta.productos) {
+      if (debeDevolver) for (const prod of venta.productos) {
         if (prod.esKit && prod.productosIncluidos && prod.productosIncluidos.length > 0) {
           for (const prodKit of prod.productosIncluidos) {
             const index = productosActualizados.findIndex(p => String(p.id) === String(prodKit.producto_id));
@@ -708,7 +731,7 @@ export default function VentasProductosPage() {
       
       if (supabase) {
         await supabase.from('ventas').delete().eq('id', venta.id);
-        for (const p of productosActualizados) {
+        if (debeDevolver) for (const p of productosActualizados) {
           await supabase.from('productos').update({ cantidad: p.cantidad }).eq('id', p.id);
         }
       }
@@ -1395,7 +1418,12 @@ export default function VentasProductosPage() {
                 ventasFiltradas.map((venta) => (
                   <React.Fragment key={venta.id}>
                     <tr className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
-                      <td className="px-4 py-3 text-xs font-mono whitespace-nowrap text-voltech-cyan pr-3">{venta.numeroOrden || 'N/A'}</td>
+                      <td className="px-4 py-3 text-xs font-mono whitespace-nowrap text-voltech-cyan pr-3">
+                        <div className="flex items-center gap-1.5">
+                          {venta.numeroOrden || 'N/A'}
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${(venta.origen || 'manual') === 'web' ? 'bg-sky-500/20 text-sky-300' : 'bg-slate-500/20 text-slate-300'}`}>{(venta.origen || 'manual') === 'web' ? '🌐 WEB' : '✍️ MANUAL'}</span>
+                        </div>
+                      </td>
                       <td className="px-4 py-3 text-sm text-voltech-muted whitespace-nowrap"><span className="inline-flex items-center gap-2"><Calendar className="w-3 h-3" /> {venta.fecha}</span></td>
                       <td className="px-4 py-3"><p className="text-sm font-medium text-white">{venta.cliente}</p><p className="text-xs text-voltech-muted">{venta.telefono}</p></td>
                       <td className="px-4 py-3"><p className="text-sm text-white">{venta.productos[0]?.nombre}{venta.productos[0]?.esKit && <span className="text-xs text-voltech-purple ml-1">(KIT)</span>}{venta.productos.length > 1 && (<span className="text-xs text-voltech-muted ml-1">(+{venta.productos.length - 1} más)</span>)}</p><button onClick={() => setExpandedId(expandedId === venta.id ? null : venta.id)} className="text-xs text-voltech-cyan hover:underline flex items-center gap-1 mt-1"><ChevronDown className={`w-3 h-3 transition-transform ${expandedId === venta.id ? 'rotate-180' : ''}`} /> Ver detalle</button></td>
