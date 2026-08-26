@@ -97,6 +97,7 @@ const [terminosAceptados, setTerminosAceptados] = useState(false);
 const [verTerminosCompletos, setVerTerminosCompletos] = useState(false);
 const [showMobileMenu, setShowMobileMenu] = useState(false);
 const [showUserMenu, setShowUserMenu] = useState(false);
+const [ofertasTab, setOfertasTab] = useState('productos');
 const [clienteNombre, setClienteNombre] = useState('');
 const [clienteTelefono, setClienteTelefono] = useState('');
 const bannerRef = useRef(null);
@@ -804,8 +805,60 @@ abrirWhatsAppNat(whatsappNumero, mensaje);
     return match && (!filterPlatform || p.plataforma === filterPlatform) && p.tipo === 'streaming' && !p.esCombo;
   });
 
-  const ofertas = (productos || []).filter(p => p.publicado && (p.estado === 'oferta' || Number(p.precio_oferta || p.precioOferta) > 0));
-
+// ✅ Agrega al carrito aplicando el descuento de la oferta/publicidad
+const agregarOfertaAlCarrito = (p) => {
+const prod = p.prodVinculado || p;
+const info = getPrecioMostrar(prod);
+let precioFinal = info.precioPrincipal;
+let precioOriginal = info.precioTachado || info.precioPrincipal;
+if (p.esPublicidad) {
+const baseManual = Number(String(p.precio_manual || '').replace(/[^0-9.]/g, '')) || 0;
+if (baseManual > 0) {
+precioOriginal = baseManual;
+precioFinal = p.descuento_pct > 0 ? baseManual * (1 - Number(p.descuento_pct) / 100) : baseManual;
+} else if (p.descuento_pct > 0) {
+precioFinal = precioOriginal * (1 - Number(p.descuento_pct) / 100);
+}
+}
+const existente = cart.find(i => i.id === prod.id);
+if (existente) {
+setCart(cart.map(i => i.id === prod.id ? { ...i, cantidad: i.cantidad + 1, precio_oferta: precioFinal, precioOferta: precioFinal, precioDetal: precioOriginal } : i));
+} else {
+setCart([...cart, { ...prod, cantidad: 1, precio_oferta: precioFinal, precioOferta: precioFinal, precioDetal: precioOriginal }]);
+}
+setShowCart(true);
+toast.success(`🛒 "${prod.producto || prod.plataforma}" agregado con precio de oferta`);
+};
+// ✅ Click en oferta: externo→link · todo lo demás→carrito con descuento
+const manejarClickOferta = (p) => {
+if (p.esPublicidad) {
+registrarClickPub(p);
+if (p.esExterno) { window.open(p.url_destino, '_blank'); return; }
+if (p.prodVinculado) { agregarOfertaAlCarrito(p); return; }
+if (p.url_destino) { window.location.href = p.url_destino; }
+return;
+}
+agregarOfertaAlCarrito(p);
+};  const esItemStreaming = (p) => p.tipo === 'streaming' || (p.categoria || '').toUpperCase() === 'STREAMING' || p.modalidad === 'combo' || p.esComboStreaming;
+  const ofertasBase = (productos || []).filter(p => p.publicado && (p.estado === 'oferta' || Number(p.precio_oferta || p.precioOferta) > 0));
+  const pubsComoOferta = (publicidad || []).map(pub => {
+  const prodVinculado = productos.find(pr => `/catalogo?producto=${pr.id}` === pub.url_destino) || null;
+  const esExterno = !!pub.url_destino && pub.url_destino.startsWith('http') && !pub.url_destino.includes(typeof window !== 'undefined' ? window.location.origin : '');
+  return {
+  ...pub,
+  esPublicidad: true,
+  esExterno,
+  prodVinculado,
+  id: `pub-${pub.id}`,
+  producto: pub.titulo,
+  plataforma: pub.titulo,
+  imagen: (pub.imagenes && pub.imagenes[0]) || pub.url_imagen || '',
+  tipo: prodVinculado ? prodVinculado.tipo : (esExterno ? 'externo' : 'fisico'),
+  };
+  }).filter(p => !ofertasBase.some(o => o.id === p.id));
+  const ofertas = [...ofertasBase, ...pubsComoOferta];
+  const ofertasProductos = ofertas.filter(p => !esItemStreaming(p));
+const ofertasStreaming = ofertas.filter(p => esItemStreaming(p));
   const bg = darkMode ? 'bg-slate-950' : 'bg-slate-50';
   const text = darkMode ? 'text-slate-100' : 'text-slate-900';
   const cardBg = darkMode ? 'bg-slate-900' : 'bg-white';
@@ -815,15 +868,14 @@ abrirWhatsAppNat(whatsappNumero, mensaje);
   const headerBg = darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-slate-200';
   const totalVotos = productosVotacion.reduce((sum, p) => sum + (p.votos || 0), 0);
 
-  const productosAgrupados = useMemo(() => {
-    const grupos = {};
-    productosFiltrados.forEach(p => {
-      const cat = (p.categoria || 'OTROS').toUpperCase();
-      (grupos[cat] = grupos[cat] || []).push(p);
-    });
-    return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [productosFiltrados]);
-
+const productosAgrupados = useMemo(() => {
+const grupos = {};
+productosFiltrados.forEach(p => {
+const cat = (p.categoria || 'OTROS').toUpperCase();
+(grupos[cat] = grupos[cat] || []).push(p);
+});
+return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0]));
+}, [productosFiltrados]);
       const renderProductCard = (p, idx = 0) => {
       const precioInfo = getPrecioMostrar(p);
       return (
@@ -865,7 +917,13 @@ setPublicidad(prev => prev.map(p => p.id === pub.id ? { ...p, clicks: nuevosClic
 if (supabase) await supabase.from('publicidad').update({ clicks: nuevosClicks }).eq('id', pub.id);
 } catch (e) { console.error('Error registrando click:', e); }
 };
-// ✅ Si la publi tiene miembros seleccionados, abre WhatsApp a uno AL AZAR con el mensaje guardado
+// ✅ Detecta si un link es interno (misma tienda) o externo
+const esLinkInterno = (url) => {
+if (!url) return true;
+if (url.startsWith('/')) return true;
+try { return new URL(url).origin === window.location.origin; } catch { return true; }
+};
+// ✅ Click en publi: WhatsApp al azar si hay miembros; si hay producto vinculado, lo agrega al carrito y abre el carrito con descuento
 const manejarClickPub = (e, pub) => {
 registrarClickPub(pub);
 const destinos = pub.whatsapp_destinos || [];
@@ -874,14 +932,52 @@ e.preventDefault();
 const al = destinos[Math.floor(Math.random() * destinos.length)];
 const msg = pub.mensaje_whatsapp || `¡Hola! 👋 Vi la publicidad "${pub.titulo}" y quiero más información.`;
 abrirWhatsAppNat(al.telefono, msg);
+return;
+}
+const url = pub.url_destino || '';
+const prodId = (url.match(/[?&]producto=([^&]+)/) || [])[1];
+if (prodId) {
+e.preventDefault();
+const prod = productos.find(p => String(p.id) === String(prodId));
+if (prod) {
+const info = getPrecioMostrar(prod);
+let precioFinal = info.precioPrincipal;
+let precioOriginal = info.precioTachado || info.precioPrincipal;
+const baseManual = Number(String(pub.precio_manual || '').replace(/[^0-9.]/g, '')) || 0;
+if (baseManual > 0) {
+precioOriginal = baseManual;
+precioFinal = pub.descuento_pct > 0 ? baseManual * (1 - Number(pub.descuento_pct) / 100) : baseManual;
+} else if (pub.descuento_pct > 0) {
+precioFinal = precioOriginal * (1 - Number(pub.descuento_pct) / 100);
+}
+const existente = cart.find(i => i.id === prod.id);
+if (existente) {
+setCart(cart.map(i => i.id === prod.id ? { ...i, cantidad: i.cantidad + 1, precio_oferta: precioFinal, precioOferta: precioFinal, precioDetal: precioOriginal } : i));
+} else {
+setCart([...cart, { ...prod, cantidad: 1, precio_oferta: precioFinal, precioOferta: precioFinal, precioDetal: precioOriginal }]);
+}
+setShowCart(true);
+toast.success(`🛒 "${prod.producto || prod.plataforma}" agregado al carrito`);
+return;
+}
+}
+if (!url) {
+e.preventDefault();
+setActiveSection('ofertas');
+window.scrollTo({ top: 0, behavior: 'smooth' });
+return;
+}
+if (esLinkInterno(url)) {
+e.preventDefault();
+window.location.href = url;
 }
 };
 
   const renderPubCard = (pub) => (
-    <a 
-      key={pub.id} 
-      href={pub.url_destino || '#'} 
-      target={pub.url_destino ? '_blank' : '_self'}
+    <a
+      key={pub.id}
+      href={pub.url_destino || '#'}
+      target={esLinkInterno(pub.url_destino) ? '_self' : '_blank'}
       onClick={(e) => manejarClickPub(e, pub)}
       className={`block ${cardBg} border ${cardBorder} rounded-xl overflow-hidden hover:border-voltech-cyan/50 transition-all grHoup`}
     >
@@ -1058,8 +1154,8 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
       </header>
 
       <main className="max-w-[1800px] xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
-{/* ✅ HERO BANNER: adaptable dinámicamente según la imagen */}
-{(() => {
+{/* ✅ HERO BANNER: oculto en la sección Ofertas */}
+{activeSection !== 'ofertas' && (() => {
   const pubsActivas = publicidad.filter(p => !p.dispositivos || p.dispositivos.movil !== false);
   const mvMovilActivo = hayMasVendidos && (masVendidosConfig?.ubicacion_movil || 'arriba') === 'arriba';
   const totalSlides = pubsActivas.length + (mvMovilActivo ? 1 : 0);
@@ -1080,13 +1176,13 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
               const esModo2 = (pub.modo_2_imagenes === true || pub.modo2Imagenes === true || pub.tipo_disposicion === '35_35_30' || (pub.imagenes && pub.imagenes.length >= 2)) && !!img2 && img2 !== img1;
               
               return (
-                <a 
-                  key={pub.id + '-' + offset} 
-                  href={pub.url_destino || '#'} 
-                  target={pub.url_destino ? '_blank' : '_self'} 
-                  onClick={() => registrarClickPub(pub)} 
-                  className="relative w-full h-[280px] rounded-2xl overflow-hidden border border-voltech-border bg-black shadow-xl flex"
-                >
+                <a
+                key={pub.id + '-' + offset}
+                href={pub.url_destino || '#'}
+                target={esLinkInterno(pub.url_destino) ? '_self' : '_blank'}
+                onClick={(e) => manejarClickPub(e, pub)}
+                className="relative w-full h-[280px] rounded-2xl overflow-hidden border border-voltech-border bg-black shadow-xl flex"
+              >
                   {esModo2 ? (
                     <div className="h-full w-[70%] bg-black flex overflow-hidden">
                       <div className="w-1/2 h-full bg-black overflow-hidden"><img src={img1} alt={pub.titulo} className="w-full h-full object-cover" /></div>
@@ -1148,12 +1244,12 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
             const esModo2 = (pub.modo_2_imagenes === true || pub.modo2Imagenes === true || pub.tipo_disposicion === '35_35_30') && !!img2 && img2 !== img1;
             
             return (
-              <a 
-                key={pub.id} 
-                href={pub.url_destino || '#'} 
-                target={pub.url_destino ? '_blank' : '_self'} 
-                onClick={() => registrarClickPub(pub)} 
-                className="shrink-0 w-full snap-start rounded-2xl overflow-hidden bg-black border border-slate-800/80 flex flex-row items-center h-44 shadow-2xl"
+              <a
+              key={pub.id}
+              href={pub.url_destino || '#'}
+              target={esLinkInterno(pub.url_destino) ? '_self' : '_blank'}
+              onClick={(e) => manejarClickPub(e, pub)}
+              className="shrink-0 w-full snap-start rounded-2xl overflow-hidden bg-black border border-slate-800/80 flex flex-row items-center h-44 shadow-2xl"
               >
                 {/* 1. LADO IZQUIERDO: Multimedia */}
                 <div className={`${pub.tipo_disposicion === '35_35_30' ? 'h-full w-[70%] max-w-[70%]' : 'h-full w-[55%] max-w-[55%]'} relative flex items-center justify-center bg-black overflow-hidden shrink-0`}>
@@ -1371,39 +1467,46 @@ productosAgrupados.map(([cat, items]) => (
             {activeSection === 'ofertas' && (
               <div>
                 <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}> Ofertas Especiales</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5 w-full">
-                  {ofertas.length > 0 ? (
-                  ofertas.map((p, idx) => {
+                  <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                  <button onClick={() => setOfertasTab('productos')} className={`flex-1 px-6 py-3 rounded-xl font-semibold text-sm transition-all border-2 flex items-center justify-center gap-2 ${ofertasTab === 'productos' ? 'border-voltech-cyan bg-voltech-cyan/10 text-voltech-cyan' : `${cardBorder} ${mutedText} hover:border-voltech-cyan/50`}`}>
+                  <Package className="w-4 h-4" /> Productos ({ofertasProductos.length})
+                  </button>
+                  <button onClick={() => setOfertasTab('streaming')} className={`flex-1 px-6 py-3 rounded-xl font-semibold text-sm transition-all border-2 flex items-center justify-center gap-2 ${ofertasTab === 'streaming' ? 'border-voltech-purple bg-voltech-purple/10 text-voltech-purple' : `${cardBorder} ${mutedText} hover:border-voltech-purple/50`}`}>
+                  <Play className="w-4 h-4" /> Streaming ({ofertasStreaming.length})
+                  </button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5 w-full">
+                  {(ofertasTab === 'productos' ? ofertasProductos : ofertasStreaming).length > 0 ? (
+                  (ofertasTab === 'productos' ? ofertasProductos : ofertasStreaming).map((p, idx) => {
                   const precioInfo = getPrecioMostrar(p);
                   return (
-                  <div key={p.id || p.producto || p.plataforma || `oferta-${idx}`} onClick={() => setSelectedProduct(p)} className={`flex flex-col justify-between h-full ${darkMode ? 'bg-gradient-to-br from-orange-900/30 to-red-900/30 border-red-800' : 'bg-gradient-to-br from-orange-50 to-red-50 border-red-200'} rounded-2xl shadow-md border-2 overflow-hidden relative hover:shadow-xl hover:-translate-y-0.5 transition-all cursor-pointer group`}>
+                  <div key={p.id || p.producto || p.plataforma || `oferta-${idx}`} onClick={() => manejarClickOferta(p)} className={`flex flex-col justify-between h-full ${darkMode ? 'bg-gradient-to-br from-orange-900/30 to-red-900/30 border-red-800' : 'bg-gradient-to-br from-orange-50 to-red-50 border-red-200'} rounded-2xl shadow-md border-2 overflow-hidden relative hover:shadow-xl hover:-translate-y-0.5 transition-all cursor-pointer group`}>
                           <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md z-10">OFERTA</div>
-                          <div className={`relative w-full overflow-hidden rounded-t-2xl flex items-center justify-center ${(p.tipo === 'streaming' || (p.categoria || '').toUpperCase() === 'STREAMING') ? 'aspect-[16/9] bg-slate-950' : 'aspect-square bg-white'}`}>
-                            {p.imagen ? <img src={p.imagen} alt={p.producto || p.plataforma} className={`w-full h-full transition-transform duration-300 group-hover:scale-105 ${(p.tipo === 'streaming' || (p.categoria || '').toUpperCase() === 'STREAMING') ? 'object-cover object-center' : 'object-contain p-2'}`} onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-12 h-12 text-slate-300" />}
+                          <div className={`relative w-full overflow-hidden rounded-t-2xl flex items-center justify-center ${(p.tipo === 'streaming' || (p.categoria || '').toUpperCase() === 'STREAMING') ? 'aspect-[16/9] bg-slate-950' : 'aspect-square bg-slate-900'}`}>
+                            {p.imagen ? <img src={p.imagen} alt={p.producto || p.plataforma} className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-12 h-12 text-slate-300" />}
                           </div>
                           <div className="p-3 flex flex-col flex-1">
                             <h3 className={`font-semibold text-sm mb-2 line-clamp-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto || p.plataforma}</h3>
-                            <div className="mb-3">
-                              <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)}</p>
-                              <p className={`text-xl font-bold ${darkMode ? 'text-red-400' : 'text-red-600'}`}>${precioInfo.precioPrincipal}</p>
-                              <p className={`text-xs ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
+                          <div className="mb-3">
+                          {(precioInfo.precioTachado || (p.esPublicidad && p.precio_original > 0)) && <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado ? precioInfo.precioTachado.toFixed(2) : Number(p.precio_original).toFixed(2)}</p>}
+                          <p className={`text-xl font-bold ${darkMode ? 'text-red-400' : 'text-red-600'}`}>{p.esPublicidad && p.precio_manual ? p.precio_manual : `$${(precioInfo.precioPrincipal || 0).toFixed ? (precioInfo.precioPrincipal || 0).toFixed(2) : precioInfo.precioPrincipal}`}</p>
+                          <p className={`text-xs ${mutedText}`}>Bs {calcularPrecioBs(p.esPublicidad && p.precio_manual ? (parseFloat(String(p.precio_manual).replace(/[^0-9.]/g, '')) || 0) : (precioInfo.precioPrincipal || 0))}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 w-full mt-auto pt-3">
+                          <button onClick={(e) => { e.stopPropagation(); manejarClickOferta(p); }} className="w-full inline-flex items-center justify-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs py-2 px-2 rounded-xl transition-all shadow-sm">
+                          <ShoppingCart className="w-4 h-4 shrink-0" />
+                          <span>{p.esPublicidad && p.esExterno ? 'Ver Oferta Externa' : 'Compra Ya'}</span>
+                          </button>
+                          </div>                            
                             </div>
-                            <div className="flex items-center gap-1.5 w-full mt-auto pt-3">
-                                <button onClick={(e) => { e.stopPropagation(); addToCart(p); }} className="w-full inline-flex items-center justify-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs py-2 px-2 rounded-xl transition-all shadow-sm">
-                                <ShoppingCart className="w-4 h-4 shrink-0" />
-                                <span>Agregar al Carrito</span>
-                                </button>
-                                </div>
-                              </div>
                               </div>
                               );
                               })
                             ) : (
                     <div className="col-span-full text-center py-20">
                       <Zap className={`w-16 h-16 mx-auto mb-3 opacity-30 ${mutedText}`} />
-                      <p className={`text-lg ${mutedText}`}>No hay ofertas disponibles</p>
-                      <p className={`text-sm ${mutedText} mt-2`}>Las ofertas aparecerán aquí cuando haya productos con estado "oferta"</p>
-                    </div>
+                    <p className={`text-lg ${mutedText}`}>No hay ofertas de {ofertasTab === 'productos' ? 'productos' : 'streaming'} disponibles</p>
+                    <p className={`text-sm ${mutedText} mt-2`}>Activa una oferta o una publicidad con destino interno para verla aquí</p>                    </div>
                   )}
                 </div>
               </div>
@@ -2227,4 +2330,4 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
       )}
     </div>
   );
-}
+};
