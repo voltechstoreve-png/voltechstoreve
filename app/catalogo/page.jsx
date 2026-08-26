@@ -1091,7 +1091,7 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
                 className="shrink-0 w-full snap-start rounded-2xl overflow-hidden bg-black border border-slate-800/80 flex flex-row items-center h-44 shadow-2xl"
               >
                 {/* 1. LADO IZQUIERDO: Multimedia */}
-                <div className={`${(pub.tipo_disposicion === '35_35_30' || pub.imagenes?.length >= 2 || pub.url_imagen_2) ? 'h-full w-[70%] max-w-[70%]' : 'h-full max-w-[70%]'} relative flex items-center justify-center bg-black overflow-hidden shrink-0`} style={(pub.tipo_disposicion === '35_35_30' || pub.imagenes?.length >= 2 || pub.url_imagen_2) ? undefined : { aspectRatio: `${ratios[pub.id] || 1}` }}>
+                <div className={`${pub.tipo_disposicion === '35_35_30' ? 'h-full w-[70%] max-w-[70%]' : 'h-full w-[55%] max-w-[55%]'} relative flex items-center justify-center bg-black overflow-hidden shrink-0`}>
                   {esModo2 ? (
                     <div className="w-full h-full flex overflow-x-auto overflow-y-hidden no-scrollbar snap-x snap-mandatory">
                       <div className="w-full h-full shrink-0 snap-center bg-black">
