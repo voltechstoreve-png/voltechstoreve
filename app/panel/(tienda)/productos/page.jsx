@@ -1601,7 +1601,7 @@ import { motion, AnimatePresence } from 'framer-motion';
                               <input type="text" value={busquedaKit} onChange={(e) => setBusquedaKit(e.target.value)} placeholder="Buscar por nombre o SKU..." className="input-voltech w-full rounded-lg pl-10 pr-4 py-2 text-sm" />
                             </div>
                             <div className="max-h-60 overflow-y-auto border border-voltech-border rounded-lg bg-voltech-dark/30 p-2 space-y-2">
-                              {productosParaKit.map((prod, idx) => {
+                              {((productosParaKit && productosParaKit.length > 0) ? productosParaKit : (productos || []).filter(p => p.tipo !== 'streaming' && !p.esCombo && !p.esKit && ((p.plataforma || p.producto || '').toLowerCase().includes((busquedaKit || '').toLowerCase()) || (p.sku || '').toLowerCase().includes((busquedaKit || '').toLowerCase())))).map((prod, idx) => {
                                 const enKit = (item.productos_kit || []).find(p => p.producto_id === prod.id);
                                 return (
                                   <div key={idx} className={`flex items-center justify-between p-3 rounded-lg border transition-all ${enKit ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-surface border-voltech-border hover:border-voltech-cyan/50'}`}>
@@ -1623,7 +1623,7 @@ import { motion, AnimatePresence } from 'framer-motion';
                                   </div>
                                 );
                               })}
-                              {productosParaKit.length === 0 && <p className="text-center text-xs text-voltech-muted py-4">No se encontraron productos</p>}
+                              {((productosParaKit && productosParaKit.length > 0) ? productosParaKit : (productos || []).filter(p => p.tipo !== 'streaming' && !p.esCombo && !p.esKit)).length === 0 && <p className="text-center text-xs text-voltech-muted py-4">No se encontraron productos</p>}
                             </div>
                           </div>
                         )}
