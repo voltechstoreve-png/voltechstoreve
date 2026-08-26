@@ -23,8 +23,14 @@ import WhatsAppIcon from '@/components/WhatsAppIcon';
 const abrirWhatsAppNat = (numero, texto) => {
 const limpio = String(numero || '').replace(/\D/g, '');
 const cod = encodeURIComponent(texto);
-// ✅ wa.me abre la APP en móvil y WhatsApp Web en PC (sin página intermedia)
-window.open(`https://wa.me/${limpio}?text=${cod}`, '_blank');
+const esMovil = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
+if (esMovil) {
+// ✅ MÓVIL: abre la APP de WhatsApp directamente (deep link)
+window.location.href = `https://wa.me/${limpio}?text=${cod}`;
+} else {
+// ✅ PC: abre WhatsApp Web/App de escritorio directo (sin página intermedia)
+window.open(`https://web.whatsapp.com/send?phone=${limpio}&text=${cod}`, '_blank');
+}
 };
 
 export default function CatalogoPage() {
@@ -127,12 +133,26 @@ useEffect(() => {
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const refCode = urlParams.get('ref');
-    if (refCode) {
-      setAutoReferrer(refCode.toUpperCase());
-      toast.success(`Referido por: ${refCode.toUpperCase()}`);
+    let refCode = urlParams.get('ref') || urlParams.get('v');
+    if (!refCode && window.location.hash) {
+    refCode = window.location.hash.replace(/^#\/?/, '').replace(/^ref=/i, '');
     }
-
+    if (refCode) {
+    refCode = refCode.toUpperCase();
+    setAutoReferrer(refCode);
+    sessionStorage.setItem('voltech_ref_detectado', refCode);
+    localStorage.setItem('voltech_ref', JSON.stringify({ codigo: refCode, fecha: new Date().toISOString() }));
+    // ✅ INTERNO: el cliente SIEMPRE ve el link original (se limpia la URL)
+    const url = new URL(window.location.href);
+    url.searchParams.delete('ref');
+    url.searchParams.delete('v');
+    window.history.replaceState({}, '', url.pathname + url.search);
+    } else {
+    try {
+    const guardado = JSON.parse(localStorage.getItem('voltech_ref') || 'null');
+    if (guardado?.codigo) setAutoReferrer(guardado.codigo);
+    } catch (e) {}
+    }
     const participantesGuardados = localStorage.getItem('voltech_participantes');
     const opinionesGuardadas = localStorage.getItem('voltech_opiniones');
     const cartGuardado = localStorage.getItem('voltech_cart');
@@ -264,10 +284,10 @@ useEffect(() => {
     const logueado = localStorage.getItem('voltech_user');
     if (!yaContada && !logueado && supabase) {
       sessionStorage.setItem('voltech_visita_contada', '1');
-      const ref = new URLSearchParams(window.location.search).get('ref');
-      supabase
-        .from('visitas_publicas')
-        .insert({ ref_code: ref ? ref.toUpperCase() : null })
+      const ref = sessionStorage.getItem('voltech_ref_detectado') || new URLSearchParams(window.location.search).get('ref');
+    supabase
+      .from('visitas_publicas')
+      .insert({ ref_code: ref ? ref.toUpperCase() : null })
         .then(({ error }) => { if (error) console.warn('No se registró visita:', error.message); });
     }
   }, []);
@@ -2117,22 +2137,7 @@ productosAgrupados.map(([cat, items]) => (
                         </div>
                       )}
                       
-                      {autoReferrer && !appliedCoupon && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <div className={`flex-1 px-3 py-2 border-2 border-purple-500 rounded-lg text-sm ${darkMode ? 'bg-purple-900/20' : 'bg-purple-50'}`}>
-                            <span className="text-xs text-purple-600">🤝 Referido por:</span>
-                            <span className="font-mono font-bold text-purple-600 ml-2">{autoReferrer}</span>
-                          </div>
-                          <button 
-                            onClick={removeAutoReferrer}
-                            className="p-2 bg-slate-500 hover:bg-slate-600 text-white rounded-lg transition-colors"
-                            title="Quitar referido"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    {/* ✅ Referido ahora es 100% interno: el cliente no lo ve (sigue yendo en el mensaje al equipo) */}                    </div>
 
                     {(() => {
                           const hayStreaming = cart.some(item => item.tipo === 'streaming' || (item.categoria || '').toUpperCase() === 'STREAMING');
@@ -2213,11 +2218,13 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
         )}
       </AnimatePresence>
 
-      {/* ✅ CHATBOT WIDGET */}
-      <ChatbotWidget 
-        productos={productos} 
-        whatsappNumber={whatsappNumero}
+      {/* ✅ CHATBOT WIDGET: se oculta mientras el carrito está abierto para no estorbar al finalizar */}
+      {!showCart && (
+      <ChatbotWidget
+      productos={productos}
+      whatsappNumber={whatsappNumero}
       />
+      )}
     </div>
   );
 }

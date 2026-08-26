@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
@@ -12,7 +12,9 @@ import {
   LogOut,
   X,
   TrendingUp,
-  Copy
+  Copy,
+  BellRing,
+  BellOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -42,6 +44,56 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
   });
 
   const { notificaciones } = useNotificaciones();
+
+  // ✅ NOTIFICACIONES DEL SISTEMA (PC y móvil), por dispositivo
+  const [notifSistema, setNotifSistema] = useState(false);
+  const vistasRef = useRef(null);
+
+  useEffect(() => {
+    setNotifSistema(localStorage.getItem('voltech_notif_sistema') === '1');
+  }, []);
+
+  const activarNotifSistema = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      toast.error('Este dispositivo no soporta notificaciones');
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      localStorage.setItem('voltech_notif_sistema', '1');
+      setNotifSistema(true);
+      try { new Notification('VOLTECH STORE ✅', { body: 'Notificaciones activadas en este dispositivo', icon: '/voltechstore.png' }); } catch (e) {}
+      toast.success('Notificaciones activadas en este dispositivo');
+    } else {
+      toast.error('Permiso de notificaciones denegado');
+    }
+  };
+
+  const desactivarNotifSistema = () => {
+    localStorage.setItem('voltech_notif_sistema', '0');
+    setNotifSistema(false);
+    toast.success('Notificaciones desactivadas en este dispositivo');
+  };
+
+  // ✅ Al llegar una notificación NUEVA del panel → la envía al sistema operativo
+  useEffect(() => {
+    if (!Array.isArray(notificaciones) || notificaciones.length === 0) return;
+    const keyDe = (n) => n.id || `${n.titulo || ''}${n.fecha || ''}`;
+    if (vistasRef.current === null) {
+      vistasRef.current = new Set(notificaciones.map(keyDe));
+      return; // no notificar las que ya existían al abrir
+    }
+    const nuevas = notificaciones.filter(n => !vistasRef.current.has(keyDe(n)));
+    if (nuevas.length > 0) {
+      nuevas.forEach(n => vistasRef.current.add(keyDe(n)));
+      if (notifSistema && 'Notification' in window && Notification.permission === 'granted') {
+        const n = nuevas[0];
+        try {
+          new Notification(n.titulo || 'VOLTECH STORE', { body: n.mensaje || n.detalle || '', icon: '/voltechstore.png' });
+        } catch (e) {}
+      }
+    }
+  }, [notificaciones, notifSistema]);
 
   // ✅ ACTUALIZADO: Obtiene datos de Supabase con fallback a localStorage
   useEffect(() => {
@@ -225,13 +277,13 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
   }, []);
 
   const referralCode = userData.nombre ? `VOLTECHSTORE-${userData.nombre.substring(0, 5).toUpperCase()}-${(userData.id || '0000').toString().slice(-4)}` : 'voltech2024';
-  const referralLink = typeof window !== 'undefined' ? `${window.location.origin}/catalogo?ref=${referralCode}` : '';
-
+  // ✅ UN solo link visible (el original); el código viaja oculto en el # (interno)
+  const referralLink = typeof window !== 'undefined' ? `${window.location.origin}/catalogo` : '';
+  const referralLinkInterno = typeof window !== 'undefined' ? `${window.location.origin}/catalogo#${referralCode}` : '';
   const copyReferralLink = () => {
-    navigator.clipboard.writeText(referralLink);
-    toast.success('Link de referido copiado al portapapeles');
+  navigator.clipboard.writeText(referralLinkInterno);
+  toast.success('Link copiado 🔒 Se ve como el original; el rastreo es interno');
   };
-
   const handleLogout = () => {
     if (confirm('¿Estás seguro de que deseas cerrar sesión?')) {
       localStorage.removeItem('voltech_user');
@@ -295,6 +347,14 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
           </div>
 
           <div className="flex items-center gap-4">
+            <button
+              onClick={notifSistema ? desactivarNotifSistema : activarNotifSistema}
+              className={`p-2 rounded-lg transition-colors ${notifSistema ? 'bg-voltech-success/20 text-voltech-success' : 'hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan'}`}
+              title={notifSistema ? 'Notificaciones del sistema: ACTIVADAS (clic para apagar)' : 'Activar notificaciones en este dispositivo (PC/móvil)'}
+            >
+              {notifSistema ? <BellRing className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
+            </button>
+
             <NotificationBell />
 
             <div className="relative">
@@ -325,7 +385,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
                     </div>
                     <div className="p-4 space-y-3">
                       <div>
-                        <p className="text-xs text-voltech-muted mb-1">Tu link de referencia:</p>
+                        <p className="text-xs text-voltech-muted mb-1">Tu link para compartir (se ve original 🔒):</p>
                         <div className="flex items-center gap-2 bg-voltech-dark border border-voltech-border rounded-lg p-2">
                           <span className="text-xs text-voltech-cyan truncate flex-1">{referralLink}</span>
                           <button 
