@@ -278,14 +278,16 @@ if (pData) plts = pData; if (cData) cpons = cData; if (puData) pubs = puData;
 if (prData) prods = prData; if (clData) clts = clData; if (etData?.valor) etqs = etData.valor;
 if (mvData?.valor) mvConfig = mvData.valor;
 // ✅ Combina el equipo desde 'usuarios' Y 'equipo' (sin duplicados por nombre)
-const porNombre = new Map();
-[...(usData || []), ...(eqData || [])].forEach(m => {
-if (m && m.nombre) {
-const k = String(m.nombre).toLowerCase();
-if (!porNombre.has(k)) porNombre.set(k, m);
-}
-});
-setEquipo(Array.from(porNombre.values()));}
+const refCode = urlParams.get('ref') || urlParams.get('v');
+if (refCode) {
+setAutoReferrer(refCode.toUpperCase());
+localStorage.setItem('voltech_ref', JSON.stringify({ codigo: refCode.toUpperCase(), fecha: new Date().toISOString() }));
+// ✅ Referido INTERNO: limpia la URL y sin aviso — el cliente siempre ve el link original
+const urlLimpia = new URL(window.location.href);
+urlLimpia.searchParams.delete('ref');
+urlLimpia.searchParams.delete('v');
+window.history.replaceState({}, '', urlLimpia);
+}}
 if (plts.length === 0) { const d = localStorage.getItem('voltech_plantillas'); if (d) plts = JSON.parse(d); }
 if (cpons.length === 0) { const d = localStorage.getItem('voltech_cupones'); if (d) cpons = JSON.parse(d); }
 if (pubs.length === 0) { const d = localStorage.getItem('voltech_publicidad'); if (d) pubs = JSON.parse(d); }
