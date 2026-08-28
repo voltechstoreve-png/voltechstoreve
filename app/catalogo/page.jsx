@@ -2,6 +2,7 @@
 
 import BannerCard from '@/components/BannerCard';
 import { useState, useEffect, useRef, useMemo } from 'react';
+import CustomSelect from '@/components/CustomSelect';
 import { useTheme } from '@/app/context/ThemeContext';
 import { useProductos, useSettings, useTasaBCV, useAuth } from '@/hooks/useVoltech';
 import { supabase } from '@/lib/supabase';
@@ -1229,10 +1230,13 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
             </div>
           
             {activeSection === 'streaming' && (
-              <select value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)} className={`w-full md:w-auto px-3 py-2.5 border rounded-lg text-sm font-medium transition-colors ${inputBg}`}>
-                <option value="">Todas las plataformas</option>
-                {plataformas.map(p => <option key={p} value={p} className="text-slate-900 bg-white">{p}</option>)}
-              </select>
+              <CustomSelect
+                value={filterPlatform}
+                onChange={setFilterPlatform}
+                options={plataformas.map(p => ({ value: p, label: p }))}
+                placeholder="Todas las plataformas"
+                className="w-full md:w-auto"
+              />
             )}
           </div>
         </div>
@@ -1629,21 +1633,22 @@ productosAgrupados.map(([cat, items]) => (
                       
                       {/* ✅ NUEVO CAMPO: ¿Dónde nos conoció? */}
                       <div>
-                        <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>¿Dónde nos conoció?</label>
-                        <select 
-                          value={formDataOpinion.donde_nos_conocio} 
-                          onChange={(e) => setFormDataOpinion({...formDataOpinion, donde_nos_conocio: e.target.value})} 
-                          className={`w-full px-4 py-2 border rounded-lg ${inputBg}`}
-                        >
-                          <option value="">Selecciona una opción</option>
-                          <option value="Instagram">Instagram</option>
-                          <option value="TikTok">TikTok</option>
-                          <option value="Facebook">Facebook</option>
-                          <option value="WhatsApp">WhatsApp</option>
-                          <option value="Google">Google</option>
-                          <option value="Recomendación">Recomendación de amigo/familiar</option>
-                          <option value="Otro">Otro</option>
-                        </select>
+                        <CustomSelect
+                          label="¿Dónde nos conoció?"
+                          value={formDataOpinion.donde_nos_conocio}
+                          onChange={(v) => setFormDataOpinion({...formDataOpinion, donde_nos_conocio: v})}
+                          options={[
+                            { value: 'Instagram', label: 'Instagram' },
+                            { value: 'TikTok', label: 'TikTok' },
+                            { value: 'Facebook', label: 'Facebook' },
+                            { value: 'WhatsApp', label: 'WhatsApp' },
+                            { value: 'Google', label: 'Google' },
+                            { value: 'Recomendación', label: 'Recomendación de amigo/familiar' },
+                            { value: 'Otro', label: 'Otro' }
+                          ]}
+                          placeholder="Selecciona una opción"
+                          className="w-full"
+                        />
                       </div>
                       
                       <div>
@@ -2247,10 +2252,13 @@ productosAgrupados.map(([cat, items]) => (
                         {deliveryMethod === 'retiro' && (
                           <div className="mt-3">
                             {puntosEntrega.length > 0 ? (
-                              <select value={selectedAddress} onChange={(e) => setSelectedAddress(e.target.value)} className={`w-full px-3 py-2 border rounded-lg text-sm ${inputBg}`}>
-                                <option value="">Selecciona punto de retiro</option>
-                                {puntosEntrega.map((d, i) => (<option key={i} value={d} className="text-slate-900 bg-white">{d}</option>))}
-                              </select>
+                              <CustomSelect
+                                value={selectedAddress}
+                                onChange={setSelectedAddress}
+                                options={puntosEntrega.map(d => ({ value: d, label: d }))}
+                                placeholder="Selecciona punto de retiro"
+                                className="w-full"
+                              />
                             ) : (
                               <div className={`p-3 rounded-lg text-xs border ${darkMode ? 'bg-yellow-900/20 text-yellow-300 border-yellow-800' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>⚠️ No hay puntos de retiro configurados. Ve a <strong>Ajustes → Envíos y Entregas</strong> para agregarlos.</div>
                             )}
@@ -2271,13 +2279,19 @@ productosAgrupados.map(([cat, items]) => (
                             ? `¡Envío nacional GRATIS por tu compra de $${settings.envios?.montoMinimoEnvioGratis || 50} o más!`
                             : (settings.envios?.descripcionEnvioNacional || `Envíos menores a $${settings.envios?.montoMinimoEnvioGratis || 50}: cobro a destino`)}
                             </div>
-                            <select value={agenciaEnvio} onChange={(e) => setAgenciaEnvio(e.target.value)} className={`w-full px-3 py-2 border rounded-lg text-sm ${inputBg}`}>
-                              <option value="MRW" className="text-slate-900 bg-white">MRW</option>
-                              <option value="ZOOM" className="text-slate-900 bg-white">ZOOM</option>
-                              <option value="Tealca" className="text-slate-900 bg-white">Tealca</option>
-                              <option value="Domesa" className="text-slate-900 bg-white">Domesa</option>
-                              <option value="Otra" className="text-slate-900 bg-white">Otra</option>
-                            </select>
+                            <CustomSelect
+                              value={agenciaEnvio}
+                              onChange={setAgenciaEnvio}
+                              options={[
+                                { value: 'MRW', label: 'MRW' },
+                                { value: 'ZOOM', label: 'ZOOM' },
+                                { value: 'Tealca', label: 'Tealca' },
+                                { value: 'Domesa', label: 'Domesa' },
+                                { value: 'Otra', label: 'Otra' }
+                              ]}
+                              placeholder="Selecciona agencia"
+                              className="w-full"
+                            />
                             <input type="text" value={oficinaDestino} onChange={(e) => setOficinaDestino(e.target.value)} placeholder="Ej: Oficina MRW Centro, Valencia" className={`w-full px-3 py-2 border rounded-lg text-sm ${inputBg}`} />
                           </div>
                         )}
@@ -2295,11 +2309,17 @@ productosAgrupados.map(([cat, items]) => (
                     <input type="tel" value={clienteTelefono} onChange={(e) => setClienteTelefono(e.target.value)} placeholder="Teléfono (WhatsApp) *" className={`w-full px-3 py-2 border rounded-lg text-sm ${inputBg}`} />
                     </div>
                     <div className="mb-4">
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}> Método de Pago</label>
-                      <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className={`w-full px-3 py-2 border rounded-lg text-sm ${inputBg}`}>
-                        <option value="">Selecciona método</option>
-                        {metodosPagoActivos.map(m => <option key={m} value={m} className="text-slate-900 bg-white">{m.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>)}
-                      </select>
+                      <CustomSelect
+                        label="Método de Pago"
+                        value={paymentMethod}
+                        onChange={setPaymentMethod}
+                        options={metodosPagoActivos.map(m => ({
+                          value: m,
+                          label: m.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+                        }))}
+                        placeholder="Selecciona método"
+                        className="w-full"
+                      />
                     </div>
 
                     <div className="mb-4">

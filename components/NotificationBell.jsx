@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
-  Bell, CheckCircle, Users, Gift, Trophy, ShoppingCart, AlertTriangle, 
+  Bell, BellRing, BellOff, CheckCircle, Users, Gift, Trophy, ShoppingCart, AlertTriangle, 
   Trash2, X, MonitorPlay, RefreshCw, Link as LinkIcon, Clock, Ticket, Megaphone 
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useNotificaciones } from '@/app/context/NotificationContext';
 import { useRouter } from 'next/navigation';
 
@@ -12,6 +13,73 @@ export default function NotificationBell() {
   const [showDropdown, setShowDropdown] = useState(false);
   const { notificaciones, marcarLeida, marcarTodasLeidas, eliminarNotificacion, limpiarTodas } = useNotificaciones();
   const router = useRouter();
+  const contenedorRef = useRef(null);
+
+  // ✅ Si el Header abre "Mis Ventas" o el menú de usuario, cerramos Notificaciones
+  useEffect(() => {
+    const cerrar = () => setShowDropdown(false);
+    window.addEventListener('voltech-abrio-dropdown', cerrar);
+    return () => window.removeEventListener('voltech-abrio-dropdown', cerrar);
+  }, []);
+
+  // ✅ Clic fuera cierra Notificaciones
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (contenedorRef.current && !contenedorRef.current.contains(e.target)) setShowDropdown(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // ✅ NOTIFICACIONES DEL SISTEMA (PC y móvil), por dispositivo
+  const [notifSistema, setNotifSistema] = useState(false);
+  const vistasRef = useRef(null);
+
+  useEffect(() => {
+    setNotifSistema(localStorage.getItem('voltech_notif_sistema') === '1');
+  }, []);
+
+  const activarNotifSistema = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      toast.error('Este dispositivo no soporta notificaciones');
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      localStorage.setItem('voltech_notif_sistema', '1');
+      setNotifSistema(true);
+      try { new Notification('VOLTECH STORE ✅', { body: 'Notificaciones activadas en este dispositivo', icon: '/voltechstore.png' }); } catch (e) {}
+      toast.success('Notificaciones activadas en este dispositivo');
+    } else {
+      toast.error('Permiso de notificaciones denegado');
+    }
+  };
+
+  const desactivarNotifSistema = () => {
+    localStorage.setItem('voltech_notif_sistema', '0');
+    setNotifSistema(false);
+    toast.success('Notificaciones desactivadas en este dispositivo');
+  };
+
+  // ✅ Al llegar una notificación NUEVA del panel → la envía al sistema operativo
+  useEffect(() => {
+    if (!Array.isArray(notificaciones) || notificaciones.length === 0) return;
+    const keyDe = (n) => n.id || `${n.titulo || ''}${n.fecha || ''}`;
+    if (vistasRef.current === null) {
+      vistasRef.current = new Set(notificaciones.map(keyDe));
+      return; // no notificar las que ya existían al abrir
+    }
+    const nuevas = notificaciones.filter(n => !vistasRef.current.has(keyDe(n)));
+    if (nuevas.length > 0) {
+      nuevas.forEach(n => vistasRef.current.add(keyDe(n)));
+      if (notifSistema && 'Notification' in window && Notification.permission === 'granted') {
+        const n = nuevas[0];
+        try {
+          new Notification(n.titulo || 'VOLTECH STORE', { body: n.mensaje || n.detalle || '', icon: '/voltechstore.png' });
+        } catch (e) {}
+      }
+    }
+  }, [notificaciones, notifSistema]);
 
   const noLeidas = notificaciones.filter(n => !n.leida).length;
   const ultimas = notificaciones.slice(0, 5);
@@ -74,9 +142,13 @@ export default function NotificationBell() {
   };
 
   return (
-    <div className="relative">
+    <div className="relative" ref={contenedorRef}>
       <button
-        onClick={() => setShowDropdown(!showDropdown)}
+        onClick={() => {
+          const vaAbrir = !showDropdown;
+          if (vaAbrir) window.dispatchEvent(new CustomEvent('voltech-abrio-notificaciones'));
+          setShowDropdown(vaAbrir);
+        }}
         className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-white transition-colors relative"
       >
         <Bell className="w-5 h-5" />
@@ -113,6 +185,13 @@ export default function NotificationBell() {
                 <Trash2 className="w-3 h-3" /> Vaciar
               </button>
             </div>
+            <button
+              onClick={notifSistema ? desactivarNotifSistema : activarNotifSistema}
+              className={`mt-2 w-full flex items-center justify-center gap-2 text-xs px-2 py-1.5 rounded-lg border transition-colors ${notifSistema ? 'bg-voltech-success/20 text-voltech-success border-voltech-success/40' : 'bg-voltech-dark/50 text-voltech-muted border-voltech-border hover:text-voltech-cyan'}`}
+            >
+              {notifSistema ? <BellRing className="w-3 h-3" /> : <BellOff className="w-3 h-3" />}
+              {notifSistema ? 'Notificaciones: ACTIVADAS' : 'Activar notificaciones (PC/móvil)'}
+            </button>
           </div>
 
           <div className="max-h-96 overflow-y-auto">

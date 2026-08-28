@@ -12,9 +12,7 @@ import {
   LogOut,
   X,
   TrendingUp,
-  Copy,
-  BellRing,
-  BellOff
+  Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -45,55 +43,26 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
 
   const { notificaciones } = useNotificaciones();
 
-  // ✅ NOTIFICACIONES DEL SISTEMA (PC y móvil), por dispositivo
-  const [notifSistema, setNotifSistema] = useState(false);
-  const vistasRef = useRef(null);
+  // ✅ REFS para detectar clic fuera y cerrar los dropdowns del Header
+  const statsRef = useRef(null);
+  const userRef = useRef(null);
 
+  // ✅ Si NotificationBell se abre, cerramos Mis Ventas y el menú de usuario
   useEffect(() => {
-    setNotifSistema(localStorage.getItem('voltech_notif_sistema') === '1');
+    const cerrar = () => { setStatsOpen(false); setUserMenuOpen(false); };
+    window.addEventListener('voltech-abrio-notificaciones', cerrar);
+    return () => window.removeEventListener('voltech-abrio-notificaciones', cerrar);
   }, []);
 
-  const activarNotifSistema = async () => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      toast.error('Este dispositivo no soporta notificaciones');
-      return;
-    }
-    const perm = await Notification.requestPermission();
-    if (perm === 'granted') {
-      localStorage.setItem('voltech_notif_sistema', '1');
-      setNotifSistema(true);
-      try { new Notification('VOLTECH STORE ✅', { body: 'Notificaciones activadas en este dispositivo', icon: '/voltechstore.png' }); } catch (e) {}
-      toast.success('Notificaciones activadas en este dispositivo');
-    } else {
-      toast.error('Permiso de notificaciones denegado');
-    }
-  };
-
-  const desactivarNotifSistema = () => {
-    localStorage.setItem('voltech_notif_sistema', '0');
-    setNotifSistema(false);
-    toast.success('Notificaciones desactivadas en este dispositivo');
-  };
-
-  // ✅ Al llegar una notificación NUEVA del panel → la envía al sistema operativo
+  // ✅ Clic fuera cierra Mis Ventas y menú de usuario
   useEffect(() => {
-    if (!Array.isArray(notificaciones) || notificaciones.length === 0) return;
-    const keyDe = (n) => n.id || `${n.titulo || ''}${n.fecha || ''}`;
-    if (vistasRef.current === null) {
-      vistasRef.current = new Set(notificaciones.map(keyDe));
-      return; // no notificar las que ya existían al abrir
-    }
-    const nuevas = notificaciones.filter(n => !vistasRef.current.has(keyDe(n)));
-    if (nuevas.length > 0) {
-      nuevas.forEach(n => vistasRef.current.add(keyDe(n)));
-      if (notifSistema && 'Notification' in window && Notification.permission === 'granted') {
-        const n = nuevas[0];
-        try {
-          new Notification(n.titulo || 'VOLTECH STORE', { body: n.mensaje || n.detalle || '', icon: '/voltechstore.png' });
-        } catch (e) {}
-      }
-    }
-  }, [notificaciones, notifSistema]);
+    const handleClickOutside = (e) => {
+      if (statsRef.current && !statsRef.current.contains(e.target)) setStatsOpen(false);
+      if (userRef.current && !userRef.current.contains(e.target)) setUserMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // ✅ ACTUALIZADO: Obtiene datos de Supabase con fallback a localStorage
   useEffect(() => {
@@ -347,19 +316,16 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
           </div>
 
           <div className="flex items-center gap-4">
-            <button
-              onClick={notifSistema ? desactivarNotifSistema : activarNotifSistema}
-              className={`p-2 rounded-lg transition-colors ${notifSistema ? 'bg-voltech-success/20 text-voltech-success' : 'hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan'}`}
-              title={notifSistema ? 'Notificaciones del sistema: ACTIVADAS (clic para apagar)' : 'Activar notificaciones en este dispositivo (PC/móvil)'}
-            >
-              {notifSistema ? <BellRing className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
-            </button>
-
             <NotificationBell />
 
-            <div className="relative">
+            <div className="relative" ref={statsRef}>
               <button
-                onClick={() => setStatsOpen(!statsOpen)}
+                onClick={() => {
+                  const vaAbrir = !statsOpen;
+                  setUserMenuOpen(false);
+                  if (vaAbrir) window.dispatchEvent(new CustomEvent('voltech-abrio-dropdown'));
+                  setStatsOpen(vaAbrir);
+                }}
                 className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors relative"
                 title="Mis Ventas"
               >
@@ -428,9 +394,14 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
               </AnimatePresence>
             </div>
 
-            <div className="relative">
+            <div className="relative" ref={userRef}>
               <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                onClick={() => {
+                  const vaAbrir = !userMenuOpen;
+                  setStatsOpen(false);
+                  if (vaAbrir) window.dispatchEvent(new CustomEvent('voltech-abrio-dropdown'));
+                  setUserMenuOpen(vaAbrir);
+                }}
                 className="flex items-center gap-2 p-2 rounded-lg hover:bg-voltech-border transition-colors"
               >
                 <img 

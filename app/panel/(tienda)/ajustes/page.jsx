@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
 import WhatsAppIcon from '@/components/WhatsAppIcon';
+import CustomSelect from '@/components/CustomSelect';
 import {
   Store, CreditCard, Truck, FileText, Database, Save, Download, Upload,
   Plus, Trash2, MapPin, Eye, EyeOff, ArrowUp, Info,
@@ -352,10 +353,20 @@ export default function AjustesPage() {
                   </div>
                 ))}
                 <div>
-                  <label className="block text-xs text-voltech-muted mb-2">Tipo de Difuminado</label>
-                  <select value={settings.colores.difuminado} onChange={(e) => updateColor('difuminado', e.target.value)} className="input-voltech w-full rounded-lg px-3 py-2 text-sm">
-                    <option value="horizontal">↔️ Horizontal</option><option value="vertical">↕️ Vertical</option><option value="diagonal">↗️ Diagonal</option><option value="radial">⭕ Radial</option><option value="none">❌ Sólido</option>
-                  </select>
+                  <CustomSelect
+                    label="Tipo de Difuminado"
+                    value={settings.colores.difuminado}
+                    onChange={(v) => updateColor('difuminado', v)}
+                    options={[
+                      { value: 'horizontal', label: '↔️ Horizontal' },
+                      { value: 'vertical', label: '↕️ Vertical' },
+                      { value: 'diagonal', label: '↗️ Diagonal' },
+                      { value: 'radial', label: '⭕ Radial' },
+                      { value: 'none', label: '❌ Sólido' }
+                    ]}
+                    placeholder="Selecciona tipo"
+                    className="w-full"
+                  />
                 </div>
               </div>
               <div className="mt-6 pt-4 border-t border-voltech-border">
@@ -509,12 +520,18 @@ export default function AjustesPage() {
             <p className="text-xs text-voltech-muted">Edita el mensaje que recibe el cliente al pulsar "WhatsApp" en un producto. Variables: <code className="text-voltech-cyan">[Producto]</code> <code className="text-voltech-cyan">[Precio]</code> <code className="text-voltech-cyan">[Bs]</code> <code className="text-voltech-cyan">[Url]</code></p>
             <textarea value={plantillaActual} onChange={(e) => updateSetting('whatsapp', 'plantilla_compra', e.target.value)} rows={6} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
             <div>
-              <label className="block text-xs text-voltech-muted mb-1">✍️ Cierre del mensaje</label>
-              <select value={cierreCompra} onChange={(e) => updateSetting('whatsapp', 'cierre_compra', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                <option value="Quiero comprar ✅">Quiero comprar ✅</option>
-                <option value="Quiero más información 🙋">Quiero más información 🙋</option>
-                <option value="Quiero aprovechar la oferta 🔥">Quiero aprovechar la oferta 🔥</option>
-              </select>
+              <CustomSelect
+                label="✍️ Cierre del mensaje"
+                value={cierreCompra}
+                onChange={(v) => updateSetting('whatsapp', 'cierre_compra', v)}
+                options={[
+                  { value: 'Quiero comprar ✅', label: 'Quiero comprar ✅' },
+                  { value: 'Quiero más información 🙋', label: 'Quiero más información 🙋' },
+                  { value: 'Quiero aprovechar la oferta 🔥', label: 'Quiero aprovechar la oferta 🔥' }
+                ]}
+                placeholder="Selecciona cierre"
+                className="w-full"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-voltech-muted mb-2">👁️ Vista previa del mensaje</label>
