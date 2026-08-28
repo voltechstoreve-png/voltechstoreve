@@ -13,6 +13,7 @@ import {
   Box, Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import CustomSelect from '@/components/CustomSelect';
 import toast, { Toaster } from 'react-hot-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -1002,11 +1003,15 @@ export default function VentasProductosPage() {
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">N° Orden</label><input type="text" value={formData.numeroOrden} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-mono text-voltech-cyan bg-voltech-dark/50" /></div>
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Fecha *</label><input type="date" value={formData.fecha} onChange={(e) => setFormData({ ...formData, fecha: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                   <div>
-                    <label className="block text-xs text-voltech-muted mb-1 ml-1">Vendedor *</label>
-                    <select value={formData.vendedor} onChange={(e) => setFormData({ ...formData, vendedor: e.target.value })} disabled={esVendedor || esSocio} className={`input-voltech w-full rounded-lg px-4 py-2 text-sm ${esVendedor || esSocio ? 'bg-voltech-dark/50 cursor-not-allowed' : ''}`}>
-                      <option value="">-- Selecciona --</option>
-                      {vendedores.map(v => (<option key={v.id} value={v.nombre}>{v.nombre} ({v.rol})</option>))}
-                    </select>
+                    <CustomSelect
+                      label="Vendedor *"
+                      value={formData.vendedor}
+                      onChange={(v) => setFormData({ ...formData, vendedor: v })}
+                      options={vendedores.map(v => ({ value: v.nombre, label: `${v.nombre} (${v.rol})` }))}
+                      placeholder="-- Selecciona --"
+                      disabled={esVendedor || esSocio}
+                      className="w-full"
+                    />
                   </div>
                   <div className="relative">
                     <label className="block text-xs text-voltech-muted mb-1 ml-1">Comprador *</label>
@@ -1019,18 +1024,27 @@ export default function VentasProductosPage() {
                   </div>
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Teléfono *</label><input type="tel" value={formData.telefono} onChange={(e) => setFormData({ ...formData, telefono: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="0412-1234567" /></div>
                   <div>
-                    <label className="block text-xs text-voltech-muted mb-1 ml-1">Método de Pago *</label>
-                    <select value={formData.metodoPago} onChange={(e) => setFormData({ ...formData, metodoPago: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                      <option value="">-- Selecciona --</option>
-                      {metodosPagoActivos.length > 0 ? metodosPagoActivos.map(([key, val]) => (<option key={key} value={key}>{val.nombre || key}</option>)) : <option disabled>No hay métodos configurados</option>}
-                    </select>
+                    <CustomSelect
+                      label="Método de Pago *"
+                      value={formData.metodoPago}
+                      onChange={(v) => setFormData({ ...formData, metodoPago: v })}
+                      options={metodosPagoActivos.length > 0 
+                        ? metodosPagoActivos.map(([key, val]) => ({ value: key, label: val.nombre || key }))
+                        : []
+                      }
+                      placeholder={metodosPagoActivos.length > 0 ? "-- Selecciona --" : "No hay métodos configurados"}
+                      className="w-full"
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs text-voltech-muted mb-1 ml-1">Cartera *</label>
-                    <select value={formData.carteraId} onChange={(e) => setFormData({ ...formData, carteraId: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                      <option value="">-- Selecciona --</option>
-                      {carterasActivas.map(c => (<option key={c.id} value={c.id}>{c.nombre}</option>))}
-                    </select>
+                    <CustomSelect
+                      label="Cartera *"
+                      value={formData.carteraId}
+                      onChange={(v) => setFormData({ ...formData, carteraId: v })}
+                      options={carterasActivas.map(c => ({ value: c.id, label: c.nombre }))}
+                      placeholder="-- Selecciona --"
+                      className="w-full"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs text-voltech-muted mb-1 ml-1">% Comisión</label>
@@ -1120,18 +1134,18 @@ export default function VentasProductosPage() {
                           </div>
 
                           <div className="col-span-6 md:col-span-2">
-                            <label className="block text-xs text-voltech-muted mb-1 ml-1">Filtrar Categoría</label>
-                            <select
+                            <CustomSelect
+                              label="Filtrar Categoría"
                               value={prod.filtroCategoria}
-                              onChange={(e) => actualizarCampoProducto(index, 'filtroCategoria', e.target.value)}
-                              className="input-voltech w-full rounded-lg px-3 py-2 text-sm"
+                              onChange={(v) => actualizarCampoProducto(index, 'filtroCategoria', v)}
                               disabled={prod.esKit}
-                            >
-                              <option value="">Todas</option>
-                              {categoriasDisponibles.map(cat => (
-                                <option key={cat} value={cat}>{cat}</option>
-                              ))}
-                            </select>
+                              options={[
+                                { value: '', label: 'Todas' },
+                                ...categoriasDisponibles.map(cat => ({ value: cat, label: cat }))
+                              ]}
+                              placeholder="Todas"
+                              className="w-full"
+                            />
                           </div>
 
                           <div className="col-span-6 md:col-span-2">
@@ -1150,23 +1164,24 @@ export default function VentasProductosPage() {
                           </div>
 
                           <div className="col-span-12 md:col-span-4 relative">
-                            <label className="block text-xs text-voltech-muted mb-1 ml-1">Producto *</label>
                             <div className="flex items-center gap-2 w-full min-w-0">
-                              <select
+                              <CustomSelect
+                                label="Producto *"
                                 value={prod.productoId}
-                                onChange={(e) => actualizarCampoProducto(index, 'productoId', e.target.value)}
-                                className="input-voltech flex-1 min-w-0 w-full text-xs sm:text-sm rounded-lg px-3 py-2"
+                                onChange={(v) => actualizarCampoProducto(index, 'productoId', v)}
                                 disabled={prod.esKit}
-                              >
-                                <option value="">-- Selecciona --</option>
-                                {productosParaSelect.map(p => (
-                                  <option key={p.id} value={p.id}>
-                                    {p.plataforma || p.producto} (Stock: {p.cantidad})
-                                  </option>
-                                ))}
-                              </select>
+                                options={[
+                                  { value: '', label: '-- Selecciona --' },
+                                  ...productosParaSelect.map(p => ({ 
+                                    value: p.id, 
+                                    label: `${p.plataforma || p.producto} (Stock: ${p.cantidad})` 
+                                  }))
+                                ]}
+                                placeholder="-- Selecciona --"
+                                className="flex-1 min-w-0"
+                              />
                               {!prod.esKit && (
-                                <button onClick={() => abrirModalProductoNuevo(index)} className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-voltech-purple/20 text-voltech-purple hover:bg-voltech-purple/30 transition-colors" title="Crear nuevo"><Plus className="w-4 h-4" /></button>
+                                <button onClick={() => abrirModalProductoNuevo(index)} className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-voltech-purple/20 text-voltech-purple hover:bg-voltech-purple/30 transition-colors mt-6" title="Crear nuevo"><Plus className="w-4 h-4" /></button>
                               )}
                             </div>
                           </div>
@@ -1282,16 +1297,67 @@ export default function VentasProductosPage() {
                   <div className="lg:col-span-2"><label className="block text-xs text-voltech-muted mb-1 ml-1">Plataforma / Producto *</label><input type="text" value={nuevoProducto.plataforma} onChange={(e) => setNuevoProducto({ ...nuevoProducto, plataforma: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Ej: Audífonos JBL" /></div>
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Categoría *</label><input type="text" value={nuevoProducto.categoria} onChange={(e) => setNuevoProducto({ ...nuevoProducto, categoria: e.target.value.toUpperCase() })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Ej: STREAMING" /></div>
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Fecha</label><input type="date" value={new Date().toISOString().split('T')[0]} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50" /></div>
-                  <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Comprador (Equipo)</label><select className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="">-- Selecciona --</option>{equipo.map(e => (<option key={e.id} value={e.nombre}>{e.nombre} ({e.rol})</option>))}</select></div>
+                  <div>
+                    <CustomSelect
+                      label="Comprador (Equipo)"
+                      value=""
+                      onChange={() => {}}
+                      options={[
+                        { value: '', label: '-- Selecciona --' },
+                        ...equipo.map(e => ({ value: e.nombre, label: `${e.nombre} (${e.rol})` }))
+                      ]}
+                      placeholder="-- Selecciona --"
+                      className="w-full"
+                    />
+                  </div>
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Marca *</label><input type="text" value={nuevoProducto.marca} onChange={(e) => setNuevoProducto({ ...nuevoProducto, marca: e.target.value.toUpperCase() })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Ej: JBL" /></div>
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cantidad</label><input type="number" value={nuevoProducto.cantidad} onChange={(e) => setNuevoProducto({ ...nuevoProducto, cantidad: Number(e.target.value) })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
-                  <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Moneda de compra</label><select value={nuevoProducto.tipo === 'bs' ? 'bs' : 'usd'} onChange={(e) => setNuevoProducto({ ...nuevoProducto, tipo: e.target.value === 'bs' ? 'bs' : 'fisico' })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="usd">Dólares ($)</option><option value="bs">Bolívares (Bs)</option></select></div>
+                  <div>
+                    <CustomSelect
+                      label="Moneda de compra"
+                      value={nuevoProducto.tipo === 'bs' ? 'bs' : 'usd'}
+                      onChange={(v) => setNuevoProducto({ ...nuevoProducto, tipo: v === 'bs' ? 'bs' : 'fisico' })}
+                      options={[
+                        { value: 'usd', label: 'Dólares ($)' },
+                        { value: 'bs', label: 'Bolívares (Bs)' }
+                      ]}
+                      placeholder="Selecciona moneda"
+                      className="w-full"
+                    />
+                  </div>
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Mayor ($) <span className="text-voltech-warning">(Tu costo)</span></label><input type="number" step="0.01" value={nuevoProducto.precioMayor} onChange={(e) => setNuevoProducto({ ...nuevoProducto, precioMayor: Number(e.target.value) })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Detal ($) <span className="text-voltech-success">(Venta al público)</span></label><input type="number" step="0.01" value={nuevoProducto.precioDetal} onChange={(e) => setNuevoProducto({ ...nuevoProducto, precioDetal: Number(e.target.value) })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio (Bs)</label><input type="number" step="0.01" value={nuevoProducto.precioBs} onChange={(e) => setNuevoProducto({ ...nuevoProducto, precioBs: Number(e.target.value) })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Total</label><div className="bg-voltech-dark border border-voltech-border rounded-lg px-4 py-2 text-sm font-bold text-voltech-success">${(Number(nuevoProducto.precioMayor || 0) * Number(nuevoProducto.cantidad || 1)).toFixed(2)}</div></div>
-                  <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Método de Pago</label><select value={nuevoProducto.metodoPago} onChange={(e) => setNuevoProducto({ ...nuevoProducto, metodoPago: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="efectivo">Efectivo</option><option value="pago_movil">Pago Móvil</option><option value="transferencia">Transferencia</option><option value="zelle">Zelle</option><option value="binance">Binance</option></select></div>
-                  <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cartera</label><select value={nuevoProducto.cartera} onChange={(e) => setNuevoProducto({ ...nuevoProducto, cartera: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="">-- Selecciona --</option>{carteras.map(c => (<option key={c.id} value={c.nombre}>{c.nombre}</option>))}</select></div>
+                  <div>
+                    <CustomSelect
+                      label="Método de Pago"
+                      value={nuevoProducto.metodoPago}
+                      onChange={(v) => setNuevoProducto({ ...nuevoProducto, metodoPago: v })}
+                      options={[
+                        { value: 'efectivo', label: 'Efectivo' },
+                        { value: 'pago_movil', label: 'Pago Móvil' },
+                        { value: 'transferencia', label: 'Transferencia' },
+                        { value: 'zelle', label: 'Zelle' },
+                        { value: 'binance', label: 'Binance' }
+                      ]}
+                      placeholder="Selecciona método"
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <CustomSelect
+                      label="Cartera"
+                      value={nuevoProducto.cartera}
+                      onChange={(v) => setNuevoProducto({ ...nuevoProducto, cartera: v })}
+                      options={[
+                        { value: '', label: '-- Selecciona --' },
+                        ...carteras.map(c => ({ value: c.id, label: c.nombre }))
+                      ]}
+                      placeholder="-- Selecciona --"
+                      className="w-full"
+                    />
+                  </div>
                 </div>
                 {Number(nuevoProducto.precioMayor || 0) > 0 && Number(nuevoProducto.precioDetal || 0) > 0 && (<div className="bg-voltech-success/10 border border-voltech-success/30 rounded-lg p-3 text-sm text-voltech-success">Ganancia por unidad: ${(Number(nuevoProducto.precioDetal) - Number(nuevoProducto.precioMayor)).toFixed(2)} ({((Number(nuevoProducto.precioDetal) - Number(nuevoProducto.precioMayor)) / Number(nuevoProducto.precioMayor) * 100).toFixed(0)}%)</div>)}
               </div>

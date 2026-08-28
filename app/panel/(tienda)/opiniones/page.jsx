@@ -8,6 +8,7 @@ import {
   X, User, Calendar, Clock, Eye
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import CustomSelect from '@/components/CustomSelect';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function OpinionesPage() {
@@ -528,18 +529,18 @@ export default function OpinionesPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-voltech-muted mb-2">
-                      Estado
-                    </label>
-                    <select
+                    <CustomSelect
+                      label="Estado"
                       value={formData.estado}
-                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                      className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
-                    >
-                      <option value="pendiente">Pendiente</option>
-                      <option value="aprobada">Aprobada</option>
-                      <option value="rechazada">Rechazada</option>
-                    </select>
+                      onChange={(v) => setFormData({ ...formData, estado: v })}
+                      options={[
+                        { value: 'pendiente', label: 'Pendiente' },
+                        { value: 'aprobada', label: 'Aprobada' },
+                        { value: 'rechazada', label: 'Rechazada' }
+                      ]}
+                      placeholder="Selecciona estado"
+                      className="w-full"
+                    />
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-voltech-border">

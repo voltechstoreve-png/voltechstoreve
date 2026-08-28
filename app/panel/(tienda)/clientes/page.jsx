@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
+import CustomSelect from '@/components/CustomSelect';
 import { 
   Users, UserPlus, Search, Edit3, Trash2, X, Save, Mail, Phone, MapPin, 
   Tag, AlertTriangle, CheckCircle, Filter, Palette, Plus, Gift, 
@@ -457,16 +458,37 @@ function ClientesContent() {
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Teléfono *</label><input type="tel" name="telefono" value={formData.telefono} onChange={handleInputChange} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="0412-1234567" /></div>
                       <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Correo (Opcional)</label><input type="email" name="correo" value={formData.correo} onChange={handleInputChange} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="cliente@email.com" /></div>
                       <div className="lg:col-span-2"><label className="block text-xs text-voltech-muted mb-1 ml-1">Dirección (Opcional)</label><input type="text" name="direccion" value={formData.direccion} onChange={handleInputChange} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Dirección completa" /></div>
-                      <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Fuente de Registro</label><select name="fuenteRegistro" value={formData.fuenteRegistro} onChange={handleInputChange} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="normal">Normal</option><option value="sorteo">Sorteo (Auto-asigna)</option><option value="referido">Referido</option></select></div>
+                      <div>
+                        <CustomSelect
+                          label="Fuente de Registro"
+                          name="fuenteRegistro"
+                          value={formData.fuenteRegistro}
+                          onChange={(v) => handleInputChange({ target: { name: 'fuenteRegistro', value: v } })}
+                          options={[
+                            { value: 'normal', label: 'Normal' },
+                            { value: 'sorteo', label: 'Sorteo (Auto-asigna)' },
+                            { value: 'referido', label: 'Referido' }
+                          ]}
+                          placeholder="-- Selecciona --"
+                          className="w-full"
+                        />
+                      </div>
                       <div>
                         <label className="block text-xs text-voltech-muted mb-1 ml-1">Registrado por (Equipo) *</label>
                         {esVendedor ? (
                           <input type="text" value={usuarioActual?.nombre || ''} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed" />
                         ) : (
-                          <select name="registradoPor" value={formData.registradoPor} onChange={handleInputChange} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                            <option value="">-- Selecciona --</option>
-                            {equipo.filter(e => ['vendedor', 'admin', 'socio'].includes((e.rol || '').toLowerCase())).map(e => (<option key={e.id} value={e.nombre}>{e.nombre} ({e.rol})</option>))}
-                          </select>
+                          <CustomSelect
+                            label="Registrado por (Equipo) *"
+                            name="registradoPor"
+                            value={formData.registradoPor}
+                            onChange={(v) => handleInputChange({ target: { name: 'registradoPor', value: v } })}
+                            options={equipo
+                              .filter(e => ['vendedor', 'admin', 'socio'].includes((e.rol || '').toLowerCase()))
+                              .map(e => ({ value: e.nombre, label: `${e.nombre} (${e.rol})` }))}
+                            placeholder="-- Selecciona --"
+                            className="w-full"
+                          />
                         )}
                       </div>
                       {formData.fuenteRegistro === 'sorteo' && (<div className="lg:col-span-3 bg-voltech-purple/5 border border-voltech-purple/20 rounded-lg p-4"><div className="flex items-center gap-2 mb-2"><Gift className="w-4 h-4 text-voltech-purple" /><span className="text-sm font-semibold text-voltech-purple">Registro por Sorteo</span></div><p className="text-xs text-voltech-muted mb-3">Asignado a: <strong className="text-white">{formData.registradoPor || 'Nadie'}</strong></p><div><label className="block text-xs text-voltech-muted mb-1 ml-1">N° Orden del Sorteo</label><input type="text" name="numeroOrdenSorteo" value={formData.numeroOrdenSorteo} onChange={handleInputChange} className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-mono" placeholder="Ej: 23-07-003" /></div></div>)}
@@ -505,10 +527,10 @@ function ClientesContent() {
               </div>
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Filter className="w-4 h-4 text-voltech-muted shrink-0" />
-                <select 
-                  value={filterEtiqueta} 
-                  onChange={(e) => {
-                    if (e.target.value === 'GESTIONAR_ETIQUETAS') {
+                <CustomSelect
+                  value={filterEtiqueta}
+                  onChange={(v) => {
+                    if (v === 'GESTIONAR_ETIQUETAS') {
                       if (tienePermiso('puedeVerConfiguracion')) {
                         setShowEtiquetasModal(true);
                       } else {
@@ -516,20 +538,20 @@ function ClientesContent() {
                       }
                       setFilterEtiqueta('');
                     } else {
-                      setFilterEtiqueta(e.target.value);
+                      setFilterEtiqueta(v);
                     }
-                  }} 
-                  className="input-voltech w-full sm:w-auto rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm sm:min-w-[200px]"
-                >
-                  <option value="">Todas las etiquetas</option>
-                  {etiquetas.map(e => (<option key={e.id} value={e.nombre}>{e.nombre}</option>))}
-                  {tienePermiso('puedeVerConfiguracion') && (
-                    <>
-                      <option disabled>────────────────</option>
-                      <option value="GESTIONAR_ETIQUETAS" className="text-voltech-cyan font-bold">🎨 Gestionar etiquetas</option>
-                    </>
-                  )}
-                </select>
+                  }}
+                  options={[
+                    { value: '', label: 'Todas las etiquetas' },
+                    ...etiquetas.map(e => ({ value: e.nombre, label: e.nombre })),
+                    ...(tienePermiso('puedeVerConfiguracion') ? [
+                      { value: '__separador__', label: '────────────────' },
+                      { value: 'GESTIONAR_ETIQUETAS', label: '🎨 Gestionar etiquetas' }
+                    ] : [])
+                  ]}
+                  placeholder="Todas las etiquetas"
+                  className="w-full sm:w-auto sm:min-w-[200px]"
+                />
               </div>
             </div>
 

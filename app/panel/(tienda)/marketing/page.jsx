@@ -16,6 +16,7 @@ import {
   Phone, Instagram, Globe, Truck, RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import CustomSelect from '@/components/CustomSelect';
 import toast, { Toaster } from 'react-hot-toast';
 
 // ✅ Abre WhatsApp en la app (móvil) o WhatsApp Web (PC)
@@ -907,7 +908,17 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <input type="text" value={formDataPlantilla.nombre} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, nombre: e.target.value, tipo: 'whatsapp' })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Nombre del texto" />
-                  <select value={formDataPlantilla.categoria} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, categoria: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="mensaje">Mensaje</option><option value="oferta">Oferta</option><option value="contacto">Contacto</option></select>
+                  <CustomSelect
+                    value={formDataPlantilla.categoria}
+                    onChange={(v) => setFormDataPlantilla({ ...formDataPlantilla, categoria: v })}
+                    options={[
+                      { value: 'mensaje', label: 'Mensaje' },
+                      { value: 'oferta', label: 'Oferta' },
+                      { value: 'contacto', label: 'Contacto' }
+                    ]}
+                    placeholder="Categoría"
+                    className="w-full"
+                  />
                 </div>
                 <textarea value={formDataPlantilla.contenido} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, contenido: e.target.value, tipo: 'whatsapp' })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-24 resize-none" placeholder="Contenido del mensaje..." />
                 {esAdmin && (<label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={formDataPlantilla.esGlobal} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, esGlobal: e.target.checked })} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" /><span className="text-xs text-voltech-muted">⭐ Plantilla Global / Oficial</span></label>)}
@@ -931,10 +942,16 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                   <div className="lg:col-span-7 space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-voltech-muted mb-2">1. Seleccionar Producto</label>
-                      <select value={productoSeleccionado ? String(productoSeleccionado.id) : ''} onChange={(e) => { const prod = productos.find(p => String(p.id) === String(e.target.value)); setProductoSeleccionado(prod || null); setPrecioPromocion(''); }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                        <option value="">Buscar producto...</option>
-                        {productos.filter(p => p.cantidad > 0).map(p => (<option key={p.id} value={String(p.id)}>{p.plataforma || p.producto || p.nombre || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>))}
-                      </select>
+                      <CustomSelect
+                        value={productoSeleccionado ? String(productoSeleccionado.id) : ''}
+                        onChange={(v) => { const prod = productos.find(p => String(p.id) === String(v)); setProductoSeleccionado(prod || null); setPrecioPromocion(''); }}
+                        options={[
+                          { value: '', label: 'Buscar producto...' },
+                          ...productos.filter(p => p.cantidad > 0).map(p => ({ value: String(p.id), label: `${p.plataforma || p.producto || p.nombre || 'Sin nombre'} - $${Number(p.precioDetal || 0).toFixed(2)}` }))
+                        ]}
+                        placeholder="Buscar producto..."
+                        className="w-full"
+                      />
                     </div>
                     {productoSeleccionado && (
                       <>
@@ -945,17 +962,29 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div>
                             <label className="block text-sm font-medium text-voltech-muted mb-2">2. Plantilla WhatsApp (Opcional)</label>
-                            <select value={plantillaWhatsappSeleccionada} onChange={(e) => setPlantillaWhatsappSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                              <option value="">Sin plantilla</option>
-                              {plantillas.filter(p => p.tipo === 'whatsapp').map(p => (<option key={p.id} value={String(p.id)}>{p.nombre}{p.esGlobal ? ' ⭐' : ''}</option>))}
-                            </select>
+                            <CustomSelect
+                              value={plantillaWhatsappSeleccionada}
+                              onChange={setPlantillaWhatsappSeleccionada}
+                              options={[
+                                { value: '', label: 'Sin plantilla' },
+                                ...plantillas.filter(p => p.tipo === 'whatsapp').map(p => ({ value: String(p.id), label: `${p.nombre}${p.esGlobal ? ' ⭐' : ''}` }))
+                              ]}
+                              placeholder="Sin plantilla"
+                              className="w-full"
+                            />
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-voltech-muted mb-2">3. Plantilla de Contacto (Opcional)</label>
-                            <select value={plantillaContactoWaSeleccionada} onChange={(e) => setPlantillaContactoWaSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                              <option value="">Sin plantilla</option>
-                              {plantillasInfoContacto.map(p => (<option key={p.id} value={String(p.id)}>{p.nombre}{p.esGlobal ? ' ⭐' : ''}</option>))}
-                            </select>
+                            <CustomSelect
+                              value={plantillaContactoWaSeleccionada}
+                              onChange={setPlantillaContactoWaSeleccionada}
+                              options={[
+                                { value: '', label: 'Sin plantilla' },
+                                ...plantillasInfoContacto.map(p => ({ value: String(p.id), label: `${p.nombre}${p.esGlobal ? ' ⭐' : ''}` }))
+                              ]}
+                              placeholder="Sin plantilla"
+                              className="w-full"
+                            />
                           </div>
                         </div>
                         <div className="border border-voltech-border rounded-lg overflow-hidden">
@@ -1078,7 +1107,17 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <input type="text" value={formDataPlantilla.nombre} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, nombre: e.target.value, tipo: 'marketplace' })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Nombre del texto" />
-                  <select value={formDataPlantilla.categoria} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, categoria: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm"><option value="mensaje">Mensaje</option><option value="oferta">Oferta</option><option value="contacto">Contacto</option></select>
+                  <CustomSelect
+                    value={formDataPlantilla.categoria}
+                    onChange={(v) => setFormDataPlantilla({ ...formDataPlantilla, categoria: v })}
+                    options={[
+                      { value: 'mensaje', label: 'Mensaje' },
+                      { value: 'oferta', label: 'Oferta' },
+                      { value: 'contacto', label: 'Contacto' }
+                    ]}
+                    placeholder="Categoría"
+                    className="w-full"
+                  />
                 </div>
                 <textarea value={formDataPlantilla.contenido} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, contenido: e.target.value, tipo: 'marketplace' })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-24 resize-none" placeholder="Contenido del texto..." />
                 {esAdmin && (<label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={formDataPlantilla.esGlobal} onChange={(e) => setFormDataPlantilla({ ...formDataPlantilla, esGlobal: e.target.checked })} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" /><span className="text-xs text-voltech-muted">⭐ Plantilla Global / Oficial</span></label>)}
@@ -1102,10 +1141,16 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                   <div className="lg:col-span-7 space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-voltech-muted mb-2">1. Seleccionar Producto</label>
-                      <select value={productoMarketplace ? String(productoMarketplace.id) : ''} onChange={(e) => { const prod = productos.find(p => String(p.id) === String(e.target.value)); setProductoMarketplace(prod || null); setPrecioPromocionMarketplace(''); }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                        <option value="">Buscar producto...</option>
-                        {productos.map(p => (<option key={p.id} value={String(p.id)}>{p.plataforma || p.producto || p.nombre || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>))}
-                      </select>
+                      <CustomSelect
+                        value={productoMarketplace ? String(productoMarketplace.id) : ''}
+                        onChange={(v) => { const prod = productos.find(p => String(p.id) === String(v)); setProductoMarketplace(prod || null); setPrecioPromocionMarketplace(''); }}
+                        options={[
+                          { value: '', label: 'Buscar producto...' },
+                          ...productos.map(p => ({ value: String(p.id), label: `${p.plataforma || p.producto || p.nombre || 'Sin nombre'} - $${Number(p.precioDetal || 0).toFixed(2)}` }))
+                        ]}
+                        placeholder="Buscar producto..."
+                        className="w-full"
+                      />
                     </div>
                     {productoMarketplace && (
                       <>
@@ -1116,17 +1161,29 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div>
                             <label className="block text-sm font-medium text-voltech-muted mb-2">2. Plantilla Marketplace (Opcional)</label>
-                            <select value={plantillaMarketplaceSeleccionada} onChange={(e) => setPlantillaMarketplaceSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                              <option value="">Sin plantilla</option>
-                              {plantillas.filter(p => p.tipo === 'marketplace').map(p => (<option key={p.id} value={String(p.id)}>{p.nombre}{p.esGlobal ? ' ⭐' : ''}</option>))}
-                            </select>
+                            <CustomSelect
+                              value={plantillaMarketplaceSeleccionada}
+                              onChange={setPlantillaMarketplaceSeleccionada}
+                              options={[
+                                { value: '', label: 'Sin plantilla' },
+                                ...plantillas.filter(p => p.tipo === 'marketplace').map(p => ({ value: String(p.id), label: `${p.nombre}${p.esGlobal ? ' ⭐' : ''}` }))
+                              ]}
+                              placeholder="Sin plantilla"
+                              className="w-full"
+                            />
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-voltech-muted mb-2">3. Plantilla de Contacto (Opcional)</label>
-                            <select value={plantillaContactoMpSeleccionada} onChange={(e) => setPlantillaContactoMpSeleccionada(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                              <option value="">Sin plantilla</option>
-                              {plantillasInfoContacto.map(p => (<option key={p.id} value={String(p.id)}>{p.nombre}{p.esGlobal ? ' ⭐' : ''}</option>))}
-                            </select>
+                            <CustomSelect
+                              value={plantillaContactoMpSeleccionada}
+                              onChange={setPlantillaContactoMpSeleccionada}
+                              options={[
+                                { value: '', label: 'Sin plantilla' },
+                                ...plantillasInfoContacto.map(p => ({ value: String(p.id), label: `${p.nombre}${p.esGlobal ? ' ⭐' : ''}` }))
+                              ]}
+                              placeholder="Sin plantilla"
+                              className="w-full"
+                            />
                           </div>
                         </div>
                       </>
@@ -1308,17 +1365,19 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div>
                         <label className="block text-xs text-voltech-muted mb-1">Tipo de Descuento</label>
-                        <select 
-                          value={formDataCupon.tipo_descuento} 
-                          disabled={formDataCupon.tipo_aplicacion === 'producto_gratis'} 
-                          onChange={(e) => setFormDataCupon({...formDataCupon, tipo_descuento: e.target.value})} 
-                          className="input-voltech w-full rounded-lg px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <option value="porcentaje">Porcentaje (%)</option>
-                          <option value="monto_fijo">Monto Fijo ($)</option>
-                          {formDataCupon.tipo_aplicacion === 'producto_gratis' && <option value="gratis">Gratis (100% off)</option>}
-                        </select>
-                      </div>
+                                                <CustomSelect
+                          value={formDataCupon.tipo_descuento}
+                          onChange={(v) => setFormDataCupon({...formDataCupon, tipo_descuento: v})}
+                          disabled={formDataCupon.tipo_aplicacion === 'producto_gratis'}
+                          options={[
+                            { value: 'porcentaje', label: 'Porcentaje (%)' },
+                            { value: 'monto_fijo', label: 'Monto Fijo ($)' },
+                            ...(formDataCupon.tipo_aplicacion === 'producto_gratis' ? [{ value: 'gratis', label: 'Gratis (100% off)' }] : [])
+                          ]}
+                          placeholder="Selecciona tipo"
+                          className="w-full"
+                        />                    
+                          </div>
                       <div>
                         <label className="block text-xs text-voltech-muted mb-1">
                           {formDataCupon.tipo_descuento === 'porcentaje' ? 'Valor (%)' : formDataCupon.tipo_descuento === 'monto_fijo' ? 'Valor ($)' : 'Valor'} *
@@ -1390,14 +1449,16 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs text-voltech-muted mb-1">Límite de Usos Totales</label>
-                        <select 
-                          value={formDataCupon.limite_usos} 
-                          onChange={(e) => setFormDataCupon({...formDataCupon, limite_usos: e.target.value})} 
-                          className="input-voltech w-full rounded-lg px-4 py-2 text-sm"
-                        >
-                          <option value="ilimitado">Ilimitado</option>
-                          <option value="limitado">Limitado</option>
-                        </select>
+                        <CustomSelect
+                          value={formDataCupon.limite_usos}
+                          onChange={(v) => setFormDataCupon({...formDataCupon, limite_usos: v})}
+                          options={[
+                            { value: 'ilimitado', label: 'Ilimitado' },
+                            { value: 'limitado', label: 'Limitado' }
+                          ]}
+                          placeholder="Selecciona límite"
+                          className="w-full"
+                        />
                       </div>
                       {formDataCupon.limite_usos === 'limitado' && (
                         <div>
@@ -1597,125 +1658,134 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                       <textarea value={formDataPublicidad.descripcion} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, descripcion: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 h-20" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-voltech-muted mb-2">🎯 Destino de la Publicidad</label>
-                      <select 
-                        value={formDataPublicidad.tipo_destino} 
-                        onChange={(e) => {
-                          const nuevoTipo = e.target.value;
+                      <CustomSelect
+                        label="🎯 Destino de la Publicidad"
+                        value={formDataPublicidad.tipo_destino}
+                        onChange={(v) => {
                           setFormDataPublicidad({
-                            ...formDataPublicidad, 
-                            tipo_destino: nuevoTipo, 
-                            url_destino: '', 
+                            ...formDataPublicidad,
+                            tipo_destino: v,
+                            url_destino: '',
                             producto_id: ''
                           });
-                        }} 
-                        className="input-voltech w-full rounded-lg px-4 py-2 mb-3"
-                      >
-                        <option value="url_externa">🌐 URL Externa (banner, no entra en Ofertas)</option>
-                        <option value="producto">📦 Producto (físico) → Ofertas / Productos</option>
-                        <option value="streaming">📺 Streaming → Ofertas / Streaming</option>
-                        <option value="kit">🎁 Kit (producto) → Ofertas / Productos</option>
-                        <option value="combo_streaming">🎬 Combo Streaming → Ofertas / Streaming</option>
-                      </select>
+                        }}
+                        options={[
+                          { value: 'url_externa', label: '🌐 URL Externa (banner, no entra en Ofertas)' },
+                          { value: 'producto', label: '📦 Producto (físico) → Ofertas / Productos' },
+                          { value: 'streaming', label: '📺 Streaming → Ofertas / Streaming' },
+                          { value: 'kit', label: '🎁 Kit (producto) → Ofertas / Productos' },
+                          { value: 'combo_streaming', label: '🎬 Combo Streaming → Ofertas / Streaming' }
+                        ]}
+                        placeholder="Selecciona destino"
+                        className="w-full mb-3"
+                      />
                       
                       {formDataPublicidad.tipo_destino === 'url_externa' && (
                         <input type="text" value={formDataPublicidad.url_destino} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, url_destino: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="https://..." />
                       )}
                       
                       {formDataPublicidad.tipo_destino === 'producto' && (
-                        <select value={formDataPublicidad.producto_id} onChange={(e) => {
-                          const prod = productos.find(p => p.id === e.target.value);
-                          setFormDataPublicidad(prev => ({
-                            ...prev,
-                            producto_id: e.target.value,
-                            url_destino: prod ? `/catalogo?producto=${prod.id}` : '',
-                            url_imagen: prod?.imagen || prev.url_imagen,
-                            titulo: prev.titulo || (prod?.producto || prod?.plataforma || prev.titulo),
-                            descripcion: prev.descripcion || (prod?.descripcion || ''),
-                            precio_manual: prev.precio_manual || (prod ? `$${Number(prod.precioDetal || 0).toFixed(2)}` : ''),
-                          }));
-                          if (prod?.imagen) setImagenPreview(prod.imagen);
-                        }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                          <option value="">Seleccionar producto...</option>
-                          {productos.filter(p => p.tipo === 'fisico' && !p.esCombo && p.disponibilidad !== 'kit' && (p.categoria || '').toUpperCase() !== 'KIT' && p.publicado !== false).map(p => (
-                            <option key={p.id} value={p.id}>{p.plataforma || p.producto || p.nombre || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>
-                          ))}
-                        </select>
+                        <CustomSelect
+                          value={formDataPublicidad.producto_id}
+                          onChange={(v) => {
+                            const prod = productos.find(p => p.id === v);
+                            setFormDataPublicidad(prev => ({
+                              ...prev,
+                              producto_id: v,
+                              url_destino: prod ? `/catalogo?producto=${prod.id}` : '',
+                              url_imagen: prod?.imagen || prev.url_imagen,
+                              titulo: prev.titulo || (prod?.producto || prod?.plataforma || prev.titulo),
+                              descripcion: prev.descripcion || (prod?.descripcion || ''),
+                              precio_manual: prev.precio_manual || (prod ? `$${Number(prod.precioDetal || 0).toFixed(2)}` : ''),
+                            }));
+                            if (prod?.imagen) setImagenPreview(prod.imagen);
+                          }}
+                          options={productos.filter(p => p.tipo === 'fisico' && !p.esCombo && p.disponibilidad !== 'kit' && (p.categoria || '').toUpperCase() !== 'KIT' && p.publicado !== false).map(p => ({ value: p.id, label: `${p.plataforma || p.producto || p.nombre || 'Sin nombre'} - $${Number(p.precioDetal || 0).toFixed(2)}` }))}
+                          placeholder="Seleccionar producto..."
+                          className="w-full"
+                        />
                       )}
                       
                       {formDataPublicidad.tipo_destino === 'streaming' && (
-                        <select value={formDataPublicidad.producto_id} onChange={(e) => {
-                          const prod = productos.find(p => p.id === e.target.value);
-                          setFormDataPublicidad(prev => ({
-                            ...prev,
-                            producto_id: e.target.value,
-                            url_destino: prod ? `/catalogo?producto=${prod.id}` : '',
-                            url_imagen: prod?.imagen || prev.url_imagen,
-                            titulo: prev.titulo || (prod?.plataforma || prev.titulo),
-                            descripcion: prev.descripcion || (prod?.descripcion || ''),
-                            precio_manual: prev.precio_manual || (prod ? `$${Number(prod.precioDetal || 0).toFixed(2)}` : ''),
-                          }));
-                          if (prod?.imagen) setImagenPreview(prod.imagen);
-                        }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                          <option value="">Seleccionar plataforma...</option>
-                          {productos.filter(p => p.tipo === 'streaming' && !p.esCombo && p.publicado !== false).map(p => (
-                            <option key={p.id} value={p.id}>{p.plataforma || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>
-                          ))}
-                        </select>
+                        <CustomSelect
+                          value={formDataPublicidad.producto_id}
+                          onChange={(v) => {
+                            const prod = productos.find(p => p.id === v);
+                            setFormDataPublicidad(prev => ({
+                              ...prev,
+                              producto_id: v,
+                              url_destino: prod ? `/catalogo?producto=${prod.id}` : '',
+                              url_imagen: prod?.imagen || prev.url_imagen,
+                              titulo: prev.titulo || (prod?.plataforma || prev.titulo),
+                              descripcion: prev.descripcion || (prod?.descripcion || ''),
+                              precio_manual: prev.precio_manual || (prod ? `$${Number(prod.precioDetal || 0).toFixed(2)}` : ''),
+                            }));
+                            if (prod?.imagen) setImagenPreview(prod.imagen);
+                          }}
+                          options={productos.filter(p => p.tipo === 'streaming' && !p.esCombo && p.publicado !== false).map(p => ({ value: p.id, label: `${p.plataforma || 'Sin nombre'} - $${Number(p.precioDetal || 0).toFixed(2)}` }))}
+                          placeholder="Seleccionar plataforma..."
+                          className="w-full"
+                        />
                       )}
                       
                       {formDataPublicidad.tipo_destino === 'kit' && (
-                        <select value={formDataPublicidad.producto_id} onChange={(e) => {
-                          const prod = productos.find(p => p.id === e.target.value);
-                          setFormDataPublicidad(prev => ({
-                            ...prev,
-                            producto_id: e.target.value,
-                            url_destino: prod ? `/catalogo?producto=${prod.id}` : '',
-                            url_imagen: prod?.imagen || prev.url_imagen,
-                            titulo: prev.titulo || (prod?.plataforma || prev.titulo),
-                            descripcion: prev.descripcion || (prod?.descripcion || ''),
-                            precio_manual: prev.precio_manual || (prod ? `$${Number(prod.precioDetal || 0).toFixed(2)}` : ''),
-                          }));
-                          if (prod?.imagen) setImagenPreview(prod.imagen);
-                        }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                          <option value="">Seleccionar kit...</option>
-                          {productos.filter(p => (p.tipo === 'kit' || p.disponibilidad === 'kit' || (p.categoria || '').toUpperCase() === 'KIT') && p.publicado !== false).map(p => (
-                            <option key={p.id} value={p.id}>{p.plataforma || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>
-                          ))}
-                        </select>
+                        <CustomSelect
+                          value={formDataPublicidad.producto_id}
+                          onChange={(v) => {
+                            const prod = productos.find(p => p.id === v);
+                            setFormDataPublicidad(prev => ({
+                              ...prev,
+                              producto_id: v,
+                              url_destino: prod ? `/catalogo?producto=${prod.id}` : '',
+                              url_imagen: prod?.imagen || prev.url_imagen,
+                              titulo: prev.titulo || (prod?.plataforma || prev.titulo),
+                              descripcion: prev.descripcion || (prod?.descripcion || ''),
+                              precio_manual: prev.precio_manual || (prod ? `$${Number(prod.precioDetal || 0).toFixed(2)}` : ''),
+                            }));
+                            if (prod?.imagen) setImagenPreview(prod.imagen);
+                          }}
+                          options={productos.filter(p => (p.tipo === 'kit' || p.disponibilidad === 'kit' || (p.categoria || '').toUpperCase() === 'KIT') && p.publicado !== false).map(p => ({ value: p.id, label: `${p.plataforma || 'Sin nombre'} - $${Number(p.precioDetal || 0).toFixed(2)}` }))}
+                          placeholder="Seleccionar kit..."
+                          className="w-full"
+                        />
                       )}
                       
                       {formDataPublicidad.tipo_destino === 'combo_streaming' && (
-                        <select value={formDataPublicidad.producto_id} onChange={(e) => {
-                          const prod = productos.find(p => p.id === e.target.value);
-                          setFormDataPublicidad(prev => ({
-                            ...prev,
-                            producto_id: e.target.value,
-                            url_destino: prod ? `/catalogo?producto=${prod.id}` : '',
-                            url_imagen: prod?.imagen || prev.url_imagen,
-                            titulo: prev.titulo || (prod?.plataforma || prev.titulo),
-                            descripcion: prev.descripcion || (prod?.descripcion || ''),
-                            precio_manual: prev.precio_manual || (prod ? `$${Number(prod.precioDetal || 0).toFixed(2)}` : ''),
-                          }));
-                          if (prod?.imagen) setImagenPreview(prod.imagen);
-                        }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                          <option value="">Seleccionar combo...</option>
-                          {productos.filter(p => p.esCombo && p.publicado !== false).map(p => (
-                            <option key={p.id} value={p.id}>{p.plataforma || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>
-                          ))}
-                        </select>
+                        <CustomSelect
+                          value={formDataPublicidad.producto_id}
+                          onChange={(v) => {
+                            const prod = productos.find(p => p.id === v);
+                            setFormDataPublicidad(prev => ({
+                              ...prev,
+                              producto_id: v,
+                              url_destino: prod ? `/catalogo?producto=${prod.id}` : '',
+                              url_imagen: prod?.imagen || prev.url_imagen,
+                              titulo: prev.titulo || (prod?.plataforma || prev.titulo),
+                              descripcion: prev.descripcion || (prod?.descripcion || ''),
+                              precio_manual: prev.precio_manual || (prod ? `$${Number(prod.precioDetal || 0).toFixed(2)}` : ''),
+                            }));
+                            if (prod?.imagen) setImagenPreview(prod.imagen);
+                          }}
+                          options={productos.filter(p => p.esCombo && p.publicado !== false).map(p => ({ value: p.id, label: `${p.plataforma || 'Sin nombre'} - $${Number(p.precioDetal || 0).toFixed(2)}` }))}
+                          placeholder="Seleccionar combo..."
+                          className="w-full"
+                        />
                       )}
                     </div>
                     
                     <div>
                       <label className="block text-sm font-medium text-voltech-muted mb-2">🏷️ Categoría de Promoción</label>
                       <div className="flex gap-2">
-                        <select value={formDataPublicidad.categoria_promo} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, categoria_promo: e.target.value})} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm">
-                          <option value="">Sin categoría</option>
-                          {categoriasPromo.map(cat => (
-                            <option key={cat} value={cat}>{cat}</option>
-                          ))}
-                        </select>
+                        <CustomSelect
+                          value={formDataPublicidad.categoria_promo}
+                          onChange={(v) => setFormDataPublicidad({...formDataPublicidad, categoria_promo: v})}
+                          options={[
+                            { value: '', label: 'Sin categoría' },
+                            ...categoriasPromo.map(cat => ({ value: cat, label: cat }))
+                          ]}
+                          placeholder="Sin categoría"
+                          className="flex-1"
+                        />
                         <button onClick={() => setShowCategoriasPromoModal(true)} className="px-3 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg hover:bg-voltech-purple/30 transition-colors">
                           <Plus className="w-4 h-4" />
                         </button>
@@ -1908,20 +1978,32 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-voltech-muted mb-2">🖥️ Ubicación en WEB</label>
-                      <select value={formDataPublicidad.ubicacion_web || 'oculta'} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, ubicacion_web: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                      <option value="oculta">No mostrar en web</option>
-                      <option value="arriba">⬆️ Banner superior</option>
-                       <option value="abajo">⬇️ Banner inferior</option>
-                       </select>                    
+                      <CustomSelect
+                        label="🖥️ Ubicación en WEB"
+                        value={formDataPublicidad.ubicacion_web || 'oculta'}
+                        onChange={(v) => setFormDataPublicidad({...formDataPublicidad, ubicacion_web: v})}
+                        options={[
+                          { value: 'oculta', label: 'No mostrar en web' },
+                          { value: 'arriba', label: '⬆️ Banner superior' },
+                          { value: 'abajo', label: '⬇️ Banner inferior' }
+                        ]}
+                        placeholder="Selecciona ubicación"
+                        className="w-full"
+                      />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-voltech-muted mb-2">📱 Ubicación en MÓVIL</label>
-                      <select value={formDataPublicidad.ubicacion_movil || 'oculta'} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, ubicacion_movil: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                        <option value="oculta">No mostrar en móvil</option>
-                        <option value="arriba">⬆️ Banner superior</option>
-                        <option value="abajo">⬇️ Final de página</option>
-                      </select>
+                      <CustomSelect
+                        label="📱 Ubicación en MÓVIL"
+                        value={formDataPublicidad.ubicacion_movil || 'oculta'}
+                        onChange={(v) => setFormDataPublicidad({...formDataPublicidad, ubicacion_movil: v})}
+                        options={[
+                          { value: 'oculta', label: 'No mostrar en móvil' },
+                          { value: 'arriba', label: '⬆️ Banner superior' },
+                          { value: 'abajo', label: '⬇️ Final de página' }
+                        ]}
+                        placeholder="Selecciona ubicación"
+                        className="w-full"
+                      />
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
@@ -2123,20 +2205,32 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-xs text-voltech-muted mb-1">🖥️ Ubicación en WEB</label>
-                          <select value={masVendidosConfig.ubicacion_web || 'oculta'} onChange={(e) => setMasVendidosConfig({...masVendidosConfig, ubicacion_web: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                            <option value="oculta">No mostrar en web</option>
-                            <option value="izquierda">⬅️ Columna izquierda</option>
-                            <option value="derecha">➡️ Columna derecha</option>
-                          </select>
+                          <CustomSelect
+                            label="🖥️ Ubicación en WEB"
+                            value={masVendidosConfig.ubicacion_web || 'oculta'}
+                            onChange={(v) => setMasVendidosConfig({...masVendidosConfig, ubicacion_web: v})}
+                            options={[
+                              { value: 'oculta', label: 'No mostrar en web' },
+                              { value: 'izquierda', label: '⬅️ Columna izquierda' },
+                              { value: 'derecha', label: '➡️ Columna derecha' }
+                            ]}
+                            placeholder="Selecciona ubicación"
+                            className="w-full"
+                          />
                         </div>
                         <div>
-                          <label className="block text-xs text-voltech-muted mb-1">📱 Ubicación en MÓVIL</label>
-                          <select value={masVendidosConfig.ubicacion_movil || 'oculta'} onChange={(e) => setMasVendidosConfig({...masVendidosConfig, ubicacion_movil: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                            <option value="oculta">No mostrar en móvil</option>
-                            <option value="arriba">⬆️ Banner superior (junto a publicidad)</option>
-                            <option value="abajo">⬇️ Final de página</option>
-                          </select>
+                          <CustomSelect
+                            label="📱 Ubicación en MÓVIL"
+                            value={masVendidosConfig.ubicacion_movil || 'oculta'}
+                            onChange={(v) => setMasVendidosConfig({...masVendidosConfig, ubicacion_movil: v})}
+                            options={[
+                              { value: 'oculta', label: 'No mostrar en móvil' },
+                              { value: 'arriba', label: '⬆️ Banner superior (junto a publicidad)' },
+                              { value: 'abajo', label: '⬇️ Final de página' }
+                            ]}
+                            placeholder="Selecciona ubicación"
+                            className="w-full"
+                          />
                         </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2145,15 +2239,21 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                           <input type="text" value={masVendidosConfig.titulo} onChange={(e) => setMasVendidosConfig({...masVendidosConfig, titulo: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
                         </div>
                         <div>
-                          <label className="block text-xs text-voltech-muted mb-1">Cantidad Máxima</label>
-                          <select value={masVendidosConfig.cantidad_maxima} onChange={(e) => setMasVendidosConfig({...masVendidosConfig, cantidad_maxima: parseInt(e.target.value)})} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                            <option value={1}>1</option>
-                            <option value={2}>2</option>
-                            <option value={3}>3</option>
-                            <option value={4}>4</option>
-                            <option value={5}>5</option>
-                            <option value={6}>6</option>
-                          </select>
+                          <CustomSelect
+                            label="Cantidad Máxima"
+                            value={String(masVendidosConfig.cantidad_maxima)}
+                            onChange={(v) => setMasVendidosConfig({...masVendidosConfig, cantidad_maxima: parseInt(v)})}
+                            options={[
+                              { value: '1', label: '1' },
+                              { value: '2', label: '2' },
+                              { value: '3', label: '3' },
+                              { value: '4', label: '4' },
+                              { value: '5', label: '5' },
+                              { value: '6', label: '6' }
+                            ]}
+                            placeholder="Selecciona cantidad"
+                            className="w-full"
+                          />
                         </div>
                         <div>
                           <label className="block text-xs text-voltech-muted mb-1">Descripción 1</label>

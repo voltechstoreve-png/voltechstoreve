@@ -11,6 +11,7 @@ import {
   ChevronDown, ChevronUp, Briefcase, PieChart, Printer, Send, Eye, EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import CustomSelect from '@/components/CustomSelect';
 import toast, { Toaster } from 'react-hot-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -794,17 +795,29 @@ useEffect(() => {
             </div>
             <div className="flex gap-2 flex-wrap">
               <input type="text" placeholder="Buscar vendedor..." value={filtroNombreEquipo} onChange={(e) => setFiltroNombreEquipo(e.target.value)} className="input-voltech rounded-lg px-3 py-2 text-sm" />
-              <select value={filtroRol} onChange={(e) => setFiltroRol(e.target.value)} className="input-voltech rounded-lg px-3 py-2 text-sm">
-                <option value="todos">Todos los roles</option>
-                <option value="admin">Admin</option>
-                <option value="vendedor">Vendedor</option>
-                <option value="socio">Socio</option>
-              </select>
-              <select value={filtroPendiente} onChange={(e) => setFiltroPendiente(e.target.value)} className="input-voltech rounded-lg px-3 py-2 text-sm">
-                <option value="todos">Todos</option>
-                <option value="pendiente">Con pendiente</option>
-                <option value="solicitado">Con solicitud</option>
-              </select>
+              <CustomSelect
+                value={filtroRol}
+                onChange={setFiltroRol}
+                options={[
+                  { value: 'todos', label: 'Todos los roles' },
+                  { value: 'admin', label: 'Admin' },
+                  { value: 'vendedor', label: 'Vendedor' },
+                  { value: 'socio', label: 'Socio' }
+                ]}
+                placeholder="Rol"
+                className="w-full sm:w-auto"
+              />
+              <CustomSelect
+                value={filtroPendiente}
+                onChange={setFiltroPendiente}
+                options={[
+                  { value: 'todos', label: 'Todos' },
+                  { value: 'pendiente', label: 'Con pendiente' },
+                  { value: 'solicitado', label: 'Con solicitud' }
+                ]}
+                placeholder="Estado"
+                className="w-full sm:w-auto"
+              />
             </div>
           </div>
           {!equipoColapsado && (<>
@@ -1057,23 +1070,32 @@ useEffect(() => {
                 </div>
                 {formData.tipo === 'inversion' && (
                   <div>
-                    <label className="block text-xs text-voltech-muted mb-1 ml-1">Tipo de Movimiento *</label>
-                    <select value={formData.subtipo} onChange={(e) => setFormData({ ...formData, subtipo: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                      <option value="inyeccion">💚 Inyección de Capital</option>
-                      <option value="retorno">🔴 Retorno de Capital</option>
-                      <option value="rendimiento">🟡 Pago de Rendimiento</option>
-                    </select>
+                    <CustomSelect
+                      label="Tipo de Movimiento *"
+                      value={formData.subtipo}
+                      onChange={(v) => setFormData({ ...formData, subtipo: v })}
+                      options={[
+                        { value: 'inyeccion', label: '💚 Inyección de Capital' },
+                        { value: 'retorno', label: '🔴 Retorno de Capital' },
+                        { value: 'rendimiento', label: '🟡 Pago de Rendimiento' }
+                      ]}
+                      placeholder="Selecciona tipo"
+                      className="w-full"
+                    />
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs text-voltech-muted mb-1 ml-1">Miembro *</label>
-                  <select value={formData.miembroId} onChange={(e) => {
-                    const miembro = equipo.find(x => x.id === e.target.value);
-                    setFormData({ ...formData, miembroId: e.target.value, miembroNombre: miembro?.nombre || '' });
-                  }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                    <option value="">-- Selecciona --</option>
-                    {equipo.map(e => (<option key={e.id} value={e.id}>{e.nombre} ({e.rol})</option>))}
-                  </select>
+                  <CustomSelect
+                    label="Miembro *"
+                    value={formData.miembroId}
+                    onChange={(v) => {
+                      const miembro = equipo.find(x => x.id === v);
+                      setFormData({ ...formData, miembroId: v, miembroNombre: miembro?.nombre || '' });
+                    }}
+                    options={equipo.map(e => ({ value: e.id, label: `${e.nombre} (${e.rol})` }))}
+                    placeholder="-- Selecciona --"
+                    className="w-full"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-voltech-muted mb-1 ml-1">Monto ($) *</label>
@@ -1112,25 +1134,37 @@ useEffect(() => {
                   <input type="text" value={formData.periodo} onChange={(e) => setFormData({ ...formData, periodo: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Ej: 2024-06" />
                 </div>
                 <div>
-                  <label className="block text-xs text-voltech-muted mb-1 ml-1">Cartera</label>
-                  <select value={formData.carteraId} onChange={(e) => setFormData({ ...formData, carteraId: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                    <option value="">-- Sin especificar --</option>
-                    {carteras.map(c => (<option key={c.id} value={c.id}>{c.nombre}</option>))}
-                  </select>
+                  <CustomSelect
+                    label="Cartera"
+                    value={formData.carteraId}
+                    onChange={(v) => setFormData({ ...formData, carteraId: v })}
+                    options={carteras.map(c => ({ value: c.id, label: c.nombre }))}
+                    placeholder="-- Sin especificar --"
+                    className="w-full"
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs text-voltech-muted mb-1 ml-1">Método de Pago</label>
-                  <select value={formData.metodoPago} onChange={(e) => setFormData({ ...formData, metodoPago: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                    <option value="">-- Sin especificar --</option>
-                    {metodosPago.map(m => (<option key={m.id} value={m.id}>{m.nombre}</option>))}
-                  </select>
+                  <CustomSelect
+                    label="Método de Pago"
+                    value={formData.metodoPago}
+                    onChange={(v) => setFormData({ ...formData, metodoPago: v })}
+                    options={metodosPago.map(m => ({ value: m.id, label: m.nombre }))}
+                    placeholder="-- Sin especificar --"
+                    className="w-full"
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs text-voltech-muted mb-1 ml-1">Estado</label>
-                  <select value={formData.estado} onChange={(e) => setFormData({ ...formData, estado: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                    <option value="pagado">Pagado</option>
-                    <option value="pendiente">Pendiente</option>
-                  </select>
+                  <CustomSelect
+                    label="Estado"
+                    value={formData.estado}
+                    onChange={(v) => setFormData({ ...formData, estado: v })}
+                    options={[
+                      { value: 'pagado', label: 'Pagado' },
+                      { value: 'pendiente', label: 'Pendiente' }
+                    ]}
+                    placeholder="Selecciona estado"
+                    className="w-full"
+                  />
                 </div>
                 <div className="md:col-span-4">
                   <label className="block text-xs text-voltech-muted mb-1 ml-1">Descripción</label>
@@ -1206,10 +1240,16 @@ useEffect(() => {
             {activeTab === 'pagos' && (
               <button onClick={depurarPagos} className="w-full sm:w-auto shrink-0 bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"><Trash2 className="w-3 h-3" /> Depurar</button>
             )}
-            <select value={filtroMiembro} onChange={(e) => setFiltroMiembro(e.target.value)} className="flex-1 w-full bg-slate-900/80 border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500">
-              <option value="todos">Todos los miembros</option>
-              {equipo.map(e => (<option key={e.id} value={e.id}>{e.nombre}</option>))}
-            </select>
+            <CustomSelect
+              value={filtroMiembro}
+              onChange={setFiltroMiembro}
+              options={[
+                { value: 'todos', label: 'Todos los miembros' },
+                ...equipo.map(e => ({ value: e.id, label: e.nombre }))
+              ]}
+              placeholder="Filtrar miembro"
+              className="flex-1 w-full"
+            />
             <div className="relative w-full sm:w-56 shrink-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
               <input type="text" placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-slate-900/80 border border-slate-700/60 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-300 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-purple-500" />

@@ -9,6 +9,7 @@ import {
   Package, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import CustomSelect from '@/components/CustomSelect';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function ProveedoresPage() {
@@ -373,24 +374,24 @@ export default function ProveedoresPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-voltech-muted mb-1">Ciudad *</label>
-                      <select
+                      <CustomSelect
+                        label="Ciudad *"
                         value={formData.ciudad}
-                        onChange={(e) => setFormData({ ...formData, ciudad: e.target.value })}
-                        className="input-voltech w-full rounded-lg px-4 py-2 text-sm"
-                      >
-                        {ciudades.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
+                        onChange={(v) => setFormData({ ...formData, ciudad: v })}
+                        options={ciudades.map(c => ({ value: c, label: c }))}
+                        placeholder="Selecciona ciudad"
+                        className="w-full"
+                      />
                     </div>
                     <div>
-                      <label className="block text-xs text-voltech-muted mb-1">Tipo de Productos *</label>
-                      <select
+                      <CustomSelect
+                        label="Tipo de Productos *"
                         value={formData.tipo_productos}
-                        onChange={(e) => setFormData({ ...formData, tipo_productos: e.target.value })}
-                        className="input-voltech w-full rounded-lg px-4 py-2 text-sm"
-                      >
-                        {tiposProductos.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
+                        onChange={(v) => setFormData({ ...formData, tipo_productos: v })}
+                        options={tiposProductos.map(t => ({ value: t, label: t }))}
+                        placeholder="Selecciona tipo"
+                        className="w-full"
+                      />
                     </div>
                     <div>
                       <label className="block text-xs text-voltech-muted mb-1">Sitio Web</label>
@@ -655,14 +656,16 @@ export default function ProveedoresPage() {
           />
         </div>
         {activeTab === 'ciudad' && (
-          <select
+          <CustomSelect
             value={filterCiudad}
-            onChange={(e) => setFilterCiudad(e.target.value)}
-            className="input-voltech w-full sm:w-auto rounded-xl px-4 py-2.5 text-sm sm:min-w-[200px]"
-          >
-            <option value="">Todas las ciudades</option>
-            {ciudades.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+            onChange={setFilterCiudad}
+            options={[
+              { value: '', label: 'Todas las ciudades' },
+              ...ciudades.map(c => ({ value: c, label: c }))
+            ]}
+            placeholder="Todas las ciudades"
+            className="w-full sm:w-auto sm:min-w-[200px]"
+          />
         )}
       </div>
 

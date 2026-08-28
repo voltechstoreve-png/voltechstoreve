@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
 import { useNotificaciones } from '@/app/context/NotificationContext';
 import { Bell, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Search, CheckCircle, Clock, AlertTriangle, XCircle, ExternalLink, X, Trash2 } from 'lucide-react';
+import CustomSelect from '@/components/CustomSelect';
 import toast, { Toaster } from 'react-hot-toast';
 
 const CATEGORIAS = [
@@ -303,13 +304,19 @@ export default function AlertasPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-voltech-muted" />
                 <input type="text" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar alerta..." className="w-full pl-10 pr-3 py-2 bg-voltech-dark border border-voltech-border rounded-lg text-xs sm:text-sm text-white" />
               </div>
-              <select value={estadoFiltro} onChange={(e) => setEstadoFiltro(e.target.value)} className="w-full sm:w-auto text-xs py-2 bg-voltech-dark border border-voltech-border rounded-lg px-3 text-white">
-                <option value="">Todos los estados</option>
-                <option value="requiere_accion">Requiere Acción</option>
-                <option value="pendiente">Pendiente</option>
-                <option value="completado">Completado</option>
-                <option value="expirado">Expirado</option>
-              </select>
+              <CustomSelect
+                value={estadoFiltro}
+                onChange={setEstadoFiltro}
+                options={[
+                  { value: '', label: 'Todos los estados' },
+                  { value: 'requiere_accion', label: 'Requiere Acción' },
+                  { value: 'pendiente', label: 'Pendiente' },
+                  { value: 'completado', label: 'Completado' },
+                  { value: 'expirado', label: 'Expirado' }
+                ]}
+                placeholder="Estado"
+                className="w-full sm:w-auto"
+              />
             </div>
             <div className="flex items-center gap-2 w-full overflow-x-auto no-scrollbar py-2 min-w-0">
               {CATEGORIAS.map(c => (

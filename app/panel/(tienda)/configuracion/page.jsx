@@ -7,6 +7,7 @@ import {
   MailCheck, Calendar, Smartphone, Info, RotateCcw, Lock, Eye, EyeOff, Send, Trash2
 } from 'lucide-react';
 import EmojiTextarea, { PLANTILLAS_WA_DEFAULT, rellenarVariables } from '@/components/EmojiTextarea';
+import CustomSelect from '@/components/CustomSelect';
 import toast, { Toaster } from 'react-hot-toast';
 
 const TABS = [
@@ -268,10 +269,22 @@ export default function ConfiguracionPage() {
             <div className="grid grid-cols-2 gap-4">
               <div><label className="block text-xs text-voltech-muted mb-2">Hora de aviso</label>
                 <input type="time" value={config.recordatoriosStreaming.hora} onChange={e => setConfig({ ...config, recordatoriosStreaming: { ...config.recordatoriosStreaming, hora: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" /></div>
-              <div><label className="block text-xs text-voltech-muted mb-2">Anticipación</label>
-                <select value={config.recordatoriosStreaming.diasAnticipacion} onChange={e => setConfig({ ...config, recordatoriosStreaming: { ...config.recordatoriosStreaming, diasAnticipacion: parseInt(e.target.value) } })} className="input-voltech w-full rounded-lg px-4 py-3 text-sm">
-                  {[1, 2, 3, 5, 7].map(d => <option key={d} value={d}>{d} día(s) antes</option>)}
-                </select></div>
+              <div>
+                <CustomSelect
+                  label="Anticipación"
+                  value={String(config.recordatoriosStreaming.diasAnticipacion)}
+                  onChange={(v) => setConfig({ ...config, recordatoriosStreaming: { ...config.recordatoriosStreaming, diasAnticipacion: parseInt(v) } })}
+                  options={[
+                    { value: '1', label: '1 día(s) antes' },
+                    { value: '2', label: '2 día(s) antes' },
+                    { value: '3', label: '3 día(s) antes' },
+                    { value: '5', label: '5 día(s) antes' },
+                    { value: '7', label: '7 día(s) antes' }
+                  ]}
+                  placeholder="Selecciona días"
+                  className="w-full"
+                />
+              </div>
             </div>
             <label className="flex items-center justify-between p-4 rounded-lg bg-voltech-dark/50 border border-voltech-border">
               <span className="text-sm text-white">Activar recordatorios</span>
@@ -287,10 +300,19 @@ export default function ConfiguracionPage() {
             <div className="grid grid-cols-2 gap-4">
               <div><label className="block text-xs text-voltech-muted mb-2">Hora fija</label>
                 <input type="time" value={config.recordatoriosProductos.hora} onChange={e => setConfig({ ...config, recordatoriosProductos: { ...config.recordatoriosProductos, hora: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" /></div>
-              <div><label className="block text-xs text-voltech-muted mb-2">Frecuencia</label>
-                <select value={config.recordatoriosProductos.frecuencia} onChange={e => setConfig({ ...config, recordatoriosProductos: { ...config.recordatoriosProductos, frecuencia: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-3 text-sm">
-                  <option value="diario">Diario</option><option value="semanal">Semanal (Lunes)</option>
-                </select></div>
+              <div>
+                <CustomSelect
+                  label="Frecuencia"
+                  value={config.recordatoriosProductos.frecuencia}
+                  onChange={(v) => setConfig({ ...config, recordatoriosProductos: { ...config.recordatoriosProductos, frecuencia: v } })}
+                  options={[
+                    { value: 'diario', label: 'Diario' },
+                    { value: 'semanal', label: 'Semanal (Lunes)' }
+                  ]}
+                  placeholder="Selecciona frecuencia"
+                  className="w-full"
+                />
+              </div>
             </div>
             <label className="flex items-center justify-between p-4 rounded-lg bg-voltech-dark/50 border border-voltech-border">
               <span className="text-sm text-white">Activar recordatorios</span>

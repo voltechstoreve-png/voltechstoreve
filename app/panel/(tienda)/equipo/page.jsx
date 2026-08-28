@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Users, Plus, Edit, Trash2, X, Shield, UserCheck, UserX, Copy, Check, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import CustomSelect from '@/components/CustomSelect';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function EquipoPage() {
@@ -408,19 +409,21 @@ export default function EquipoPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-voltech-muted mb-1 ml-1">Rol</label>
-                <select
+                <CustomSelect
+                  label="Rol"
                   name="rol"
                   value={formData.rol}
-                  onChange={handleChange}
-                  className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
-                >
-                  <option value="admin">Administrador</option>
-                  <option value="socio">Socio</option>
-                  <option value="vendedor">Vendedor</option>
-                  <option value="logistica">Logística</option>
-                  <option value="marketing">Marketing</option>
-                </select>
+                  onChange={(v) => setFormData({ ...formData, rol: v })}
+                  options={[
+                    { value: 'admin', label: 'Administrador' },
+                    { value: 'socio', label: 'Socio' },
+                    { value: 'vendedor', label: 'Vendedor' },
+                    { value: 'logistica', label: 'Logística' },
+                    { value: 'marketing', label: 'Marketing' }
+                  ]}
+                  placeholder="Selecciona rol"
+                  className="w-full"
+                />
               </div>
             </div>
             <div className="flex items-center gap-2 mt-4">

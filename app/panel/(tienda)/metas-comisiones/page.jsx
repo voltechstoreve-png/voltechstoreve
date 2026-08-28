@@ -10,6 +10,7 @@ import {
   Award, Download, AlertCircle, ExternalLink, ShoppingCart, Send
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import CustomSelect from '@/components/CustomSelect';
 import toast, { Toaster } from 'react-hot-toast';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -1188,15 +1189,17 @@ export default function MetasYComisionesPage() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-voltech-muted mb-2">Estado</label>
-                          <select
+                          <CustomSelect
+                            label="Estado"
                             value={meta.activo ? 'activo' : 'inactivo'}
-                            onChange={(e) => actualizarMeta(meta.id, 'activo', e.target.value === 'activo')}
-                            className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
-                          >
-                            <option value="activo">Activo</option>
-                            <option value="inactivo">Inactivo</option>
-                          </select>
+                            onChange={(v) => actualizarMeta(meta.id, 'activo', v === 'activo')}
+                            options={[
+                              { value: 'activo', label: 'Activo' },
+                              { value: 'inactivo', label: 'Inactivo' }
+                            ]}
+                            placeholder="Selecciona estado"
+                            className="w-full"
+                          />
                         </div>
                       </div>
                     </div>
