@@ -1589,7 +1589,7 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                           if (prod?.imagen) setImagenPreview(prod.imagen);
                         }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
                           <option value="">Seleccionar producto...</option>
-                          {productos.filter(p => p.tipo === 'fisico' && p.publicado !== false && !p.esCombo && !p.disponibilidad === 'kit').map(p => (
+                          {productos.filter(p => p.tipo === 'fisico' && !p.esCombo && p.disponibilidad !== 'kit' && (p.categoria || '').toUpperCase() !== 'KIT' && p.publicado !== false).map(p => (
                             <option key={p.id} value={p.id}>{p.plataforma || p.producto || p.nombre || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>
                           ))}
                         </select>
