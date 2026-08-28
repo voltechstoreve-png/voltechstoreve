@@ -20,7 +20,7 @@ import ChatbotWidget from '@/components/ChatbotWidget';
 import WhatsAppIcon from '@/components/WhatsAppIcon';
 
 // ✅ Abre WhatsApp NATIVO en móvil o WhatsApp Web en PC (conserva emojis)
-const abrirWhatsAppNat = (numero, texto) => {
+  const abrirWhatsAppNat = (numero, texto) => {
 const limpio = String(numero || '').replace(/\D/g, '');
 const cod = encodeURIComponent(texto);
 const esMovil = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
@@ -31,6 +31,38 @@ window.location.href = `https://wa.me/${limpio}?text=${cod}`;
 // ✅ PC: abre WhatsApp Web/App de escritorio directo (sin página intermedia)
 window.open(`https://web.whatsapp.com/send?phone=${limpio}&text=${cod}`, '_blank');
 }
+};
+
+// ✅ CARRUSEL DE IMÁGENES: portada primero + flechas ‹ › + puntitos (para tarjetas y modal)
+const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', iconoVacio = null }) => {
+  const [idx, setIdx] = useState(0);
+  const todas = (imagenes || []).filter(Boolean);
+  if (todas.length === 0) {
+    return iconoVacio || <Package className="w-12 h-12 text-slate-300" />;
+  }
+  const actual = todas[Math.min(idx, todas.length - 1)];
+  return (
+    <>
+      <img
+        src={actual}
+        alt={alt}
+        className={className}
+        style={{ objectFit }}
+        onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }}
+      />
+      {todas.length > 1 && (
+        <>
+          <button type="button" onClick={(e) => { e.stopPropagation(); setIdx((idx - 1 + todas.length) % todas.length); }} className="absolute left-1 top-1/2 -translate-y-1/2 z-10 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-black/80">‹</button>
+          <button type="button" onClick={(e) => { e.stopPropagation(); setIdx((idx + 1) % todas.length); }} className="absolute right-1 top-1/2 -translate-y-1/2 z-10 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-black/80">›</button>
+          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10 flex gap-1 bg-black/30 rounded-full px-1.5 py-0.5">
+            {todas.map((_, i) => (
+              <span key={i} className={`h-1 rounded-full transition-all ${i === Math.min(idx, todas.length - 1) ? 'w-3 bg-voltech-cyan' : 'w-1 bg-white/60'}`} />
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
 };
 
 export default function CatalogoPage() {
@@ -363,6 +395,24 @@ const calcularPrecioBs = (precioUsd) => {
       return { precioPrincipal: precioOferta, precioTachado: precioDetal, tieneOferta: true };
     }
     return { precioPrincipal: precioDetal, precioTachado: null, tieneOferta: false };
+  };
+
+  const getImagenProducto = (p) => {
+    if (p.imagen) return p.imagen;
+    if (Array.isArray(p.imagenes) && p.imagenes.length > 0) return p.imagenes[0];
+    if (Array.isArray(p.productos_kit) && p.productos_kit.length > 0) {
+      for (const item of p.productos_kit) {
+        const prod = (productos || []).find(x => x.id === item.producto_id);
+        if (prod && prod.imagen) return prod.imagen;
+      }
+    }
+    if (p.esCombo && Array.isArray(p.plataformasCombo) && p.plataformasCombo.length > 0) {
+      for (const nombre of p.plataformasCombo) {
+        const prod = (productos || []).find(x => (x.plataforma === nombre || x.producto === nombre) && x.imagen);
+        if (prod) return prod.imagen;
+      }
+    }
+    return '';
   };
 
   const addToCart = (producto) => {
@@ -802,7 +852,7 @@ abrirWhatsAppNat(whatsappNumero, mensaje);
     const searchTermLower = searchTerm.toLowerCase();
     const match = (p.plataforma || '').toLowerCase().includes(searchTermLower) ||
                   (p.descripcion_detallada || '').toLowerCase().includes(searchTermLower);
-    return match && (!filterPlatform || p.plataforma === filterPlatform) && p.tipo === 'streaming' && !p.esCombo;
+    return match && (!filterPlatform || p.plataforma === filterPlatform) && p.tipo === 'streaming';
   });
 
 // ✅ Agrega al carrito aplicando el descuento de la oferta/publicidad
@@ -839,11 +889,24 @@ if (p.url_destino) { window.location.href = p.url_destino; }
 return;
 }
 agregarOfertaAlCarrito(p);
-};  const esItemStreaming = (p) => p.tipo === 'streaming' || (p.categoria || '').toUpperCase() === 'STREAMING' || p.modalidad === 'combo' || p.esComboStreaming;
+};  const esItemStreaming = (p) => p.tipo === 'streaming' || (p.categoria || '').toUpperCase() === 'STREAMING' || p.modalidad === 'combo' || p.esComboStreaming || p.esCombo;
   const ofertasBase = (productos || []).filter(p => p.publicado && (p.estado === 'oferta' || Number(p.precio_oferta || p.precioOferta) > 0));
-  const pubsComoOferta = (publicidad || []).map(pub => {
-  const prodVinculado = productos.find(pr => `/catalogo?producto=${pr.id}` === pub.url_destino) || null;
-  const esExterno = !!pub.url_destino && pub.url_destino.startsWith('http') && !pub.url_destino.includes(typeof window !== 'undefined' ? window.location.origin : '');
+  // ✅ Solo entran a Ofertas las publicidades con destino interno (producto / streaming / kit / combo_streaming)
+  // Las URL externas NO entran en Ofertas (solo banner)
+  const tiposInternos = ['producto', 'streaming', 'kit', 'combo_streaming'];
+  const pubsComoOferta = (publicidad || [])
+  .filter(pub => tiposInternos.includes(pub.tipo_destino) || (pub.url_destino && /[?&]producto=/.test(pub.url_destino)))
+  .map(pub => {
+  const prodVinculado = (pub.producto_id ? productos.find(pr => String(pr.id) === String(pub.producto_id)) : null)
+    || productos.find(pr => `/catalogo?producto=${pr.id}` === pub.url_destino)
+    || null;
+  const esExterno = !!pub.url_destino && /^https?:\/\//i.test(pub.url_destino) && !pub.url_destino.includes(typeof window !== 'undefined' ? window.location.origin : '');
+  const tipoFinal = prodVinculado ? (prodVinculado.esCombo ? 'streaming' : prodVinculado.tipo)
+    : (pub.tipo_destino === 'streaming' || pub.tipo_destino === 'combo_streaming' ? 'streaming' : 'fisico');
+  const todasImagenes = Array.from(new Set([
+    pub.url_imagen,
+    ...(Array.isArray(pub.imagenes) ? pub.imagenes : [])
+  ].filter(Boolean)));
   return {
   ...pub,
   esPublicidad: true,
@@ -852,8 +915,10 @@ agregarOfertaAlCarrito(p);
   id: `pub-${pub.id}`,
   producto: pub.titulo,
   plataforma: pub.titulo,
-  imagen: (pub.imagenes && pub.imagenes[0]) || pub.url_imagen || '',
-  tipo: prodVinculado ? prodVinculado.tipo : (esExterno ? 'externo' : 'fisico'),
+  imagen: todasImagenes[0] || '',
+  imagenes: todasImagenes,
+  tipo: tipoFinal,
+  categoria_promo: pub.categoria_promo || '',
   };
   }).filter(p => !ofertasBase.some(o => o.id === p.id));
   const ofertas = [...ofertasBase, ...pubsComoOferta];
@@ -878,16 +943,23 @@ return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0]));
 }, [productosFiltrados]);
       const renderProductCard = (p, idx = 0) => {
       const precioInfo = getPrecioMostrar(p);
+      const todasImagenes = Array.from(new Set([
+        p.imagen,
+        ...(Array.isArray(p.imagenes) ? p.imagenes : []),
+        ...(Array.isArray(p.productos_kit) ? p.productos_kit.map(k => k.imagen).filter(Boolean) : [])
+      ].filter(Boolean)));
       return (
       <div key={p.id || p.producto || `prod-${idx}`} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between cursor-pointer group`}>
         <div className="aspect-square bg-slate-900 flex items-center justify-center overflow-hidden relative">
-          {p.imagen ? (
-            <img src={p.imagen} alt={p.producto} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} />
-          ) : (
-            <Package className="w-12 h-12 text-slate-300" />
-          )}
+          <CarruselImagen
+            imagenes={todasImagenes}
+            alt={p.producto || p.plataforma}
+            className="w-full h-full group-hover:scale-105 transition-transform duration-300"
+            iconoVacio={<Package className="w-12 h-12 text-slate-300" />}
+          />
+          {p.categoria_promo && <div className="absolute top-2 left-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-md z-10">{p.categoria_promo}</div>}
           {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">OFERTA</div>}
-          {p.tipo === 'kit' && <div className="absolute top-2 left-2 bg-voltech-cyan text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">KIT</div>}
+          {p.tipo === 'kit' && !p.categoria_promo && <div className="absolute top-2 left-2 bg-voltech-cyan text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">KIT</div>}
           {p.disponibilidad === 'bajo_pedido' && <div className="absolute bottom-2 left-2 bg-amber-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-md">🛒 BAJO PEDIDO</div>}
           </div>
         <div className="p-3 flex flex-col flex-1">
@@ -923,7 +995,10 @@ if (!url) return true;
 if (url.startsWith('/')) return true;
 try { return new URL(url).origin === window.location.origin; } catch { return true; }
 };
-// ✅ Click en publi: WhatsApp al azar si hay miembros; si hay producto vinculado, lo agrega al carrito y abre el carrito con descuento
+// ✅ Click en publi:
+// - URL externa manual (http...) → abre en nueva pestaña
+// - tipo_destino = producto / streaming / kit / combo_streaming (o url_destino con ?producto=) → agrega al carrito con descuento y lo abre
+// - Sin destino → va a la sección Ofertas
 const manejarClickPub = (e, pub) => {
 registrarClickPub(pub);
 const destinos = pub.whatsapp_destinos || [];
@@ -935,10 +1010,20 @@ abrirWhatsAppNat(al.telefono, msg);
 return;
 }
 const url = pub.url_destino || '';
-const prodId = (url.match(/[?&]producto=([^&]+)/) || [])[1];
-if (prodId) {
+const esExterna = !!url && /^https?:\/\//i.test(url) && !url.includes(typeof window !== 'undefined' ? window.location.origin : '');
+if (esExterna) {
 e.preventDefault();
-const prod = productos.find(p => String(p.id) === String(prodId));
+window.open(url, '_blank');
+return;
+}
+// ✅ Prioridad 1: campo producto_id (nuevo del Marketing)
+// Prioridad 2: extraer prodId de url_destino (/catalogo?producto=X)
+const prodIdFromField = pub.producto_id;
+const prodIdFromUrl = (url.match(/[?&]producto=([^&]+)/) || [])[1];
+const prodIdFinal = prodIdFromField || prodIdFromUrl;
+if (prodIdFinal) {
+e.preventDefault();
+const prod = productos.find(p => String(p.id) === String(prodIdFinal));
 if (prod) {
 const info = getPrecioMostrar(prod);
 let precioFinal = info.precioPrincipal;
@@ -1432,11 +1517,13 @@ productosAgrupados.map(([cat, items]) => (
       return (
       <div key={p.id || p.plataforma || `stream-${idx}`} onClick={() => setSelectedProduct(p)} className={`flex flex-col justify-between h-full ${darkMode ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl shadow-md border overflow-hidden hover:shadow-xl hover:border-slate-700 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer group`}>
       <div className="relative w-full aspect-[16/9] bg-slate-950 flex items-center justify-center overflow-hidden rounded-t-2xl">
-        {p.imagen ? (
-          <img src={p.imagen} alt={p.plataforma} className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} />
-        ) : (
-          <Play className="w-10 h-10 text-white/80" />
-        )}
+        <CarruselImagen
+          imagenes={Array.from(new Set([p.imagen, ...(Array.isArray(p.imagenes) ? p.imagenes : [])].filter(Boolean)))}
+          alt={p.plataforma}
+          className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
+          iconoVacio={<Play className="w-10 h-10 text-white/80" />}
+        />
+        {p.categoria_promo && <div className="absolute top-2 left-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-md z-10">{p.categoria_promo}</div>}
         {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md z-10">OFERTA</div>}
         {p.disponibilidad === 'bajo_pedido' && <div className="absolute bottom-2 left-2 bg-amber-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-md z-10">🛒 BAJO PEDIDO</div>}
         </div>
@@ -1482,8 +1569,14 @@ productosAgrupados.map(([cat, items]) => (
                   return (
                   <div key={p.id || p.producto || p.plataforma || `oferta-${idx}`} onClick={() => manejarClickOferta(p)} className={`flex flex-col justify-between h-full ${darkMode ? 'bg-gradient-to-br from-orange-900/30 to-red-900/30 border-red-800' : 'bg-gradient-to-br from-orange-50 to-red-50 border-red-200'} rounded-2xl shadow-md border-2 overflow-hidden relative hover:shadow-xl hover:-translate-y-0.5 transition-all cursor-pointer group`}>
                           <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md z-10">OFERTA</div>
+                          {p.categoria_promo && <div className="absolute top-2 left-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-md z-20">{p.categoria_promo}</div>}
                           <div className={`relative w-full overflow-hidden rounded-t-2xl flex items-center justify-center ${(p.tipo === 'streaming' || (p.categoria || '').toUpperCase() === 'STREAMING') ? 'aspect-[16/9] bg-slate-950' : 'aspect-square bg-slate-900'}`}>
-                            {p.imagen ? <img src={p.imagen} alt={p.producto || p.plataforma} className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105" onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }} /> : <Package className="w-12 h-12 text-slate-300" />}
+                            <CarruselImagen
+                              imagenes={Array.from(new Set([p.imagen, ...(Array.isArray(p.imagenes) ? p.imagenes : [])].filter(Boolean)))}
+                              alt={p.producto || p.plataforma}
+                              className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
+                              iconoVacio={<Package className="w-12 h-12 text-slate-300" />}
+                            />
                           </div>
                           <div className="p-3 flex flex-col flex-1">
                             <h3 className={`font-semibold text-sm mb-2 line-clamp-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto || p.plataforma}</h3>
@@ -1945,19 +2038,19 @@ productosAgrupados.map(([cat, items]) => (
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
                 <div className="space-y-4">
-                  <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative ${selectedProduct.tipo === 'streaming' ? 'bg-black' : 'bg-transparent'}`}>
-                    {selectedProduct.imagen ? (
-                      <img 
-                        src={selectedProduct.imagen} 
-                        alt={selectedProduct.producto || selectedProduct.plataforma} 
-                        className="w-full h-auto max-h-[420px] object-contain mx-auto"
-                        onError={(e) => {
-                          e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iIzFhMWUyOSIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2MzY2ZjEiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5TaW4gSW1hZ2VuPC90ZXh0Pjwvc3ZnPg==';
-                        }}
-                      />
-                    ) : (
-                      <Package className="w-24 h-24 text-slate-300" />
-                    )}
+                  <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative ${selectedProduct.tipo === 'streaming' ? 'bg-black' : 'bg-transparent'}`} style={{ minHeight: '280px' }}>
+                    <CarruselImagen
+                      imagenes={Array.from(new Set([
+                        selectedProduct.imagen,
+                        ...(Array.isArray(selectedProduct.imagenes) ? selectedProduct.imagenes : []),
+                        ...(Array.isArray(selectedProduct.productos_kit) ? selectedProduct.productos_kit.map(k => k.imagen).filter(Boolean) : [])
+                      ].filter(Boolean)))}
+                      alt={selectedProduct.producto || selectedProduct.plataforma}
+                      className="w-full h-auto max-h-[420px] object-contain mx-auto"
+                      objectFit="contain"
+                      iconoVacio={<Package className="w-24 h-24 text-slate-300" />}
+                    />
+                    {selectedProduct.categoria_promo && <div className="absolute top-4 left-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md z-20">{selectedProduct.categoria_promo}</div>}
                     {getPrecioMostrar(selectedProduct).tieneOferta && (
                 <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">OFERTA</div>
                 )}

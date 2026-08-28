@@ -190,7 +190,12 @@ export default function MarketingPage() {
     cierre_whatsapp: 'Quiero comprar ✅',
     tipo_destino: 'url_externa', producto_id: '', categoria_promo: ''
     });
-  
+  const [masVendidosConfig, setMasVendidosConfig] = useState({
+    activo: false, titulo: '🔥 Los Favoritos de Nuestros Clientes', cantidad_maxima: 3,
+    descripcion_1: '🚚 Envíos rápidos a todo el país en 24-48h',
+    descripcion_2: '️ Garantía de 3 días en todos nuestros productos'
+  });
+
   useEffect(() => {
 const cargarDatos = async () => {
 let plts = [], cpons = [], pubs = [], prods = [], clts = [], etqs = [], mvConfig = [], catsPromo = [];
