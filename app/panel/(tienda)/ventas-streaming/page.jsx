@@ -92,6 +92,17 @@ export default function VentasStreamingPage() {
   const [cuponAplicado, setCuponAplicado] = useState(null);
   const [errorCupon, setErrorCupon] = useState('');
 
+  // ✅ M = manual (panel), W = web (catálogo) — definida ANTES de usarla en el estado inicial
+  const generarNumeroOrden = (origen = 'manual') => {
+    const hoy = new Date();
+    const dia = String(hoy.getDate()).padStart(2, '0');
+    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+    const prefijo = origen === 'web' ? 'W' : 'M';
+    const ventasHoy = ventas.filter(v => v.fecha === hoy.toISOString().split('T')[0] && (v.origen || 'manual') === origen);
+    const consecutivo = String(ventasHoy.length + 1).padStart(3, '0');
+    return `${prefijo}-${dia}-${mes}-${consecutivo}`;
+  };
+
   const [formDataNueva, setFormDataNueva] = useState({
     numeroOrden: generarNumeroOrden('manual'),
     fecha: new Date().toISOString().split('T')[0],
@@ -294,17 +305,6 @@ export default function VentasStreamingPage() {
     const intervalo = setInterval(verificarVencimientos, 60 * 60 * 1000);
     return () => clearInterval(intervalo);
   }, [ventas, configRecordatorios, agregarNotificacion]);
-
-  // ✅ M = manual (panel), W = web (catálogo)
-  const generarNumeroOrden = (origen = 'manual') => {
-    const hoy = new Date();
-    const dia = String(hoy.getDate()).padStart(2, '0');
-    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
-    const prefijo = origen === 'web' ? 'W' : 'M';
-    const ventasHoy = ventas.filter(v => v.fecha === hoy.toISOString().split('T')[0] && (v.origen || 'manual') === origen);
-    const consecutivo = String(ventasHoy.length + 1).padStart(3, '0');
-    return `${prefijo}-${dia}-${mes}-${consecutivo}`;
-  };
 
   const calcularFechaVencimiento = (fechaInicio, dias) => {
     if (!fechaInicio || !dias) return '';

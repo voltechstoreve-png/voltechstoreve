@@ -159,6 +159,9 @@ export default function MarketingPage() {
   const [publicidad, setPublicidad] = useState([]);
   const [showPublicidadForm, setShowPublicidadForm] = useState(false);
   const [resumenData, setResumenData] = useState({ abierto: false, texto: '', telefono: '', titulo: '', cliente: '' });
+  const [categoriasPromo, setCategoriasPromo] = useState([]);
+  const [showCategoriasPromoModal, setShowCategoriasPromoModal] = useState(false);
+  const [nuevaCategoriaPromo, setNuevaCategoriaPromo] = useState('');
   const [publicidadEditando, setPublicidadEditando] = useState(null);
   const [imagenPreview, setImagenPreview] = useState('');
   const [imagenesExtra, setImagenesExtra] = useState([]);
@@ -184,86 +187,16 @@ export default function MarketingPage() {
     color_titulo: '#ffffff', color_descripcion: '#ffffff', color_precio: '#34d399',
     whatsapp_destinos: [], precio_manual: '', descuento_pct: 0,
     saludo_whatsapp: '¡Hola! Te escribo del catálogo 👋',
-    cierre_whatsapp: 'Quiero comprar ✅'
+    cierre_whatsapp: 'Quiero comprar ✅',
+    tipo_destino: 'url_externa', producto_id: '', categoria_promo: ''
     });
-  const [masVendidosConfig, setMasVendidosConfig] = useState({
-    activo: false, titulo: '🔥 Los Favoritos de Nuestros Clientes', cantidad_maxima: 3,
-    descripcion_1: '🚚 Envíos rápidos a todo el país en 24-48h',
-    descripcion_2: '️ Garantía de 3 días en todos nuestros productos'
-  });
-
-  // ❌ ELIMINADO: campanasCalendario state
-  const [alertasVencimiento, setAlertasVencimiento] = useState([]);
-
-  // ✅ CÁLCULO AUTOMÁTICO DE FECHA DE VENCIMIENTO
-  useEffect(() => {
-    if (formDataCupon.fecha_inicio && formDataCupon.duracion_dias) {
-      const fecha = new Date(formDataCupon.fecha_inicio);
-      fecha.setDate(fecha.getDate() + parseInt(formDataCupon.duracion_dias));
-      const year = fecha.getFullYear();
-      const month = String(fecha.getMonth() + 1).padStart(2, '0');
-      const day = String(fecha.getDate()).padStart(2, '0');
-      const hours = String(fecha.getHours()).padStart(2, '0');
-      const minutes = String(fecha.getMinutes()).padStart(2, '0');
-      setFormDataCupon(prev => ({ ...prev, fecha_vencimiento: `${year}-${month}-${day}T${hours}:${minutes}` }));
-    }
-  }, [formDataCupon.fecha_inicio, formDataCupon.duracion_dias]);
-
-  useEffect(() => {
-    const cargarHistorial = async () => {
-      const hoy = new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase
-        .from('envios_marketing')
-        .select('cliente_id')
-        .gte('fecha_envio', `${hoy}T00:00:00`);
-      
-      if (!error && data) {
-        const conteo = {};
-        data.forEach(envio => {
-          conteo[envio.cliente_id] = (conteo[envio.cliente_id] || 0) + 1;
-        });
-        setHistorialEnvios(conteo);
-      }
-
-      const { data: histDet, error: histErr } = await supabase
-        .from('envios_marketing')
-        .select('cliente_id, producto_id, fecha_envio')
-        .order('fecha_envio', { ascending: false })
-        .limit(10);
-      
-      if (!histErr && histDet) setHistorialDetallado(histDet);
-    };
-    cargarHistorial();
-  }, []);
-
-  useEffect(() => {
-    if (formDataPublicidad.fecha_inicio && formDataPublicidad.duracion_dias) {
-      const fecha = new Date(formDataPublicidad.fecha_inicio);
-      fecha.setDate(fecha.getDate() + parseInt(formDataPublicidad.duracion_dias));
-      setFormDataPublicidad(prev => ({ ...prev, fecha_fin: fecha.toISOString().split('T')[0] }));
-    }
-  }, [formDataPublicidad.fecha_inicio, formDataPublicidad.duracion_dias]);
-
-  // ✅ ALERTAS DE VENCIMIENTO: solo cupones (publicidad se movió a Alertas)
-  useEffect(() => {
-    const alertas = [];
-    const hoy = new Date();
-    cupones.forEach(cupon => {
-      if (cupon.estado === 'activo' && cupon.fecha_vencimiento) {
-        const fin = new Date(cupon.fecha_vencimiento);
-        const dias = Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24));
-        if (dias <= 3 && dias >= 0) alertas.push({ tipo: 'Cupón', titulo: cupon.titulo, dias, fecha: cupon.fecha_vencimiento });
-      }
-    });
-    setAlertasVencimiento(alertas);
-  }, [cupones]);
-
+  
   useEffect(() => {
 const cargarDatos = async () => {
-let plts = [], cpons = [], pubs = [], prods = [], clts = [], etqs = [], mvConfig = {};
+let plts = [], cpons = [], pubs = [], prods = [], clts = [], etqs = [], mvConfig = [], catsPromo = [];
 if (supabase) {
 const safe = (q) => q.then(r => r.data).catch(() => null);
-const [pData, cData, puData, prData, clData, etData, mvData, eqData, usData] = await Promise.all([
+const [pData, cData, puData, prData, clData, etData, mvData, eqData, usData, cpData] = await Promise.all([
 safe(supabase.from('plantillas').select('*')),
 safe(supabase.from('cupones').select('*')),
 safe(supabase.from('publicidad').select('*')),
@@ -273,16 +206,17 @@ safe(supabase.from('settings').select('valor').eq('clave', 'etiquetas').single()
 safe(supabase.from('marketing_config').select('valor').eq('clave', 'mas_vendidos').single()),
 safe(supabase.from('equipo').select('*')),
 safe(supabase.from('usuarios').select('*')),
+safe(supabase.from('settings').select('valor').eq('clave', 'categorias_promo').single()),
 ]);
 if (pData) plts = pData; if (cData) cpons = cData; if (puData) pubs = puData;
 if (prData) prods = prData; if (clData) clts = clData; if (etData?.valor) etqs = etData.valor;
 if (mvData?.valor) mvConfig = mvData.valor;
-// ✅ Combina el equipo desde 'usuarios' Y 'equipo' (sin duplicados por nombre)
+if (cpData?.valor) catsPromo = cpData.valor;
+const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
 const refCode = urlParams.get('ref') || urlParams.get('v');
 if (refCode) {
 setAutoReferrer(refCode.toUpperCase());
 localStorage.setItem('voltech_ref', JSON.stringify({ codigo: refCode.toUpperCase(), fecha: new Date().toISOString() }));
-// ✅ Referido INTERNO: limpia la URL y sin aviso — el cliente siempre ve el link original
 const urlLimpia = new URL(window.location.href);
 urlLimpia.searchParams.delete('ref');
 urlLimpia.searchParams.delete('v');
@@ -296,6 +230,8 @@ if (clts.length === 0) { const d = localStorage.getItem('voltech_clientes'); if 
 if (etqs.length === 0) { const d = localStorage.getItem('voltech_etiquetas'); if (d) etqs = JSON.parse(d); }
 if (Object.keys(mvConfig).length === 0) { const d = localStorage.getItem('voltech_mas_vendidos_config'); if (d) mvConfig = JSON.parse(d); }
 if (Object.keys(mvConfig).length > 0) setMasVendidosConfig(mvConfig);
+if (catsPromo.length === 0) { const d = localStorage.getItem('voltech_categorias_promo'); if (d) catsPromo = JSON.parse(d); }
+if (catsPromo.length > 0) setCategoriasPromo(catsPromo);
 let clientesFiltrados = clts;
 if (!esAdmin && !esSocio && usuarioActual?.nombre) {
 clientesFiltrados = clts.filter(c => c.registradoPor === usuarioActual.nombre);
@@ -312,6 +248,23 @@ setProductos(prods); setClientes(clientesFiltrados); setEtiquetas(etqs);
 };
 cargarDatos();
 }, [esAdmin, esSocio, usuarioActual]);
+
+  const [alertasVencimiento, setAlertasVencimiento] = useState([]);
+
+  // ✅ ALERTAS DE VENCIMIENTO: solo cupones (publicidad se movió a Alertas)
+  useEffect(() => {
+    const alertas = [];
+    const hoy = new Date();
+    cupones.forEach(cupon => {
+      if (cupon.estado === 'activo' && cupon.fecha_vencimiento) {
+        const fin = new Date(cupon.fecha_vencimiento);
+        const dias = Math.ceil((fin - hoy) / (1000 * 60 * 60 * 24));
+        if (dias <= 3 && dias >= 0) alertas.push({ tipo: 'Cupón', titulo: cupon.titulo, dias, fecha: cupon.fecha_vencimiento });
+      }
+    });
+    setAlertasVencimiento(alertas);
+  }, [cupones]);
+
   useEffect(() => {
     if (!productoSeleccionado || clientesSeleccionados.length === 0) {
       setMensajePersonalizadoWa('');
@@ -510,6 +463,26 @@ cargarDatos();
     img.src = imagenPreview;
   }, [imagenPreview]);
 
+  const agregarCategoriaPromo = async () => {
+    if (!nuevaCategoriaPromo.trim()) return toast.error('Ingresa un nombre');
+    if (categoriasPromo.includes(nuevaCategoriaPromo)) return toast.error('Esta categoría ya existe');
+    const nuevas = [...categoriasPromo, nuevaCategoriaPromo];
+    setCategoriasPromo(nuevas);
+    if (supabase) await supabase.from('settings').upsert({ clave: 'categorias_promo', valor: nuevas }, { onConflict: 'clave' });
+    localStorage.setItem('voltech_categorias_promo', JSON.stringify(nuevas));
+    setNuevaCategoriaPromo('');
+    toast.success('Categoría agregada');
+  };
+
+  const eliminarCategoriaPromo = async (cat) => {
+    if (!confirm(`¿Eliminar "${cat}"?`)) return;
+    const nuevas = categoriasPromo.filter(c => c !== cat);
+    setCategoriasPromo(nuevas);
+    if (supabase) await supabase.from('settings').upsert({ clave: 'categorias_promo', valor: nuevas }, { onConflict: 'clave' });
+    localStorage.setItem('voltech_categorias_promo', JSON.stringify(nuevas));
+    toast.success('Categoría eliminada');
+  };
+
   // ✅ Limpia TODO el formulario al crear una publicidad NUEVA (evita que quede la vieja)
   const abrirNuevaPublicidad = () => {
     setPublicidadEditando(null);
@@ -524,7 +497,8 @@ cargarDatos();
       color_titulo: '#ffffff', color_descripcion: '#ffffff', color_precio: '#34d399',
       precio_manual: '', descuento_pct: 0,
     saludo_whatsapp: '¡Hola! Te escribo del catálogo 👋',
-    cierre_whatsapp: 'Quiero comprar ✅'
+    cierre_whatsapp: 'Quiero comprar ✅',
+    tipo_destino: 'url_externa', producto_id: '', categoria_promo: ''
     });
     setImagenPreview('');
     setImagenPreview('');
@@ -1559,7 +1533,7 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                     <X className="w-5 h-5 text-voltech-muted" />
                   </button>
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-voltech-muted mb-2">Título *</label>
@@ -1570,22 +1544,38 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                       <textarea value={formDataPublicidad.descripcion} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, descripcion: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2 h-20" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-voltech-muted mb-2">URL de Destino</label>
-                      <div className="space-y-2 mb-2">
-                        <label className="flex items-center gap-2 text-xs cursor-pointer">
-                          <input type="radio" checked={urlDestinoType === 'manual'} onChange={() => setFormDataPublicidad({...formDataPublicidad, url_destino: ''})} /> URL Manual
-                        </label>
-                        <label className="flex items-center gap-2 text-xs cursor-pointer">
-                          <input type="radio" checked={urlDestinoType === 'producto'} onChange={() => setFormDataPublicidad({...formDataPublicidad, url_destino: '/catalogo?producto='})} /> Seleccionar producto
-                        </label>
-                      </div>
-                      {urlDestinoType === 'producto' ? (
-                        <select value={formDataPublicidad.url_destino} onChange={(e) => {
-                          const val = e.target.value;
-                          const prod = productos.find(p => `/catalogo?producto=${p.id}` === val);
+                      <label className="block text-sm font-medium text-voltech-muted mb-2">🎯 Destino de la Publicidad</label>
+                      <select 
+                        value={formDataPublicidad.tipo_destino} 
+                        onChange={(e) => {
+                          const nuevoTipo = e.target.value;
+                          setFormDataPublicidad({
+                            ...formDataPublicidad, 
+                            tipo_destino: nuevoTipo, 
+                            url_destino: '', 
+                            producto_id: ''
+                          });
+                        }} 
+                        className="input-voltech w-full rounded-lg px-4 py-2 mb-3"
+                      >
+                        <option value="url_externa">🌐 URL Externa (banner, no entra en Ofertas)</option>
+                        <option value="producto">📦 Producto (físico) → Ofertas / Productos</option>
+                        <option value="streaming">📺 Streaming → Ofertas / Streaming</option>
+                        <option value="kit">🎁 Kit (producto) → Ofertas / Productos</option>
+                        <option value="combo_streaming">🎬 Combo Streaming → Ofertas / Streaming</option>
+                      </select>
+                      
+                      {formDataPublicidad.tipo_destino === 'url_externa' && (
+                        <input type="text" value={formDataPublicidad.url_destino} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, url_destino: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="https://..." />
+                      )}
+                      
+                      {formDataPublicidad.tipo_destino === 'producto' && (
+                        <select value={formDataPublicidad.producto_id} onChange={(e) => {
+                          const prod = productos.find(p => p.id === e.target.value);
                           setFormDataPublicidad(prev => ({
                             ...prev,
-                            url_destino: val,
+                            producto_id: e.target.value,
+                            url_destino: prod ? `/catalogo?producto=${prod.id}` : '',
                             url_imagen: prod?.imagen || prev.url_imagen,
                             titulo: prev.titulo || (prod?.producto || prod?.plataforma || prev.titulo),
                             descripcion: prev.descripcion || (prod?.descripcion || ''),
@@ -1593,12 +1583,91 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                           }));
                           if (prod?.imagen) setImagenPreview(prod.imagen);
                         }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
-                          <option value="/catalogo?producto=">Seleccionar producto...</option>
-                          {productos.filter(p => p.publicado !== false).map(p => (<option key={p.id} value={`/catalogo?producto=${p.id}`}>{p.plataforma || p.producto || p.nombre || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>))}
+                          <option value="">Seleccionar producto...</option>
+                          {productos.filter(p => p.tipo === 'fisico' && p.publicado !== false && !p.esCombo && !p.disponibilidad === 'kit').map(p => (
+                            <option key={p.id} value={p.id}>{p.plataforma || p.producto || p.nombre || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>
+                          ))}
                         </select>
-                      ) : (
-                        <input type="text" value={formDataPublicidad.url_destino} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, url_destino: e.target.value})} className="input-voltech w-full rounded-lg px-4 py-2" placeholder="https://..." />
                       )}
+                      
+                      {formDataPublicidad.tipo_destino === 'streaming' && (
+                        <select value={formDataPublicidad.producto_id} onChange={(e) => {
+                          const prod = productos.find(p => p.id === e.target.value);
+                          setFormDataPublicidad(prev => ({
+                            ...prev,
+                            producto_id: e.target.value,
+                            url_destino: prod ? `/catalogo?producto=${prod.id}` : '',
+                            url_imagen: prod?.imagen || prev.url_imagen,
+                            titulo: prev.titulo || (prod?.plataforma || prev.titulo),
+                            descripcion: prev.descripcion || (prod?.descripcion || ''),
+                            precio_manual: prev.precio_manual || (prod ? `$${Number(prod.precioDetal || 0).toFixed(2)}` : ''),
+                          }));
+                          if (prod?.imagen) setImagenPreview(prod.imagen);
+                        }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                          <option value="">Seleccionar plataforma...</option>
+                          {productos.filter(p => p.tipo === 'streaming' && !p.esCombo && p.publicado !== false).map(p => (
+                            <option key={p.id} value={p.id}>{p.plataforma || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>
+                          ))}
+                        </select>
+                      )}
+                      
+                      {formDataPublicidad.tipo_destino === 'kit' && (
+                        <select value={formDataPublicidad.producto_id} onChange={(e) => {
+                          const prod = productos.find(p => p.id === e.target.value);
+                          setFormDataPublicidad(prev => ({
+                            ...prev,
+                            producto_id: e.target.value,
+                            url_destino: prod ? `/catalogo?producto=${prod.id}` : '',
+                            url_imagen: prod?.imagen || prev.url_imagen,
+                            titulo: prev.titulo || (prod?.plataforma || prev.titulo),
+                            descripcion: prev.descripcion || (prod?.descripcion || ''),
+                            precio_manual: prev.precio_manual || (prod ? `$${Number(prod.precioDetal || 0).toFixed(2)}` : ''),
+                          }));
+                          if (prod?.imagen) setImagenPreview(prod.imagen);
+                        }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                          <option value="">Seleccionar kit...</option>
+                          {productos.filter(p => p.tipo === 'fisico' && p.disponibilidad === 'kit' && p.publicado !== false).map(p => (
+                            <option key={p.id} value={p.id}>{p.plataforma || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>
+                          ))}
+                        </select>
+                      )}
+                      
+                      {formDataPublicidad.tipo_destino === 'combo_streaming' && (
+                        <select value={formDataPublicidad.producto_id} onChange={(e) => {
+                          const prod = productos.find(p => p.id === e.target.value);
+                          setFormDataPublicidad(prev => ({
+                            ...prev,
+                            producto_id: e.target.value,
+                            url_destino: prod ? `/catalogo?producto=${prod.id}` : '',
+                            url_imagen: prod?.imagen || prev.url_imagen,
+                            titulo: prev.titulo || (prod?.plataforma || prev.titulo),
+                            descripcion: prev.descripcion || (prod?.descripcion || ''),
+                            precio_manual: prev.precio_manual || (prod ? `$${Number(prod.precioDetal || 0).toFixed(2)}` : ''),
+                          }));
+                          if (prod?.imagen) setImagenPreview(prod.imagen);
+                        }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm">
+                          <option value="">Seleccionar combo...</option>
+                          {productos.filter(p => p.esCombo && p.publicado !== false).map(p => (
+                            <option key={p.id} value={p.id}>{p.plataforma || 'Sin nombre'} - ${Number(p.precioDetal || 0).toFixed(2)}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-voltech-muted mb-2">🏷️ Categoría de Promoción</label>
+                      <div className="flex gap-2">
+                        <select value={formDataPublicidad.categoria_promo} onChange={(e) => setFormDataPublicidad({...formDataPublicidad, categoria_promo: e.target.value})} className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm">
+                          <option value="">Sin categoría</option>
+                          {categoriasPromo.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                        <button onClick={() => setShowCategoriasPromoModal(true)} className="px-3 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg hover:bg-voltech-purple/30 transition-colors">
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-voltech-muted mt-1">Ej: Promo del día, Descuento Exclusivo, Oferta Flash...</p>
                     </div>                  
                     <div>
                       <div className="grid grid-cols-2 gap-3 mb-4">
@@ -2075,6 +2144,64 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
         )}
         {/* ❌ ELIMINADO: todo el tab 'calendario' (vive ahora en /panel/alertas) */}
       </div>
+
+      {/* ✅ Modal de gestión de Categorías de Promoción */}
+      <AnimatePresence>
+        {showCategoriasPromoModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-voltech-surface border border-voltech-border rounded-2xl w-full max-w-md max-h-[80vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Tag className="w-5 h-5 text-voltech-purple" /> Categorías de Promoción
+                  </h3>
+                  <button onClick={() => setShowCategoriasPromoModal(false)} className="p-2 rounded-lg hover:bg-voltech-border">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <div className="mb-6 p-4 bg-voltech-dark/50 rounded-lg border border-voltech-border">
+                  <h4 className="text-sm font-semibold text-voltech-cyan mb-3">Agregar Nueva</h4>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={nuevaCategoriaPromo}
+                      onChange={(e) => setNuevaCategoriaPromo(e.target.value)}
+                      placeholder="Ej: Promo del día, Oferta Flash..."
+                      className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm"
+                      onKeyDown={(e) => e.key === 'Enter' && agregarCategoriaPromo()}
+                    />
+                    <button onClick={agregarCategoriaPromo} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2">
+                      <Plus className="w-4 h-4" /> Agregar
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-semibold text-voltech-purple mb-3">Categorías Existentes</h4>
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                    {categoriasPromo.map((cat, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-voltech-dark/50 p-3 rounded-lg border border-voltech-border">
+                        <span className="text-sm text-white flex-1">{cat}</span>
+                        <button 
+                          onClick={() => eliminarCategoriaPromo(cat)}
+                          className="p-2 text-voltech-error hover:bg-voltech-error/10 rounded transition-colors"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                    {categoriasPromo.length === 0 && (
+                      <p className="text-xs text-voltech-muted text-center py-4">No hay categorías creadas</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ✅ Modal para enviar resumen por WhatsApp */}
       <ModalWhatsApp

@@ -4,7 +4,7 @@
   import Link from 'next/link';
   import { supabase } from '@/lib/supabase';
   import { usePermissions } from '@/app/context/PermissionsContext';
- import { 
+  import { 
   Plus, Search, Edit, Trash2, X, Package, DollarSign, TrendingUp,
   AlertTriangle, CheckCircle, Image as ImageIcon, Save, Minus,
   Upload, Eye, EyeOff, Globe, LayoutGrid, Table, Download,
@@ -12,10 +12,10 @@
   ChevronDown, MoreVertical, Filter, ShoppingCart
 } from 'lucide-react';
   import toast, { Toaster } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'framer-motion';
+  import { motion, AnimatePresence } from 'framer-motion';
 
   // ✅ COMPONENTE CUSTOM SELECT UNIFICADO CON PALETA VOLTECH
-  const CustomSelect = ({ label, value, onChange, options, placeholder = '-- Selecciona --', disabled = false, className = '' }) => {
+    const CustomSelect = ({ label, value, onChange, options, placeholder = '-- Selecciona --', disabled = false, className = '' }) => {
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef(null);
 
@@ -110,6 +110,9 @@ import { motion, AnimatePresence } from 'framer-motion';
     const [gestionSubtipo, setGestionSubtipo] = useState('');
     const [editCatMarca, setEditCatMarca] = useState({ tipo: '', valorOriginal: '', valorNuevo: '' });
     const [busquedaKit, setBusquedaKit] = useState('');
+    const [nombresProductosGuardados, setNombresProductosGuardados] = useState([]);
+    const [nombresKitsGuardados, setNombresKitsGuardados] = useState([]);
+    const [nombresCombosGuardados, setNombresCombosGuardados] = useState([]);
     const [nuevoCampo, setNuevoCampo] = useState({ tipo: '', valor: '' });
     const [showNuevoCampo, setShowNuevoCampo] = useState({ tipo: '', show: false });
 
@@ -281,6 +284,12 @@ import { motion, AnimatePresence } from 'framer-motion';
         
         const catsData = sData.categorias || (localStorage.getItem('voltech_categorias') ? JSON.parse(localStorage.getItem('voltech_categorias')) : []);
         const marData = sData.marcas || (localStorage.getItem('voltech_marcas') ? JSON.parse(localStorage.getItem('voltech_marcas')) : []);
+        const nombresProdData = sData.nombres_productos || (localStorage.getItem('voltech_nombres_productos') ? JSON.parse(localStorage.getItem('voltech_nombres_productos')) : []);
+        setNombresProductosGuardados(Array.isArray(nombresProdData) ? nombresProdData : []);
+        const kitsProdData = sData.nombres_kits || (localStorage.getItem('voltech_nombres_kits') ? JSON.parse(localStorage.getItem('voltech_nombres_kits')) : []);
+        setNombresKitsGuardados(Array.isArray(kitsProdData) ? kitsProdData : []);
+        const combosProdData = sData.nombres_combos || (localStorage.getItem('voltech_nombres_combos') ? JSON.parse(localStorage.getItem('voltech_nombres_combos')) : []);
+        setNombresCombosGuardados(Array.isArray(combosProdData) ? combosProdData : []);
         const tasaData = sData.tasa_bcv || (localStorage.getItem('voltech_tasa_bcv') ? JSON.parse(localStorage.getItem('voltech_tasa_bcv')) : { tasa: 36.50, usarBCV: true, tasaPersonalizada: 36.50 });
 
         const catsBase = Array.isArray(catsData) ? catsData : [];
@@ -300,6 +309,10 @@ import { motion, AnimatePresence } from 'framer-motion';
         setEquipo(eqData);
         setCategorias(catsFinal);
         setMarcas(marFinal);
+        const kitsG = sData.nombres_kits || (localStorage.getItem('voltech_nombres_kits') ? JSON.parse(localStorage.getItem('voltech_nombres_kits')) : []);
+        const combosG = sData.nombres_combos || (localStorage.getItem('voltech_nombres_combos') ? JSON.parse(localStorage.getItem('voltech_nombres_combos')) : []);
+        setNombresKitsGuardados(Array.isArray(kitsG) ? kitsG : []);
+        setNombresCombosGuardados(Array.isArray(combosG) ? combosG : []);
         setTasaBCV(tasaData.tasa || 36.50);
         setUsarTasaBCV(tasaData.usarBCV !== undefined ? tasaData.usarBCV : true);
         setTasaPersonalizada(tasaData.tasaPersonalizada || tasaData.tasa || 36.50);
@@ -352,17 +365,21 @@ import { motion, AnimatePresence } from 'framer-motion';
     const handleChange = (index, name, value) => {
       const nuevosItems = [...items];
       const item = nuevosItems[index];
+      const disponibilidadAnterior = item.disponibilidad;
 
       if (name === 'tipo') {
         item.plataforma = '';
         item.categoria = '';
         item.marca = '';
         item.sku = '';
+        item.disponibilidad = 'stock';
+        item.productos_kit = [];
+        item.imagen = '';
+        item.imagenes = [];
+        item.precio_costo_total = 0;
+        item.precio_individual_total = 0;
         if (value === 'streaming') {
           item.categoria = 'STREAMING';
-          item.marca = 'Voltech';
-        } else if (value === 'kit') {
-          item.categoria = 'KIT';
           item.marca = 'Voltech';
         }
       }
@@ -373,11 +390,44 @@ import { motion, AnimatePresence } from 'framer-motion';
         item.metodoPago = 'por_comprar';
         item.cartera = 'por_comprar';
         item.cantidad = 0;
+        item.productos_kit = [];
+        item.esCombo = false;
       } else if (name === 'disponibilidad' && value === 'stock' && item.metodoPago === 'por_comprar') {
         item.metodoPago = 'efectivo';
         item.cartera = '';
+        item.productos_kit = [];
+        item.esCombo = false;
       }
-
+      if (name === 'disponibilidad') {
+        if (value === 'kit') {
+          item.categoria = 'KIT';
+          item.marca = item.marca || 'Voltech';
+          item.tipo = 'fisico';
+          item.esCombo = false;
+        } else if (value === 'combo') {
+          item.categoria = 'COMBO';
+          item.marca = 'Voltech';
+          item.tipo = 'streaming';
+          item.esCombo = true;
+        } else if (value === 'stock' || value === 'bajo_pedido') {
+          item.esCombo = false;
+          item.productos_kit = [];
+          if (item.tipo === 'fisico') item.categoria = '';
+          else if (item.tipo === 'streaming') item.categoria = 'STREAMING';
+        }
+        if ((value === 'kit' && disponibilidadAnterior === 'combo') || (value === 'combo' && disponibilidadAnterior === 'kit')) {
+          item.productos_kit = [];
+          item.imagen = '';
+          item.imagenes = [];
+          item.precio_costo_total = 0;
+          item.precio_individual_total = 0;
+        }
+      }
+      if (name === 'disponibilidad') {
+      if (value === 'kit') { item.categoria = 'KIT'; item.marca = item.marca || 'Voltech'; }
+      else if (value === 'combo') { item.categoria = 'COMBO'; item.marca = 'Voltech'; }
+      else if (item.tipo === 'fisico') { item.categoria = ''; }
+}
       if (item.tipo === 'fisico') {
         if (name === 'plataforma' && value) {
           const registros = productos.filter(p => p.tipo === 'fisico' && normalizarTexto(p.plataforma) === normalizarTexto(value));
@@ -442,9 +492,16 @@ import { motion, AnimatePresence } from 'framer-motion';
       const existe = kitActual.find(p => p.producto_id === producto.id);
       
       if (existe) {
-        nuevosItems[index].productos_kit = kitActual.filter(p => p.producto_id !== producto.id);
+      nuevosItems[index].productos_kit = kitActual.filter(p => p.producto_id !== producto.id);
+      if (producto.imagen) {
+      nuevosItems[index].imagenes = (nuevosItems[index].imagenes || []).filter(img => img !== producto.imagen);
+      if (nuevosItems[index].imagen === producto.imagen) {
+      const resto = nuevosItems[index].productos_kit.map(p => p.imagen).filter(Boolean);
+      nuevosItems[index].imagen = resto[0] || (nuevosItems[index].imagenes || [])[0] || '';
+      }
+      }
       } else {
-        nuevosItems[index].productos_kit = [...kitActual, {
+      nuevosItems[index].productos_kit = [...kitActual, {
           producto_id: producto.id,
           sku: producto.sku,
           nombre: producto.plataforma || producto.producto,
@@ -453,9 +510,21 @@ import { motion, AnimatePresence } from 'framer-motion';
           precio_venta: producto.precioDetal || 0,
           imagen: producto.imagen
         }];
+        if (producto.imagen) {
+        if (!nuevosItems[index].imagenes) nuevosItems[index].imagenes = [];
+        if (!nuevosItems[index].imagenes.includes(producto.imagen)) nuevosItems[index].imagenes.push(producto.imagen);
+        if (!nuevosItems[index].imagen) nuevosItems[index].imagen = producto.imagen;
       }
+    } 
       
       const kitActualizado = nuevosItems[index].productos_kit;
+    // ✅ AUTO-IMAGEN: si el kit/combo no tiene imagen, toma la del 1er producto marcado
+    const primeraImagen = kitActualizado.map(p => p.imagen).filter(Boolean)[0];
+    if (primeraImagen && !nuevosItems[index].imagen) {
+      nuevosItems[index].imagen = primeraImagen;
+      if (!nuevosItems[index].imagenes) nuevosItems[index].imagenes = [];
+      if (!nuevosItems[index].imagenes.includes(primeraImagen)) nuevosItems[index].imagenes.push(primeraImagen);
+    }
       const costoTotal = kitActualizado.reduce((sum, p) => sum + (p.precio_costo * p.cantidad), 0);
       const ventaTotal = kitActualizado.reduce((sum, p) => sum + (p.precio_venta * p.cantidad), 0);
       
@@ -706,6 +775,36 @@ import { motion, AnimatePresence } from 'framer-motion';
         }
 
         toast.success(`"${gestionValor}" creado con SKU ${skuGenerado}`);
+      } else if (gestionTipo === 'nombre_fisico') {
+        if (!nombresProductosGuardados.includes(gestionValor)) {
+          const nuevos = [...nombresProductosGuardados, gestionValor];
+          setNombresProductosGuardados(nuevos);
+          if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_productos', valor: nuevos }, { onConflict: 'clave' });
+          localStorage.setItem('voltech_nombres_productos', JSON.stringify(nuevos));
+          toast.success('Nombre de producto agregado');
+        } else {
+          toast.error('Este nombre ya existe');
+        }
+      } else if (gestionTipo === 'nombre_kit') {
+        if (!nombresKitsGuardados.includes(gestionValor)) {
+          const nuevos = [...nombresKitsGuardados, gestionValor];
+          setNombresKitsGuardados(nuevos);
+          if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_kits', valor: nuevos }, { onConflict: 'clave' });
+          localStorage.setItem('voltech_nombres_kits', JSON.stringify(nuevos));
+          toast.success('Nombre de kit agregado');
+        } else {
+          toast.error('Este nombre ya existe');
+        }
+      } else if (gestionTipo === 'nombre_combo') {
+        if (!nombresCombosGuardados.includes(gestionValor)) {
+          const nuevos = [...nombresCombosGuardados, gestionValor];
+          setNombresCombosGuardados(nuevos);
+          if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_combos', valor: nuevos }, { onConflict: 'clave' });
+          localStorage.setItem('voltech_nombres_combos', JSON.stringify(nuevos));
+          toast.success('Nombre de combo agregado');
+        } else {
+          toast.error('Este nombre ya existe');
+        }
       }
       
       setGestionValor('');
@@ -735,6 +834,24 @@ import { motion, AnimatePresence } from 'framer-motion';
         setProductos(nuevosProductos);
         localStorage.setItem('voltech_productos', JSON.stringify(nuevosProductos));
         toast.success(`"${valor}" eliminado`);
+      } else if (tipo === 'nombre_fisico') {
+        const nuevos = nombresProductosGuardados.filter(n => n !== valor);
+        setNombresProductosGuardados(nuevos);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_productos', valor: nuevos }, { onConflict: 'clave' });
+        localStorage.setItem('voltech_nombres_productos', JSON.stringify(nuevos));
+        toast.success(`Nombre "${valor}" eliminado`);
+      } else if (tipo === 'nombre_kit') {
+        const nuevos = nombresKitsGuardados.filter(n => n !== valor);
+        setNombresKitsGuardados(nuevos);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_kits', valor: nuevos }, { onConflict: 'clave' });
+        localStorage.setItem('voltech_nombres_kits', JSON.stringify(nuevos));
+        toast.success(`Nombre de kit "${valor}" eliminado`);
+      } else if (tipo === 'nombre_combo') {
+        const nuevos = nombresCombosGuardados.filter(n => n !== valor);
+        setNombresCombosGuardados(nuevos);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_combos', valor: nuevos }, { onConflict: 'clave' });
+        localStorage.setItem('voltech_nombres_combos', JSON.stringify(nuevos));
+        toast.success(`Nombre de combo "${valor}" eliminado`);
       }
     };
 
@@ -878,11 +995,15 @@ import { motion, AnimatePresence } from 'framer-motion';
     const guardarProductos = async () => {
       for (let i = 0; i < items.length; i++) {
         const it = items[i];
-        if (it.tipo === 'kit') {
+        const esKit = it.disponibilidad === 'kit';
+        const esCombo = it.disponibilidad === 'combo';
+        if (esKit || esCombo) {
           if (!it.plataforma || (it.productos_kit || []).length === 0) {
-            toast.error(`El Kit ${i + 1} debe tener un nombre y al menos 1 producto del inventario`);
+            toast.error(`El ${esCombo ? 'Combo' : 'Kit'} ${i + 1} debe tener un nombre y al menos 1 ${esCombo ? 'plataforma' : 'producto'}`);
             return;
           }
+          if (esKit) { it.tipo = 'kit'; it.categoria = 'KIT'; it.marca = it.marca || 'Voltech'; }
+          if (esCombo) { it.tipo = 'streaming'; it.esCombo = true; it.categoria = 'COMBO'; it.marca = 'Voltech'; }
         } else {
           if (!it.plataforma || !it.categoria || (it.tipo === 'fisico' && !it.marca)) {
             toast.error(`El item ${i + 1} está incompleto: nombre, categoría y marca son obligatorios`);
@@ -929,6 +1050,7 @@ import { motion, AnimatePresence } from 'framer-motion';
           tipo: item.tipo,
           disponibilidad: item.disponibilidad || 'stock',
           imagen: item.imagen || null,
+          imagenes: imagenesArr,
           sku: item.sku,
           fecha: item.fecha,
           fechaCreacion: new Date().toISOString(),
@@ -1023,12 +1145,17 @@ import { motion, AnimatePresence } from 'framer-motion';
           });
           setCategorias(nuevasCategorias);
           setMarcas(nuevasMarcas);
+          // ✅ Persistir nombres de productos físicos (como categorías y marcas)
+          const nombresFisicosNuevos = [...new Set([...nombresProductosGuardados, ...nuevosProductos.filter(p => p.tipo === 'fisico' && !p.esCombo).map(p => p.plataforma).filter(Boolean)])];
+          setNombresProductosGuardados(nombresFisicosNuevos);
           if (supabase) {
             await supabase.from('settings').upsert({ clave: 'categorias', valor: nuevasCategorias }, { onConflict: 'clave' });
             await supabase.from('settings').upsert({ clave: 'marcas', valor: nuevasMarcas }, { onConflict: 'clave' });
+            await supabase.from('settings').upsert({ clave: 'nombres_productos', valor: nombresFisicosNuevos }, { onConflict: 'clave' });
           }
           localStorage.setItem('voltech_categorias', JSON.stringify(nuevasCategorias));
           localStorage.setItem('voltech_marcas', JSON.stringify(nuevasMarcas));
+          localStorage.setItem('voltech_nombres_productos', JSON.stringify(nombresFisicosNuevos));
 
           const mensaje = productosActualizados > 0 
             ? `${productosGuardados} nuevo(s) y ${productosActualizados} actualizado(s)`
@@ -1191,11 +1318,33 @@ import { motion, AnimatePresence } from 'framer-motion';
       return estilos[estado] || estilos.nuevo;
     };
 
+    // ✅ Helper: imagen con respaldo para kits y combos en el panel
+    const getImagenProducto = (p) => {
+      if (p.imagen) return p.imagen;
+      if (Array.isArray(p.imagenes) && p.imagenes.length > 0) return p.imagenes[0];
+      if (Array.isArray(p.productos_kit) && p.productos_kit.length > 0) {
+        for (const item of p.productos_kit) {
+          if (item.imagen) return item.imagen;
+          const prod = productos.find(x => x.id === item.producto_id);
+          if (prod && prod.imagen) return prod.imagen;
+        }
+      }
+      if (p.esCombo && Array.isArray(p.plataformasCombo) && p.plataformasCombo.length > 0) {
+        for (const nombre of p.plataformasCombo) {
+          const prod = productos.find(x => (x.plataforma === nombre || x.producto === nombre) && x.imagen);
+          if (prod) return prod.imagen;
+        }
+      }
+      return '';
+    };
+
     const productosParaKit = productos.filter(p => p.tipo === 'fisico' && p.cantidad > 0 && (p.plataforma?.toLowerCase().includes(busquedaKit.toLowerCase()) || p.sku?.toLowerCase().includes(busquedaKit.toLowerCase())));
 
-    const productosFisicos = [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.plataforma).filter(Boolean))];
-    const plataformasStreaming = [...new Set(productos.filter(p => p.tipo === 'streaming').map(p => p.plataforma).filter(Boolean))];
-    const nombresKits = [...new Set(productos.filter(p => p.tipo === 'kit').map(p => p.plataforma).filter(Boolean))];
+    const productosFisicos = [...new Set(productos.filter(p => p.tipo === 'fisico' && p.disponibilidad !== 'kit' && (p.categoria || '').toUpperCase() !== 'KIT').map(p => p.plataforma).filter(Boolean))];
+    const plataformasStreaming = [...new Set(productos.filter(p => p.tipo === 'streaming' && !p.esCombo && p.disponibilidad !== 'combo' && (p.categoria || '').toUpperCase() !== 'COMBO').map(p => p.plataforma).filter(Boolean))];
+    const nombresKits = [...new Set([...nombresKitsGuardados, ...productos.filter(p => p.tipo === 'kit' || p.disponibilidad === 'kit' || (p.categoria || '').toUpperCase() === 'KIT').map(p => p.plataforma).filter(Boolean)])];
+    const nombresCombos = [...new Set([...nombresCombosGuardados, ...productos.filter(p => p.esCombo || p.disponibilidad === 'combo' || (p.categoria || '').toUpperCase() === 'COMBO').map(p => p.plataforma).filter(Boolean)])];
+    const nombresFisicos = [...new Set([...nombresProductosGuardados, ...productosFisicos])];
 
     const categoriasFisico = useMemo(() => {
       return [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.categoria).filter(Boolean))];
@@ -1281,7 +1430,7 @@ import { motion, AnimatePresence } from 'framer-motion';
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-bold text-white">
-                      Gestionar {gestionTipo === 'categoria' ? 'Categorías' : gestionTipo === 'marca' ? 'Marcas' : 'Nombres de Producto'}
+                      Gestionar {gestionTipo === 'categoria' ? 'Categorías' : gestionTipo === 'marca' ? 'Marcas' : gestionTipo === 'nombre_kit' ? 'Nombres de Kit' : gestionTipo === 'nombre_combo' ? 'Nombres de Combo Streaming' : 'Nombres de Producto'}
                     </h3>
                     <button onClick={() => { setShowGestionModal(false); setGestionTipo(''); }} className="p-2 rounded-lg hover:bg-voltech-border"><X className="w-5 h-5" /></button>
                   </div>
@@ -1305,10 +1454,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 
                   <div>
                     <h4 className="text-sm font-semibold text-voltech-purple mb-3">
-                      {gestionTipo === 'categoria' ? 'Categorías Existentes' : gestionTipo === 'marca' ? 'Marcas Existentes' : 'Nombres Existentes'}
+                      {gestionTipo === 'categoria' ? 'Categorías Existentes' : gestionTipo === 'marca' ? 'Marcas Existentes' : gestionTipo === 'nombre_fisico' ? 'Nombres de Productos Existentes' : 'Nombres Existentes'}
                     </h4>
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                      {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : 
+                      {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : gestionTipo === 'nombre_fisico' ? nombresProductosGuardados : gestionTipo === 'nombre_kit' ? nombresKits : gestionTipo === 'nombre_combo' ? nombresCombos :
                         (gestionSubtipo === 'streaming' ? plataformasStreaming : 
                         gestionSubtipo === 'kit' ? nombresKits : productosFisicos)
                       ).map((valor, idx) => (
@@ -1323,7 +1472,7 @@ import { motion, AnimatePresence } from 'framer-motion';
                           </button>
                         </div>
                       ))}
-                      {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : 
+                      {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : gestionTipo === 'nombre_fisico' ? nombresProductosGuardados : gestionTipo === 'nombre_kit' ? nombresKits : gestionTipo === 'nombre_combo' ? nombresCombos :
                         (gestionSubtipo === 'streaming' ? plataformasStreaming : 
                         gestionSubtipo === 'kit' ? nombresKits : productosFisicos)
                       ).length === 0 && (
@@ -1426,9 +1575,12 @@ import { motion, AnimatePresence } from 'framer-motion';
                     const marcasDisponibles = item.tipo === 'fisico'
                       ? getMarcasFiltradas(item.categoria)
                       : [];
-                    const productosDisponibles = item.tipo === 'fisico'
-                      ? getProductosFisicosFiltrados(item.categoria, item.marca)
-                      : (item.tipo === 'streaming' ? plataformasStreaming : nombresKits);
+                    const productosDisponibles = (() => {
+                      if (item.disponibilidad === 'kit') return nombresKits;
+                      if (item.disponibilidad === 'combo') return nombresCombos;
+                      if (item.tipo === 'streaming') return plataformasStreaming;
+                      return nombresFisicos;
+                      })();
 
                     return (
                     <div key={item.id} className="border border-voltech-border rounded-lg p-4 relative">
@@ -1437,24 +1589,26 @@ import { motion, AnimatePresence } from 'framer-motion';
                       
                       <div className="mb-4">
                         <label className="block text-xs text-voltech-muted mb-2 ml-1">Tipo de Producto</label>
-                        <div className="grid grid-cols-3 gap-1.5 w-full md:flex md:gap-3">
-                          <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'fisico')} className={`flex-1 py-2 md:py-3 px-1 md:px-3 rounded-lg border flex items-center justify-center gap-1 md:gap-2 transition-all text-xs md:text-sm ${item.tipo === 'fisico' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Package className="w-3 h-3 md:w-4 md:h-4 shrink-0" /><span className="truncate">Físico</span></button>
+                        <div className="grid grid-cols-2 gap-1.5 w-full md:flex md:gap-3">
+                          <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'fisico')} className={`flex-1 py-2 md:py-3 px-1 md:px-3 rounded-lg border flex items-center justify-center gap-1 md:gap-2 transition-all text-xs md:text-sm ${item.tipo === 'fisico' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Package className="w-3 h-3 md:w-4 md:h-4 shrink-0" /><span className="truncate">Producto</span></button>
                           <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'streaming')} className={`flex-1 py-2 md:py-3 px-1 md:px-3 rounded-lg border flex items-center justify-center gap-1 md:gap-2 transition-all text-xs md:text-sm ${item.tipo === 'streaming' ? 'bg-voltech-purple/20 border-voltech-purple text-voltech-purple' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-purple'}`}><MonitorPlay className="w-3 h-3 md:w-4 md:h-4 shrink-0" /><span className="truncate">Streaming</span></button>
-                          <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'kit')} className={`flex-1 py-2 md:py-3 px-1 md:px-3 rounded-lg border flex items-center justify-center gap-1 md:gap-2 transition-all text-xs md:text-sm ${item.tipo === 'kit' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Gift className="w-3 h-3 md:w-4 md:h-4 shrink-0" /><span className="truncate">Kit</span></button>
                         </div>
                       </div>
 
                       <div className="mb-4">
-                        <label className="block text-xs text-voltech-muted mb-2 ml-1">📦 Disponibilidad / Stock</label>
-                        <div className="grid grid-cols-2 gap-1.5 w-full">
-                          <button type="button" onClick={() => handleChange(itemIndex, 'disponibilidad', 'stock')} className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all text-xs md:text-sm ${item.disponibilidad !== 'bajo_pedido' ? 'bg-voltech-success/20 border-voltech-success text-voltech-success' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-success'}`}>
-                            <Package className="w-4 h-4 shrink-0" /><span className="truncate">📦 Stock físico</span>
-                          </button>
-                          <button type="button" onClick={() => handleChange(itemIndex, 'disponibilidad', 'bajo_pedido')} className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all text-xs md:text-sm ${item.disponibilidad === 'bajo_pedido' ? 'bg-voltech-warning/20 border-voltech-warning text-voltech-warning' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-warning'}`}>
-                            <ShoppingCart className="w-4 h-4 shrink-0" /><span className="truncate">🛒 Compra al momento</span>
-                          </button>
-                        </div>
-                        {item.disponibilidad === 'bajo_pedido' && (
+                      <label className="block text-xs text-voltech-muted mb-2 ml-1">{item.tipo === 'streaming' ? '💿 Disponibilidad / Stock' : '📦 Disponibilidad / Stock'}</label>
+                      <div className="grid grid-cols-3 gap-1.5 w-full">
+                      <button type="button" onClick={() => handleChange(itemIndex, 'disponibilidad', 'stock')} className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all text-xs md:text-sm ${item.disponibilidad === 'stock' ? 'bg-voltech-success/20 border-voltech-success text-voltech-success' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-success'}`}>
+                      <Package className="w-4 h-4 shrink-0" /><span className="truncate">{item.tipo === 'streaming' ? '💿 Stock digital' : '📦 Stock físico'}</span>
+                      </button>
+                      <button type="button" onClick={() => handleChange(itemIndex, 'disponibilidad', 'bajo_pedido')} className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all text-xs md:text-sm ${item.disponibilidad === 'bajo_pedido' ? 'bg-voltech-warning/20 border-voltech-warning text-voltech-warning' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-warning'}`}>
+                      <ShoppingCart className="w-4 h-4 shrink-0" /><span className="truncate">🛒 Compra al momento</span>
+                      </button>
+                      <button type="button" onClick={() => handleChange(itemIndex, 'disponibilidad', item.tipo === 'streaming' ? 'combo' : 'kit')} className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all text-xs md:text-sm ${(item.disponibilidad === 'kit' || item.disponibilidad === 'combo') ? 'bg-voltech-purple/20 border-voltech-purple text-voltech-purple' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-purple'}`}>
+                      <Gift className="w-4 h-4 shrink-0" /><span className="truncate">{item.tipo === 'streaming' ? '🎬 Combo' : '🎁 Kit'}</span>
+                      </button>
+                      </div> 
+                       {item.disponibilidad === 'bajo_pedido' && (
                           <p className="text-[10px] text-voltech-warning mt-1">ℹ️ Se publicará en el catálogo aunque el stock sea 0. Lo compras al proveedor cuando se venda.</p>
                         )}
                       </div>
@@ -1521,7 +1675,7 @@ import { motion, AnimatePresence } from 'framer-motion';
                         
                         <div className="flex flex-col gap-1 w-full lg:col-span-2">
                           <label className="text-xs text-voltech-muted font-medium">
-                            {item.tipo === 'streaming' ? 'Nombre Plataforma *' : item.tipo === 'kit' ? 'Nombre del Kit *' : 'Nombre del Producto *'}
+                            {item.disponibilidad === 'kit' ? 'Nombre del Kit *' : item.disponibilidad === 'combo' ? 'Nombre del Combo Streaming *' : item.tipo === 'streaming' ? 'Nombre Plataforma *' : 'Nombre del Producto *'}
                           </label>
                           <div className="flex items-center gap-2 w-full min-w-0">
                             <CustomSelect
@@ -1533,7 +1687,12 @@ import { motion, AnimatePresence } from 'framer-motion';
                             />
                             <button 
                               type="button" 
-                              onClick={() => abrirGestionModal('plataforma', item.tipo)} 
+                              onClick={() => abrirGestionModal(
+                                item.disponibilidad === 'kit' ? 'nombre_kit' : 
+                                item.disponibilidad === 'combo' ? 'nombre_combo' : 
+                                item.tipo === 'streaming' ? 'plataforma' : 'nombre_fisico', 
+                                item.tipo
+                              )} 
                               className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
                               title="Gestionar"
                             >
@@ -1542,9 +1701,9 @@ import { motion, AnimatePresence } from 'framer-motion';
                           </div>
                         </div>
                         
-                        {item.tipo === 'fisico' ? (
+                          {item.tipo === 'fisico' && item.disponibilidad !== 'kit' ? (
                           <div className="flex flex-col gap-1 w-full">
-                            <label className="text-xs text-voltech-muted font-medium">Categoría *</label>
+                          <label className="text-xs text-voltech-muted font-medium">Categoría *</label>
                             <div className="flex items-center gap-2 w-full min-w-0">
                               <CustomSelect
                                 value={item.categoria}
@@ -1563,12 +1722,12 @@ import { motion, AnimatePresence } from 'framer-motion';
                               </button>
                             </div>
                           </div>
-                        ) : (
+                          ) : (
                           <div className="flex flex-col gap-1 w-full">
-                            <label className="text-xs text-voltech-muted font-medium">Categoría (Fija)</label>
-                            <input type="text" value={item.categoria} readOnly className="input-voltech w-full rounded-md px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed border border-voltech-border" />
+                          <label className="text-xs text-voltech-muted font-medium">Categoría (Fija)</label>
+                          <input type="text" value={item.disponibilidad === 'kit' ? 'KIT' : item.categoria} readOnly className="input-voltech w-full rounded-md px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed border border-voltech-border" />
                           </div>
-                        )}
+                          )}
 
                         {item.tipo === 'fisico' && (
                           <div className="flex flex-col gap-1 w-full">
@@ -1593,7 +1752,7 @@ import { motion, AnimatePresence } from 'framer-motion';
                           </div>
                         )}
 
-                        {item.tipo === 'kit' && (
+                        {item.disponibilidad === 'kit' && (
                           <div className="lg:col-span-3 space-y-3">
                             <label className="block text-xs text-voltech-muted mb-1 ml-1">Seleccionar Productos del Inventario</label>
                             <div className="relative">
@@ -1628,11 +1787,42 @@ import { motion, AnimatePresence } from 'framer-motion';
                           </div>
                         )}
 
+                        {item.disponibilidad === 'combo' && (
+                          <div className="lg:col-span-3 space-y-3">
+                            <label className="block text-xs text-voltech-muted mb-1 ml-1">Seleccionar Plataformas del Inventario (Streaming)</label>
+                            <div className="max-h-60 overflow-y-auto border border-voltech-border rounded-lg bg-voltech-dark/30 p-2 space-y-2">
+                              {productos.filter(p => p.tipo === 'streaming' && !p.esCombo && p.disponibilidad !== 'combo' && p.id !== item.id).map((prod, idx) => {
+                                const enCombo = (item.productos_kit || []).find(p => p.producto_id === prod.id);
+                                return (
+                                  <div key={idx} className={`flex items-center justify-between p-3 rounded-lg border transition-all ${enCombo ? 'bg-voltech-purple/10 border-voltech-purple' : 'bg-voltech-surface border-voltech-border hover:border-voltech-purple/50'}`}>
+                                    <div className="flex items-center gap-3 flex-1">
+                                      <input type="checkbox" checked={!!enCombo} onChange={() => toggleProductoKit(itemIndex, prod)} className="w-4 h-4 rounded border-voltech-border text-voltech-purple" />
+                                      {prod.imagen ? <img src={prod.imagen} alt={prod.plataforma} className="w-10 h-10 rounded object-cover" /> : <div className="w-10 h-10 rounded bg-voltech-dark flex items-center justify-center"><MonitorPlay className="w-5 h-5 text-voltech-muted" /></div>}
+                                      <div>
+                                        <p className="text-sm font-medium text-white">{prod.plataforma || prod.producto}</p>
+                                        <p className="text-xs text-voltech-muted">SKU: {prod.sku} | Precio: ${prod.precioDetal || 0}</p>
+                                      </div>
+                                    </div>
+                                    {enCombo && (
+                                      <div className="flex items-center gap-2">
+                                        <button onClick={() => actualizarCantidadKit(itemIndex, prod.id, enCombo.cantidad - 1)} className="p-1 hover:bg-voltech-border rounded"><Minus className="w-3 h-3" /></button>
+                                        <span className="text-sm font-bold w-6 text-center">{enCombo.cantidad}</span>
+                                        <button onClick={() => actualizarCantidadKit(itemIndex, prod.id, enCombo.cantidad + 1)} className="p-1 hover:bg-voltech-border rounded"><Plus className="w-3 h-3" /></button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              {productos.filter(p => p.tipo === 'streaming' && !p.esCombo && p.disponibilidad !== 'combo').length === 0 && <p className="text-center text-xs text-voltech-muted py-4">No hay plataformas streaming cargadas. Cárgalas individualmente primero.</p>}
+                            </div>
+                          </div>
+                        )}
+
                         <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cantidad</label><input type="number" value={item.cantidad} onChange={(e) => handleChange(itemIndex, 'cantidad', e.target.value)} min="0" className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                         
-                        {item.tipo === 'kit' && (item.productos_kit || []).length > 0 && (
+                        {(item.disponibilidad === 'kit' || item.disponibilidad === 'combo') && (item.productos_kit || []).length > 0 && (
                           <div className="lg:col-span-3 bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 space-y-2">
-                            <h4 className="text-sm font-bold text-voltech-cyan flex items-center gap-2"><DollarSign className="w-4 h-4" /> Resumen Financiero del Kit</h4>
+                            <h4 className="text-sm font-bold text-voltech-cyan flex items-center gap-2"><DollarSign className="w-4 h-4" /> Resumen Financiero del {item.disponibilidad === 'combo' ? 'Combo' : 'Kit'}</h4>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                               <div><p className="text-xs text-voltech-muted">Inversión Total:</p><p className="font-bold text-white">${(item.precio_costo_total || 0).toFixed(2)}</p></div>
                               <div><p className="text-xs text-voltech-muted">Valor Individual:</p><p className="font-bold text-white">${(item.precio_individual_total || 0).toFixed(2)}</p></div>
@@ -1660,7 +1850,7 @@ import { motion, AnimatePresence } from 'framer-motion';
                             options={[
                               { value: 'nuevo', label: 'Nuevo' },
                               { value: 'oferta', label: 'Oferta' },
-                              { value: 'kit', label: 'Kit' },
+                              ...(item.tipo === 'streaming' ? [{ value: 'combo', label: 'Combo Streaming' }] : [{ value: 'kit', label: 'Kit' }]),
                               { value: 'agotado', label: 'Agotado' }
                             ]}
                           />
@@ -1789,8 +1979,8 @@ import { motion, AnimatePresence } from 'framer-motion';
                     <div key={producto.id} className={`bg-slate-800/60 border rounded-2xl p-4 space-y-3 ${isSelected ? 'border-purple-500' : 'border-slate-700/50'}`}>
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-3 min-w-0">
-                          {producto.imagen ? (
-                            <img src={producto.imagen} alt={producto.plataforma} className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                          {getImagenProducto(producto) ? (
+                            <img src={getImagenProducto(producto)} alt={producto.plataforma} className="w-12 h-12 rounded-lg object-cover shrink-0" />
                           ) : (
                             <div className="w-12 h-12 rounded-lg bg-slate-900 flex items-center justify-center shrink-0">
                               <ImageIcon className="w-6 h-6 text-slate-500" />
@@ -1948,7 +2138,7 @@ import { motion, AnimatePresence } from 'framer-motion';
                           <td className="px-4 py-3"><span className="text-xs font-mono whitespace-nowrap text-voltech-cyan">{producto.sku}</span></td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
-                              {producto.imagen ? (<img src={producto.imagen} alt={producto.plataforma} className="w-10 h-10 rounded-lg object-cover" />) : (<div className="w-10 h-10 rounded-lg bg-voltech-dark flex items-center justify-center"><ImageIcon className="w-5 h-5 text-voltech-muted" /></div>)}
+                              {getImagenProducto(producto) ? (<img src={getImagenProducto(producto)} alt={producto.plataforma} className="w-10 h-10 rounded-lg object-cover" />) : (<div className="w-10 h-10 rounded-lg bg-voltech-dark flex items-center justify-center"><ImageIcon className="w-5 h-5 text-voltech-muted" /></div>)}
                               <div><p className="text-sm font-medium text-white">{producto.plataforma}</p>{producto.esCombo && (<p className="text-xs text-voltech-purple">Combo: {producto.plataformasCombo?.join(', ')}</p>)}</div>
                             </div>
                           </td>
@@ -2063,7 +2253,7 @@ import { motion, AnimatePresence } from 'framer-motion';
               productosFiltrados.map((producto) => (
                 <div key={producto.id} className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden hover:border-voltech-cyan/50 transition-all">
                   <div className="relative h-48 bg-voltech-dark">
-                    {producto.imagen ? (<img src={producto.imagen} alt={producto.plataforma} className="w-full h-full object-cover" />) : (<div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-12 h-12 text-voltech-muted opacity-50" /></div>)}
+                    {getImagenProducto(producto) ? (<img src={getImagenProducto(producto)} alt={producto.plataforma} className="w-full h-full object-cover" />) : (<div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-12 h-12 text-voltech-muted opacity-50" /></div>)}
                     <div className="absolute top-2 right-2 flex gap-2">
                       <button onClick={() => togglePublicado(producto.id)} className={`p-2 rounded-lg backdrop-blur-sm transition-colors ${producto.publicado ? 'bg-voltech-success/80 text-white' : 'bg-voltech-dark/80 text-voltech-muted'}`}>{producto.publicado ? <Globe className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
                     </div>
