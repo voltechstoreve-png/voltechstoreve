@@ -196,6 +196,54 @@ export default function MarketingPage() {
     descripcion_2: '️ Garantía de 3 días en todos nuestros productos'
   });
 
+  // ✅ CÁLCULO AUTOMÁTICO DE FECHA FIN DE PUBLICIDAD
+  useEffect(() => {
+    if (formDataPublicidad.fecha_inicio && formDataPublicidad.duracion_dias) {
+      const fecha = new Date(formDataPublicidad.fecha_inicio + 'T00:00:00');
+      fecha.setDate(fecha.getDate() + parseInt(formDataPublicidad.duracion_dias));
+      const year = fecha.getFullYear();
+      const month = String(fecha.getMonth() + 1).padStart(2, '0');
+      const day = String(fecha.getDate()).padStart(2, '0');
+      setFormDataPublicidad(prev => ({ ...prev, fecha_fin: `${year}-${month}-${day}` }));
+    }
+  }, [formDataPublicidad.fecha_inicio, formDataPublicidad.duracion_dias]);
+
+  // ✅ CÁLCULO AUTOMÁTICO DE FECHA FIN DE PUBLICIDAD
+  useEffect(() => {
+    if (formDataPublicidad.fecha_inicio && formDataPublicidad.duracion_dias) {
+      const fecha = new Date(formDataPublicidad.fecha_inicio + 'T00:00:00');
+      fecha.setDate(fecha.getDate() + parseInt(formDataPublicidad.duracion_dias));
+      const year = fecha.getFullYear();
+      const month = String(fecha.getMonth() + 1).padStart(2, '0');
+      const day = String(fecha.getDate()).padStart(2, '0');
+      setFormDataPublicidad(prev => ({ ...prev, fecha_fin: `${year}-${month}-${day}` }));
+    }
+  }, [formDataPublicidad.fecha_inicio, formDataPublicidad.duracion_dias]);
+
+  // ✅ CÁLCULO AUTOMÁTICO DE FECHA FIN DE PUBLICIDAD
+  useEffect(() => {
+    if (formDataPublicidad.fecha_inicio && formDataPublicidad.duracion_dias) {
+      const fecha = new Date(formDataPublicidad.fecha_inicio + 'T00:00:00');
+      fecha.setDate(fecha.getDate() + parseInt(formDataPublicidad.duracion_dias));
+      const year = fecha.getFullYear();
+      const month = String(fecha.getMonth() + 1).padStart(2, '0');
+      const day = String(fecha.getDate()).padStart(2, '0');
+      setFormDataPublicidad(prev => ({ ...prev, fecha_fin: `${year}-${month}-${day}` }));
+    }
+  }, [formDataPublicidad.fecha_inicio, formDataPublicidad.duracion_dias]);
+
+  // ✅ CÁLCULO AUTOMÁTICO DE FECHA FIN DE PUBLICIDAD
+  useEffect(() => {
+    if (formDataPublicidad.fecha_inicio && formDataPublicidad.duracion_dias) {
+      const fecha = new Date(formDataPublicidad.fecha_inicio + 'T00:00:00');
+      fecha.setDate(fecha.getDate() + parseInt(formDataPublicidad.duracion_dias));
+      const year = fecha.getFullYear();
+      const month = String(fecha.getMonth() + 1).padStart(2, '0');
+      const day = String(fecha.getDate()).padStart(2, '0');
+      setFormDataPublicidad(prev => ({ ...prev, fecha_fin: `${year}-${month}-${day}` }));
+    }
+  }, [formDataPublicidad.fecha_inicio, formDataPublicidad.duracion_dias]);
+
   useEffect(() => {
 const cargarDatos = async () => {
 let plts = [], cpons = [], pubs = [], prods = [], clts = [], etqs = [], mvConfig = [], catsPromo = [];
