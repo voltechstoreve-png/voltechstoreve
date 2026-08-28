@@ -2139,7 +2139,7 @@
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               {getImagenProducto(producto) ? (<img src={getImagenProducto(producto)} alt={producto.plataforma} className="w-10 h-10 rounded-lg object-cover" />) : (<div className="w-10 h-10 rounded-lg bg-voltech-dark flex items-center justify-center"><ImageIcon className="w-5 h-5 text-voltech-muted" /></div>)}
-                              <div><p className="text-sm font-medium text-white">{producto.plataforma}</p>{producto.esCombo && (<p className="text-xs text-voltech-purple">Combo: {producto.plataformasCombo?.join(', ')}</p>)}</div>
+                              <div><p className="text-sm font-medium text-white">{producto.plataforma}</p></div>
                             </div>
                           </td>
                           <td className="px-4 py-3">{producto.tipo === 'streaming' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-purple/20 text-voltech-purple flex items-center gap-1 w-fit whitespace-nowrap"><MonitorPlay className="w-3 h-3" />Streaming</span>) : producto.tipo === 'kit' ? (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit whitespace-nowrap"><Gift className="w-3 h-3" />Kit</span>) : (<span className="text-xs px-2 py-1 rounded-full bg-voltech-cyan/20 text-voltech-cyan flex items-center gap-1 w-fit whitespace-nowrap"><Package className="w-3 h-3" />Físico</span>)}</td>
