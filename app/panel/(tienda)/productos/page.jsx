@@ -159,6 +159,7 @@
     const [editData, setEditData] = useState({
       tipo: 'fisico',
       precioDetal: 0,
+      precioMayor: 0,
       precioOferta: 0,
       estado: 'nuevo',
       descripcion: '',
@@ -1163,6 +1164,27 @@
           
           toast.success(mensaje);
           
+          // ✅ Notificar al equipo cuando se agregan productos nuevos
+          if (productosGuardados > 0) {
+            const nuevosNombres = nuevosProductos
+              .filter(p => !productos.some(existing => existing.id === p.id))
+              .map(p => p.plataforma || p.producto)
+              .slice(0, 3)
+              .join(', ');
+            
+            if (agregarNotificacion) {
+              agregarNotificacion({
+                tipo: 'producto_nuevo',
+                titulo: `📦 ${productosGuardados} producto(s) nuevo(s) agregado(s)`,
+                mensaje: nuevosNombres 
+                  ? `Nuevos productos: ${nuevosNombres}${productosGuardados > 3 ? '...' : ''}`
+                  : `${productosGuardados} productos nuevos agregados al inventario`,
+                detalle: `Precio detal: $${nuevosProductos[0]?.precioDetal || 0}`,
+                usuario_id: 'todos'
+              });
+            }
+          }
+          
           setItems([{
             id: crypto.randomUUID(),
             tipo: 'fisico',
@@ -1213,7 +1235,8 @@
     setImagenesExtraEdit(extras);
     setEditData({
       tipo: producto.tipo || 'fisico',
-      precioDetal: producto.precioDetal || producto.precioMayor,
+      precioDetal: producto.precioDetal || 0,
+      precioMayor: producto.precioMayor || 0,
       precioOferta: producto.precioOferta || 0,
       estado: producto.estado || 'nuevo',
       descripcion: producto.descripcion || '',
@@ -1236,6 +1259,8 @@
     const dataFinal = {
       ...editData,
       imagenes: Array.from(new Set(imagenesFinal)),
+      precioMayor: editData.precioMayor || 0,
+      precioDetal: editData.precioDetal || editData.precioMayor || 0,
     };
     if (supabase) {
       await supabase.from('productos').update(dataFinal).eq('id', id);
@@ -2084,6 +2109,10 @@
                           </h4>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
+                              <label className="text-xs text-voltech-muted">Precio Mayor ($)</label>
+                              <input type="number" step="0.01" value={editData.precioMayor} onChange={(e) => setEditData({ ...editData, precioMayor: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                            </div>
+                            <div>
                               <label className="text-xs text-voltech-muted">Precio Detal ($)</label>
                               <input type="number" step="0.01" value={editData.precioDetal} onChange={(e) => setEditData({ ...editData, precioDetal: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
                             </div>
@@ -2218,6 +2247,10 @@
                                   <button onClick={cancelarEdicion} className="p-1 hover:bg-voltech-border rounded"><X className="w-4 h-4 text-voltech-muted" /></button>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                  <div>
+                                    <label className="block text-xs text-voltech-muted mb-1">Precio Mayor ($)</label>
+                                    <input type="number" step="0.01" value={editData.precioMayor} onChange={(e) => setEditData({ ...editData, precioMayor: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded px-3 py-2 text-sm" />
+                                  </div>
                                   <div>
                                     <label className="block text-xs text-voltech-muted mb-1">Precio Detal ($)</label>
                                     <input type="number" step="0.01" value={editData.precioDetal} onChange={(e) => setEditData({ ...editData, precioDetal: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded px-3 py-2 text-sm" />
