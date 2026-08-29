@@ -69,7 +69,7 @@ const CustomSelect = ({ label, value, onChange, options, placeholder = '-- Selec
           disabled={disabled}
           className="input-voltech w-full rounded-lg px-4 py-2 text-sm"
         >
-          <option value="">{placeholder}</option>
+          {!options.some((opt) => opt.value === '') && <option value="">{placeholder}</option>}
           {options.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
