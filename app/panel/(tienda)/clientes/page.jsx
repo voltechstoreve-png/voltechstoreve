@@ -793,7 +793,36 @@ function ClientesContent() {
 
             <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6">
               <h3 className="text-lg font-bold text-white mb-4">Códigos de Referidos Generados</h3>
-              <div className="overflow-x-auto">
+              {/* ✅ Vista Card Móvil (< md) */}
+              <div className="block md:hidden space-y-3">
+                {clientes.filter(c => (c.referidos?.length || 0) >= 2).length === 0 ? (
+                  <p className="text-center py-8 text-voltech-muted text-sm">Aún no hay códigos generados</p>
+                ) : (
+                  clientes.filter(c => (c.referidos?.length || 0) >= 2).map(cliente => {
+                    const nivel = obtenerNivelReferido(cliente.referidos.length);
+                    return (
+                      <div key={cliente.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-slate-100 truncate">{cliente.nombre}</h4>
+                            <p className="text-[11px] text-cyan-400 font-mono truncate">{generarCodigoReferido(cliente)}</p>
+                          </div>
+                          <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300">{nivel?.nombre || 'Sin nivel'}</span>
+                        </div>
+                        <div className="pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-2 text-[11px]">
+                          <div><span className="text-slate-400 block">Descuento:</span><span className="text-emerald-400 font-bold">{nivel?.descuento || 0}%</span></div>
+                          <div><span className="text-slate-400 block">Referidos:</span><span className="text-slate-200 font-bold">{cliente.referidos?.length || 0}</span></div>
+                        </div>
+                        <div className="flex items-center gap-2 pt-2 border-t border-slate-700/40">
+                          <button onClick={() => { navigator.clipboard.writeText(generarCodigoReferido(cliente)); toast.success('Código copiado'); }} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-cyan-300 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 transition-colors"><Copy size={14} /> Copiar</button>
+                          <button onClick={() => { const codigo = generarCodigoReferido(cliente); const mensaje = `¡Hola! ${cliente.nombre} te invitó a Voltech Store 🎉\nUsa mi código ${codigo} y obtén beneficios\n👉 https://voltechstore.ve/?ref=${codigo}`; window.open(`https://wa.me/?text=${encodeURIComponent(mensaje)}`, '_blank'); }} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-emerald-300 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors"><Share2 size={14} /> Compartir</button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-voltech-dark border-b border-voltech-border">
                     <tr>

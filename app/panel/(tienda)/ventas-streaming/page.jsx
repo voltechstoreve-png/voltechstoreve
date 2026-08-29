@@ -1150,10 +1150,12 @@ export default function VentasStreamingPage() {
 
                   <div className="mb-6 pb-6 border-b border-voltech-border">
                     <h4 className="text-sm font-semibold text-voltech-cyan mb-3 flex items-center gap-2"><Tag className="w-4 h-4" /> Cupón de Descuento</h4>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <input type="text" value={cuponInput} onChange={(e) => { setCuponInput(e.target.value.toUpperCase()); setErrorCupon(''); setCuponAplicado(null); }} placeholder="Ingresa el código del cupón" className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm uppercase" disabled={!!cuponAplicado} />
-                      <button onClick={validarYAplicarCupon} disabled={!!cuponAplicado} className="px-4 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg hover:bg-voltech-purple/30 text-sm font-medium disabled:opacity-50">Aplicar</button>
-                      {cuponAplicado && (<button onClick={() => { setCuponInput(''); setCuponAplicado(null); setErrorCupon(''); }} className="px-4 py-2 bg-voltech-error/20 text-voltech-error rounded-lg hover:bg-voltech-error/30 text-sm" title="Quitar cupón"><X className="w-4 h-4" /></button>)}
+                      <div className="flex gap-2">
+                        <button onClick={validarYAplicarCupon} disabled={!!cuponAplicado} className="flex-1 sm:flex-none px-4 py-2 bg-voltech-purple/20 text-voltech-purple rounded-lg hover:bg-voltech-purple/30 text-sm font-medium disabled:opacity-50">Aplicar</button>
+                        {cuponAplicado && (<button onClick={() => { setCuponInput(''); setCuponAplicado(null); setErrorCupon(''); }} className="px-4 py-2 bg-voltech-error/20 text-voltech-error rounded-lg hover:bg-voltech-error/30 text-sm" title="Quitar cupón"><X className="w-4 h-4" /></button>)}
+                      </div>
                     </div>
                     {errorCupon && <p className="text-xs text-voltech-error mt-2 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {errorCupon}</p>}
                     {cuponAplicado && (<p className="text-xs text-voltech-success mt-2 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Cupón "{cuponAplicado.codigo}" aplicado: -$ {cuponAplicado.descuentoCalculado.toFixed(2)}</p>)}
@@ -1655,7 +1657,48 @@ export default function VentasStreamingPage() {
 
           <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
             <div className="p-4 border-b border-voltech-border"><h3 className="text-lg font-bold text-white">Inventario Completo</h3></div>
-            <div className="overflow-x-auto">
+
+            {/* ✅ Vista Card Móvil (< md) */}
+            <div className="block md:hidden space-y-3 p-3">
+              {inventarioFiltrado.length === 0 ? (
+                <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 text-center">
+                  <Database className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                  <p className="text-xs text-slate-400">No hay cuentas en inventario</p>
+                </div>
+              ) : (
+                inventarioFiltrado.map((item) => {
+                  const diasRestantes = calcularDiasRestantes(item.fechaVencimiento);
+                  return (
+                    <div key={item.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-bold text-slate-100 truncate">{item.plataforma}</h4>
+                          <p className="text-[11px] text-slate-400 font-mono truncate">{item.correo}</p>
+                        </div>
+                        <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${diasRestantes <= 3 ? 'bg-rose-500/20 text-rose-300' : diasRestantes <= 7 ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>Vence: {diasRestantes} días</span>
+                      </div>
+                      <div className="pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-2 text-[11px]">
+                        <div><span className="text-slate-400 block">Precio:</span><span className="text-emerald-400 font-bold">${item.precioDetal}</span></div>
+                        <div><span className="text-slate-400 block">Vence:</span><span className="text-slate-200 font-mono">{item.fechaVencimiento}</span></div>
+                        <div><span className="text-slate-400 block">Proveedor:</span><span className="text-slate-200 truncate block">{item.proveedor || 'N/A'}</span></div>
+                        <div><span className="text-slate-400 block">Fecha:</span><span className="text-slate-200 font-mono">{item.fecha}</span></div>
+                      </div>
+                      <div className="flex items-center gap-2 pt-2 border-t border-slate-700/40">
+                        <button onClick={() => { setReemplazoData({ cuentaId: item.id, nuevaPlataforma: item.plataforma, nuevoCorreo: item.correo, nuevaContraseña: item.contraseña, nuevosPins: item.pins, observacion: '' }); setShowReemplazoCuentaModal(true); }} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-purple-300 py-2 rounded-lg bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500/20 transition-colors">
+                          <Edit3 size={14} /> Editar
+                        </button>
+                        <button onClick={async () => { if (supabase) await supabase.from('inventario_streaming').delete().eq('id', item.id); setInventario(inventario.filter(i => i.id !== item.id)); toast.success('Eliminado'); }} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-rose-300 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 transition-colors">
+                          <Trash2 size={14} /> Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* ✅ Vista Tabla Desktop (>= md) */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-voltech-dark border-b border-voltech-border">
                   <tr>

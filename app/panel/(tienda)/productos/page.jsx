@@ -9,7 +9,7 @@
   AlertTriangle, CheckCircle, Image as ImageIcon, Save, Minus,
   Upload, Eye, EyeOff, Globe, LayoutGrid, Table, Download,
   Database, MonitorPlay, Tag, Layers, Calendar, Percent, Gift,
-  ChevronDown, MoreVertical, Filter, ShoppingCart
+  ChevronDown, MoreVertical, Filter, ShoppingCart, Share2
 } from 'lucide-react';
   import toast, { Toaster } from 'react-hot-toast';
   import { motion, AnimatePresence } from 'framer-motion';
@@ -1281,6 +1281,35 @@
       }
     };
 
+    // ✅ COMPARTIR PRODUCTO A WHATSAPP (estado o chat): imagen + texto + link
+    const compartirProducto = async (producto) => {
+      const url = `${window.location.origin}/catalogo?producto=${producto.id}`;
+      const nombre = producto.plataforma || producto.producto || 'Producto';
+      const precio = Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2);
+      const texto = `🔥 ${nombre}\n💰 $${precio}\n🔗 ${url}`;
+      try {
+        const img = getImagenProducto(producto);
+        if (img && navigator.canShare) {
+          const resp = await fetch(img);
+          const blob = await resp.blob();
+          const file = new File([blob], `${producto.id}.jpg`, { type: blob.type || 'image/jpeg' });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], text: texto, title: nombre });
+            toast.success('¡Listo para tu estado de WhatsApp!');
+            return;
+          }
+        }
+        await navigator.share({ text: texto, title: nombre });
+        toast.success('Compartido');
+      } catch (e) {
+        if (e?.name === 'AbortError') return;
+        try {
+          await navigator.clipboard.writeText(texto);
+          toast.success('Texto copiado. Pégalo en tu estado de WhatsApp.');
+        } catch { toast.error('No se pudo compartir'); }
+      }
+    };
+
     const guardarTasa = async () => {
       const tasaData = { tasa: usarTasaBCV ? tasaBCV : tasaPersonalizada, usarBCV: usarTasaBCV, tasaPersonalizada };
       if (supabase) await supabase.from('settings').upsert({ clave: 'tasa_bcv', valor: tasaData }, { onConflict: 'clave' });
@@ -1599,13 +1628,13 @@
                       <label className="block text-xs text-voltech-muted mb-2 ml-1">{item.tipo === 'streaming' ? '💿 Disponibilidad / Stock' : '📦 Disponibilidad / Stock'}</label>
                       <div className="grid grid-cols-3 gap-1.5 w-full">
                       <button type="button" onClick={() => handleChange(itemIndex, 'disponibilidad', 'stock')} className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all text-xs md:text-sm ${item.disponibilidad === 'stock' ? 'bg-voltech-success/20 border-voltech-success text-voltech-success' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-success'}`}>
-                      <Package className="w-4 h-4 shrink-0" /><span className="truncate">{item.tipo === 'streaming' ? '💿 Stock digital' : '📦 Stock físico'}</span>
+                      {item.tipo === 'streaming' ? <MonitorPlay className="w-4 h-4 shrink-0" /> : <Package className="w-4 h-4 shrink-0" />}<span className="truncate">{item.tipo === 'streaming' ? 'Stock digital' : 'Stock físico'}</span>
                       </button>
                       <button type="button" onClick={() => handleChange(itemIndex, 'disponibilidad', 'bajo_pedido')} className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all text-xs md:text-sm ${item.disponibilidad === 'bajo_pedido' ? 'bg-voltech-warning/20 border-voltech-warning text-voltech-warning' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-warning'}`}>
-                      <ShoppingCart className="w-4 h-4 shrink-0" /><span className="truncate">🛒 Compra al momento</span>
+                      <ShoppingCart className="w-4 h-4 shrink-0" /><span className="truncate">Compra al momento</span>
                       </button>
                       <button type="button" onClick={() => handleChange(itemIndex, 'disponibilidad', item.tipo === 'streaming' ? 'combo' : 'kit')} className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all text-xs md:text-sm ${(item.disponibilidad === 'kit' || item.disponibilidad === 'combo') ? 'bg-voltech-purple/20 border-voltech-purple text-voltech-purple' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-purple'}`}>
-                      <Gift className="w-4 h-4 shrink-0" /><span className="truncate">{item.tipo === 'streaming' ? '🎬 Combo' : '🎁 Kit'}</span>
+                      {item.tipo === 'streaming' ? <Layers className="w-4 h-4 shrink-0" /> : <Gift className="w-4 h-4 shrink-0" />}<span className="truncate">{item.tipo === 'streaming' ? 'Combo' : 'Kit'}</span>
                       </button>
                       </div> 
                        {item.disponibilidad === 'bajo_pedido' && (
@@ -2028,6 +2057,9 @@
                           <p className="text-[10px] text-slate-400">Bs {producto.precioBs.toFixed(2)}</p>
                         </div>
                         <div className="flex items-center gap-1">
+                          <button onClick={() => compartirProducto(producto)} className="p-1.5 rounded-lg bg-voltech-cyan/20 text-voltech-cyan" title="Compartir en WhatsApp">
+                            <Share2 size={14} />
+                          </button>
                           <button onClick={() => togglePublicado(producto.id)} className={`p-1.5 rounded-lg transition-colors ${producto.publicado ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700/50 text-slate-400'}`} title={producto.publicado ? 'Ocultar' : 'Publicar'}>
                             {producto.publicado ? <Globe size={14} /> : <EyeOff size={14} />}
                           </button>
@@ -2162,6 +2194,7 @@
                           {tienePermiso('puedeVerInventarioCompleto') && (
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-2">
+                                <button onClick={() => compartirProducto(producto)} className="p-2 rounded-lg hover:bg-voltech-cyan/20 text-voltech-muted hover:text-voltech-cyan transition-colors" title="Compartir en WhatsApp"><Share2 className="w-4 h-4" /></button>
                                 <button onClick={() => abrirEdicion(producto)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors" title="Editar"><Edit className="w-4 h-4" /></button>
                                 <button onClick={() => eliminarProducto(producto.id)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
                               </div>
@@ -2275,7 +2308,7 @@
                       </div>
                       <div className="text-right"><p className="text-xs text-voltech-muted">Comisión</p><p className="text-sm font-bold text-voltech-purple">{producto.porcentaje_comision || 5}%</p></div>
                     </div>
-                    {tienePermiso('puedeVerInventarioCompleto') && (<div className="flex gap-2"><button onClick={() => abrirEdicion(producto)} className="flex-1 py-2 bg-voltech-dark border border-voltech-border rounded-lg text-xs text-voltech-muted hover:text-voltech-cyan hover:border-voltech-cyan transition-colors flex items-center justify-center gap-1"><Edit className="w-3 h-3" />Editar</button><button onClick={() => eliminarProducto(producto.id)} className="py-2 px-3 bg-voltech-dark border border-voltech-border rounded-lg text-xs text-voltech-muted hover:text-voltech-error hover:border-voltech-error transition-colors"><Trash2 className="w-3 h-3" /></button></div>)}
+                    {tienePermiso('puedeVerInventarioCompleto') && (<div className="flex gap-2"><button onClick={() => compartirProducto(producto)} className="py-2 px-3 bg-voltech-dark border border-voltech-border rounded-lg text-xs text-voltech-muted hover:text-voltech-cyan hover:border-voltech-cyan transition-colors flex items-center justify-center gap-1"><Share2 className="w-3 h-3" />Compartir</button><button onClick={() => abrirEdicion(producto)} className="flex-1 py-2 bg-voltech-dark border border-voltech-border rounded-lg text-xs text-voltech-muted hover:text-voltech-cyan hover:border-voltech-cyan transition-colors flex items-center justify-center gap-1"><Edit className="w-3 h-3" />Editar</button><button onClick={() => eliminarProducto(producto.id)} className="py-2 px-3 bg-voltech-dark border border-voltech-border rounded-lg text-xs text-voltech-muted hover:text-voltech-error hover:border-voltech-error transition-colors"><Trash2 className="w-3 h-3" /></button></div>)}
                   </div>
                 </div>
               ))

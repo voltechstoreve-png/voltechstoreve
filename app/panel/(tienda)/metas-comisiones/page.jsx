@@ -565,18 +565,18 @@ export default function MetasYComisionesPage() {
             {esVendedor ? 'Monitorea tu progreso y rendimiento' : 'Configura porcentajes, bonos y monitorea el equipo'}
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           {puedeGestionar && (
             <button
               onClick={generarReporteSocio}
-              className="px-4 py-2 bg-voltech-surface border border-voltech-border text-voltech-cyan rounded-lg text-sm font-medium hover:bg-voltech-cyan/10 transition-all flex items-center gap-2"
+              className="w-full sm:w-auto justify-center px-4 py-2 bg-voltech-surface border border-voltech-border text-voltech-cyan rounded-lg text-sm font-medium hover:bg-voltech-cyan/10 transition-all flex items-center gap-2"
             >
               <Download className="w-4 h-4" /> Reporte PDF
             </button>
           )}
           <button
             onClick={handleSave}
-            className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2"
+            className="w-full sm:w-auto justify-center px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2"
           >
             <Save className="w-4 h-4" /> Guardar Configuración
           </button>
@@ -1231,26 +1231,28 @@ export default function MetasYComisionesPage() {
 
         {puedeGestionar && (
           <div className="mb-6 bg-voltech-dark/30 border border-voltech-border rounded-xl p-4">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
               <h4 className="text-sm font-semibold text-white">📊 Escala de Comisiones por Referidos</h4>
-              <div className="flex gap-2">
-                <button onClick={agregarEscala} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"><Plus className="w-4 h-4" /> Agregar Nivel</button>
-                <button onClick={guardarEscala} className="px-4 py-2 bg-voltech-success/20 text-voltech-success rounded-lg text-sm hover:bg-voltech-success/30 transition-colors flex items-center gap-2"><Save className="w-4 h-4" /> Guardar Escala</button>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <button onClick={agregarEscala} className="w-full sm:w-auto justify-center px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2"><Plus className="w-4 h-4" /> Agregar Nivel</button>
+                <button onClick={guardarEscala} className="w-full sm:w-auto justify-center px-4 py-2 bg-voltech-success/20 text-voltech-success rounded-lg text-sm hover:bg-voltech-success/30 transition-colors flex items-center gap-2"><Save className="w-4 h-4" /> Guardar Escala</button>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {escalaReferidos.map((nivel, idx) => (
-                <div key={idx} className="flex items-center gap-3 bg-voltech-dark/50 border border-voltech-border rounded-xl p-4">
-                  <div className="flex-1">
-                    <label className="block text-xs text-voltech-muted mb-2">Referidos</label>
-                    <input type="number" min="1" value={nivel.referidos} onChange={(e) => actualizarEscala(idx, 'referidos', parseInt(e.target.value) || 0)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" />
+                <div key={idx} className="bg-voltech-dark/50 border border-voltech-border rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <label className="block text-xs text-voltech-muted mb-2">Referidos</label>
+                      <input type="number" min="1" value={nivel.referidos} onChange={(e) => actualizarEscala(idx, 'referidos', parseInt(e.target.value) || 0)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" />
+                    </div>
+                    <span className="text-voltech-muted text-sm mt-6">→</span>
+                    <div className="flex-1">
+                      <label className="block text-xs text-voltech-muted mb-2">Comisión (%)</label>
+                      <input type="number" min="0" max="100" step="0.5" value={nivel.porcentaje} onChange={(e) => actualizarEscala(idx, 'porcentaje', parseFloat(e.target.value) || 0)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" />
+                    </div>
+                    <button onClick={() => eliminarEscala(idx)} className="p-2 text-voltech-error hover:bg-voltech-error/10 rounded-lg mt-6 shrink-0"><X className="w-4 h-4" /></button>
                   </div>
-                  <span className="text-voltech-muted text-sm mt-6">→</span>
-                  <div className="flex-1">
-                    <label className="block text-xs text-voltech-muted mb-2">Comisión (%)</label>
-                    <input type="number" min="0" max="100" step="0.5" value={nivel.porcentaje} onChange={(e) => actualizarEscala(idx, 'porcentaje', parseFloat(e.target.value) || 0)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" />
-                  </div>
-                  <button onClick={() => eliminarEscala(idx)} className="p-2 text-voltech-error hover:bg-voltech-error/10 rounded-lg mt-6"><X className="w-4 h-4" /></button>
                 </div>
               ))}
             </div>

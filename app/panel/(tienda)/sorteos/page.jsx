@@ -538,8 +538,8 @@ export default function PanelSorteosPage() {
                           <input type="text" value={formData.titulo} onChange={(e) => setFormData({ ...formData, titulo: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" placeholder="Ej: Sorteo Especial Mes del Padre" required />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-voltech-muted mb-2">Fecha y Hora de Finalización *</label>
-                          <input type="datetime-local" value={formData.fecha_fin} onChange={(e) => setFormData({ ...formData, fecha_fin: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" required />
+                          <label className="block text-sm font-medium text-voltech-muted mb-2">Fecha de Finalización *</label>
+                          <input type="date" value={formData.fecha_fin} onChange={(e) => setFormData({ ...formData, fecha_fin: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" required />
                         </div>
                       </div>
 

@@ -956,7 +956,7 @@ export default function VentasProductosPage() {
           <h1 className="text-xl sm:text-2xl font-bold text-white">Ventas de Productos</h1>
           <p className="text-xs sm:text-sm text-voltech-muted mt-1">{esVendedor ? 'Registra y gestiona tus ventas personales' : 'Registra ventas y descuenta inventario automáticamente'}</p>
         </div>
-        <button onClick={() => { resetForm(); setShowForm(true); }} className="w-full sm:w-auto shrink-0 justify-center px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2">
+        <button onClick={() => { resetForm(); setShowForm(true); }} className="w-full sm:w-auto shrink-0 justify-center px-4 py-2.5 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-xl text-xs sm:text-sm font-semibold hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center gap-2">
           <Plus className="w-4 h-4" /> Nueva Venta
         </button>
       </div>
@@ -1127,13 +1127,13 @@ export default function VentasProductosPage() {
                             )}
                           </div>
                         )}
-                        <div className="grid grid-cols-2 md:grid-cols-12 gap-3 items-end">
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                           <div className="col-span-12 md:col-span-2">
                             <label className="block text-xs text-voltech-muted mb-1 ml-1">SKU</label>
                             <input type="text" value={prod.sku} readOnly className="input-voltech w-full rounded-lg px-3 py-2 text-sm font-mono text-voltech-cyan bg-voltech-dark/50" placeholder="Auto" />
                           </div>
 
-                          <div className="col-span-6 md:col-span-2">
+                          <div className="col-span-12 md:col-span-2">
                             <CustomSelect
                               label="Filtrar Categoría"
                               value={prod.filtroCategoria}
@@ -1148,7 +1148,7 @@ export default function VentasProductosPage() {
                             />
                           </div>
 
-                          <div className="col-span-6 md:col-span-2">
+                          <div className="col-span-12 md:col-span-2">
                             <label className="block text-xs text-voltech-muted mb-1 ml-1">Filtrar Marca</label>
                             <select
                               value={prod.filtroMarca}
@@ -1404,11 +1404,11 @@ export default function VentasProductosPage() {
                       <h4 className="text-xs font-bold text-slate-100 truncate">{venta.cliente}</h4>
                       <p className="text-[11px] text-slate-400 font-mono truncate">{venta.telefono}</p>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => { setShowWhatsappModal(venta); setWhatsappMode('gracias'); }} className="p-1.5 text-slate-400 hover:text-emerald-400" title="Mensaje de gracias"><MessageCircle size={16} /></button>
-                      <button onClick={() => { setShowWhatsappModal(venta); setWhatsappMode('recordatorio'); }} className="p-1.5 text-slate-400 hover:text-amber-400" title="Recordatorio de pago"><AlertTriangle size={16} /></button>
-                      <button onClick={() => editarVenta(venta)} className="p-1.5 text-slate-400 hover:text-cyan-400" title="Editar"><Edit3 size={16} /></button>
-                      <button onClick={() => eliminarVenta(venta)} className="p-1.5 text-slate-400 hover:text-rose-400" title="Eliminar"><Trash2 size={16} /></button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={() => { setShowWhatsappModal(venta); setWhatsappMode('gracias'); }} className="p-2 text-slate-400 hover:text-emerald-400 rounded-lg hover:bg-emerald-500/10 transition-colors" title="Mensaje de gracias"><MessageCircle size={16} /></button>
+                      <button onClick={() => { setShowWhatsappModal(venta); setWhatsappMode('recordatorio'); }} className="p-2 text-slate-400 hover:text-amber-400 rounded-lg hover:bg-amber-500/10 transition-colors" title="Recordatorio de pago"><AlertTriangle size={16} /></button>
+                      <button onClick={() => editarVenta(venta)} className="p-2 text-slate-400 hover:text-cyan-400 rounded-lg hover:bg-cyan-500/10 transition-colors" title="Editar"><Edit3 size={16} /></button>
+                      <button onClick={() => eliminarVenta(venta)} className="p-2 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors" title="Eliminar"><Trash2 size={16} /></button>
                     </div>
                   </div>
 

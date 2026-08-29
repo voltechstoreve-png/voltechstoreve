@@ -267,8 +267,8 @@ export default function ConfiguracionPage() {
               <div><h3 className="text-lg font-bold text-white">Recordatorios Streaming</h3><p className="text-xs text-voltech-muted">Vencimiento de suscripciones</p></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="block text-xs text-voltech-muted mb-2">Hora de aviso</label>
-                <input type="time" value={config.recordatoriosStreaming.hora} onChange={e => setConfig({ ...config, recordatoriosStreaming: { ...config.recordatoriosStreaming, hora: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" /></div>
+              <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Hora de aviso</label>
+                <input type="time" value={config.recordatoriosStreaming.hora} onChange={e => setConfig({ ...config, recordatoriosStreaming: { ...config.recordatoriosStreaming, hora: e.target.value } })} className="input-voltech w-full rounded-lg px-3 md:px-4 py-2 text-sm" /></div>
               <div>
                 <CustomSelect
                   label="Anticipación"
@@ -298,8 +298,8 @@ export default function ConfiguracionPage() {
               <div><h3 className="text-lg font-bold text-white">Recordatorios Productos</h3><p className="text-xs text-voltech-muted">Cobros pendientes</p></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="block text-xs text-voltech-muted mb-2">Hora fija</label>
-                <input type="time" value={config.recordatoriosProductos.hora} onChange={e => setConfig({ ...config, recordatoriosProductos: { ...config.recordatoriosProductos, hora: e.target.value } })} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" /></div>
+              <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Hora fija</label>
+                <input type="time" value={config.recordatoriosProductos.hora} onChange={e => setConfig({ ...config, recordatoriosProductos: { ...config.recordatoriosProductos, hora: e.target.value } })} className="input-voltech w-full rounded-lg px-3 md:px-4 py-2 text-sm" /></div>
               <div>
                 <CustomSelect
                   label="Frecuencia"

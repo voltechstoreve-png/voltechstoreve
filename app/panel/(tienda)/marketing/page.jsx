@@ -1418,9 +1418,9 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       <div>
-                        <label className="block text-xs text-voltech-muted mb-1">Fecha y Hora de Inicio *</label>
+                        <label className="block text-xs text-voltech-muted mb-1">Fecha de Inicio *</label>
                         <input 
-                          type="datetime-local" 
+                          type="date" 
                           value={formDataCupon.fecha_inicio} 
                           onChange={(e) => setFormDataCupon({...formDataCupon, fecha_inicio: e.target.value})} 
                           className="input-voltech w-full rounded-lg px-4 py-2 text-sm" 
@@ -1438,9 +1438,9 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                       </div>
                     </div>
                     <div className="mb-4">
-                      <label className="block text-xs text-voltech-muted mb-1">Fecha y Hora de Vencimiento (Auto)</label>
+                      <label className="block text-xs text-voltech-muted mb-1">Fecha de Vencimiento (Auto)</label>
                       <input 
-                        type="datetime-local" 
+                        type="date" 
                         value={formDataCupon.fecha_vencimiento} 
                         readOnly 
                         className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50" 
