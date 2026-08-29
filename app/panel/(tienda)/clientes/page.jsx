@@ -243,8 +243,8 @@ function ClientesContent() {
     if (supabase) {
       const { error } = await supabase.from('clientes').upsert(clienteAGuardar, { onConflict: 'id' });
       if (error) {
-        console.error('Error Supabase:', error);
-        toast.error('Error de conexión al guardar');
+        console.error('Error Supabase:', error?.message, error?.code, error?.details);
+        toast.error('Error al guardar: ' + (error?.message || 'revisa la consola'));
         return;
       }
     }
@@ -479,7 +479,6 @@ function ClientesContent() {
                           <input type="text" value={usuarioActual?.nombre || ''} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed" />
                         ) : (
                           <CustomSelect
-                            label="Registrado por (Equipo) *"
                             name="registradoPor"
                             value={formData.registradoPor}
                             onChange={(v) => handleInputChange({ target: { name: 'registradoPor', value: v } })}

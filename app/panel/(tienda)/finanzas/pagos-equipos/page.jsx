@@ -54,6 +54,88 @@ export default function PagosEquiposPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filtroMiembro, setFiltroMiembro] = useState('todos');
 
+  // ✅ NUEVO: Cuentas / Caja (lo que entra y sale de cada cuenta)
+  const [movCuentas, setMovCuentas] = useState([]);
+  const [movGlobales, setMovGlobales] = useState([]);
+  const [showFormCuenta, setShowFormCuenta] = useState(false);
+  const [formCuenta, setFormCuenta] = useState({ tipo: 'entrada', cuentaOrigen: '', cuentaDestino: '', montoBs: '', montoUsd: '', monedaOrigen: 'USD', monedaDestino: 'USDT', tasa: 36.5, nota: '' });
+
+  useEffect(() => {
+    const cargarCuentas = async () => {
+      let mc = [], vts = [], vst = [], movs = [], prods = [], pubs = [];
+      if (supabase) {
+        const [a, b, c, d, e, f] = await Promise.all([
+          supabase.from('movimientos_cuentas').select('*'),
+          supabase.from('ventas').select('*'),
+          supabase.from('ventas_streaming').select('*'),
+          supabase.from('movimientos_equipo').select('*'),
+          supabase.from('productos').select('*'),
+          supabase.from('publicidad').select('*'),
+        ]);
+        mc = a.data || []; vts = b.data || []; vst = c.data || []; movs = d.data || []; prods = e.data || []; pubs = f.data || [];
+      } else {
+        mc = JSON.parse(localStorage.getItem('voltech_movimientos_cuentas') || '[]');
+        vts = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
+        vst = JSON.parse(localStorage.getItem('voltech_ventas_streaming') || '[]');
+        movs = JSON.parse(localStorage.getItem('voltech_movimientos_equipo') || '[]');
+        prods = JSON.parse(localStorage.getItem('voltech_productos') || '[]');
+        pubs = JSON.parse(localStorage.getItem('voltech_publicidad') || '[]');
+      }
+      const list = [];
+      vts.forEach(v => list.push({ id: 'vp-' + v.id, fecha: v.fecha, tipo: 'entrada', fuente: 'Venta Producto', concepto: (v.numeroOrden || '') + ' ' + (v.cliente || ''), cuenta: v.carteraId || v.metodoPago || 'sin cuenta', monto: Number(v.total || 0) }));
+      vst.forEach(v => list.push({ id: 'vs-' + v.id, fecha: v.fecha, tipo: 'entrada', fuente: 'Venta Streaming', concepto: (v.numeroOrden || '') + ' ' + (v.cliente || ''), cuenta: v.cartera || v.metodoPago || 'sin cuenta', monto: Number(v.total || 0) }));
+      movs.filter(m => m.tipo === 'pago').forEach(m => list.push({ id: 'pg-' + m.id, fecha: m.fecha, tipo: 'salida', fuente: 'Pago Equipo', concepto: 'Pago a ' + (m.miembroNombre || ''), cuenta: m.carteraId || m.metodoPago || 'sin cuenta', monto: Number(m.monto || 0) }));
+      movs.filter(m => m.tipo === 'inversion').forEach(m => list.push({ id: 'inv-' + m.id, fecha: m.fecha, tipo: (m.subtipo === 'inyeccion' || !m.subtipo) ? 'entrada' : 'salida', fuente: 'Inversión', concepto: m.miembroNombre || '', cuenta: m.carteraId || 'sin cuenta', monto: Number(m.monto || 0) }));
+      prods.forEach(p => (p.historial || []).forEach((h, i) => list.push({ id: 'com-' + p.id + '-' + i, fecha: h.fecha, tipo: 'salida', fuente: 'Compra', concepto: 'Compra ' + (p.plataforma || p.producto || ''), cuenta: h.cartera || h.metodoPago || 'sin cuenta', monto: Number(h.precioTotal || 0) })));
+      pubs.forEach(p => list.push({ id: 'pub-' + p.id, fecha: p.fecha_inicio, tipo: 'entrada', fuente: 'Publicidad', concepto: (p.titulo || '') + (p.estado_pago === 'pagado' ? ' (Pagado)' : ' (Por cobrar)'), cuenta: p.estado_pago === 'pagado' ? (p.cuenta_pago || 'efectivo') : 'por cobrar', monto: (p.clicks || 0) * (p.costo_por_click || 0) }));
+      mc.forEach(m => list.push({ id: 'mc-' + m.id, fecha: m.fecha, tipo: m.tipo, fuente: 'Manual', concepto: m.nota || m.tipo, cuenta: m.cuentaOrigen, cuentaOrigen: m.cuentaOrigen, cuentaDestino: m.cuentaDestino, montoDestino: m.montoDestino, monto: Number(m.monto || 0) }));
+      list.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+      setMovCuentas(mc);
+      setMovGlobales(list);
+    };
+    cargarCuentas();
+    const handleAct = () => cargarCuentas();
+    window.addEventListener('voltech-data-updated', handleAct);
+    return () => window.removeEventListener('voltech-data-updated', handleAct);
+  }, []);
+
+  const saldoCartera = (nombre) => {
+    let saldo = 0;
+    movGlobales.forEach(m => {
+      if (m.tipo === 'transferencia') {
+        if (m.cuentaOrigen === nombre) saldo -= Number(m.monto);
+        if (m.cuentaDestino === nombre) saldo += Number(m.montoDestino || m.monto);
+      } else if (m.cuenta === nombre) {
+        saldo += (m.tipo === 'entrada' ? Number(m.monto) : -Number(m.monto));
+      }
+    });
+    return saldo;
+  };
+
+  const setMontoBs = (v) => setFormCuenta(prev => ({ ...prev, montoBs: v, montoUsd: (Number(v || 0) / Number(prev.tasa || 36.5)).toFixed(2) }));
+  const setMontoUsd = (v) => setFormCuenta(prev => ({ ...prev, montoUsd: v, montoBs: (Number(v || 0) * Number(prev.tasa || 36.5)).toFixed(2) }));
+  const setTasaBs = (v) => setFormCuenta(prev => ({ ...prev, tasa: v, montoBs: prev.montoUsd ? (Number(prev.montoUsd) * Number(v || 36.5)).toFixed(2) : prev.montoBs }));
+
+  const registrarMovCuenta = async () => {
+    const montoBs = Number(formCuenta.montoBs) || 0;
+    const montoUsd = Number(formCuenta.montoUsd) || 0;
+    const montoOrigen = formCuenta.monedaOrigen === 'BS' ? montoBs : montoUsd;
+    const montoDestino = formCuenta.monedaDestino === 'BS' ? montoBs : montoUsd;
+    const monto = formCuenta.tipo === 'entrada' ? montoDestino : montoOrigen;
+    if (!monto || monto <= 0) { toast.error('Ingresa un monto válido'); return; }
+    if (formCuenta.tipo !== 'entrada' && !formCuenta.cuentaOrigen) { toast.error('Selecciona la cuenta de origen'); return; }
+    if (formCuenta.tipo !== 'salida' && !formCuenta.cuentaDestino) { toast.error('Selecciona la cuenta de destino'); return; }
+    const mov = { id: Date.now().toString(), fecha: new Date().toISOString().split('T')[0], ...formCuenta, monto, montoDestino, usuario: usuarioActual?.nombre || 'Admin', creado_en: new Date().toISOString() };
+    if (supabase) await supabase.from('movimientos_cuentas').upsert(mov, { onConflict: 'id' });
+    const nuevos = [mov, ...movCuentas];
+    setMovCuentas(nuevos);
+    localStorage.setItem('voltech_movimientos_cuentas', JSON.stringify(nuevos));
+    toast.success('Movimiento registrado');
+    setShowFormCuenta(false);
+    setFormCuenta({ tipo: 'entrada', cuentaOrigen: '', cuentaDestino: '', montoBs: '', montoUsd: '', monedaOrigen: 'USD', monedaDestino: 'USDT', tasa: 36.5, nota: '' });
+    window.dispatchEvent(new Event('voltech-data-updated'));
+  };
+
   // Formulario
   const [formData, setFormData] = useState({
     tipo: 'pago',
@@ -742,6 +824,12 @@ useEffect(() => {
             className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${activeTab === 'inversiones' ? 'text-voltech-success bg-voltech-success/10 border-transparent md:bg-transparent md:border-voltech-success' : 'text-voltech-muted border-transparent hover:text-white'}`}
           >
             <TrendingUp className="w-4 h-4" /> Inversiones Socios
+          </button>
+          <button 
+            onClick={() => setActiveTab('cuentas')}
+            className={`justify-center md:justify-start py-2.5 md:py-0 md:pb-3 flex items-center gap-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap rounded-lg md:rounded-none border-b-2 ${activeTab === 'cuentas' ? 'text-voltech-cyan bg-voltech-cyan/10 border-transparent md:bg-transparent md:border-voltech-cyan' : 'text-voltech-muted border-transparent hover:text-white'}`}
+          >
+            <Wallet className="w-4 h-4" /> Cuentas / Caja
           </button>
         </div>
       </div>
@@ -1504,6 +1592,110 @@ useEffect(() => {
           </table>
         </div>
       </div>
+
+      {activeTab === 'cuentas' && (
+        <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
+          <div className="p-6 border-b border-voltech-border flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-voltech-cyan/20"><Wallet className="w-5 h-5 text-voltech-cyan" /></div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Cuentas / Caja</h3>
+                <p className="text-xs text-voltech-muted">Lo que entra y sale de cada cuenta · mueve fondos entre cuentas</p>
+              </div>
+            </div>
+            <button onClick={() => setShowFormCuenta(!showFormCuenta)} className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all flex items-center gap-2">
+              <Plus className="w-4 h-4" /> Registrar Movimiento
+            </button>
+          </div>
+
+          {showFormCuenta && (
+            <div className="p-6 border-b border-voltech-border grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs text-voltech-muted mb-1 ml-1">Tipo</label>
+                <CustomSelect value={formCuenta.tipo} onChange={(v) => setFormCuenta({ ...formCuenta, tipo: v })} options={[{ value: 'entrada', label: '⬆️ Entrada' }, { value: 'salida', label: '⬇️ Salida' }, { value: 'transferencia', label: '🔄 Transferencia' }]} placeholder="Tipo" className="w-full" />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-1 ml-1">Cuenta Origen</label>
+                <CustomSelect value={formCuenta.cuentaOrigen} onChange={(v) => setFormCuenta({ ...formCuenta, cuentaOrigen: v })} options={carteras.map(c => ({ value: c.nombre, label: c.nombre }))} placeholder="-- Origen --" className="w-full" />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-1 ml-1">Cuenta Destino</label>
+                <CustomSelect value={formCuenta.cuentaDestino} onChange={(v) => setFormCuenta({ ...formCuenta, cuentaDestino: v })} options={carteras.map(c => ({ value: c.nombre, label: c.nombre }))} placeholder="-- Destino --" className="w-full" />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-1 ml-1">Moneda Origen</label>
+                <CustomSelect value={formCuenta.monedaOrigen} onChange={(v) => setFormCuenta({ ...formCuenta, monedaOrigen: v })} options={[{ value: 'USD', label: 'USD $' }, { value: 'BS', label: 'Bolívares Bs' }, { value: 'USDT', label: 'USDT' }]} placeholder="USD" className="w-full" />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-1 ml-1">Moneda Destino</label>
+                <CustomSelect value={formCuenta.monedaDestino} onChange={(v) => setFormCuenta({ ...formCuenta, monedaDestino: v })} options={[{ value: 'USD', label: 'USD $' }, { value: 'BS', label: 'Bolívares Bs' }, { value: 'USDT', label: 'USDT' }]} placeholder="USDT" className="w-full" />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-1 ml-1">Tasa (Bs/$) · ej: BCV</label>
+                <input type="number" step="0.01" value={formCuenta.tasa} onChange={(e) => setTasaBs(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="36.50" />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-1 ml-1">Monto en Bs → calcula $</label>
+                <input type="number" step="0.01" value={formCuenta.montoBs} onChange={(e) => setMontoBs(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="0.00" />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-1 ml-1">Monto en $ → calcula Bs</label>
+                <input type="number" step="0.01" value={formCuenta.montoUsd} onChange={(e) => setMontoUsd(e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="0.00" />
+              </div>
+              <div>
+                <label className="block text-xs text-voltech-muted mb-1 ml-1">Nota</label>
+                <input type="text" value={formCuenta.nota} onChange={(e) => setFormCuenta({ ...formCuenta, nota: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Ej: Bs → USDT" />
+              </div>
+              <div className="md:col-span-2 lg:col-span-4 flex gap-3">
+                <button onClick={registrarMovCuenta} className="flex-1 btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"><Save className="w-5 h-5" /> Guardar Movimiento</button>
+                <button onClick={() => setShowFormCuenta(false)} className="px-6 py-3 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white"><X className="w-4 h-4" /> Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          <div className="p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {carteras.map(c => (
+              <div key={c.id} className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4">
+                <p className="text-xs text-voltech-muted mb-1 truncate">{c.nombre}</p>
+                <p className="text-xl font-bold text-voltech-cyan">{saldoCartera(c.nombre).toFixed(2)}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-voltech-dark border-b border-voltech-border">
+                <tr>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Fecha</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Tipo</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Origen</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Destino</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Monto</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Nota</th>
+                </tr>
+              </thead>
+              <tbody>
+                {movGlobales.length === 0 ? (
+                  <tr><td colSpan="6" className="text-center py-8 text-voltech-muted">No hay movimientos aún.</td></tr>
+                ) : (
+                  movGlobales.map(m => (
+                    <tr key={m.id} className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
+                      <td className="px-4 py-3 text-sm text-voltech-muted">{m.fecha}</td>
+                      <td className="px-4 py-3 text-sm text-white">{m.fuente}</td>
+                      <td className="px-4 py-3 text-sm text-voltech-muted truncate max-w-[160px]">{m.concepto || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-voltech-muted">{m.tipo === 'transferencia' ? `${m.cuentaOrigen} → ${m.cuentaDestino}` : (m.cuenta || '-')}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className={`text-[10px] px-2 py-1 rounded-full font-semibold ${m.tipo === 'entrada' ? 'bg-voltech-success/20 text-voltech-success' : m.tipo === 'salida' ? 'bg-voltech-error/20 text-voltech-error' : 'bg-voltech-cyan/20 text-voltech-cyan'}`}>{m.tipo === 'entrada' ? '⬆ Entrada' : m.tipo === 'salida' ? '⬇ Salida' : '🔄 Transf'}</span>
+                      </td>
+                      <td className={`px-4 py-3 text-right text-sm font-bold ${m.tipo === 'entrada' ? 'text-voltech-success' : 'text-voltech-error'}`}>{m.tipo === 'entrada' ? '+' : '-'}${Number(m.monto).toFixed(2)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

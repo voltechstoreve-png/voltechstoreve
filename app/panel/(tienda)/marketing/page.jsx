@@ -258,7 +258,7 @@ safe(supabase.from('productos').select('*')),
 safe(supabase.from('clientes').select('*')),
 safe(supabase.from('settings').select('valor').eq('clave', 'etiquetas').single()),
 safe(supabase.from('marketing_config').select('valor').eq('clave', 'mas_vendidos').single()),
-safe(supabase.from('equipo').select('*')),
+safe(supabase.from('usuarios').select('*').eq('activo', true)),
 safe(supabase.from('usuarios').select('*')),
 safe(supabase.from('settings').select('valor').eq('clave', 'categorias_promo').single()),
 ]);
@@ -318,6 +318,18 @@ cargarDatos();
     });
     setAlertasVencimiento(alertas);
   }, [cupones]);
+
+  // ✅ AUTO-CALCULA Fecha de Vencimiento del cupón = Inicio + Duración (días)
+  useEffect(() => {
+    if (formDataCupon.fecha_inicio && formDataCupon.duracion_dias) {
+      const f = new Date(formDataCupon.fecha_inicio + 'T00:00:00');
+      f.setDate(f.getDate() + (parseInt(formDataCupon.duracion_dias) || 0));
+      const y = f.getFullYear();
+      const m = String(f.getMonth() + 1).padStart(2, '0');
+      const d = String(f.getDate()).padStart(2, '0');
+      setFormDataCupon(prev => ({ ...prev, fecha_vencimiento: `${y}-${m}-${d}` }));
+    }
+  }, [formDataCupon.fecha_inicio, formDataCupon.duracion_dias]);
 
   useEffect(() => {
     if (!productoSeleccionado || clientesSeleccionados.length === 0) {
@@ -569,7 +581,10 @@ cargarDatos();
     }
     if (!(formDataPublicidad.saludo_whatsapp || '').trim() || !(formDataPublicidad.cierre_whatsapp || '').trim() || !(formDataPublicidad.url_destino || '').trim()) {
     return toast.error('El saludo, la URL de destino y el cierre del mensaje son obligatorios');
-}
+    }
+    if (!formDataPublicidad.anunciante || !(Number(formDataPublicidad.costo_por_click) > 0)) {
+    return toast.error('Indica el Anunciante y el Costo por click para poder cobrar la publicidad');
+    }
 const portadaComp = await comprimirImagen(formDataPublicidad.url_imagen);
 const extrasComp = [];
 for (const im of imagenesExtra) { if (im && im !== formDataPublicidad.url_imagen) extrasComp.push(await comprimirImagen(im)); }
@@ -599,7 +614,18 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
     setResumenData({ abierto: true, texto: construirResumen(pub), telefono: pub.telefono_anunciante || '', titulo: 'Resumen de Publicidad', cliente: pub.anunciante || pub.titulo });
   };
 
-  const enviarResumenDiario = () => {
+  const toggleEstadoPagoPub = async (pub) => {
+  const nuevo = pub.estado_pago === 'pagado' ? 'pendiente' : 'pagado';
+  const actualizada = { ...pub, estado_pago: nuevo };
+  const actualizadas = publicidad.map(p => p.id === pub.id ? actualizada : p);
+  setPublicidad(actualizadas);
+  localStorage.setItem('voltech_publicidad', JSON.stringify(actualizadas));
+  if (supabase) await supabase.from('publicidad').update({ estado_pago: nuevo }).eq('id', pub.id);
+  toast.success(nuevo === 'pagado' ? '✅ Marcado como PAGADO' : '⏳ Marcado como PENDIENTE por pagar');
+  window.dispatchEvent(new Event('voltech-data-updated'));
+};
+
+const enviarResumenDiario = () => {
     const activas = publicidad.filter(p => p.estado === 'activo');
     if (activas.length === 0) { toast.error('No hay publicidades activas'); return; }
     let total = 0;
@@ -1046,45 +1072,90 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
               </div>
             </div>
             )}
-          <div className="bg-voltech-surface border border-voltech-border rounded-xl">
+          <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
           <div className="p-6 border-b border-voltech-border"><h3 className="text-lg font-bold text-white flex items-center gap-2"><WhatsAppIcon className="w-5 h-5 text-[#25D366]" /> Mensajes Creados</h3></div>
               {plantillas.filter(p => p.tipo === 'whatsapp').length === 0 ? (
                 <div className="p-12 text-center"><MessageSquare className="w-16 h-16 text-voltech-muted mx-auto mb-4 opacity-30" /><h3 className="text-lg font-semibold text-white mb-2">No hay mensajes</h3><p className="text-voltech-muted text-sm">Crea tu primer texto para WhatsApp</p></div>
               ) : (
-                <div className="divide-y divide-voltech-border">
-                  {plantillas.filter(p => p.tipo === 'whatsapp').map(p => (
-                    <div key={p.id} className="p-4 flex items-center justify-between hover:bg-voltech-dark/30">
-                      <div><p className="text-sm font-medium text-white">{p.nombre} {p.esGlobal && <span className="text-voltech-warning">⭐</span>}</p><p className="text-xs text-voltech-muted line-clamp-1">{p.contenido}</p><p className="text-[10px] text-voltech-muted">👤 {p.creadoPor || 'Desconocido'}</p></div>
-                      {puedeGestionar && (<div className="flex gap-1"><button onClick={() => { setFormDataPlantilla(p); setPlantillaEditando(p); setShowPlantillaForm(true); }} className="p-2 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit3 className="w-4 h-4" /></button><button onClick={() => eliminarPlantilla(p.id)} className="p-2 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-4 h-4" /></button></div>)}
-                    </div>
-                  ))}
-                </div>
+                <>
+                  {/* ✅ Móvil: tarjetas */}
+                  <div className="block md:hidden space-y-3 p-3">
+                    {plantillas.filter(p => p.tipo === 'whatsapp').map(p => (
+                      <div key={p.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-slate-100 truncate">{p.nombre} {p.esGlobal && <span className="text-amber-300">⭐</span>}</h4>
+                            <p className="text-[11px] text-slate-400 line-clamp-2">{p.contenido}</p>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-slate-500">👤 {p.creadoPor || 'Desconocido'}</p>
+                        {puedeGestionar && (
+                          <div className="flex items-center gap-2 pt-2 border-t border-slate-700/40">
+                            <button onClick={() => { setFormDataPlantilla(p); setPlantillaEditando(p); setShowPlantillaForm(true); }} className="flex-1 text-[11px] font-semibold text-cyan-300 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30">Editar</button>
+                            <button onClick={() => eliminarPlantilla(p.id)} className="p-2 text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg"><Trash2 size={14} /></button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {/* ✅ PC: lista */}
+                  <div className="hidden md:block divide-y divide-voltech-border">
+                    {plantillas.filter(p => p.tipo === 'whatsapp').map(p => (
+                      <div key={p.id} className="p-4 flex items-center justify-between hover:bg-voltech-dark/30">
+                        <div><p className="text-sm font-medium text-white">{p.nombre} {p.esGlobal && <span className="text-voltech-warning">⭐</span>}</p><p className="text-xs text-voltech-muted line-clamp-1">{p.contenido}</p><p className="text-[10px] text-voltech-muted">👤 {p.creadoPor || 'Desconocido'}</p></div>
+                        {puedeGestionar && (<div className="flex gap-1"><button onClick={() => { setFormDataPlantilla(p); setPlantillaEditando(p); setShowPlantillaForm(true); }} className="p-2 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit3 className="w-4 h-4" /></button><button onClick={() => eliminarPlantilla(p.id)} className="p-2 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-4 h-4" /></button></div>)}
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
 
-            <div className="bg-voltech-surface border border-voltech-border rounded-xl">
+            <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
               <div className="p-6 border-b border-voltech-border"><h3 className="text-lg font-bold text-white">Historial de Envíos Recientes</h3></div>
-              <div className="divide-y divide-voltech-border">
-                {historialDetallado.length === 0 ? (
-                  <div className="p-6 text-center text-sm text-voltech-muted">No hay envíos registrados aún.</div>
-                ) : (
-                  historialDetallado.map((envio, idx) => {
-                    const cliente = clientes.find(c => String(c.id) === String(envio.cliente_id));
-                    const prod = productos.find(p => String(p.id) === String(envio.producto_id));
-                    return (
-                      <div key={idx} className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-voltech-cyan/20 flex items-center justify-center text-voltech-cyan text-xs font-bold">{cliente?.nombre?.charAt(0) || '?'}</div>
-                          <div>
-                            <p className="text-sm text-white font-medium">{cliente?.nombre || 'Cliente Desconocido'}</p>
-                            <p className="text-xs text-voltech-muted">{new Date(envio.fecha_envio).toLocaleString('es-VE')} • {prod?.plataforma || 'Producto'}</p>
+              {historialDetallado.length === 0 ? (
+                <div className="p-6 text-center text-sm text-voltech-muted">No hay envíos registrados aún.</div>
+              ) : (
+                <>
+                  {/* ✅ Móvil: tarjetas */}
+                  <div className="block md:hidden space-y-3 p-3">
+                    {historialDetallado.map((envio, idx) => {
+                      const cliente = clientes.find(c => String(c.id) === String(envio.cliente_id));
+                      const prod = productos.find(p => String(p.id) === String(envio.producto_id));
+                      return (
+                        <div key={idx} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-voltech-cyan/20 flex items-center justify-center text-voltech-cyan text-xs font-bold shrink-0">{cliente?.nombre?.charAt(0) || '?'}</div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-100 truncate">{cliente?.nombre || 'Cliente Desconocido'}</p>
+                              <p className="text-[11px] text-slate-400 truncate">{prod?.plataforma || 'Producto'}</p>
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-slate-400">{new Date(envio.fecha_envio).toLocaleString('es-VE')}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* ✅ Desktop: lista */}
+                  <div className="hidden md:block divide-y divide-voltech-border">
+                    {historialDetallado.map((envio, idx) => {
+                      const cliente = clientes.find(c => String(c.id) === String(envio.cliente_id));
+                      const prod = productos.find(p => String(p.id) === String(envio.producto_id));
+                      return (
+                        <div key={idx} className="p-4 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-voltech-cyan/20 flex items-center justify-center text-voltech-cyan text-xs font-bold">{cliente?.nombre?.charAt(0) || '?'}</div>
+                            <div>
+                              <p className="text-sm text-white font-medium">{cliente?.nombre || 'Cliente Desconocido'}</p>
+                              <p className="text-xs text-voltech-muted">{new Date(envio.fecha_envio).toLocaleString('es-VE')} • {prod?.plataforma || 'Producto'}</p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -1207,19 +1278,42 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
             </div>
             )}
 
-            <div className="bg-voltech-surface border border-voltech-border rounded-xl">
+            <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
               <div className="p-6 border-b border-voltech-border"><h3 className="text-lg font-bold text-white flex items-center gap-2"><FileText className="w-5 h-5 text-voltech-purple" /> Textos Creados</h3></div>
               {plantillas.filter(p => p.tipo === 'marketplace').length === 0 ? (
                 <div className="p-12 text-center"><FileText className="w-16 h-16 text-voltech-muted mx-auto mb-4 opacity-30" /><h3 className="text-lg font-semibold text-white mb-2">No hay textos</h3><p className="text-voltech-muted text-sm">Crea tu primer texto para Marketplace</p></div>
               ) : (
-                <div className="divide-y divide-voltech-border">
-                  {plantillas.filter(p => p.tipo === 'marketplace').map(p => (
-                    <div key={p.id} className="p-4 flex items-center justify-between hover:bg-voltech-dark/30">
-                      <div><p className="text-sm font-medium text-white">{p.nombre} {p.esGlobal && <span className="text-voltech-warning">⭐</span>}</p><p className="text-xs text-voltech-muted line-clamp-1">{p.contenido}</p><p className="text-[10px] text-voltech-muted">👤 {p.creadoPor || 'Desconocido'}</p></div>
-                      {puedeGestionar && (<div className="flex gap-1"><button onClick={() => { setFormDataPlantilla(p); setPlantillaEditando(p); setShowPlantillaForm(true); }} className="p-2 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit3 className="w-4 h-4" /></button><button onClick={() => eliminarPlantilla(p.id)} className="p-2 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-4 h-4" /></button></div>)}
-                    </div>
-                  ))}
-                </div>
+                <>
+                  {/* ✅ Móvil: tarjetas */}
+                  <div className="block md:hidden space-y-3 p-3">
+                    {plantillas.filter(p => p.tipo === 'marketplace').map(p => (
+                      <div key={p.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-slate-100 truncate">{p.nombre} {p.esGlobal && <span className="text-amber-300">⭐</span>}</h4>
+                            <p className="text-[11px] text-slate-400 line-clamp-2">{p.contenido}</p>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-slate-500">👤 {p.creadoPor || 'Desconocido'}</p>
+                        {puedeGestionar && (
+                          <div className="flex items-center gap-2 pt-2 border-t border-slate-700/40">
+                            <button onClick={() => { setFormDataPlantilla(p); setPlantillaEditando(p); setShowPlantillaForm(true); }} className="flex-1 text-[11px] font-semibold text-cyan-300 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30">Editar</button>
+                            <button onClick={() => eliminarPlantilla(p.id)} className="p-2 text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg"><Trash2 size={14} /></button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {/* ✅ PC: lista */}
+                  <div className="hidden md:block divide-y divide-voltech-border">
+                    {plantillas.filter(p => p.tipo === 'marketplace').map(p => (
+                      <div key={p.id} className="p-4 flex items-center justify-between hover:bg-voltech-dark/30">
+                        <div><p className="text-sm font-medium text-white">{p.nombre} {p.esGlobal && <span className="text-voltech-warning">⭐</span>}</p><p className="text-xs text-voltech-muted line-clamp-1">{p.contenido}</p><p className="text-[10px] text-voltech-muted">👤 {p.creadoPor || 'Desconocido'}</p></div>
+                        {puedeGestionar && (<div className="flex gap-1"><button onClick={() => { setFormDataPlantilla(p); setPlantillaEditando(p); setShowPlantillaForm(true); }} className="p-2 text-voltech-cyan hover:bg-voltech-cyan/10 rounded"><Edit3 className="w-4 h-4" /></button><button onClick={() => eliminarPlantilla(p.id)} className="p-2 text-voltech-error hover:bg-voltech-error/10 rounded"><Trash2 className="w-4 h-4" /></button></div>)}
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -1500,13 +1594,58 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                   Cupones Creados
                 </h3>
               </div>
-              <div className="divide-y divide-voltech-border">
+              {/* ✅ Móvil: tarjetas */}
+              <div className="block md:hidden space-y-3 p-3">
                 {cupones.length === 0 ? (
-                  <div className="p-12 text-center">
-                    <Ticket className="w-16 h-16 text-voltech-muted mx-auto mb-4 opacity-30" />
-                    <h3 className="text-lg font-semibold text-white mb-2">No hay cupones creados</h3>
-                    <p className="text-voltech-muted text-sm">Crea tu primer cupón para comenzar a promocionar</p>
+                  <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 text-center">
+                    <Ticket className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                    <p className="text-xs text-slate-400">No hay cupones creados</p>
                   </div>
+                ) : (
+                  cupones.map(cupon => {
+                    const descuentoTexto = cupon.es_gratis || cupon.tipo_descuento === 'gratis' ? '100% GRATIS' : cupon.tipo_descuento === 'porcentaje' ? `${cupon.valor_descuento || cupon.valor}%` : `$${Number(cupon.valor_descuento || cupon.valor || 0).toFixed(2)}`;
+                    const estaVencido = new Date(cupon.fecha_vencimiento) < new Date();
+                    const estaAgotado = cupon.limite_usos === 'limitado' && (cupon.usos || 0) >= (cupon.max_usos || 0);
+                    return (
+                      <div key={cupon.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-slate-100 truncate">{cupon.titulo}</h4>
+                            <p className="text-[11px] text-cyan-400 font-mono truncate">{cupon.codigo}</p>
+                          </div>
+                          <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-semibold ${estaVencido || estaAgotado ? 'bg-rose-500/20 text-rose-300' : cupon.estado === 'activo' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-500/20 text-slate-300'}`}>{estaVencido ? 'Expirado' : estaAgotado ? 'Agotado' : cupon.estado === 'activo' ? 'Activo' : 'Inactivo'}</span>
+                        </div>
+                        <div className="pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-2 text-[11px]">
+                          <div><span className="text-slate-400 block">Descuento:</span><span className="text-emerald-300 font-bold">{descuentoTexto}</span></div>
+                          <div><span className="text-slate-400 block">Usos:</span><span className="text-slate-200 font-bold">{cupon.usos || 0}{cupon.limite_usos === 'limitado' ? ` / ${cupon.max_usos}` : ''}</span></div>
+                        </div>
+                        <div className="flex items-center gap-2 pt-2 border-t border-slate-700/40">
+                          <button onClick={() => toggleEstadoCupon(cupon)} className="flex-1 text-[11px] font-semibold text-amber-300 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30">{cupon.estado === 'activo' ? 'Desactivar' : 'Activar'}</button>
+                          <button onClick={() => editarCupon(cupon)} className="flex-1 text-[11px] font-semibold text-cyan-300 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30">Editar</button>
+                          <button onClick={() => eliminarCupon(cupon.id)} className="p-2 text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg"><Trash2 size={14} /></button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              {/* ✅ Desktop: TABLA (como Imagen 31) */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-voltech-dark border-b border-voltech-border">
+                    <tr>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Código</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Título</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Descuento</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Usos</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Vigencia</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Estado</th>
+                      <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                {cupones.length === 0 ? (
+                  <tr><td colSpan="7" className="p-12 text-center"><Ticket className="w-16 h-16 text-voltech-muted mx-auto mb-4 opacity-30" /><h3 className="text-lg font-semibold text-white mb-2">No hay cupones creados</h3><p className="text-voltech-muted text-sm">Crea tu primer cupón para comenzar a promocionar</p></td></tr>
                 ) : (
                   cupones.map(cupon => {
                     const aplicaTexto = () => {
@@ -1528,48 +1667,23 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                     const estadoColor = estaVencido || estaAgotado ? 'text-voltech-error' : cupon.estado === 'activo' ? 'text-voltech-success' : 'text-voltech-muted';
                     
                     return (
-                      <div key={cupon.id} className="p-6 hover:bg-voltech-dark/30 transition-colors">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2 flex-wrap">
-                              <h4 className="text-lg font-bold text-white">{cupon.titulo}</h4>
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${estadoColor === 'text-voltech-success' ? 'bg-voltech-success/20 text-voltech-success' : estadoColor === 'text-voltech-error' ? 'bg-voltech-error/20 text-voltech-error' : 'bg-voltech-muted/20 text-voltech-muted'}`}>
-                                {estadoDisplay}
-                              </span>
-                              {cupon.excluir_ofertas && (
-                                <span className="px-3 py-1 rounded-full text-xs font-medium bg-voltech-warning/20 text-voltech-warning flex items-center gap-1">
-                                  <X className="w-3 h-3" /> Excluye ofertas
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-voltech-muted mb-2">{cupon.descripcion}</p>
-                            {cupon.creado_por && <p className="text-[10px] text-voltech-muted mb-3">👤 Creado por: {cupon.creado_por}</p>}
-                            <div className="flex flex-wrap gap-4 text-sm">
-                              <div className="flex items-center gap-2">
-                                <Ticket className="w-4 h-4 text-voltech-cyan" />
-                                <span className="font-mono font-bold text-voltech-cyan">{cupon.codigo}</span>
-                                <button onClick={() => copiarCodigo(cupon.codigo)} className="p-1 hover:bg-voltech-border rounded">
-                                  <Copy className="w-3 h-3 text-voltech-muted" />
-                                </button>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Percent className="w-4 h-4 text-voltech-success" />
-                                <span className="text-voltech-success font-bold">{descuentoTexto}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Package className="w-4 h-4 text-voltech-purple" />
-                                <span className="text-voltech-muted">{aplicaTexto()}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Calendar className="w-4 h-4 text-voltech-warning" />
-                                <span className="text-voltech-muted">
-                                  {new Date(cupon.fecha_inicio).toLocaleDateString('es-VE')} - {new Date(cupon.fecha_vencimiento).toLocaleDateString('es-VE')}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
+                      <tr key={cupon.id} className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
+                        <td className="px-4 py-3 text-sm font-mono text-voltech-cyan">{cupon.codigo}</td>
+                        <td className="px-4 py-3">
+                          <p className="text-sm font-bold text-white">{cupon.titulo}</p>
+                          <p className="text-xs text-voltech-muted">{cupon.descripcion}</p>
+                        </td>
+                        <td className="px-4 py-3 text-sm font-bold text-voltech-success">{descuentoTexto}</td>
+                        <td className="px-4 py-3 text-sm text-voltech-muted">{cupon.usos || 0}{cupon.limite_usos === 'limitado' ? ` / ${cupon.max_usos}` : ''}</td>
+                        <td className="px-4 py-3 text-sm text-voltech-muted">{new Date(cupon.fecha_inicio).toLocaleDateString('es-VE')} - {new Date(cupon.fecha_vencimiento).toLocaleDateString('es-VE')}</td>
+                        <td className="px-4 py-3">
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${estaVencido || estaAgotado ? 'bg-voltech-error/20 text-voltech-error' : cupon.estado === 'activo' ? 'bg-voltech-success/20 text-voltech-success' : 'bg-voltech-muted/20 text-voltech-muted'}`}>
+                            {estaVencido ? 'Expirado' : estaAgotado ? 'Agotado' : cupon.estado === 'activo' ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
                           {puedeGestionar && (
-                            <div className="flex items-center gap-2 ml-4">
+                            <div className="flex items-center justify-end gap-2">
                               <button 
                                 onClick={() => toggleEstadoCupon(cupon)} 
                                 className={`p-2 rounded-lg transition-colors ${cupon.estado === 'activo' ? 'hover:bg-voltech-warning/20 text-voltech-warning' : 'hover:bg-voltech-success/20 text-voltech-success'}`} 
@@ -1593,37 +1707,13 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                               </button>
                             </div>
                           )}
-                        </div>
-                        
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-voltech-border">
-                          <div>
-                            <p className="text-xs text-voltech-muted mb-1">Veces Usado</p>
-                            <p className="text-lg font-bold text-white">
-                              {cupon.usos || 0} 
-                              {cupon.limite_usos === 'limitado' && <span className="text-xs text-voltech-muted"> / {cupon.max_usos}</span>}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-voltech-muted mb-1">Descuento Total</p>
-                            <p className="text-lg font-bold text-voltech-success">${Number(cupon.descuento_total || 0).toFixed(2)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-voltech-muted mb-1">Tasa de Conversión</p>
-                            <p className="text-lg font-bold text-voltech-cyan">
-                              {cupon.usos > 0 ? ((cupon.usos / (cupon.max_usos || 100)) * 100).toFixed(1) : 0}%
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-voltech-muted mb-1">Estado</p>
-                            <p className={`text-sm font-medium ${estaVencido || estaAgotado ? 'text-voltech-error' : cupon.estado === 'activo' ? 'text-voltech-success' : 'text-voltech-muted'}`}>
-                              {estaVencido ? 'Expirado' : estaAgotado ? 'Agotado' : cupon.estado === 'activo' ? 'Vigente' : 'Inactivo'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+                        </td>
+                      </tr>
                     );
                   })
                 )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -2126,8 +2216,19 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                 </div>
                 </div>
                 )}
+                <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
                 <div className="p-6 border-b border-voltech-border">
-                <h3 className="text-lg font-bold text-white">Publicidades Creadas</h3>              <div className="divide-y divide-voltech-border">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2"><Megaphone className="w-5 h-5 text-voltech-purple" /> Publicidades Creadas</h3>
+                </div>
+                <div className="hidden md:block overflow-x-auto"><table className="w-full"><thead className="bg-voltech-dark border-b border-voltech-border"><tr>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Campaña</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Estado</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Vigencia</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Clicks</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Total</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Pago</th>
+                      <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Acciones</th>
+                    </tr></thead><tbody>
                 {publicidad.length === 0 ? (
                   <div className="p-12 text-center">
                     <Megaphone className="w-16 h-16 text-voltech-muted mx-auto mb-4 opacity-30" />
@@ -2136,20 +2237,35 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                   </div>
                 ) : (
                   publicidad.map(pub => (
-                    <div key={pub.id} className="p-6 hover:bg-voltech-dark/30 transition-colors">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h4 className="text-lg font-bold text-white">{pub.titulo}</h4>
-                          <div className="flex gap-4 mt-2 text-sm flex-wrap">
-                            {(() => { const vencida = pub.fecha_fin && new Date(pub.fecha_fin + 'T23:59') < new Date(); return (<span className={vencida ? 'text-voltech-error font-bold' : pub.estado === 'activo' ? 'text-voltech-success' : 'text-voltech-muted'}>{vencida ? '⏰ Vencida' : pub.estado === 'activo' ? 'Activo' : 'Inactivo'}</span>); })()}
-                            <span className="text-voltech-muted">{new Date(pub.fecha_inicio).toLocaleDateString('es-VE')} - {new Date(pub.fecha_fin).toLocaleDateString('es-VE')}</span>
-                            <span className="text-voltech-cyan font-semibold">👆 {pub.clicks || 0} clicks</span>
-                            <span className="text-voltech-success font-bold">💵 ${((pub.clicks || 0) * (pub.costo_por_click || 0)).toFixed(2)}</span>
-                            {pub.anunciante && <span className="text-voltech-purple">🏢 {pub.anunciante}</span>}
-                          </div>
-                        </div>
+                    <tr key={pub.id} className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="text-sm font-bold text-white">{pub.titulo}</p>
+                        {pub.anunciante && <p className="text-xs text-voltech-muted">🏢 {pub.anunciante}</p>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${pub.estado === 'activo' ? 'bg-voltech-success/20 text-voltech-success' : 'bg-voltech-muted/20 text-voltech-muted'}`}>{pub.estado === 'activo' ? 'Activo' : 'Inactivo'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-voltech-muted">{new Date(pub.fecha_inicio).toLocaleDateString('es-VE')} - {new Date(pub.fecha_fin).toLocaleDateString('es-VE')}</td>
+                      <td className="px-4 py-3 text-sm text-voltech-cyan font-semibold">👆 {pub.clicks || 0}</td>
+                      <td className="px-4 py-3 text-sm text-voltech-success font-bold">💵 ${((pub.clicks || 0) * (pub.costo_por_click || 0)).toFixed(2)}</td>
+                      <td className="px-4 py-3">
+                        {(pub.tipo_destino === 'url_externa' && pub.anunciante && pub.telefono_anunciante) ? (
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${pub.estado_pago === 'pagado' ? 'bg-voltech-success/20 text-voltech-success' : 'bg-voltech-warning/20 text-voltech-warning'}`}>
+                            {pub.estado_pago === 'pagado' ? '✅ Pagado' : '⏳ Pendiente por pagar'}
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2 py-1 rounded-full font-medium bg-voltech-cyan/20 text-voltech-cyan">🏠 Propia</span>
+                        )}
+                        {(pub.whatsapp_destinos || []).length > 0 && (
+                          <p className="text-[10px] text-voltech-muted mt-1">📲 {pub.whatsapp_destinos.map(d => d.nombre).join(', ')}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
                         {esAdmin && (
-                          <div className="flex gap-2">
+                          <div className="flex items-center justify-end gap-2">
+                            <button onClick={() => toggleEstadoPagoPub(pub)} className={`p-2 rounded-lg ${pub.estado_pago === 'pagado' ? 'hover:bg-voltech-warning/20 text-voltech-success' : 'hover:bg-voltech-success/20 text-voltech-warning'}`} title={pub.estado_pago === 'pagado' ? 'Marcar como PENDIENTE por pagar' : 'Marcar como PAGADO'}>
+                              {pub.estado_pago === 'pagado' ? <CheckCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                            </button>
                             <button onClick={() => enviarResumenPub(pub)} className="p-2 hover:bg-voltech-success/20 rounded-lg text-voltech-success" title="Enviar resumen al anunciante">
                               <WhatsAppIcon className="w-4 h-4" />
                             </button>
@@ -2176,6 +2292,31 @@ console.warn('Supabase no disponible, guardado solo en este navegador:', e.messa
                             </button>
                           </div>
                         )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody></table></div>
+              {/* ✅ Móvil: tarjetas */}
+              <div className="block md:hidden space-y-3 p-3">
+                {publicidad.length === 0 ? (
+                  <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 text-center"><Megaphone className="w-8 h-8 mx-auto mb-2 text-slate-500" /><p className="text-xs text-slate-400">No hay publicidades</p></div>
+                ) : (
+                  publicidad.map(pub => (
+                    <div key={pub.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0"><h4 className="text-xs font-bold text-slate-100 truncate">{pub.titulo}</h4><p className="text-[11px] text-slate-400">{new Date(pub.fecha_inicio).toLocaleDateString('es-VE')} - {new Date(pub.fecha_fin).toLocaleDateString('es-VE')}</p></div>
+                        <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-semibold ${pub.estado_pago === 'pagado' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>{pub.estado_pago === 'pagado' ? '✅ Pagado' : '⏳ Pendiente'}</span>
+                      </div>
+                      <div className="pt-2 border-t border-slate-700/40 grid grid-cols-2 gap-2 text-[11px]">
+                        <div><span className="text-slate-400 block">Clicks:</span><span className="text-cyan-300 font-bold">{pub.clicks || 0}</span></div>
+                        <div><span className="text-slate-400 block">Total:</span><span className="text-emerald-300 font-bold">${((pub.clicks || 0) * (pub.costo_por_click || 0)).toFixed(2)}</span></div>
+                      </div>
+                      <div className="flex items-center gap-2 pt-2 border-t border-slate-700/40">
+                        <button onClick={() => toggleEstadoPagoPub(pub)} className="flex-1 text-[11px] font-semibold text-amber-300 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30">{pub.estado_pago === 'pagado' ? 'Marcar Pendiente' : 'Marcar Pagado'}</button>
+                        <button onClick={() => enviarResumenPub(pub)} className="p-2 text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-lg"><WhatsAppIcon className="w-4 h-4" /></button>
+                        <button onClick={() => { setPublicidadEditando(pub); setImagenPreview(pub.url_imagen || ''); setImagenesExtra((pub.imagenes || []).slice(1)); setModoDosImagenes(!!pub.modo_2_imagenes); setFormDataPublicidad(prev => ({ ...prev, ...pub, ubicacion_web: pub.ubicacion_web || 'oculta', ubicacion_movil: pub.ubicacion_movil || 'arriba' })); setShowPublicidadForm(true); }} className="p-2 text-cyan-300 bg-cyan-500/10 border border-cyan-500/30 rounded-lg"><Edit3 className="w-4 h-4" /></button>
+                        <button onClick={async () => { if(!confirm('¿Eliminar esta publicidad?')) return; try { if (supabase) { const { error } = await supabase.from('publicidad').delete().eq('id', pub.id); if (error) throw error; } const nuevas = publicidad.filter(p => p.id !== pub.id); setPublicidad(nuevas); localStorage.setItem('voltech_publicidad', JSON.stringify(nuevas)); toast.success('Publicidad eliminada'); } catch (err) { toast.error('Error al eliminar'); } }} className="p-2 text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </div>
                   ))
