@@ -137,6 +137,33 @@ const bannerRef = useRef(null);
 const [bannerIdx, setBannerIdx] = useState(0);
 const [isPaused, setIsPaused] = useState(false);
 
+// ⚡ OFERTA RELÁMPAGO (configurada en Ajustes)
+const [ofertaRelampago, setOfertaRelampago] = useState(null);
+useEffect(() => {
+  const cargarOferta = async () => {
+    let cfg = null;
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('settings').select('valor').eq('clave', 'oferta_relampago').maybeSingle();
+        if (data?.valor) cfg = typeof data.valor === 'string' ? JSON.parse(data.valor) : data.valor;
+      } catch (e) {}
+    }
+    if (!cfg) { try { cfg = JSON.parse(localStorage.getItem('voltech_oferta_relampago') || 'null'); } catch (e) {} }
+    setOfertaRelampago(cfg);
+  };
+  cargarOferta();
+  const h = () => cargarOferta();
+  window.addEventListener('voltech-data-updated', h);
+  return () => window.removeEventListener('voltech-data-updated', h);
+}, []);
+const ofertaActiva = useMemo(() => {
+  if (!ofertaRelampago || !ofertaRelampago.activo) return null;
+  const now = new Date();
+  if (ofertaRelampago.inicio && now < new Date(ofertaRelampago.inicio)) return null;
+  if (ofertaRelampago.fin && now > new Date(ofertaRelampago.fin)) return null;
+  return ofertaRelampago;
+}, [ofertaRelampago]);
+
 // 🔴 NUEVO ESTADO: Guarda la relación de aspecto dinámica de cada imagen
 const [ratios, setRatios] = useState({});
 
@@ -542,8 +569,9 @@ return { gratis: false, costo, texto: `Cobro a destino ($${costo.toFixed(2)})` }
 
   const calculateTotal = () => {
     let subtotal = cart.reduce((sum, item) => sum + (getPrecioMostrar(item).precioPrincipal * item.cantidad), 0);
-    const descuento = appliedCoupon ? appliedCoupon.descuentoCalculado : 0;
-    return Math.max(0, subtotal - descuento + calcularEnvio());
+    const descuentoCupon = appliedCoupon ? appliedCoupon.descuentoCalculado : 0;
+    const descuentoOferta = ofertaActiva ? subtotal * ((Number(ofertaActiva.descuento_pct) || 0) / 100) : 0;
+    return Math.max(0, subtotal - descuentoCupon - descuentoOferta + calcularEnvio());
   };
 
   const finalizarPedido = async () => {
@@ -570,6 +598,10 @@ return { gratis: false, costo, texto: `Cobro a destino ($${costo.toFixed(2)})` }
     
     if (appliedCoupon) {
       mensaje += `\n 🎟️ Cupón: ${appliedCoupon.codigo} (-$${appliedCoupon.descuentoCalculado.toFixed(2)})`;
+    }
+    if (ofertaActiva) {
+      const descRel = subtotalSinEnvio * (Number(ofertaActiva.descuento_pct) || 0) / 100;
+      mensaje += `\n ⚡ Oferta Relámpago (${ofertaActiva.descuento_pct}%): -$${descRel.toFixed(2)}`;
     }
     if (autoReferrer) {
       mensaje += `\n Referido por: ${autoReferrer}`;
@@ -940,7 +972,10 @@ productosFiltrados.forEach(p => {
 const cat = (p.categoria || 'OTROS').toUpperCase();
 (grupos[cat] = grupos[cat] || []).push(p);
 });
-return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0]));
+Object.keys(grupos).forEach(k => {
+grupos[k].sort((a, b) => (a.producto || a.plataforma || '').localeCompare(b.producto || b.plataforma || '', 'es', { sensitivity: 'base' }));
+});
+return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }));
 }, [productosFiltrados]);
       const renderProductCard = (p, idx = 0) => {
       const precioInfo = getPrecioMostrar(p);
@@ -1117,6 +1152,15 @@ window.location.href = url;
               </div>
             </div>
             <button onClick={() => setActiveSection('sorteos')} className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors">Participar →</button>
+          </div>
+        </div>
+      )}
+
+      {ofertaActiva && (
+        <div className="bg-gradient-to-r from-voltech-cyan via-voltech-purple to-voltech-cyan text-white px-4 py-2 overflow-hidden">
+          <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 text-center">
+            <Zap className="w-4 h-4 shrink-0 animate-pulse" />
+            <p className="text-xs sm:text-sm font-bold truncate">{ofertaActiva.texto || `⚡ ${ofertaActiva.descuento_pct}% de descuento por tiempo limitado`}</p>
           </div>
         </div>
       )}
@@ -2414,6 +2458,12 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
                         <div className="flex justify-between text-green-600">
                         <span>Descuento ({appliedCoupon.codigo}):</span>
                         <span>-${appliedCoupon.descuentoCalculado.toFixed(2)}</span>
+                        </div>
+                        )}
+                        {ofertaActiva && (
+                        <div className="flex justify-between text-purple-400">
+                        <span>⚡ Oferta Relámpago ({ofertaActiva.descuento_pct}%):</span>
+                        <span>-${(cart.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0) * (Number(ofertaActiva.descuento_pct) || 0) / 100).toFixed(2)}</span>
                         </div>
                         )}
                         <div className="flex justify-between"><span className={mutedText}>Envío:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>{deliveryMethod === 'nacional' ? (envioNacionalInfo().gratis ? 'GRATIS' : envioNacionalInfo().texto) : (calcularEnvio() === 0 ? 'GRATIS' : '$' + calcularEnvio().toFixed(2))}</span></div>

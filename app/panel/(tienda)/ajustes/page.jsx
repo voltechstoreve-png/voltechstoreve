@@ -7,7 +7,8 @@ import CustomSelect from '@/components/CustomSelect';
 import {
   Store, CreditCard, Truck, FileText, Database, Save, Download, Upload,
   Plus, Trash2, MapPin, Eye, EyeOff, ArrowUp, Info,
-  Image as ImageIcon, Palette, AlertCircle, Sparkles, Wallet
+  Image as ImageIcon, Palette, AlertCircle, Sparkles, Wallet,
+  Zap, Clock, ToggleLeft, ToggleRight, X
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -70,6 +71,7 @@ export default function AjustesPage() {
     politicas: { terminos: '1. POLÍTICA DE PAGO ANTICIPADO: Para garantizar la disponibilidad de inventario y el procesamiento logístico con nuestros proveedores, todo despacho se gestionará exclusivamente previa recepción y conciliación del pago total.\n2. PRESENTACIÓN: Es obligatorio presentar este comprobante para cualquier reclamo.\n3. TIEMPO DE GARANTÍA: El producto tiene una garantía de 3 días continuos.\n4. EXCLUSIONES: No cubre daños físicos, humedad, sobrecargas o sellos removidos.\n5. EMPAQUE: Es obligatorio conservar la caja y accesorios originales en buen estado.\n6. GESTIÓN DE CAMBIOS: Sujeto a revisión técnica(24-48h). Es condición indispensable la entrega del producto defectuoso en su empaque original; no se entregará un reemplazo sin la verificación previa del equipo anterior.\n7. REEMBOLSOS Y CONFORMIDAD: Al recibir, el cliente acepta el estado del producto. Bajo ninguna circunstancia se realizará la devolución de dinero; se procederá exclusivamente al cambio por un producto igual o de similares características.', terminos_streaming: '1. ENTREGA DIGITAL: Las cuentas y suscripciones se entregan vía WhatsApp o correo electrónico en un plazo máximo de 15 minutos tras confirmar el pago.\n2. DURACIÓN: El tiempo de la suscripción comienza a contar desde el momento de la entrega de credenciales.\n3. GARANTÍA DE CUENTA: Ofrecemos garantía completa durante toda la duración contratada. Si la cuenta presenta fallas, se reemplaza de inmediato sin costo.\n4. MAL USO: Queda anulado el soporte si el cliente comparte credenciales, modifica la contraseña o el correo asociado, o incumple las normas de la plataforma (Netflix, Disney+, HBO, etc.).\n5. DEVOLUCIONES: No se realizan reembolsos una vez entregadas las credenciales. Solo aplica cambio de cuenta por fallas técnicas comprobadas.\n6. PAGO ANTICIPADO: Todas las plataformas streaming se entregan únicamente tras la verificación del pago. Sin excepciones.', privacidad: 'Tus datos están protegidos y no serán compartidos con terceros.' },
     colores: { primario: '#00ff88', secundario: '#8b5cf6', acento: '#06b6d4', fondo: '#0a0a0f', texto: '#ffffff', difuminado: 'horizontal' },
     whatsapp: { plantilla_compra: PLANTILLA_COMPRA_DEFAULT, cierre_compra: 'Quiero comprar ✅' },
+    oferta_relampago: { activo: false, texto: '⚡ 10% de descuento en toda la tienda solo por hoy', descuento_pct: 10, duracion_horas: 2, inicio: '', fin: '' },
   });
 
   const [nuevoPunto, setNuevoPunto] = useState('');
@@ -116,6 +118,7 @@ export default function AjustesPage() {
           if (datosCargados.carteras) merged.carteras = datosCargados.carteras;
           if (datosCargados.colores) merged.colores = { ...prev.colores, ...datosCargados.colores };
           if (datosCargados.whatsapp) merged.whatsapp = { ...prev.whatsapp, ...datosCargados.whatsapp };
+          if (datosCargados.oferta_relampago) merged.oferta_relampago = { ...prev.oferta_relampago, ...datosCargados.oferta_relampago };
           return merged;
         });
       }
@@ -140,6 +143,7 @@ export default function AjustesPage() {
           { clave: 'politicas', valor: settings.politicas },
           { clave: 'colores', valor: settings.colores },
           { clave: 'whatsapp', valor: settings.whatsapp },
+          { clave: 'oferta_relampago', valor: settings.oferta_relampago },
         ];
         const { error } = await supabase.from('settings').upsert(settingsToSave, { onConflict: 'clave' });
         if (error) throw error;
@@ -242,6 +246,31 @@ export default function AjustesPage() {
     }
   };
 
+  // ⚡ ACTIVAR Oferta Relámpago: establece inicio=ahora, fin=ahora+horas
+  const activarOfertaRelampago = () => {
+    const now = new Date();
+    const horas = Number(settings.oferta_relampago.duracion_horas) || 2;
+    const fin = new Date(now.getTime() + horas * 60 * 60 * 1000);
+    setSettings(prev => ({
+      ...prev,
+      oferta_relampago: {
+        ...prev.oferta_relampago,
+        activo: true,
+        inicio: now.toISOString(),
+        fin: fin.toISOString(),
+      }
+    }));
+    toast.success(`⚡ Oferta activada por ${horas} hora(s)`);
+  };
+
+  const desactivarOfertaRelampago = () => {
+    setSettings(prev => ({
+      ...prev,
+      oferta_relampago: { ...prev.oferta_relampago, activo: false, inicio: '', fin: '' }
+    }));
+    toast.success('Oferta desactivada');
+  };
+
   const cierreCompra = settings.whatsapp?.cierre_compra || 'Quiero comprar ✅';
       // ✅ Si la plantilla guardada es la vieja ("oferta/descuento"), muestra la nueva dinámica
       const plantillaGuardada = settings.whatsapp?.plantilla_compra || PLANTILLA_COMPRA_DEFAULT;
@@ -269,6 +298,7 @@ export default function AjustesPage() {
     { id: 'envios', icon: Truck, label: 'Envíos' },
     { id: 'pagos', icon: CreditCard, label: 'Pagos' },
     { id: 'carteras', icon: Wallet, label: 'Carteras' },
+    { id: 'ofertas_relampago', icon: Zap, label: 'Ofertas Relámpago' },
     { id: 'terminos', icon: FileText, label: 'Términos' },
     { id: 'whatsapp', icon: WhatsAppIcon, label: 'WhatsApp' },
     { id: 'backup', icon: Database, label: 'Backup' },
@@ -458,6 +488,131 @@ export default function AjustesPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'ofertas_relampago' && (
+          <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6 space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-voltech-border">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-voltech-cyan to-voltech-purple">
+                  <Zap className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">⚡ Ofertas Relámpago</h3>
+                  <p className="text-xs text-voltech-muted mt-0.5">Descuentos automáticos por tiempo limitado en el catálogo</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {settings.oferta_relampago.activo ? (
+                  <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-voltech-success/20 text-voltech-success flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-voltech-success animate-pulse" /> Activa
+                  </span>
+                ) : (
+                  <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-voltech-muted/20 text-voltech-muted">Inactiva</span>
+                )}
+              </div>
+            </div>
+
+            {/* Información de cómo funciona */}
+            <div className="p-4 bg-voltech-cyan/5 border border-voltech-cyan/20 rounded-lg">
+              <p className="text-xs text-voltech-cyan flex items-start gap-2">
+                <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>La oferta aparecerá como <strong>barra lineal</strong> arriba del catálogo y se aplicará <strong>automáticamente</strong> al total del carrito. El descuento se muestra al cliente y en el mensaje de WhatsApp del pedido.</span>
+              </p>
+            </div>
+
+            {/* Configuración */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs text-voltech-muted mb-2">📝 Texto del anuncio (se muestra en la barra superior)</label>
+                <input
+                  type="text"
+                  value={settings.oferta_relampago.texto}
+                  onChange={(e) => setSettings(prev => ({ ...prev, oferta_relampago: { ...prev.oferta_relampago, texto: e.target.value } }))}
+                  className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
+                  placeholder="Ej: 🚚 Delivery GRATIS solo por hoy"
+                />
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {['⚡ 10% OFF en toda la tienda', '🚚 Delivery GRATIS solo por hoy', '🔥 2x1 en accesorios por 2 horas', '💰 15% OFF pagando con Binance'].map(txt => (
+                    <button key={txt} type="button" onClick={() => setSettings(prev => ({ ...prev, oferta_relampago: { ...prev.oferta_relampago, texto: txt } }))} className={`text-[10px] font-semibold px-2.5 py-1 rounded-full transition-colors ${settings.oferta_relampago.texto === txt ? 'bg-voltech-cyan text-voltech-dark' : 'bg-voltech-border/50 text-voltech-muted hover:bg-voltech-border'}`}>{txt}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-voltech-muted mb-2">💰 Descuento (%)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={settings.oferta_relampago.descuento_pct}
+                    onChange={(e) => setSettings(prev => ({ ...prev, oferta_relampago: { ...prev.oferta_relampago, descuento_pct: parseInt(e.target.value) || 0 } }))}
+                    className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
+                    placeholder="10"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-voltech-muted mb-2">⏰ Duración (horas)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="168"
+                    value={settings.oferta_relampago.duracion_horas}
+                    onChange={(e) => setSettings(prev => ({ ...prev, oferta_relampago: { ...prev.oferta_relampago, duracion_horas: parseInt(e.target.value) || 0 } }))}
+                    className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
+                    placeholder="2"
+                  />
+                </div>
+              </div>
+
+              {settings.oferta_relampago.activo && settings.oferta_relampago.inicio && settings.oferta_relampago.fin && (
+                <div className="p-4 bg-voltech-success/5 border border-voltech-success/20 rounded-lg">
+                  <p className="text-xs text-voltech-success flex items-center gap-2 font-medium mb-2"><Clock className="w-4 h-4" /> Vigencia de la oferta activa</p>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs text-voltech-muted">Inicio</p>
+                      <p className="text-white font-mono">{new Date(settings.oferta_relampago.inicio).toLocaleString('es-VE')}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-voltech-muted">Termina</p>
+                      <p className="text-white font-mono">{new Date(settings.oferta_relampago.fin).toLocaleString('es-VE')}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Acciones */}
+            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-voltech-border">
+              {!settings.oferta_relampago.activo ? (
+                <button
+                  type="button"
+                  onClick={activarOfertaRelampago}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center justify-center gap-2"
+                >
+                  <Zap className="w-4 h-4" /> Activar Oferta ({settings.oferta_relampago.duracion_horas}h · {settings.oferta_relampago.descuento_pct}%)
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={desactivarOfertaRelampago}
+                  className="flex-1 px-4 py-3 bg-voltech-error/20 text-voltech-error border border-voltech-error/30 rounded-xl text-sm font-bold hover:bg-voltech-error/30 transition-all flex items-center justify-center gap-2"
+                >
+                  <X className="w-4 h-4" /> Desactivar Oferta Ahora
+                </button>
+              )}
+            </div>
+
+            {/* Vista previa */}
+            <div>
+              <p className="text-xs text-voltech-muted mb-2">👁️ Vista previa en el catálogo</p>
+              <div className="bg-gradient-to-r from-voltech-cyan via-voltech-purple to-voltech-cyan text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2">
+                <Zap className="w-4 h-4 shrink-0 animate-pulse" />
+                <p className="text-sm font-bold truncate">{settings.oferta_relampago.texto}</p>
+              </div>
             </div>
           </div>
         )}
