@@ -89,7 +89,7 @@ const CustomSelect = ({ label, value, onChange, options, placeholder = '-- Selec
           disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-voltech-cyan'
         }`}
       >
-        <span className={`${selectedOption ? 'text-white' : 'text-voltech-muted'} truncate flex-1 min-w-0`}>
+        <span className={`${selectedOption ? 'text-white' : 'text-slate-400'} truncate flex-1 min-w-0`}>
           {selectedOption?.label || placeholder}
         </span>
         <ChevronDown className={`w-4 h-4 text-voltech-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />

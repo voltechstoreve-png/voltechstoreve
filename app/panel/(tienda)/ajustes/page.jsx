@@ -52,7 +52,7 @@ export default function AjustesPage() {
   const { esAdmin } = usePermissions();
   const [activeTab, setActiveTab] = useState('tienda');
   const [settings, setSettings] = useState({
-    tienda: { nombre: 'VOLTECH STORE', email: 'voltechstore.ve@gmail.com', telefono: '0412-1234567', direccion: 'Caracas, Venezuela', instagramUrl: 'https://instagram.com/voltechstore', facebookUrl: 'https://facebook.com/voltechstore', tiktokUrl: 'https://tiktok.com/@voltechstore', whatsappUrl: 'https://wa.me/584121234567', logo: '' },
+    tienda: { nombre: 'VOLTECH STORE', email: '', telefono: '', direccion: '', instagramUrl: '', facebookUrl: '', tiktokUrl: '', whatsappUrl: '', logo: '' },
     pagos: {
       efectivo: { activo: true, publico: true, nombre: 'Efectivo' },
       pago_movil: { activo: true, publico: true, nombre: 'Pago Móvil' },

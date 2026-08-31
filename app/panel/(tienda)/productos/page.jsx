@@ -4,6 +4,7 @@
   import Link from 'next/link';
   import { supabase } from '@/lib/supabase';
   import { usePermissions } from '@/app/context/PermissionsContext';
+  import { useNotificaciones } from '@/app/context/NotificationContext';
   import { 
   Plus, Search, Edit, Trash2, X, Package, DollarSign, TrendingUp,
   AlertTriangle, CheckCircle, Image as ImageIcon, Save, Minus,
@@ -79,8 +80,18 @@
     return texto.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
   };
 
+  // ✅ Guardado local seguro: si el localStorage está lleno (imágenes base64), NO rompe el guardado en Supabase
+  const setLocalSafe = (clave, valor) => {
+    try {
+      localStorage.setItem(clave, valor);
+    } catch (e) {
+      console.warn('⚠️ localStorage lleno, se omite respaldo local de', clave, ':', e.message);
+    }
+  };
+
   export default function ProductosPage() {
     const { tienePermiso } = usePermissions();
+    const { agregarNotificacion } = useNotificaciones();
     
     const [productos, setProductos] = useState([]);
     const [carteras, setCarteras] = useState([]);
@@ -272,7 +283,7 @@
             }
           });
           if (cambio) {
-            localStorage.setItem('voltech_productos', JSON.stringify(pData));
+            setLocalSafe('voltech_productos', JSON.stringify(pData));
             if (supabase) supabase.from('productos').upsert(pData, { onConflict: 'id' }).then(({ error }) => {
               if (error) console.error('Error completando SKUs:', error);
               else console.log('✅ SKUs completados y guardados en Supabase');
@@ -760,7 +771,7 @@
 
         const nuevosProductos = [...productos, nuevoProducto];
         setProductos(nuevosProductos);
-        localStorage.setItem('voltech_productos', JSON.stringify(nuevosProductos));
+        setLocalSafe('voltech_productos', JSON.stringify(nuevosProductos));
 
         if (items.length > 0) {
           const nuevosItems = [...items];
@@ -833,7 +844,7 @@
         }
         const nuevosProductos = productos.filter(p => !(p.plataforma === valor && p.tipo === gestionSubtipo));
         setProductos(nuevosProductos);
-        localStorage.setItem('voltech_productos', JSON.stringify(nuevosProductos));
+        setLocalSafe('voltech_productos', JSON.stringify(nuevosProductos));
         toast.success(`"${valor}" eliminado`);
       } else if (tipo === 'nombre_fisico') {
         const nuevos = nombresProductosGuardados.filter(n => n !== valor);
@@ -928,7 +939,7 @@
 
       const productosActualizados = [...productos, nuevoCombo];
       setProductos(productosActualizados);
-      localStorage.setItem('voltech_productos', JSON.stringify(productosActualizados));
+      setLocalSafe('voltech_productos', JSON.stringify(productosActualizados));
       toast.success(`Combo "${comboNombre}" creado exitosamente`);
       setShowComboModal(false);
       setComboNombre('');
@@ -956,7 +967,7 @@
       }
 
       setProductos(productosActualizados);
-      localStorage.setItem('voltech_productos', JSON.stringify(productosActualizados));
+      setLocalSafe('voltech_productos', JSON.stringify(productosActualizados));
       toast.success(`Comisión del ${bulkCommissionPercent}% asignada a ${selectedProducts.length} productos`);
       setShowBulkCommissionModal(false);
       setSelectedProducts([]);
@@ -984,7 +995,7 @@
         }
         const nuevosProductos = productos.filter(p => !selectedProducts.includes(p.id));
         setProductos(nuevosProductos);
-        localStorage.setItem('voltech_productos', JSON.stringify(nuevosProductos));
+        setLocalSafe('voltech_productos', JSON.stringify(nuevosProductos));
         toast.success(`${selectedProducts.length} producto(s) eliminado(s)`);
         setSelectedProducts([]);
       } catch (error) {
@@ -1132,7 +1143,7 @@
           });
 
           setProductos(productosFinales);
-          localStorage.setItem('voltech_productos', JSON.stringify(productosFinales));
+          setLocalSafe('voltech_productos', JSON.stringify(productosFinales));
 
           const nuevasCategorias = [...categorias];
           const nuevasMarcas = [...marcas];
@@ -1154,9 +1165,9 @@
             await supabase.from('settings').upsert({ clave: 'marcas', valor: nuevasMarcas }, { onConflict: 'clave' });
             await supabase.from('settings').upsert({ clave: 'nombres_productos', valor: nombresFisicosNuevos }, { onConflict: 'clave' });
           }
-          localStorage.setItem('voltech_categorias', JSON.stringify(nuevasCategorias));
-          localStorage.setItem('voltech_marcas', JSON.stringify(nuevasMarcas));
-          localStorage.setItem('voltech_nombres_productos', JSON.stringify(nombresFisicosNuevos));
+          setLocalSafe('voltech_categorias', JSON.stringify(nuevasCategorias));
+          setLocalSafe('voltech_marcas', JSON.stringify(nuevasMarcas));
+          setLocalSafe('voltech_nombres_productos', JSON.stringify(nombresFisicosNuevos));
 
           const mensaje = productosActualizados > 0 
             ? `${productosGuardados} nuevo(s) y ${productosActualizados} actualizado(s)`
@@ -1925,7 +1936,7 @@
                                 label="Método de Pago"
                                 value={item.metodoPago}
                                 onChange={(value) => handleChange(itemIndex, 'metodoPago', value)}
-                                options={[...opcionesMetodosPago, { value: 'por_comprar', label: '🛒 Se compra al momento' }]}
+                                options={[...opcionesMetodosPago, { value: 'por_comprar', label: 'Se compra al momento' }]}
                               />
                             </div>
                             <div>
@@ -1933,7 +1944,7 @@
                                 label="Cartera"
                                 value={item.cartera}
                                 onChange={(value) => handleChange(itemIndex, 'cartera', value)}
-                                options={[{ value: '', label: '-- Selecciona --' }, ...carteras.map(c => ({ value: c.nombre, label: c.nombre })), { value: 'por_comprar', label: '🛒 Por comprar (al momento)' }]}
+                                options={[{ value: '', label: '-- Selecciona --' }, ...carteras.map(c => ({ value: c.nombre, label: c.nombre })), { value: 'por_comprar', label: 'Por comprar (al momento)' }]}
                               />
                             </div>
                             {tienePermiso('puedeVerInventarioCompleto') && (

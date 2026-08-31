@@ -977,6 +977,18 @@ grupos[k].sort((a, b) => (a.producto || a.plataforma || '').localeCompare(b.prod
 });
 return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }));
 }, [productosFiltrados]);
+
+const streamingAgrupados = useMemo(() => {
+const grupos = {};
+streamingFiltrados.forEach(p => {
+const cat = (p.categoria || 'STREAMING').toUpperCase();
+(grupos[cat] = grupos[cat] || []).push(p);
+});
+Object.keys(grupos).forEach(k => {
+grupos[k].sort((a, b) => (a.plataforma || '').localeCompare(b.plataforma || '', 'es', { sensitivity: 'base' }));
+});
+return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }));
+}, [streamingFiltrados]);
       const renderProductCard = (p, idx = 0) => {
       const precioInfo = getPrecioMostrar(p);
       const todasImagenes = Array.from(new Set([
@@ -1559,8 +1571,14 @@ productosAgrupados.map(([cat, items]) => (
             {activeSection === 'streaming' && (
               <div>
                 <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Streaming</h2>
+                {streamingAgrupados.map(([cat, items]) => (
+                <div key={cat} className="mb-10">
+                <h3 className={`text-lg md:text-xl font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                <Play className="w-5 h-5 text-purple-600" /> {cat}
+                <span className={`text-xs font-normal ${mutedText}`}>({items.length})</span>
+                </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5 w-full">
-      {streamingFiltrados.map((p, idx) => {
+      {items.map((p, idx) => {
       const precioInfo = getPrecioMostrar(p);
       return (
       <div key={p.id || p.plataforma || `stream-${idx}`} onClick={() => setSelectedProduct(p)} className={`flex flex-col justify-between h-full ${darkMode ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-200'} rounded-2xl shadow-md border overflow-hidden hover:shadow-xl hover:border-slate-700 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer group`}>
@@ -1594,8 +1612,10 @@ productosAgrupados.map(([cat, items]) => (
                 </div>
                 );
                 })}
-                {streamingFiltrados.length === 0 && <div className={`text-center py-20 col-span-full ${mutedText}`}><Play className="w-16 h-16 mx-auto mb-3 opacity-30" /><p className="text-lg">No hay plataformas disponibles</p></div>}
                 </div>
+                </div>
+                ))}
+                {streamingAgrupados.length === 0 && <div className={`text-center py-20 col-span-full ${mutedText}`}><Play className="w-16 h-16 mx-auto mb-3 opacity-30" /><p className="text-lg">No hay plataformas disponibles</p></div>}
               </div>
             )}
 
@@ -2139,7 +2159,7 @@ productosAgrupados.map(([cat, items]) => (
                     )}
                     {selectedProduct.disponibilidad === 'bajo_pedido' && (
                     <p className="flex items-center gap-2 text-amber-500 text-xs mt-1">
-                    <ShoppingCart className="w-4 h-4" /> Se compra al momento · entrega 24-48h
+                    <ShoppingCart className="w-4 h-4" /> Bajo pedido 
                     </p>
                     )}
                     </div>

@@ -2,6 +2,15 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase'; // ✅ CAMBIADO: Ruta relativa infalible
 
+// ✅ Helper: guarda en localStorage solo si hay espacio disponible
+const setLocalSafe = (clave, valor) => {
+  try {
+    localStorage.setItem(clave, valor);
+  } catch (e) {
+    console.warn('⚠️ localStorage lleno, se omite caché de', clave);
+  }
+};
+
 // 1. Hook para Productos
 export function useProductos() {
   const [productos, setProductos] = useState([]);
@@ -18,7 +27,7 @@ export function useProductos() {
 
         if (!error && data && data.length > 0) {
           setProductos(data);
-          localStorage.setItem('voltech_productos', JSON.stringify(data));
+          setLocalSafe('voltech_productos', JSON.stringify(data));
         } else {
           const cached = localStorage.getItem('voltech_productos');
           if (cached) setProductos(JSON.parse(cached).filter(p => p.publicado === true || p.publicado === undefined));
@@ -47,7 +56,7 @@ export function useSettings() {
           const settingsObj = {};
           data.forEach(item => { settingsObj[item.clave] = item.valor; });
           setSettings(settingsObj);
-          localStorage.setItem('voltech_settings', JSON.stringify(settingsObj));
+          setLocalSafe('voltech_settings', JSON.stringify(settingsObj));
         } else {
           const cached = localStorage.getItem('voltech_settings');
           if (cached) setSettings(JSON.parse(cached));
@@ -72,7 +81,7 @@ export function useTasaBCV() {
   }, []);
   const updateTasa = (nuevaTasa) => {
     setTasa(nuevaTasa);
-    localStorage.setItem('voltech_tasa_bcv', JSON.stringify({ tasa: nuevaTasa }));
+    setLocalSafe('voltech_tasa_bcv', JSON.stringify({ tasa: nuevaTasa }));
   };
   return { tasa, setTasa: updateTasa };
 }
