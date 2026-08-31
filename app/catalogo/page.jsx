@@ -1286,13 +1286,30 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
             </div>
           
             {activeSection === 'streaming' && (
-              <CustomSelect
-                value={filterPlatform}
-                onChange={setFilterPlatform}
-                options={plataformas.map(p => ({ value: p, label: p }))}
-                placeholder="Todas las plataformas"
-                className="w-full md:w-auto"
-              />
+              <div className="relative w-full md:w-56">
+                <select
+                  value={filterPlatform}
+                  onChange={(e) => setFilterPlatform(e.target.value)}
+                  className="w-full appearance-none bg-[#14101f]/90 border border-purple-500/40 text-slate-200 text-sm font-medium rounded-xl pl-4 pr-10 py-2.5 cursor-pointer outline-none transition-all hover:border-purple-400/70 hover:bg-[#1a1428] focus:border-purple-500 focus:ring-2 focus:ring-purple-500/40 focus:shadow-[0_0_18px_rgba(168,85,247,0.35)] [color-scheme:dark]"
+                >
+                  <option value="">Todas las plataformas</option>
+                  {plataformas.map(p => <option key={p} value={p} className="bg-[#14101f] text-slate-200">{p}</option>)}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400" />
+              </div>
+            )}
+            {activeSection === 'productos' && (
+              <div className="relative w-full md:w-56">
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="w-full appearance-none bg-[#14101f]/90 border border-purple-500/40 text-slate-200 text-sm font-medium rounded-xl pl-4 pr-10 py-2.5 cursor-pointer outline-none transition-all hover:border-purple-400/70 hover:bg-[#1a1428] focus:border-purple-500 focus:ring-2 focus:ring-purple-500/40 focus:shadow-[0_0_18px_rgba(168,85,247,0.35)] [color-scheme:dark]"
+                >
+                  <option value="">Todas las categorías</option>
+                  {(categorias || []).map(c => typeof c === 'string' ? <option key={c} value={c} className="bg-[#14101f] text-slate-200">{c}</option> : <option key={c.id || c.nombre} value={c.id || c.nombre} className="bg-[#14101f] text-slate-200">{c.nombre || c.label}</option>)}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400" />
+              </div>
             )}
           </div>
         </div>
