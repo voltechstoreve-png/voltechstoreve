@@ -72,6 +72,7 @@ export default function AjustesPage() {
     colores: { primario: '#00ff88', secundario: '#8b5cf6', acento: '#06b6d4', fondo: '#0a0a0f', texto: '#ffffff', difuminado: 'horizontal' },
     whatsapp: { plantilla_compra: PLANTILLA_COMPRA_DEFAULT, cierre_compra: 'Quiero comprar ✅' },
     oferta_relampago: { activo: false, texto: '⚡ 10% de descuento en toda la tienda solo por hoy', descuento_pct: 10, duracion_horas: 2, inicio: '', fin: '' },
+    oferta_inferior: { activo: false, texto: '', descuento_pct: 0 },
   });
 
   const [nuevoPunto, setNuevoPunto] = useState('');
@@ -83,6 +84,14 @@ export default function AjustesPage() {
   const [logoPreview, setLogoPreview] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef(null);
+  const [ofertasBanners, setOfertasBanners] = useState([]);
+  const [showOfertaForm, setShowOfertaForm] = useState(false);
+  const [ofertaEditando, setOfertaEditando] = useState(null);
+  const [formDataOferta, setFormDataOferta] = useState({
+    posicion: 'superior', texto: '', descuento_pct: 0, monto: 0,
+    fecha_inicio: '', duracion_dias: 1, fecha_fin: '',
+    hora_inicio: '00:00', hora_fin: '23:59',
+  });
 
   useEffect(() => {
     const cargarAjustes = async () => {
@@ -119,6 +128,7 @@ export default function AjustesPage() {
           if (datosCargados.colores) merged.colores = { ...prev.colores, ...datosCargados.colores };
           if (datosCargados.whatsapp) merged.whatsapp = { ...prev.whatsapp, ...datosCargados.whatsapp };
           if (datosCargados.oferta_relampago) merged.oferta_relampago = { ...prev.oferta_relampago, ...datosCargados.oferta_relampago };
+          if (datosCargados.oferta_inferior) merged.oferta_inferior = { ...prev.oferta_inferior, ...datosCargados.oferta_inferior };
           return merged;
         });
       }
@@ -128,6 +138,33 @@ export default function AjustesPage() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // ✅ Cargar Ofertas/Banners desde Supabase o localStorage
+  useEffect(() => {
+    const cargarOfertas = async () => {
+      let arr = null;
+      if (supabase) {
+        const { data } = await supabase.from('settings').select('valor').eq('clave', 'ofertas_banners').maybeSingle();
+        if (data?.valor) arr = typeof data.valor === 'string' ? JSON.parse(data.valor) : data.valor;
+      }
+      if (!arr) { try { arr = JSON.parse(localStorage.getItem('voltech_ofertas_banners') || 'null'); } catch (e) {} }
+      if (Array.isArray(arr)) setOfertasBanners(arr);
+    };
+    cargarOfertas();
+    const h = () => cargarOfertas();
+    window.addEventListener('voltech-data-updated', h);
+    return () => window.removeEventListener('voltech-data-updated', h);
+  }, []);
+
+  // ✅ Auto-calcula fecha_fin = fecha_inicio + duración
+  useEffect(() => {
+    if (formDataOferta.fecha_inicio && formDataOferta.duracion_dias) {
+      const f = new Date(formDataOferta.fecha_inicio + 'T00:00:00');
+      f.setDate(f.getDate() + (parseInt(formDataOferta.duracion_dias) || 0));
+      const y = f.getFullYear(), m = String(f.getMonth() + 1).padStart(2, '0'), d = String(f.getDate()).padStart(2, '0');
+      setFormDataOferta(prev => ({ ...prev, fecha_fin: `${y}-${m}-${d}` }));
+    }
+  }, [formDataOferta.fecha_inicio, formDataOferta.duracion_dias]);
 
   const handleSave = async () => {
     if (!esAdmin) { toast.error('Solo el administrador puede modificar los ajustes'); return; }
@@ -144,6 +181,7 @@ export default function AjustesPage() {
           { clave: 'colores', valor: settings.colores },
           { clave: 'whatsapp', valor: settings.whatsapp },
           { clave: 'oferta_relampago', valor: settings.oferta_relampago },
+          { clave: 'oferta_inferior', valor: settings.oferta_inferior },
         ];
         const { error } = await supabase.from('settings').upsert(settingsToSave, { onConflict: 'clave' });
         if (error) throw error;
@@ -271,6 +309,49 @@ export default function AjustesPage() {
     toast.success('Oferta desactivada');
   };
 
+  // ═══════════════ GESTOR DE OFERTAS / BANNERS ═══════════════
+  const resetFormOferta = () => setFormDataOferta({ posicion: 'superior', texto: '', descuento_pct: 0, monto: 0, fecha_inicio: '', duracion_dias: 1, fecha_fin: '', hora_inicio: '00:00', hora_fin: '23:59' });
+
+  const persistirOfertas = async (arr) => {
+    setOfertasBanners(arr);
+    if (supabase) await supabase.from('settings').upsert({ clave: 'ofertas_banners', valor: arr }, { onConflict: 'clave' });
+    localStorage.setItem('voltech_ofertas_banners', JSON.stringify(arr));
+    window.dispatchEvent(new CustomEvent('voltech-data-updated'));
+  };
+
+  const estadoOferta = (o) => {
+    const now = new Date();
+    const inicio = new Date(`${o.fecha_inicio}T${o.hora_inicio || '00:00'}`);
+    const fin = new Date(`${o.fecha_fin}T${o.hora_fin || '23:59'}`);
+    if (now < inicio) return 'programada';
+    if (now > fin) return 'expirada';
+    return 'activa';
+  };
+
+  const guardarOferta = async () => {
+    if (!formDataOferta.texto.trim()) { toast.error('Escribe el texto del anuncio'); return; }
+    if (!formDataOferta.fecha_inicio) { toast.error('Selecciona la fecha de inicio'); return; }
+    if (ofertaEditando) {
+      await persistirOfertas(ofertasBanners.map(o => o.id === ofertaEditando.id ? { ...o, ...formDataOferta } : o));
+      toast.success('Oferta actualizada');
+    } else {
+      await persistirOfertas([...ofertasBanners, { id: `of-${Date.now()}`, activo: true, creado_en: new Date().toISOString(), ...formDataOferta }]);
+      toast.success('Oferta creada y sincronizada al catálogo');
+    }
+    setShowOfertaForm(false); setOfertaEditando(null); resetFormOferta();
+  };
+
+  const toggleOferta = async (id) => {
+    await persistirOfertas(ofertasBanners.map(o => o.id === id ? { ...o, activo: !o.activo } : o));
+    toast.success('Estado actualizado');
+  };
+
+  const eliminarOferta = async (id) => {
+    if (!confirm('¿Eliminar esta oferta?')) return;
+    await persistirOfertas(ofertasBanners.filter(o => o.id !== id));
+    toast.success('Oferta eliminada');
+  };
+
   const cierreCompra = settings.whatsapp?.cierre_compra || 'Quiero comprar ✅';
       // ✅ Si la plantilla guardada es la vieja ("oferta/descuento"), muestra la nueva dinámica
       const plantillaGuardada = settings.whatsapp?.plantilla_compra || PLANTILLA_COMPRA_DEFAULT;
@@ -298,7 +379,7 @@ export default function AjustesPage() {
     { id: 'envios', icon: Truck, label: 'Envíos' },
     { id: 'pagos', icon: CreditCard, label: 'Pagos' },
     { id: 'carteras', icon: Wallet, label: 'Carteras' },
-    { id: 'ofertas_relampago', icon: Zap, label: 'Ofertas Relámpago' },
+    { id: 'ofertas_relampago', icon: Zap, label: 'Banners Ofertas' },
     { id: 'terminos', icon: FileText, label: 'Términos' },
     { id: 'whatsapp', icon: WhatsAppIcon, label: 'WhatsApp' },
     { id: 'backup', icon: Database, label: 'Backup' },
@@ -493,125 +574,122 @@ export default function AjustesPage() {
         )}
 
         {activeTab === 'ofertas_relampago' && (
-          <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6 space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-voltech-border">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-voltech-cyan to-voltech-purple">
-                  <Zap className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">⚡ Ofertas Relámpago</h3>
-                  <p className="text-xs text-voltech-muted mt-0.5">Descuentos automáticos por tiempo limitado en el catálogo</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {settings.oferta_relampago.activo ? (
-                  <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-voltech-success/20 text-voltech-success flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-voltech-success animate-pulse" /> Activa
-                  </span>
-                ) : (
-                  <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-voltech-muted/20 text-voltech-muted">Inactiva</span>
-                )}
-              </div>
-            </div>
-
-            {/* Información de cómo funciona */}
-            <div className="p-4 bg-voltech-cyan/5 border border-voltech-cyan/20 rounded-lg">
-              <p className="text-xs text-voltech-cyan flex items-start gap-2">
-                <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>La oferta aparecerá como <strong>barra lineal</strong> arriba del catálogo y se aplicará <strong>automáticamente</strong> al total del carrito. El descuento se muestra al cliente y en el mensaje de WhatsApp del pedido.</span>
-              </p>
-            </div>
-
-            {/* Configuración */}
-            <div className="space-y-4">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
               <div>
-                <label className="block text-xs text-voltech-muted mb-2">📝 Texto del anuncio (se muestra en la barra superior)</label>
-                <input
-                  type="text"
-                  value={settings.oferta_relampago.texto}
-                  onChange={(e) => setSettings(prev => ({ ...prev, oferta_relampago: { ...prev.oferta_relampago, texto: e.target.value } }))}
-                  className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
-                  placeholder="Ej: 🚚 Delivery GRATIS solo por hoy"
-                />
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {['⚡ 10% OFF en toda la tienda', '🚚 Delivery GRATIS solo por hoy', '🔥 2x1 en accesorios por 2 horas', '💰 15% OFF pagando con Binance'].map(txt => (
-                    <button key={txt} type="button" onClick={() => setSettings(prev => ({ ...prev, oferta_relampago: { ...prev.oferta_relampago, texto: txt } }))} className={`text-[10px] font-semibold px-2.5 py-1 rounded-full transition-colors ${settings.oferta_relampago.texto === txt ? 'bg-voltech-cyan text-voltech-dark' : 'bg-voltech-border/50 text-voltech-muted hover:bg-voltech-border'}`}>{txt}</button>
-                  ))}
-                </div>
+                <h2 className="text-xl font-bold text-white">Ofertas y Banners</h2>
+                <p className="text-sm text-voltech-muted mt-1">Crea promociones sincronizadas con el catálogo</p>
               </div>
+              <button onClick={() => { resetFormOferta(); setOfertaEditando(null); setShowOfertaForm(!showOfertaForm); }} className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium flex items-center gap-2">
+                <Plus className="w-4 h-4" /> Crear Oferta
+              </button>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-voltech-muted mb-2">💰 Descuento (%)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={settings.oferta_relampago.descuento_pct}
-                    onChange={(e) => setSettings(prev => ({ ...prev, oferta_relampago: { ...prev.oferta_relampago, descuento_pct: parseInt(e.target.value) || 0 } }))}
-                    className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
-                    placeholder="10"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-voltech-muted mb-2">⏰ Duración (horas)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="168"
-                    value={settings.oferta_relampago.duracion_horas}
-                    onChange={(e) => setSettings(prev => ({ ...prev, oferta_relampago: { ...prev.oferta_relampago, duracion_horas: parseInt(e.target.value) || 0 } }))}
-                    className="input-voltech w-full rounded-lg px-4 py-3 text-sm"
-                    placeholder="2"
-                  />
-                </div>
-              </div>
-
-              {settings.oferta_relampago.activo && settings.oferta_relampago.inicio && settings.oferta_relampago.fin && (
-                <div className="p-4 bg-voltech-success/5 border border-voltech-success/20 rounded-lg">
-                  <p className="text-xs text-voltech-success flex items-center gap-2 font-medium mb-2"><Clock className="w-4 h-4" /> Vigencia de la oferta activa</p>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <p className="text-xs text-voltech-muted">Inicio</p>
-                      <p className="text-white font-mono">{new Date(settings.oferta_relampago.inicio).toLocaleString('es-VE')}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-voltech-muted">Termina</p>
-                      <p className="text-white font-mono">{new Date(settings.oferta_relampago.fin).toLocaleString('es-VE')}</p>
-                    </div>
+            {showOfertaForm && (
+              <div className="bg-voltech-surface border border-voltech-border rounded-xl p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-voltech-muted mb-2">📍 Posición del Banner</label>
+                    <CustomSelect
+                      value={formDataOferta.posicion}
+                      onChange={(v) => setFormDataOferta({ ...formDataOferta, posicion: v })}
+                      options={[
+                        { value: 'superior', label: '⬆️ Banner Superior (fijo/informativo)' },
+                        { value: 'inferior', label: '⬇️ Banner Inferior (Oferta Relámpago)' }
+                      ]}
+                      placeholder="Selecciona posición"
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-voltech-muted mb-2">📝 Texto del anuncio</label>
+                    <input type="text" value={formDataOferta.texto} onChange={(e) => setFormDataOferta({ ...formDataOferta, texto: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Ej: 🚚 Delivery GRATIS en Caracas" />
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Acciones */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-voltech-border">
-              {!settings.oferta_relampago.activo ? (
-                <button
-                  type="button"
-                  onClick={activarOfertaRelampago}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-xl text-sm font-bold hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center justify-center gap-2"
-                >
-                  <Zap className="w-4 h-4" /> Activar Oferta ({settings.oferta_relampago.duracion_horas}h · {settings.oferta_relampago.descuento_pct}%)
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={desactivarOfertaRelampago}
-                  className="flex-1 px-4 py-3 bg-voltech-error/20 text-voltech-error border border-voltech-error/30 rounded-xl text-sm font-bold hover:bg-voltech-error/30 transition-all flex items-center justify-center gap-2"
-                >
-                  <X className="w-4 h-4" /> Desactivar Oferta Ahora
-                </button>
-              )}
-            </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-xs text-voltech-muted mb-2">💰 Descuento (%) · 0 = no aplica</label>
+                    <input type="number" min="0" max="100" value={formDataOferta.descuento_pct} onChange={(e) => setFormDataOferta({ ...formDataOferta, descuento_pct: parseInt(e.target.value) || 0 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-voltech-muted mb-2">💵 Monto ($) · 0 = no aplica</label>
+                    <input type="number" min="0" step="0.01" value={formDataOferta.monto} onChange={(e) => setFormDataOferta({ ...formDataOferta, monto: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-voltech-muted mb-2">📅 Fecha Inicio</label>
+                    <input type="date" value={formDataOferta.fecha_inicio} onChange={(e) => setFormDataOferta({ ...formDataOferta, fecha_inicio: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-voltech-muted mb-2">⏳ Duración (días)</label>
+                    <input type="number" min="1" value={formDataOferta.duracion_dias} onChange={(e) => setFormDataOferta({ ...formDataOferta, duracion_dias: parseInt(e.target.value) || 1 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+                  </div>
+                </div>
 
-            {/* Vista previa */}
-            <div>
-              <p className="text-xs text-voltech-muted mb-2">👁️ Vista previa en el catálogo</p>
-              <div className="bg-gradient-to-r from-voltech-cyan via-voltech-purple to-voltech-cyan text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2">
-                <Zap className="w-4 h-4 shrink-0 animate-pulse" />
-                <p className="text-sm font-bold truncate">{settings.oferta_relampago.texto}</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs text-voltech-muted mb-2">📅 Fecha Fin (auto)</label>
+                    <input type="date" value={formDataOferta.fecha_fin} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-voltech-muted mb-2">🕐 Hora Inicio</label>
+                    <input type="time" value={formDataOferta.hora_inicio} onChange={(e) => setFormDataOferta({ ...formDataOferta, hora_inicio: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-voltech-muted mb-2">🕘 Hora Fin</label>
+                    <input type="time" value={formDataOferta.hora_fin} onChange={(e) => setFormDataOferta({ ...formDataOferta, hora_fin: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button onClick={guardarOferta} className="flex-1 btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"><Save className="w-4 h-4" /> {ofertaEditando ? 'Guardar Cambios' : 'Registrar Oferta'}</button>
+                  <button onClick={() => { setShowOfertaForm(false); setOfertaEditando(null); resetFormOferta(); }} className="px-6 py-3 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white">Cancelar</button>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
+              <div className="p-4 border-b border-voltech-border"><h3 className="text-sm font-bold text-white">Historial de Ofertas</h3></div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px]">
+                  <thead className="bg-voltech-dark border-b border-voltech-border">
+                    <tr>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Texto</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Posición</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Descuento</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Vigencia</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Estado</th>
+                      <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ofertasBanners.length === 0 ? (
+                      <tr><td colSpan="6" className="text-center py-10 text-voltech-muted"><Zap className="w-10 h-10 mx-auto mb-2 opacity-40" /><p>No hay ofertas creadas</p></td></tr>
+                    ) : (
+                      ofertasBanners.map(o => {
+                        const est = estadoOferta(o);
+                        return (
+                          <tr key={o.id} className="border-b border-voltech-border hover:bg-voltech-border/30">
+                            <td className="px-4 py-3 text-sm text-white">{o.texto}</td>
+                            <td className="px-4 py-3 text-sm text-voltech-muted">{o.posicion === 'superior' ? '⬆️ Superior' : '⬇️ Inferior'}</td>
+                            <td className="px-4 py-3 text-sm text-voltech-success">{o.descuento_pct > 0 ? `${o.descuento_pct}%` : o.monto > 0 ? `$${o.monto}` : '—'}</td>
+                            <td className="px-4 py-3 text-xs text-voltech-muted">{o.fecha_inicio} → {o.fecha_fin}<br />{o.hora_inicio} a {o.hora_fin}</td>
+                            <td className="px-4 py-3">
+                              <span className={`text-xs px-2 py-1 rounded-full font-medium ${est === 'activa' ? 'bg-voltech-success/20 text-voltech-success' : est === 'programada' ? 'bg-voltech-cyan/20 text-voltech-cyan' : 'bg-voltech-error/20 text-voltech-error'}`}>{est}</span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button onClick={() => toggleOferta(o.id)} className="p-2 hover:bg-voltech-border rounded text-voltech-muted" title="Activar/Desactivar"><Eye className="w-4 h-4" /></button>
+                                <button onClick={() => { setOfertaEditando(o); setFormDataOferta({ posicion: o.posicion, texto: o.texto, descuento_pct: o.descuento_pct, monto: o.monto, fecha_inicio: o.fecha_inicio, duracion_dias: o.duracion_dias, fecha_fin: o.fecha_fin, hora_inicio: o.hora_inicio, hora_fin: o.hora_fin }); setShowOfertaForm(true); }} className="p-2 hover:bg-voltech-border rounded text-voltech-cyan" title="Editar"><Edit3 className="w-4 h-4" /></button>
+                                <button onClick={() => eliminarOferta(o.id)} className="p-2 hover:bg-voltech-border rounded text-voltech-error" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

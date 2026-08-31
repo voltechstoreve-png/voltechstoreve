@@ -164,6 +164,40 @@ const ofertaActiva = useMemo(() => {
   return ofertaRelampago;
 }, [ofertaRelampago]);
 
+// 🎯 BANNERS DE OFERTAS (superior + inferior) desde Ajustes
+const [ofertasBanners, setOfertasBanners] = useState([]);
+const [bannerInferiorCerrado, setBannerInferiorCerrado] = useState(() => typeof window !== 'undefined' && sessionStorage.getItem('voltech_banner_inferior_cerrado') === '1');
+useEffect(() => {
+  const cargar = async () => {
+    let arr = null;
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('settings').select('valor').eq('clave', 'ofertas_banners').maybeSingle();
+        if (data?.valor) arr = typeof data.valor === 'string' ? JSON.parse(data.valor) : data.valor;
+      } catch (e) {}
+    }
+    if (!arr) { try { arr = JSON.parse(localStorage.getItem('voltech_ofertas_banners') || 'null'); } catch (e) {} }
+    if (Array.isArray(arr)) setOfertasBanners(arr);
+  };
+  cargar();
+  const h = () => cargar();
+  window.addEventListener('voltech-data-updated', h);
+  return () => window.removeEventListener('voltech-data-updated', h);
+}, []);
+
+const ofertaEnVigencia = (o) => {
+  if (!o || !o.activo) return false;
+  const now = new Date();
+  if (o.fecha_inicio) { const ini = new Date(`${o.fecha_inicio}T${o.hora_inicio || '00:00'}`); if (now < ini) return false; }
+  if (o.fecha_fin) { const fin = new Date(`${o.fecha_fin}T${o.hora_fin || '23:59'}`); if (now > fin) return false; }
+  return true;
+};
+const bannersActivos = useMemo(() => (ofertasBanners || []).filter(ofertaEnVigencia), [ofertasBanners]);
+const bannerSuperior = bannersActivos.find(o => o.posicion === 'superior') || null;
+const bannerInferior = bannersActivos.find(o => o.posicion === 'inferior') || null;
+const bannerSuperiorFinal = bannerSuperior || ofertaActiva;
+const pctTotalDescuento = Math.min(100, (Number(bannerSuperiorFinal?.descuento_pct) || 0) + (Number(bannerInferior?.descuento_pct) || 0));
+
 // 🔴 NUEVO ESTADO: Guarda la relación de aspecto dinámica de cada imagen
 const [ratios, setRatios] = useState({});
 
@@ -570,7 +604,7 @@ return { gratis: false, costo, texto: `Cobro a destino ($${costo.toFixed(2)})` }
   const calculateTotal = () => {
     let subtotal = cart.reduce((sum, item) => sum + (getPrecioMostrar(item).precioPrincipal * item.cantidad), 0);
     const descuentoCupon = appliedCoupon ? appliedCoupon.descuentoCalculado : 0;
-    const descuentoOferta = ofertaActiva ? subtotal * ((Number(ofertaActiva.descuento_pct) || 0) / 100) : 0;
+    const descuentoOferta = subtotal * (pctTotalDescuento / 100);
     return Math.max(0, subtotal - descuentoCupon - descuentoOferta + calcularEnvio());
   };
 
@@ -599,9 +633,10 @@ return { gratis: false, costo, texto: `Cobro a destino ($${costo.toFixed(2)})` }
     if (appliedCoupon) {
       mensaje += `\n 🎟️ Cupón: ${appliedCoupon.codigo} (-$${appliedCoupon.descuentoCalculado.toFixed(2)})`;
     }
-    if (ofertaActiva) {
-      const descRel = subtotalSinEnvio * (Number(ofertaActiva.descuento_pct) || 0) / 100;
-      mensaje += `\n ⚡ Oferta Relámpago (${ofertaActiva.descuento_pct}%): -$${descRel.toFixed(2)}`;
+    if (pctTotalDescuento > 0) {
+      const descRel = subtotalSinEnvio * pctTotalDescuento / 100;
+      const nombres = [bannerSuperiorFinal?.texto, bannerInferior?.texto].filter(Boolean).join(' + ');
+      mensaje += `\n ⚡ Oferta (${pctTotalDescuento}%): -$${descRel.toFixed(2)}${nombres ? ` (${nombres})` : ''}`;
     }
     if (autoReferrer) {
       mensaje += `\n Referido por: ${autoReferrer}`;
@@ -1168,11 +1203,27 @@ window.location.href = url;
         </div>
       )}
 
-      {ofertaActiva && (
+      {bannerSuperiorFinal && (
         <div className="bg-gradient-to-r from-voltech-cyan via-voltech-purple to-voltech-cyan text-white px-4 py-2 overflow-hidden">
           <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 text-center">
             <Zap className="w-4 h-4 shrink-0 animate-pulse" />
-            <p className="text-xs sm:text-sm font-bold truncate">{ofertaActiva.texto || `⚡ ${ofertaActiva.descuento_pct}% de descuento por tiempo limitado`}</p>
+            <p className="text-xs sm:text-sm font-bold truncate">{bannerSuperiorFinal.texto || `⚡ ${bannerSuperiorFinal.descuento_pct}% de descuento por tiempo limitado`}</p>
+            {bannerSuperiorFinal.descuento_pct > 0 && <span className="shrink-0 text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded-full">-{bannerSuperiorFinal.descuento_pct}%</span>}
+          </div>
+        </div>
+      )}
+
+      {/* ✨ BANNER INFERIOR FIJO — semi-transparente, se queda al hacer scroll, cerrable con X */}
+      {bannerInferior && !bannerInferiorCerrado && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 px-3 pb-3 pointer-events-none">
+          <div className="max-w-3xl mx-auto pointer-events-auto relative rounded-2xl border border-purple-400/40 bg-[#14101f]/70 backdrop-blur-md shadow-[0_8px_30px_rgba(168,85,247,0.35)] px-4 py-3 flex items-center gap-3">
+            <Sparkles className="w-4 h-4 text-purple-300 shrink-0 animate-pulse" />
+            <p className="flex-1 text-xs sm:text-sm font-semibold text-white truncate">{bannerInferior.texto}</p>
+            {bannerInferior.descuento_pct > 0 && <span className="shrink-0 text-[10px] font-bold bg-purple-500 text-white px-2 py-0.5 rounded-full">-{bannerInferior.descuento_pct}%</span>}
+            {bannerInferior.monto > 0 && <span className="shrink-0 text-[10px] font-bold bg-voltech-cyan text-voltech-dark px-2 py-0.5 rounded-full">${bannerInferior.monto}</span>}
+            <button onClick={() => { setBannerInferiorCerrado(true); sessionStorage.setItem('voltech_banner_inferior_cerrado', '1'); }} className="shrink-0 w-6 h-6 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors" title="Cerrar">
+              <X className="w-3.5 h-3.5 text-white" />
+            </button>
           </div>
         </div>
       )}
@@ -2497,10 +2548,10 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
                         <span>-${appliedCoupon.descuentoCalculado.toFixed(2)}</span>
                         </div>
                         )}
-                        {ofertaActiva && (
+                        {pctTotalDescuento > 0 && (
                         <div className="flex justify-between text-purple-400">
-                        <span>⚡ Oferta Relámpago ({ofertaActiva.descuento_pct}%):</span>
-                        <span>-${(cart.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0) * (Number(ofertaActiva.descuento_pct) || 0) / 100).toFixed(2)}</span>
+                        <span>⚡ Oferta ({pctTotalDescuento}%){bannerSuperiorFinal?.texto || bannerInferior?.texto ? ` · ${[bannerSuperiorFinal?.texto, bannerInferior?.texto].filter(Boolean).join(' + ')}` : ''}:</span>
+                        <span>-${(cart.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0) * pctTotalDescuento / 100).toFixed(2)}</span>
                         </div>
                         )}
                         <div className="flex justify-between"><span className={mutedText}>Envío:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>{deliveryMethod === 'nacional' ? (envioNacionalInfo().gratis ? 'GRATIS' : envioNacionalInfo().texto) : (calcularEnvio() === 0 ? 'GRATIS' : '$' + calcularEnvio().toFixed(2))}</span></div>
