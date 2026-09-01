@@ -61,6 +61,8 @@ export default function PagosEquiposPage() {
   const [formCuenta, setFormCuenta] = useState({ tipo: 'entrada', cuentaOrigen: '', cuentaDestino: '', montoBs: '', montoUsd: '', monedaOrigen: 'USD', monedaDestino: 'USDT', tasa: 36.5, nota: '' });
   const [cuentasInternas, setCuentasInternas] = useState([]);
   const [nuevaCuentaInterna, setNuevaCuentaInterna] = useState('');
+  const [mostrarMontos, setMostrarMontos] = useState(true);
+  const [cajasVisibles, setCajasVisibles] = useState(true);
 
   useEffect(() => {
     const cargarCuentas = async () => {
@@ -839,6 +841,15 @@ useEffect(() => {
               Nueva Inversión
             </button>
           )}
+          {activeTab === 'cuentas' && (
+            <button
+              onClick={() => setShowFormCuenta(!showFormCuenta)}
+              className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Registrar Movimiento
+            </button>
+          )}
         </div>
       </div>
 
@@ -898,6 +909,35 @@ useEffect(() => {
           <div className="min-w-0 flex-1 md:flex-none"><p className="text-[11px] md:text-xs font-medium text-slate-400 md:text-voltech-muted leading-tight truncate">Movimientos Totales</p><p className="text-base md:text-xl font-bold text-white mt-0.5 md:mt-0">{movimientos.length}</p></div>
         </div>
       </div>
+
+      {activeTab === 'cuentas' && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={() => setMostrarMontos(!mostrarMontos)} className="px-3 py-2 rounded-lg text-xs flex items-center gap-2 bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white">
+            {mostrarMontos ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />} {mostrarMontos ? 'Ocultar montos' : 'Ver montos'}
+          </button>
+          <button onClick={() => setCajasVisibles(!cajasVisibles)} className="px-3 py-2 rounded-lg text-xs flex items-center gap-2 bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white">
+            {cajasVisibles ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />} {cajasVisibles ? 'Ocultar Cuentas/Caja' : 'Ver Cuentas/Caja'}
+          </button>
+          <div className="flex-1 min-w-[200px] flex gap-2">
+            <input type="text" value={nuevaCuentaInterna} onChange={(e) => setNuevaCuentaInterna(e.target.value)} placeholder="Nueva cuenta interna (ej: Ahorros, Publicidad)" className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" />
+            <button onClick={agregarCuentaInterna} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 flex items-center gap-2"><Plus className="w-4 h-4" /> Crear Cuenta</button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'cuentas' && cajasVisibles && (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {todasCuentas.map(nombre => (
+            <div key={nombre} className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 relative">
+              {cuentasInternas.includes(nombre) && (
+                <button onClick={() => eliminarCuentaInterna(nombre)} className="absolute top-2 right-2 p-1 text-voltech-error hover:bg-voltech-error/10 rounded" title="Eliminar cuenta"><Trash2 className="w-3 h-3" /></button>
+              )}
+              <p className="text-xs text-voltech-muted mb-1 truncate">{nombre}</p>
+              <p className="text-xl font-bold text-voltech-cyan">{mostrarMontos ? saldoCartera(nombre).toFixed(2) : '••••'}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {activeTab === 'pagos' && (
         <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
@@ -1352,6 +1392,7 @@ useEffect(() => {
         )}
       </AnimatePresence>
 
+      {activeTab !== 'cuentas' && (
       <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
         <div className="p-4 border-b border-voltech-border flex flex-col md:flex-row items-center justify-between gap-4">
           <h3 className="text-lg font-bold text-white">Historial de {activeTab === 'pagos' ? 'Pagos' : 'Inversiones'}</h3>
@@ -1623,6 +1664,7 @@ useEffect(() => {
           </table>
         </div>
       </div>
+      )}
 
       {activeTab === 'cuentas' && (
         <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
@@ -1634,9 +1676,6 @@ useEffect(() => {
                 <p className="text-xs text-voltech-muted">Lo que entra y sale de cada cuenta · mueve fondos entre cuentas</p>
               </div>
             </div>
-            <button onClick={() => setShowFormCuenta(!showFormCuenta)} className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Registrar Movimiento
-            </button>
           </div>
 
           {showFormCuenta && (
@@ -1683,24 +1722,6 @@ useEffect(() => {
               </div>
             </div>
           )}
-
-          <div className="p-6 border-b border-voltech-border flex flex-col sm:flex-row gap-2">
-            <input type="text" value={nuevaCuentaInterna} onChange={(e) => setNuevaCuentaInterna(e.target.value)} placeholder="Nueva cuenta interna (ej: Ahorros, Publicidad, Caja Principal $)" className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" />
-            <button onClick={agregarCuentaInterna} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 flex items-center gap-2"><Plus className="w-4 h-4" /> Crear Cuenta</button>
-          </div>
-
-          <div className="p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {todasCuentas.map(nombre => (
-              <div key={nombre} className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 relative">
-                {cuentasInternas.includes(nombre) && (
-                  <button onClick={() => eliminarCuentaInterna(nombre)} className="absolute top-2 right-2 p-1 text-voltech-error hover:bg-voltech-error/10 rounded" title="Eliminar cuenta"><Trash2 className="w-3 h-3" /></button>
-                )}
-                <p className="text-xs text-voltech-muted mb-1 truncate">{nombre}</p>
-                <p className="text-xl font-bold text-voltech-cyan">{saldoCartera(nombre).toFixed(2)}</p>
-              </div>
-            ))}
-          </div>
-
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-voltech-dark border-b border-voltech-border">
