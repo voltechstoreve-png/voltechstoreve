@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
+import { getUser, clearUser } from '@/lib/session';
 import { 
   Menu, 
   Search,
@@ -68,11 +69,9 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
   useEffect(() => {
     const fetchUserDataAndStats = async () => {
       let user = null;
-      const userLoggedStr = localStorage.getItem('voltech_user');
+      const localUser = getUser();
       
-      if (userLoggedStr) {
-        const localUser = JSON.parse(userLoggedStr);
-        
+      if (localUser) {
         // Intentar obtener datos frescos de Supabase si tenemos el ID
         if (supabase && localUser.id) {
           const { data, error } = await supabase
@@ -255,7 +254,7 @@ export default function Header({ sidebarOpen, setSidebarOpen, darkMode, setDarkM
   };
   const handleLogout = () => {
     if (confirm('¿Estás seguro de que deseas cerrar sesión?')) {
-      localStorage.removeItem('voltech_user');
+      clearUser();
       toast.success('Sesión cerrada correctamente');
       setTimeout(() => {
         router.push('/portal');

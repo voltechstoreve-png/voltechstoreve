@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTheme } from '@/app/context/ThemeContext';
 import { usePermissions } from '@/app/context/PermissionsContext';
+import { clearUser } from '@/lib/session';
 import { 
   Package, ShoppingCart, Users, Megaphone, Gift, MessageSquare, 
   Settings, ChevronLeft, Monitor, Moon, LogOut, PlayCircle, UserCog,
@@ -73,7 +74,7 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen, 
   })).filter(section => section.items.length > 0);
 
   const handleLogout = () => {
-    localStorage.removeItem('voltech_user');
+    clearUser();
     window.location.href = '/portal';
   };
 

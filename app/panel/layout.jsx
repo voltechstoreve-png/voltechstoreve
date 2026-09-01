@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { getUser } from '@/lib/session';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import InstallAppButton from '@/components/InstallAppButton';
@@ -23,8 +24,7 @@ export default function PanelTiendaLayout({ children }) {
 
   // ✅ CANDADO: sin sesión → al portal; con sesión → ve todo
   useEffect(() => {
-    let raw = null;
-    try { raw = JSON.parse(localStorage.getItem('voltech_user') || 'null'); } catch {}
+    const raw = getUser();
     if (!raw || !raw.nombre) {
       router.replace('/portal');
     } else {
