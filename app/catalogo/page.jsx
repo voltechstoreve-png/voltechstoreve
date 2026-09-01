@@ -18,7 +18,6 @@ User, Settings, LogOut
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import ChatbotWidget from '@/components/ChatbotWidget';
-import CustomSelect from '@/components/CustomSelect';
 import WhatsAppIcon from '@/components/WhatsAppIcon';
 
 // ✅ Abre WhatsApp NATIVO en móvil o WhatsApp Web en PC (conserva emojis)
