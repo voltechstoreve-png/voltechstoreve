@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { setUser } from '@/lib/session';
 import { Mail, Lock, User, Phone, Eye, EyeOff, CheckCircle, AlertCircle, KeyRound, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
@@ -184,18 +185,18 @@ export default function LoginPage() {
           return;
         }
 
-        localStorage.setItem('voltech_user', JSON.stringify(data));
+        setUser(data);
         toast.success('¡Bienvenido de vuelta! Redirigiendo...');
         setTimeout(() => {
           window.location.href = '/panel/dashboard-ventas';
         }, 1500);
       } else {
-        localStorage.setItem('voltech_user', JSON.stringify({
+        setUser({
           id: 'local-1',
           nombre: 'Administrador',
           email: formData.email,
           rol: 'admin'
-        }));
+        });
         toast.success('¡Bienvenido de vuelta! Redirigiendo... (Modo Local)');
         setTimeout(() => {
           window.location.href = '/panel/dashboard-ventas';

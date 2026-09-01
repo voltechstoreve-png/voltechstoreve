@@ -537,31 +537,88 @@ export default function VentasStreamingPage() {
       
       if (formDataNueva.cliente && formDataNueva.telefono) {
         const clienteExistente = clientes.find(c => c.telefono === formDataNueva.telefono || c.nombre?.toLowerCase() === formDataNueva.cliente.toLowerCase());
+        const fechaHoy = new Date().toISOString().split('T')[0];
+        const vendedorRegistro = formDataNueva.vendedor || currentUser?.nombre || 'Admin';
+        
         if (!clienteExistente) {
           const nuevoCliente = {
-            id: Date.now().toString(), nombre: formDataNueva.cliente, telefono: formDataNueva.telefono,
-            email: '', fechaRegistro: new Date().toISOString().split('T')[0],
-            ultimaCompra: new Date().toISOString().split('T')[0], totalCompras: 1, totalGastado: total,
-            etiquetas: ['Streaming'], registradoPor: formDataNueva.vendedor || currentUser?.nombre || 'Admin',
+            id: crypto.randomUUID(),
+            nombre: formDataNueva.cliente,
+            telefono: formDataNueva.telefono,
+            email: '',
+            fechaRegistro: fechaHoy,
+            ultimaCompra: fechaHoy,
+            totalCompras: 1,
+            totalGastado: total,
+            etiquetas: ['Streaming'],
+            registradoPor: vendedorRegistro,
           };
+          
+          let clienteGuardado = false;
           if (supabase) {
-            const { error: errFull } = await supabase.from('clientes').insert(nuevoCliente);
-            if (errFull) {
-              console.warn('⚠️ Insert completo falló, reintentando con campos mínimos:', errFull.message);
-              const { error: errMin } = await supabase.from('clientes').insert({
-                id: nuevoCliente.id, nombre: nuevoCliente.nombre, telefono: nuevoCliente.telefono
-              });
-              if (errMin) console.error('❌ No se pudo crear el cliente:', errMin.message);
+            try {
+              const { error: errFull } = await supabase.from('clientes').insert(nuevoCliente);
+              if (errFull) {
+                console.warn('⚠️ Insert completo falló, reintentando con campos mínimos:', errFull.message);
+                const clienteMinimo = {
+                  id: nuevoCliente.id,
+                  nombre: nuevoCliente.nombre,
+                  telefono: nuevoCliente.telefono,
+                  fechaRegistro: fechaHoy,
+                  ultimaCompra: fechaHoy,
+                  totalCompras: 1,
+                  totalGastado: total,
+                  registradoPor: vendedorRegistro,
+                };
+                const { error: errMin } = await supabase.from('clientes').insert(clienteMinimo);
+                if (errMin) {
+                  console.error('❌ No se pudo crear el cliente:', errMin.message);
+                  toast.error(`Cliente "${nuevoCliente.nombre}" no se guardó en BD (${errMin.message}). Solo está en esta sesión.`);
+                } else {
+                  clienteGuardado = true;
+                }
+              } else {
+                clienteGuardado = true;
+              }
+            } catch (e) {
+              console.error('❌ Excepción guardando cliente:', e);
+              toast.error(`Error al guardar cliente: ${e.message}`);
             }
+          } else {
+            clienteGuardado = true;
           }
-          setClientes(prev => [...prev, nuevoCliente]);
+          
+          if (clienteGuardado || !supabase) {
+            setClientes(prev => [...prev, nuevoCliente]);
+          } else {
+            setClientes(prev => [...prev, nuevoCliente]);
+          }
         } else {
-          const clienteActualizado = { ...clienteExistente, totalCompras: (clienteExistente.totalCompras || 0) + 1, totalGastado: (clienteExistente.totalGastado || 0) + total, ultimaCompra: new Date().toISOString().split('T')[0] };
+          const clienteActualizado = {
+            ...clienteExistente,
+            totalCompras: (clienteExistente.totalCompras || 0) + 1,
+            totalGastado: (clienteExistente.totalGastado || 0) + total,
+            ultimaCompra: fechaHoy,
+          };
+          
           if (supabase) {
-            const { error: errUpd } = await supabase.from('clientes').update(clienteActualizado).eq('id', clienteExistente.id);
-            if (errUpd) {
-              console.warn('⚠️ Update falló, reintentando mínimo:', errUpd.message);
-              await supabase.from('clientes').update({ ultimaCompra: clienteActualizado.ultimaCompra }).eq('id', clienteExistente.id);
+            try {
+              const { error: errUpd } = await supabase.from('clientes').update(clienteActualizado).eq('id', clienteExistente.id);
+              if (errUpd) {
+                console.warn('⚠️ Update completo falló, reintentando mínimo:', errUpd.message);
+                const { error: errMin } = await supabase.from('clientes').update({
+                  totalCompras: clienteActualizado.totalCompras,
+                  totalGastado: clienteActualizado.totalGastado,
+                  ultimaCompra: clienteActualizado.ultimaCompra,
+                }).eq('id', clienteExistente.id);
+                if (errMin) {
+                  console.error('❌ Update mínimo también falló:', errMin.message);
+                  toast.error(`No se pudo actualizar el cliente "${clienteExistente.nombre}" (${errMin.message})`);
+                }
+              }
+            } catch (e) {
+              console.error('❌ Excepción actualizando cliente:', e);
+              toast.error(`Error al actualizar cliente: ${e.message}`);
             }
           }
           setClientes(prev => prev.map(c => c.id === clienteExistente.id ? clienteActualizado : c));
