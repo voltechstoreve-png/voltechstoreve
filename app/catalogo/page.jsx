@@ -18,6 +18,7 @@ User, Settings, LogOut
 import { motion, AnimatePresence } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import ChatbotWidget from '@/components/ChatbotWidget';
+import CustomSelect from '@/components/CustomSelect';
 import WhatsAppIcon from '@/components/WhatsAppIcon';
 
 // ✅ Abre WhatsApp NATIVO en móvil o WhatsApp Web en PC (conserva emojis)
@@ -1218,7 +1219,7 @@ window.location.href = url;
 
       {/* ✨ BANNER INFERIOR FIJO — semi-transparente, se queda al hacer scroll, cerrable con X */}
       {bannerInferior && !bannerInferiorCerrado && (
-        <div className="fixed bottom-4 left-2 right-20 lg:bottom-0 lg:left-0 lg:right-0 z-50 lg:px-3 lg:pb-3 pointer-events-none">
+        <div className="fixed bottom-3 left-0 right-0 z-50 px-3 pointer-events-none">
           <div className="max-w-3xl mx-auto pointer-events-auto relative rounded-2xl border border-purple-400/40 bg-[#14101f]/80 backdrop-blur-md shadow-[0_8px_30px_rgba(168,85,247,0.35)] px-3 py-2 lg:px-4 lg:py-3 flex items-center gap-2 lg:gap-3">
             <Sparkles className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-purple-300 shrink-0 animate-pulse" />
             <p className="flex-1 text-[10px] sm:text-xs lg:text-sm font-semibold text-white line-clamp-3 leading-snug">{bannerInferior.texto}</p>
@@ -1307,10 +1308,12 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
 </AnimatePresence>
 </div>
 )}
-              <button onClick={() => setShowCart(true)} className={`relative p-2 ${darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}>
-                <ShoppingCart className="w-6 h-6" />
-                {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{cart.length}</span>}
-              </button>
+              {!currentUser && (
+                <button onClick={() => setShowCart(true)} className={`relative p-2 ${darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}>
+                  <ShoppingCart className="w-6 h-6" />
+                  {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{cart.length}</span>}
+                </button>
+              )}
             </div>
           </div>
           
@@ -1333,39 +1336,44 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
               <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
               <input type="text" placeholder={activeSection === 'productos' ? 'Buscar productos...' : activeSection === 'streaming' ? 'Buscar plataformas...' : 'Buscar...'} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${inputBg}`} />
             </div>
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className={`shrink-0 w-16 h-9 rounded-full border flex items-center justify-between px-1.5 transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'}`}
-              title={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-            >
-              {darkMode ? <Moon className="w-4 h-4 text-voltech-cyan" /> : <Sun className="w-4 h-4 text-yellow-500" />}
-              <span className={`w-5 h-5 rounded-full shadow ${darkMode ? 'bg-voltech-cyan' : 'bg-slate-900'}`} />
-            </button>
+            <div className="shrink-0 flex flex-col gap-2 items-center">
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className={`w-16 h-9 rounded-full border flex items-center justify-between px-1.5 transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'}`}
+                title={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+              >
+                {darkMode ? <Moon className="w-4 h-4 text-voltech-cyan" /> : <Sun className="w-4 h-4 text-yellow-500" />}
+                <span className={`w-5 h-5 rounded-full shadow ${darkMode ? 'bg-voltech-cyan' : 'bg-slate-900'}`} />
+              </button>
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('voltech-open-chat'))}
+                className="w-9 h-9 bg-gradient-to-r from-voltech-cyan to-voltech-purple rounded-full shadow-lg shadow-voltech-cyan/30 flex items-center justify-center text-white"
+                title="Ayuda"
+              >
+                💬
+              </button>
+            </div>
           
             {activeSection === 'streaming' && (
-              <div className="relative w-full md:w-56">
-                <select
+              <div className="w-full md:w-56">
+                <CustomSelect
                   value={filterPlatform}
-                  onChange={(e) => setFilterPlatform(e.target.value)}
-                  className="w-full appearance-none bg-[#14101f]/90 border border-purple-500/40 text-slate-200 text-sm font-medium rounded-xl pl-4 pr-10 py-2.5 cursor-pointer outline-none transition-all hover:border-purple-400/70 hover:bg-[#1a1428] focus:border-purple-500 focus:ring-2 focus:ring-purple-500/40 focus:shadow-[0_0_18px_rgba(168,85,247,0.35)] [color-scheme:dark]"
-                >
-                  <option value="">Todas las plataformas</option>
-                  {plataformas.map(p => <option key={p} value={p} className="bg-[#14101f] text-slate-200">{p}</option>)}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400" />
+                  onChange={(v) => setFilterPlatform(v)}
+                  options={[{ value: '', label: 'Todas las plataformas' }, ...plataformas.map(p => ({ value: p, label: p }))]}
+                  placeholder="Todas las plataformas"
+                  className="w-full"
+                />
               </div>
             )}
-            {activeSection === 'productos' && (
-              <div className="relative w-full md:w-56">
-                <select
+                        {activeSection === 'productos' && (
+              <div className="w-full md:w-56">
+                <CustomSelect
                   value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
-                  className="w-full appearance-none bg-[#14101f]/90 border border-purple-500/40 text-slate-200 text-sm font-medium rounded-xl pl-4 pr-10 py-2.5 cursor-pointer outline-none transition-all hover:border-purple-400/70 hover:bg-[#1a1428] focus:border-purple-500 focus:ring-2 focus:ring-purple-500/40 focus:shadow-[0_0_18px_rgba(168,85,247,0.35)] [color-scheme:dark]"
-                >
-                  <option value="">Todas las categorías</option>
-                  {(categorias || []).map(c => typeof c === 'string' ? <option key={c} value={c} className="bg-[#14101f] text-slate-200">{c}</option> : <option key={c.id || c.nombre} value={c.id || c.nombre} className="bg-[#14101f] text-slate-200">{c.nombre || c.label}</option>)}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400" />
+                  onChange={(v) => setFilterCategory(v)}
+                  options={[{ value: '', label: 'Todas las categorías' }, ...categorias.map(c => ({ value: c, label: c }))]}
+                  placeholder="Todas las categorías"
+                  className="w-full"
+                />
               </div>
             )}
           </div>
@@ -2583,10 +2591,7 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
 
       {/* ✅ CHATBOT WIDGET: se oculta mientras el carrito está abierto para no estorbar al finalizar */}
       {!showCart && (
-      <ChatbotWidget
-      productos={productos}
-      whatsappNumber={whatsappNumero}
-      />
+      <ChatbotWidget productos={productos} whatsappNumber={whatsappNumero} showFloatingButton={false} />
       )}
     </div>
   );

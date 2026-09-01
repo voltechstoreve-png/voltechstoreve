@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Bot, User, ExternalLink, ShoppingCart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function ChatbotWidget({ productos = [], whatsappNumber = '584121234567' }) {
+export default function ChatbotWidget({ productos = [], whatsappNumber = '584121234567', showFloatingButton = true }) {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -26,6 +26,13 @@ export default function ChatbotWidget({ productos = [], whatsappNumber = '584121
   useEffect(() => {
     scrollToBottom();
   }, [messages, isOpen]);
+
+  // ✅ Permite abrir el chat desde un botón externo (header del catálogo)
+  useEffect(() => {
+    const abrir = () => setIsOpen(true);
+    window.addEventListener('voltech-open-chat', abrir);
+    return () => window.removeEventListener('voltech-open-chat', abrir);
+  }, []);
 
   const normalizeText = (text) => {
     return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
@@ -131,17 +138,19 @@ export default function ChatbotWidget({ productos = [], whatsappNumber = '584121
 
   return (
     <>
-      {/* Botón Flotante */}
-      <motion.button
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-gradient-to-r from-voltech-cyan to-voltech-purple rounded-full shadow-lg shadow-voltech-cyan/30 flex items-center justify-center text-white"
-      >
-        {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
-      </motion.button>
+      {/* Botón Flotante (se oculta si el catálogo pone el suyo en el header) */}
+      {showFloatingButton && (
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setIsOpen(!isOpen)}
+          className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-gradient-to-r from-voltech-cyan to-voltech-purple rounded-full shadow-lg shadow-voltech-cyan/30 flex items-center justify-center text-white"
+        >
+          {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
+        </motion.button>
+      )}
 
       {/* Ventana del Chat */}
       <AnimatePresence>
