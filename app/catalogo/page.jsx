@@ -1215,7 +1215,7 @@ window.location.href = url;
 
       {/* ✨ BANNER INFERIOR FIJO — semi-transparente, se queda al hacer scroll, cerrable con X */}
       {bannerInferior && !bannerInferiorCerrado && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 px-3 pb-3 pointer-events-none">
+        <div className="fixed bottom-20 lg:bottom-0 left-0 right-0 z-50 px-3 pb-3 pointer-events-none">
           <div className="max-w-3xl mx-auto pointer-events-auto relative rounded-2xl border border-purple-400/40 bg-[#14101f]/70 backdrop-blur-md shadow-[0_8px_30px_rgba(168,85,247,0.35)] px-4 py-3 flex items-center gap-3">
             <Sparkles className="w-4 h-4 text-purple-300 shrink-0 animate-pulse" />
             <p className="flex-1 text-xs sm:text-sm font-semibold text-white line-clamp-2 leading-snug">{bannerInferior.texto}</p>
