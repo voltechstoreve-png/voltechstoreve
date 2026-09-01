@@ -1683,6 +1683,14 @@ export default function VentasProductosPage() {
                                   </p>
                                 </div>
                               )}
+                              {venta.descuento_origen && (
+                                <div className="md:col-span-2">
+                                  <p className="text-xs text-voltech-muted mb-1">Descuento de Banner:</p>
+                                  <p className="text-sm text-voltech-cyan font-medium flex items-center gap-1">
+                                    ⚡ {venta.descuento_origen} (-${Number(venta.descuento_aplicado || 0).toFixed(2)})
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>

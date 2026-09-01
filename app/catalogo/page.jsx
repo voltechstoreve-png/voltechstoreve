@@ -687,7 +687,7 @@ return { gratis: false, costo, texto: `Cobro a destino ($${costo.toFixed(2)})` }
             id: `web-${Date.now()}`, numeroOrden: `W-${dia}-${mes}-${String((cF || 0) + 1).padStart(3, '0')}`, fecha: fechaHoy,
             vendedor: vendedorWeb, cliente: clienteNombre.trim(), telefono: clienteTelefono.trim(),
             productos: fisicos.map(i => ({ productoId: i.id, sku: i.sku || '', nombre: i.producto || i.plataforma, categoria: i.categoria, marca: i.marca, cantidad: i.cantidad, precioUnitario: getPrecioMostrar(i).precioPrincipal, total: (getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad, tipo: 'fisico', esKit: false })),
-            subtotal: subF, total: subF, total_con_descuento: subF, descuento_aplicado: 0,
+            subtotal: subF, total: subF, total_con_descuento: subF - (subF * pctTotalDescuento / 100), descuento_aplicado: subF * pctTotalDescuento / 100, descuento_origen: pctTotalDescuento > 0 ? `Banner ${pctTotalDescuento}%` : null,
             enCuotas: false, montoAbonado: 0, montoPendiente: subF, metodoPago: paymentMethod, carteraId: '',
             porcentaje_comision: 5, estado: 'pendiente', origen: 'web', stock_descontado: false,
             fechaRegistro: new Date().toISOString(), tipo: 'producto'
@@ -700,7 +700,7 @@ return { gratis: false, costo, texto: `Cobro a destino ($${costo.toFixed(2)})` }
             id: `webs-${Date.now()}`, numeroOrden: `W-${dia}-${mes}-${String((cS || 0) + 1).padStart(3, '0')}`, fecha: fechaHoy,
             vendedor: vendedorWeb, cliente: clienteNombre.trim(), telefono: clienteTelefono.trim(),
             plataformas: streamings.map(i => ({ plataforma: i.plataforma || i.producto, cantidad: i.cantidad, precioDetal: getPrecioMostrar(i).precioPrincipal, fechaVencimiento: '', diasDisponibles: 30 })),
-            subtotal: subS, total: subS, metodoPago: paymentMethod, cartera: '',
+            subtotal: subS, total: subS, descuento_aplicado: subS * pctTotalDescuento / 100, descuento_origen: pctTotalDescuento > 0 ? `Banner ${pctTotalDescuento}%` : null, metodoPago: paymentMethod, cartera: '',
             estado: 'pendiente', origen: 'web', fechaRegistro: new Date().toISOString()
           });
         }
@@ -1221,7 +1221,7 @@ window.location.href = url;
         <div className="fixed bottom-4 left-2 right-20 lg:bottom-0 lg:left-0 lg:right-0 z-50 lg:px-3 lg:pb-3 pointer-events-none">
           <div className="max-w-3xl mx-auto pointer-events-auto relative rounded-2xl border border-purple-400/40 bg-[#14101f]/80 backdrop-blur-md shadow-[0_8px_30px_rgba(168,85,247,0.35)] px-3 py-2 lg:px-4 lg:py-3 flex items-center gap-2 lg:gap-3">
             <Sparkles className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-purple-300 shrink-0 animate-pulse" />
-            <p className="flex-1 text-[10px] sm:text-xs lg:text-sm font-semibold text-white line-clamp-2 leading-snug">{bannerInferior.texto}</p>
+            <p className="flex-1 text-[10px] sm:text-xs lg:text-sm font-semibold text-white line-clamp-3 leading-snug">{bannerInferior.texto}</p>
             {bannerInferior.descuento_pct > 0 && <span className="shrink-0 text-[10px] font-bold bg-purple-500 text-white px-2 py-0.5 rounded-full">-{bannerInferior.descuento_pct}%</span>}
             {bannerInferior.monto > 0 && <span className="shrink-0 text-[10px] font-bold bg-voltech-cyan text-voltech-dark px-2 py-0.5 rounded-full">${bannerInferior.monto}</span>}
             <button onClick={() => { setBannerInferiorCerrado(true); sessionStorage.setItem('voltech_banner_inferior_cerrado', '1'); }} className="shrink-0 w-6 h-6 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors" title="Cerrar">
@@ -1233,24 +1233,21 @@ window.location.href = url;
 
       <header className={`${headerBg} backdrop-blur-lg shadow-sm sticky top-0 z-40 border-b transition-colors duration-300`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between gap-2 mb-4">
-            <div className="flex items-center gap-2 min-w-0">
+          <div className="relative flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2">
               <button onClick={() => setShowMobileMenu(!showMobileMenu)} className={`md:hidden p-2 rounded-lg ${darkMode ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-700'}`}>
                 <Menu className="w-5 h-5" />
               </button>
-              <h1 className={`text-[13px] sm:text-base font-extrabold tracking-tight leading-tight whitespace-nowrap ${darkMode ? 'text-white' : 'text-slate-900'}`}>VOLTECH <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-fuchsia-500 bg-clip-text text-transparent">STORE.VE</span></h1>
+              <nav className="hidden md:flex gap-6">
+                {['productos', 'streaming', 'ofertas', 'opiniones', 'sorteos'].map(s => (
+                  <button key={s} onClick={() => setActiveSection(s)} className={`text-sm font-medium capitalize transition-colors ${activeSection === s ? 'text-purple-600 border-b-2 border-purple-600 pb-1' : darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}>{s}</button>
+                ))}
+              </nav>
             </div>
 
-            <nav className="hidden md:flex gap-6">
-              {['productos', 'streaming', 'ofertas', 'opiniones', 'sorteos'].map(s => (
-                <button key={s} onClick={() => setActiveSection(s)} className={`text-sm font-medium capitalize transition-colors ${activeSection === s ? 'text-purple-600 border-b-2 border-purple-600 pb-1' : darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}>{s}</button>
-              ))}
-            </nav>
+            <h1 className={`absolute left-1/2 -translate-x-1/2 text-[13px] sm:text-lg font-extrabold tracking-tight leading-tight whitespace-nowrap pointer-events-none ${darkMode ? 'text-white' : 'text-slate-900'}`}>VOLTECH <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-fuchsia-500 bg-clip-text text-transparent">STORE.VE</span></h1>
 
             <div className="flex items-center gap-3">
-              <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-lg transition-colors ${darkMode ? 'bg-slate-800 text-yellow-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
-                {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
               
 {currentUser && (
 currentUser.rol?.toLowerCase() === 'admin' ||
@@ -1331,11 +1328,19 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
             )}
           </AnimatePresence>
 
-          <div className="mt-4 flex flex-col md:flex-row gap-3 items-stretch md:items-center max-w-4xl">
-            <div className="relative flex-1 min-w-[200px]">
+          <div className="mt-4 flex flex-wrap gap-3 items-center max-w-4xl">
+            <div className="relative flex-1 min-w-[160px]">
               <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
               <input type="text" placeholder={activeSection === 'productos' ? 'Buscar productos...' : activeSection === 'streaming' ? 'Buscar plataformas...' : 'Buscar...'} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${inputBg}`} />
             </div>
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className={`shrink-0 w-16 h-9 rounded-full border flex items-center justify-between px-1.5 transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'}`}
+              title={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            >
+              {darkMode ? <Moon className="w-4 h-4 text-voltech-cyan" /> : <Sun className="w-4 h-4 text-yellow-500" />}
+              <span className={`w-5 h-5 rounded-full shadow ${darkMode ? 'bg-voltech-cyan' : 'bg-slate-900'}`} />
+            </button>
           
             {activeSection === 'streaming' && (
               <div className="relative w-full md:w-56">

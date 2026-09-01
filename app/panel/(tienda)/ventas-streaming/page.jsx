@@ -1399,6 +1399,9 @@ export default function VentasStreamingPage() {
                         <div><span className="text-slate-400 block">Comisión:</span><span className="text-indigo-300 font-bold">${Number(getComisionVenta(venta)).toFixed(2)}</span></div>
                         <div><span className="text-slate-400 block">Método:</span><span className="text-slate-200 capitalize">{(venta.metodopago || '').replace('_', ' ') || 'N/A'}</span></div>
                         <div><span className="text-slate-400 block">Cuentas:</span><span className="text-cyan-400 font-medium">{cuentasAsignadas}/{totalPlataformas} asignadas</span></div>
+                        {venta.descuento_origen && (
+                          <div className="col-span-2"><span className="text-slate-400 block">Descuento:</span><span className="text-voltech-cyan font-bold">⚡ {venta.descuento_origen} (-${Number(venta.descuento_aplicado || 0).toFixed(2)})</span></div>
+                        )}
                       </div>
 
                       {/* ✅ Acordeón "Ver Cuentas" (cerrado por defecto) */}
@@ -1490,6 +1493,7 @@ export default function VentasStreamingPage() {
                             <div>
                               <p className="text-sm text-white">{venta.plataformas?.[0]?.plataforma}</p>
                               {totalPlataformas > 1 && (<p className="text-xs text-voltech-muted">+ {totalPlataformas - 1} más</p>)}
+                              {venta.descuento_origen && (<p className="text-xs text-voltech-cyan mt-1">⚡ {venta.descuento_origen} (-${Number(venta.descuento_aplicado || 0).toFixed(2)})</p>)}
                             </div>
                           </td>
                           <td className="px-4 py-3 text-sm text-voltech-muted capitalize">{venta.metodopago?.replace('_', ' ') || 'N/A'}</td>
