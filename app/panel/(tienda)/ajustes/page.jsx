@@ -8,7 +8,7 @@ import {
   Store, CreditCard, Truck, FileText, Database, Save, Download, Upload,
   Plus, Trash2, MapPin, Eye, EyeOff, ArrowUp, Info,
   Image as ImageIcon, Palette, AlertCircle, Sparkles, Wallet,
-  Zap, Clock, ToggleLeft, ToggleRight, X
+  Zap, Clock, ToggleLeft, ToggleRight, X, Edit3
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -602,8 +602,8 @@ export default function AjustesPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-voltech-muted mb-2">📝 Texto del anuncio</label>
-                    <input type="text" value={formDataOferta.texto} onChange={(e) => setFormDataOferta({ ...formDataOferta, texto: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Ej: 🚚 Delivery GRATIS en Caracas" />
+                    <label className="block text-xs text-voltech-muted mb-2">📝 Texto del anuncio <span className="text-voltech-cyan font-mono">({formDataOferta.texto.length}/80)</span></label>
+                    <input type="text" maxLength={80} value={formDataOferta.texto} onChange={(e) => setFormDataOferta({ ...formDataOferta, texto: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Ej: 🚚 Delivery GRATIS en Caracas" />
                   </div>
                 </div>
 

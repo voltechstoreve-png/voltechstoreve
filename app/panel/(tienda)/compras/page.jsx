@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase'; // ✅ NUEVO: Conexión a Supabase
 import { 
@@ -105,6 +105,31 @@ export default function ComprasPage() {
     (c.proveedor && c.proveedor.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  // ✅ Agrupa por SKU/producto: última compra + historial completo
+  const comprasAgrupadas = useMemo(() => {
+    const grupos = {};
+    compras.forEach(c => {
+      const key = c.sku || c.productoId || (c.producto || c.plataforma || 'SIN-SKU');
+      if (!grupos[key]) grupos[key] = [];
+      grupos[key].push(c);
+    });
+    return Object.entries(grupos)
+      .map(([key, arr]) => {
+        arr.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+        const ultima = arr[0];
+        const totalUnidades = arr.reduce((s, x) => s + (Number(x.cantidad) || 0), 0);
+        return { key, historial: arr, ultima, totalUnidades };
+      })
+      .sort((a, b) => new Date(b.ultima.fecha) - new Date(a.ultima.fecha));
+  }, [compras]);
+
+  const gruposFiltrados = comprasAgrupadas.filter(g =>
+    (g.ultima.producto || g.ultima.plataforma || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (g.key || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (g.ultima.comprador && g.ultima.comprador.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (g.ultima.proveedor && g.ultima.proveedor.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
   return (
     <div className="space-y-6">
       <Toaster 
@@ -141,136 +166,111 @@ export default function ComprasPage() {
         />
       </div>
 
-      <div className="space-y-4">
-        {comprasFiltradas.length === 0 ? (
-          <div className="bg-voltech-surface border border-voltech-border rounded-xl p-12 text-center">
+      <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
+        {gruposFiltrados.length === 0 ? (
+          <div className="p-12 text-center">
             <Package className="w-12 h-12 mx-auto mb-3 opacity-50 text-voltech-muted" />
             <p className="text-voltech-muted font-medium">No hay compras registradas</p>
             <p className="text-xs text-voltech-muted mt-1 mb-4">Las compras aparecerán aquí cuando agregues o actualices productos.</p>
-            <Link
-              href="/panel/productos"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors"
-            >
-              <Package className="w-4 h-4" />
-              Ir a gestionar Productos
+            <Link href="/panel/productos" className="inline-flex items-center gap-2 px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 transition-colors">
+              <Package className="w-4 h-4" /> Ir a gestionar Productos
             </Link>
           </div>
         ) : (
-          comprasFiltradas.map((compra) => (
-            <motion.div
-              key={compra.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden hover:border-voltech-cyan/50 transition-all"
-            >
-              <div className="p-4 md:p-6">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 w-full">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="p-2 rounded-lg bg-voltech-cyan/20 shrink-0">
-                      <Calendar className="w-5 h-5 text-voltech-cyan" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-white truncate">{compra.fecha}</p>
-                      <div className="flex items-center gap-2 md:gap-3 text-xs text-voltech-muted mt-1 flex-wrap">
-                        <span className="flex items-center gap-1 shrink-0">
-                          <User className="w-3 h-3" /> <span className="truncate max-w-[90px]">{compra.comprador || 'N/A'}</span>
-                        </span>
-                        <span className="shrink-0">•</span>
-                        <span className="flex items-center gap-1 shrink-0">
-                          <Building className="w-3 h-3" /> <span className="truncate max-w-[90px]">{compra.proveedor || 'N/A'}</span>
-                        </span>
-                        {compra.esFallback && (
-                          <>
-                            <span className="shrink-0">•</span>
-                            <span className="text-voltech-warning whitespace-nowrap">Último estado</span>
-                          </>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px]">
+              <thead className="bg-voltech-dark border-b border-voltech-border">
+                <tr>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">SKU</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Producto</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Última Compra</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Comprador</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Proveedor</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-voltech-muted">Cant.</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Monto Mayor</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Cartera</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Acciones</th>
+                </tr>
+              </thead>
+
+              {gruposFiltrados.map(g => (
+                <tbody key={g.key}>
+                  <tr className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
+                    <td className="px-4 py-3 text-xs text-voltech-cyan font-mono whitespace-nowrap">{g.key}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        {g.ultima.imagen ? (
+                          <img src={g.ultima.imagen} alt={g.ultima.producto} className="w-10 h-10 rounded-lg object-cover" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-voltech-dark flex items-center justify-center"><Package className="w-5 h-5 text-voltech-muted" /></div>
                         )}
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setExpandedId(expandedId === compra.id ? null : compra.id)}
-                    className="shrink-0 text-xs py-1.5 px-3 md:text-sm md:py-2 md:px-4 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors flex items-center justify-center gap-1.5 md:gap-2 w-full sm:w-auto"
-                  >
-                    <Eye className="w-4 h-4" />
-                    <span>{expandedId === compra.id ? 'Ocultar' : 'Ver Detalles'}</span>
-                  </button>
-                </div>
-
-                <div className="border-t border-voltech-border pt-4">
-                  <div className="flex items-center gap-3">
-                    {compra.imagen ? (
-                      <img src={compra.imagen} alt={compra.producto} className="w-16 h-16 rounded-lg object-cover" />
-                    ) : (
-                      <div className="w-16 h-16 rounded-lg bg-voltech-dark flex items-center justify-center">
-                        <Package className="w-6 h-6 text-voltech-muted" />
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <h3 className="text-sm font-semibold text-white">{compra.producto}</h3>
-                      <p className="text-xs text-voltech-muted">{compra.marca} • {compra.categoria}</p>
-                      <p className="text-xs text-voltech-cyan font-mono mt-1">{compra.sku}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-voltech-muted">Cantidad</p>
-                      <p className="text-lg font-bold text-white">{compra.cantidad} unid.</p>
-                      <p className="text-sm text-voltech-success">${(compra.precioTotal || 0).toFixed(2)}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <AnimatePresence>
-                  {expandedId === compra.id && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="border-t border-voltech-border mt-4 pt-4 space-y-4"
-                    >
-                      <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <p className="text-xs text-voltech-muted flex items-center gap-1">
-                            <CreditCard className="w-3 h-3" /> Método de Pago
-                          </p>
-                          <p className="text-sm text-white">{compra.metodoPago || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-voltech-muted">Cartera</p>
-                          <p className="text-sm text-white">{compra.cartera || 'N/A'}</p>
+                          <p className="text-sm font-semibold text-white">{g.ultima.producto}</p>
+                          <p className="text-xs text-voltech-muted">{g.ultima.marca} • {g.ultima.categoria}</p>
                         </div>
                       </div>
-                      
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="bg-voltech-dark/50 rounded-lg p-4">
-                          <p className="text-xs text-voltech-muted">Cantidad</p>
-                          <p className="text-xl font-bold text-white">{compra.cantidad}</p>
-                          <p className="text-xs text-voltech-muted">unidades</p>
-                        </div>
-                        <div className="bg-voltech-dark/50 rounded-lg p-4">
-                          <p className="text-xs text-voltech-muted">Precio Unitario</p>
-                          <p className="text-xl font-bold text-white">${(compra.precioUnitario || 0).toFixed(2)}</p>
-                        </div>
-                        <div className="bg-voltech-cyan/10 border border-voltech-cyan/30 rounded-lg p-4">
-                          <p className="text-xs text-voltech-muted">Total</p>
-                          <p className="text-xl font-bold text-voltech-cyan">${(compra.precioTotal || 0).toFixed(2)}</p>
-                        </div>
-                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-white whitespace-nowrap">{g.ultima.fecha}</td>
+                    <td className="px-4 py-3 text-sm text-voltech-muted">{g.ultima.comprador || 'N/A'}</td>
+                    <td className="px-4 py-3 text-sm text-voltech-muted">{g.ultima.proveedor || 'N/A'}</td>
+                    <td className="px-4 py-3 text-center">
+                      <p className="text-sm font-bold text-white">{g.ultima.cantidad}</p>
+                      <p className="text-[10px] text-voltech-muted">acum: {g.totalUnidades}</p>
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm text-voltech-success font-semibold">${(g.ultima.precioUnitario || 0).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-sm text-voltech-muted">{g.ultima.cartera || 'N/A'}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => setExpandedId(expandedId === g.key ? null : g.key)}
+                        className="text-xs py-1.5 px-3 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors inline-flex items-center gap-1.5"
+                      >
+                        <Eye className="w-4 h-4" />
+                        <span>{expandedId === g.key ? 'Ver menos' : `Ver más (${g.historial.length})`}</span>
+                      </button>
+                    </td>
+                  </tr>
 
-                      <div className="flex gap-3">
-                        <Link
-                          href="/panel/productos"
-                          className="flex-1 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-xs text-white hover:border-voltech-cyan transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Package className="w-3 h-3" />
-                          Ver en Productos
-                        </Link>
-                      </div>
-                    </motion.div>
+                  {expandedId === g.key && (
+                    <tr className="bg-voltech-dark/40 border-b border-voltech-border">
+                      <td colSpan={9} className="px-4 py-4">
+                        <p className="text-xs font-semibold text-voltech-cyan mb-3 flex items-center gap-2"><Calendar className="w-4 h-4" /> Historial de Compras — {g.key}</p>
+                        <div className="overflow-x-auto rounded-lg border border-voltech-border">
+                          <table className="w-full min-w-[760px]">
+                            <thead className="bg-voltech-dark border-b border-voltech-border">
+                              <tr>
+                                <th className="text-left px-3 py-2 text-[10px] font-semibold text-voltech-muted">Fecha</th>
+                                <th className="text-left px-3 py-2 text-[10px] font-semibold text-voltech-muted">Comprador</th>
+                                <th className="text-left px-3 py-2 text-[10px] font-semibold text-voltech-muted">Proveedor</th>
+                                <th className="text-center px-3 py-2 text-[10px] font-semibold text-voltech-muted">Cant.</th>
+                                <th className="text-right px-3 py-2 text-[10px] font-semibold text-voltech-muted">Precio Unit.</th>
+                                <th className="text-right px-3 py-2 text-[10px] font-semibold text-voltech-muted">Total</th>
+                                <th className="text-left px-3 py-2 text-[10px] font-semibold text-voltech-muted">Cartera</th>
+                                <th className="text-left px-3 py-2 text-[10px] font-semibold text-voltech-muted">Método</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {g.historial.map(h => (
+                                <tr key={h.id} className="border-b border-voltech-border/50 last:border-b-0 hover:bg-voltech-border/20">
+                                  <td className="px-3 py-2 text-xs text-white whitespace-nowrap">{h.fecha}</td>
+                                  <td className="px-3 py-2 text-xs text-voltech-muted">{h.comprador || 'N/A'}</td>
+                                  <td className="px-3 py-2 text-xs text-voltech-muted">{h.proveedor || 'N/A'}</td>
+                                  <td className="px-3 py-2 text-center text-xs text-white">{h.cantidad}</td>
+                                  <td className="px-3 py-2 text-right text-xs text-voltech-muted">${(h.precioUnitario || 0).toFixed(2)}</td>
+                                  <td className="px-3 py-2 text-right text-xs text-voltech-success font-semibold">${(h.precioTotal || 0).toFixed(2)}</td>
+                                  <td className="px-3 py-2 text-xs text-voltech-muted">{h.cartera || 'N/A'}</td>
+                                  <td className="px-3 py-2 text-xs text-voltech-muted">{h.metodoPago || 'N/A'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </td>
+                    </tr>
                   )}
-                </AnimatePresence>
-              </div>
-            </motion.div>
-          ))
+                </tbody>
+              ))}
+            </table>
+          </div>
         )}
       </div>
     </div>

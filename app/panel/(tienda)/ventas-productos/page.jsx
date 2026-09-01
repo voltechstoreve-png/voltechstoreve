@@ -43,6 +43,7 @@ export default function VentasProductosPage() {
   const [productoModalIndex, setProductoModalIndex] = useState(null);
   const [clienteSearch, setClienteSearch] = useState('');
   const [showClientesDropdown, setShowClientesDropdown] = useState(false);
+  const [clientesFiltradosArr, setClientesFiltradosArr] = useState([]);
   const [showKitSelector, setShowKitSelector] = useState(false);
 
   const [cuponInput, setCuponInput] = useState('');
@@ -168,11 +169,10 @@ export default function VentasProductosPage() {
   const tasaBCV = settings.tasaBCV || 36.5;
   const vendedores = equipo.filter(m => m.activo && (m.rol === 'vendedor' || m.rol === 'admin' || m.rol === 'Admin' || m.rol === 'socio'));
   const productosDisponibles = productos.filter(p => {
-  const stock = Number(p.cantidad || 0);
-  const tipo = (p.tipo || '').toLowerCase();
-  // Solo mostrar físicos y kits (NO streaming)
-  return stock > 0 && (tipo === 'fisico' || tipo === 'kit');
-});
+    const tipo = (p.tipo || '').toLowerCase();
+    // ✅ Mostrar TODOS los físicos y kits (independiente del stock)
+    return tipo === 'fisico' || tipo === 'kit';
+  });
   const kitsDisponibles = kits.filter(k => k.activo !== false);
 
   const metodosPagoActivos = Object.entries(settings.pagos || {}).filter(([_, val]) => val && (val.activo === true || val === true));
@@ -189,10 +189,33 @@ export default function VentasProductosPage() {
   const handleClienteChange = (value) => {
     setClienteSearch(value);
     setFormData({ ...formData, cliente: value });
-    const clienteEncontrado = clientesBase.find(c => c.nombre.toLowerCase() === value.toLowerCase() || c.telefono === value);
-    if (clienteEncontrado) {
-      setFormData(prev => ({ ...prev, cliente: clienteEncontrado.nombre, telefono: clienteEncontrado.telefono || prev.telefono }));
+    
+    // ✅ Autocompletar teléfono si hay coincidencia EXACTA
+    const clienteExacto = clientesBase.find(c => 
+      (c.nombre || '').toLowerCase() === value.toLowerCase()
+    );
+    if (clienteExacto && clienteExacto.telefono) {
+      setFormData(prev => ({ ...prev, cliente: clienteExacto.nombre, telefono: clienteExacto.telefono }));
     }
+    
+    // ✅ Filtrar sugerencias al escribir y guardarlas en clientesFiltradosArr
+    if (value.length > 0) {
+      const filtrados = clientesBase.filter(c => {
+        const nombre = (c.nombre || '').toLowerCase();
+        const telefono = (c.telefono || '').toLowerCase();
+        const email = (c.email || '').toLowerCase();
+        const search = value.toLowerCase();
+        return nombre.includes(search) || telefono.includes(search) || email.includes(search);
+      });
+      setClientesFiltradosArr(filtrados.slice(0, 10));
+    } else {
+      setClientesFiltradosArr([]);
+    }
+  };
+
+  const mostrarTodosClientesProductos = () => {
+    setClientesFiltradosArr(clientesBase.slice(0, 50));
+    setShowClientesDropdown(true);
   };
 
   const actualizarCampoProducto = (index, field, value) => {
@@ -653,6 +676,7 @@ export default function VentasProductosPage() {
     setCuponInput('');
     setCuponAplicado(null);
     setErrorCupon('');
+    setClientesFiltradosArr([]);
     setShowForm(false); 
     setEditingId(null);
     setShowKitSelector(false);
@@ -1014,11 +1038,55 @@ export default function VentasProductosPage() {
                     />
                   </div>
                   <div className="relative">
-                    <label className="block text-xs text-voltech-muted mb-1 ml-1">Comprador *</label>
-                    <input type="text" value={clienteSearch} onChange={(e) => handleClienteChange(e.target.value)} onFocus={() => setShowClientesDropdown(true)} onBlur={() => setTimeout(() => setShowClientesDropdown(false), 200)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Buscar o escribir nombre..." />
-                    {showClientesDropdown && clientesFiltrados.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-voltech-surface border border-voltech-border rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                        {clientesFiltrados.map(c => (<button key={c.id} onClick={() => { setClienteSearch(c.nombre); setFormData({ ...formData, cliente: c.nombre, telefono: c.telefono || '' }); setShowClientesDropdown(false); }} className="w-full px-4 py-2 text-left text-sm hover:bg-voltech-border flex items-center justify-between"><span>{c.nombre}</span><span className="text-xs text-voltech-muted">{c.telefono}</span></button>))}
+                    <label className="block text-xs text-voltech-muted mb-1 ml-1">
+                      Comprador *
+                      {clientesBase.length === 0 && <span className="text-voltech-warning ml-2 text-[10px]">(Sin clientes)</span>}
+                    </label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        value={clienteSearch} 
+                        onChange={(e) => handleClienteChange(e.target.value)} 
+                        onFocus={() => { if (clientesFiltradosArr.length > 0) setShowClientesDropdown(true); }} 
+                        onBlur={() => setTimeout(() => setShowClientesDropdown(false), 200)} 
+                        className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" 
+                        placeholder="Nombre del cliente (autocompleta teléfono)" 
+                      />
+                      <button
+                        type="button"
+                        onClick={mostrarTodosClientesProductos}
+                        className="shrink-0 px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors flex items-center gap-1 text-xs"
+                        disabled={clientesBase.length === 0}
+                      >
+                        <Users className="w-4 h-4" />
+                        <span className="hidden sm:inline">Ver</span>
+                      </button>
+                    </div>
+                    {showClientesDropdown && clientesFiltradosArr.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-voltech-surface border border-voltech-border rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                        <div className="px-3 py-1.5 bg-voltech-dark/50 border-b border-voltech-border sticky top-0">
+                          <p className="text-[10px] text-voltech-muted">
+                            {clienteSearch ? `${clientesFiltradosArr.length} coincidencia(s)` : `${clientesFiltradosArr.length} clientes disponibles`}
+                          </p>
+                        </div>
+                        {clientesFiltradosArr.map(c => (
+                          <button 
+                            key={c.id} 
+                            onClick={() => { 
+                              setClienteSearch(c.nombre); 
+                              setFormData({ ...formData, cliente: c.nombre, telefono: c.telefono || '' }); 
+                              setShowClientesDropdown(false); 
+                              setClientesFiltradosArr([]);
+                            }} 
+                            className="w-full px-4 py-2 text-left text-sm hover:bg-voltech-border flex items-center justify-between border-b border-voltech-border/50 last:border-0 transition-colors"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <span className="text-white font-medium">{c.nombre || 'Sin nombre'}</span>
+                              {c.email && <p className="text-[10px] text-voltech-muted truncate">{c.email}</p>}
+                            </div>
+                            <span className="text-xs text-voltech-muted ml-2 shrink-0">{c.telefono || 'Sin tel.'}</span>
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>

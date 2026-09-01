@@ -163,7 +163,7 @@ export default function VentasStreamingPage() {
 
       try {
         if (supabase) {
-          const [{ data: v }, { data: c }, { data: i }, { data: p }, { data: cp }, { data: u }, { data: cl }, { data: st }] = await Promise.all([
+          const [{ data: v, error: errV }, { data: c, error: errC }, { data: i, error: errI }, { data: p, error: errP }, { data: cp, error: errCp }, { data: u, error: errU }, { data: cl, error: errCl }, { data: st, error: errSt }] = await Promise.all([
             supabase.from('ventas_streaming').select('*').order('fecharegistro', { ascending: false }),
             supabase.from('cuentas_streaming').select('*'),
             supabase.from('inventario_streaming').select('*'),
@@ -174,8 +174,14 @@ export default function VentasStreamingPage() {
             supabase.from('settings').select('clave, valor'),
           ]);
           
+          if (errV) console.error('❌ Error cargando ventas:', errV.message);
+          if (errC) console.error('❌ Error cargando cuentas:', errC.message);
+          if (errI) console.error('❌ Error cargando inventario:', errI.message);
+          if (errCl) console.error('❌ Error cargando clientes:', errCl.message);
+          
           if (v) {
             setVentas(v);
+            console.log('✅ Ventas cargadas:', v.length);
           }
           if (c) {
             // ✅ SINCRONIZACIÓN: cuentas usadas en ventas quedan ocupadas y con el perfil del cliente
@@ -193,12 +199,45 @@ export default function VentasStreamingPage() {
               }
             });
             setCuentas(c);
+            console.log('✅ Cuentas cargadas:', c.length);
           }
-          if (i) setInventario(i);
-          if (p?.valor) setPlataformas(p.valor);
-          if (cp) setCupones(cp);
-          if (u) setEquipo(u);
-          if (cl) setClientes(cl);
+          if (i) {
+            setInventario(i);
+            console.log('✅ Inventario cargado:', i.length);
+          }
+          if (p?.valor) {
+            setPlataformas(p.valor);
+            console.log('✅ Plataformas cargadas:', p.valor.length);
+          }
+          if (cp) {
+            setCupones(cp);
+            console.log('✅ Cupones cargados:', cp.length);
+          }
+          if (u) {
+            setEquipo(u);
+            console.log('✅ Equipo cargado:', u.length);
+          }
+          if (cl) {
+            setClientes(cl);
+            console.log('✅ Clientes cargados:', cl.length);
+          } else {
+            // ✅ FALLBACK: Si Supabase no devolvió clientes, intentar desde localStorage
+            console.warn('⚠️ No se cargaron clientes desde Supabase, intentando localStorage');
+            const clientesLocal = localStorage.getItem('voltech_clientes');
+            if (clientesLocal) {
+              try {
+                const parsed = JSON.parse(clientesLocal);
+                setClientes(parsed);
+                console.log('✅ Clientes cargados desde localStorage:', parsed.length);
+              } catch (e) {
+                console.error('❌ Error parseando clientes de localStorage:', e);
+                setClientes([]);
+              }
+            } else {
+              console.warn('⚠️ No hay clientes en localStorage tampoco');
+              setClientes([]);
+            }
+          }
           
           if (st) {
             const settingsMapLocal = {};
@@ -322,14 +361,32 @@ export default function VentasStreamingPage() {
 
   const handleClienteChange = (value) => {
     setFormDataNueva(prev => ({ ...prev, cliente: value }));
+    
+    // ✅ Autocompletar teléfono si hay coincidencia EXACTA
+    const clienteExacto = clientes.find(c => 
+      (c.nombre || '').toLowerCase() === value.toLowerCase()
+    );
+    if (clienteExacto && clienteExacto.telefono) {
+      setFormDataNueva(prev => ({ ...prev, telefono: clienteExacto.telefono }));
+    }
+    
+    // ✅ Siempre mostrar sugerencias si hay clientes cargados
+    if (clientes.length === 0) {
+      console.warn('⚠️ No hay clientes cargados para buscar');
+      setSugerenciasClientes([]);
+      setShowSugerencias(false);
+      return;
+    }
+    
     if (value.length > 0) {
       const filtrados = clientes.filter(c => {
         const nombre = (c.nombre || '').toLowerCase();
         const telefono = (c.telefono || '').toLowerCase();
+        const email = (c.email || '').toLowerCase();
         const search = value.toLowerCase();
-        return nombre.includes(search) || telefono.includes(search);
+        return nombre.includes(search) || telefono.includes(search) || email.includes(search);
       });
-      setSugerenciasClientes(filtrados);
+      setSugerenciasClientes(filtrados.slice(0, 10));
       setShowSugerencias(filtrados.length > 0);
     } else {
       setSugerenciasClientes([]);
@@ -343,6 +400,11 @@ export default function VentasStreamingPage() {
     }));
     setShowSugerencias(false);
     setSugerenciasClientes([]);
+  };
+
+  const mostrarTodosClientes = () => {
+    setSugerenciasClientes(clientes.slice(0, 50));
+    setShowSugerencias(true);
   };
 
   const agregarPlataformaAVenta = () => {
@@ -1083,10 +1145,55 @@ export default function VentasStreamingPage() {
     className="w-full"
   />
 </div>
-                    <div className="relative"><label className="block text-xs text-voltech-muted mb-1 ml-1">Comprador *</label><input ref={clienteInputRef} type="text" value={formDataNueva.cliente} onChange={(e) => handleClienteChange(e.target.value)} onFocus={() => { if (sugerenciasClientes.length > 0) setShowSugerencias(true); }} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Buscar cliente..." />
+                    <div className="relative">
+                      <label className="block text-xs text-voltech-muted mb-1 ml-1">
+                        Comprador *
+                        {clientes.length === 0 && <span className="text-voltech-warning ml-2 text-[10px]">(Sin clientes)</span>}
+                      </label>
+                      <div className="flex gap-2">
+                        <input 
+                          ref={clienteInputRef} 
+                          type="text" 
+                          value={formDataNueva.cliente} 
+                          onChange={(e) => handleClienteChange(e.target.value)} 
+                          onFocus={() => {
+                            // ✅ Solo abrir si ya hay sugerencias cargadas (por "Ver" o por escribir)
+                            if (sugerenciasClientes.length > 0) setShowSugerencias(true);
+                          }}
+                          onBlur={() => setTimeout(() => setShowSugerencias(false), 200)}
+                          className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" 
+                          placeholder="Nombre del cliente (autocompleta teléfono)" 
+                        />
+                        <button
+                          type="button"
+                          onClick={mostrarTodosClientes}
+                          className="shrink-0 px-3 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors flex items-center gap-1 text-xs"
+                          disabled={clientes.length === 0}
+                        >
+                          <Users className="w-4 h-4" />
+                          <span className="hidden sm:inline">Ver</span>
+                        </button>
+                      </div>
                       {showSugerencias && sugerenciasClientes.length > 0 && (
-                        <div className="absolute z-50 w-full mt-1 bg-voltech-surface border border-voltech-border rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                          {sugerenciasClientes.map((cliente) => (<button key={cliente.id} onClick={() => seleccionarCliente(cliente)} className="w-full px-4 py-2 text-left text-sm hover:bg-voltech-border flex items-center justify-between border-b border-voltech-border/50 last:border-0"><span className="text-white">{cliente.nombre}</span><span className="text-xs text-voltech-muted">{cliente.telefono}</span></button>))}
+                        <div className="absolute z-50 w-full mt-1 bg-voltech-surface border border-voltech-border rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                          <div className="px-3 py-1.5 bg-voltech-dark/50 border-b border-voltech-border sticky top-0">
+                            <p className="text-[10px] text-voltech-muted">
+                              {formDataNueva.cliente ? `${sugerenciasClientes.length} coincidencia(s)` : `${sugerenciasClientes.length} clientes disponibles`}
+                            </p>
+                          </div>
+                          {sugerenciasClientes.map((cliente) => (
+                            <button 
+                              key={cliente.id} 
+                              onClick={() => seleccionarCliente(cliente)} 
+                              className="w-full px-4 py-2 text-left text-sm hover:bg-voltech-border flex items-center justify-between border-b border-voltech-border/50 last:border-0 transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <span className="text-white font-medium">{cliente.nombre || 'Sin nombre'}</span>
+                                {cliente.email && <p className="text-[10px] text-voltech-muted truncate">{cliente.email}</p>}
+                              </div>
+                              <span className="text-xs text-voltech-muted ml-2 shrink-0">{cliente.telefono || 'Sin tel.'}</span>
+                            </button>
+                          ))}
                         </div>
                       )}
                     </div>

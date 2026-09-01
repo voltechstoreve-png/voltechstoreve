@@ -1207,7 +1207,7 @@ window.location.href = url;
         <div className="bg-gradient-to-r from-voltech-cyan via-voltech-purple to-voltech-cyan text-white px-4 py-2 overflow-hidden">
           <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 text-center">
             <Zap className="w-4 h-4 shrink-0 animate-pulse" />
-            <p className="text-xs sm:text-sm font-bold truncate">{bannerSuperiorFinal.texto || `⚡ ${bannerSuperiorFinal.descuento_pct}% de descuento por tiempo limitado`}</p>
+            <p className="text-xs sm:text-sm font-bold line-clamp-2 leading-snug">{bannerSuperiorFinal.texto || `⚡ ${bannerSuperiorFinal.descuento_pct}% de descuento por tiempo limitado`}</p>
             {bannerSuperiorFinal.descuento_pct > 0 && <span className="shrink-0 text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded-full">-{bannerSuperiorFinal.descuento_pct}%</span>}
           </div>
         </div>
@@ -1218,7 +1218,7 @@ window.location.href = url;
         <div className="fixed bottom-0 left-0 right-0 z-50 px-3 pb-3 pointer-events-none">
           <div className="max-w-3xl mx-auto pointer-events-auto relative rounded-2xl border border-purple-400/40 bg-[#14101f]/70 backdrop-blur-md shadow-[0_8px_30px_rgba(168,85,247,0.35)] px-4 py-3 flex items-center gap-3">
             <Sparkles className="w-4 h-4 text-purple-300 shrink-0 animate-pulse" />
-            <p className="flex-1 text-xs sm:text-sm font-semibold text-white truncate">{bannerInferior.texto}</p>
+            <p className="flex-1 text-xs sm:text-sm font-semibold text-white line-clamp-2 leading-snug">{bannerInferior.texto}</p>
             {bannerInferior.descuento_pct > 0 && <span className="shrink-0 text-[10px] font-bold bg-purple-500 text-white px-2 py-0.5 rounded-full">-{bannerInferior.descuento_pct}%</span>}
             {bannerInferior.monto > 0 && <span className="shrink-0 text-[10px] font-bold bg-voltech-cyan text-voltech-dark px-2 py-0.5 rounded-full">${bannerInferior.monto}</span>}
             <button onClick={() => { setBannerInferiorCerrado(true); sessionStorage.setItem('voltech_banner_inferior_cerrado', '1'); }} className="shrink-0 w-6 h-6 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors" title="Cerrar">
@@ -1307,12 +1307,10 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
 </AnimatePresence>
 </div>
 )}
-              {!currentUser && (
-                <button onClick={() => setShowCart(true)} className={`relative p-2 ${darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}>
-                  <ShoppingCart className="w-6 h-6" />
-                  {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{cart.length}</span>}
-                </button>
-              )}
+              <button onClick={() => setShowCart(true)} className={`relative p-2 ${darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}>
+                <ShoppingCart className="w-6 h-6" />
+                {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{cart.length}</span>}
+              </button>
             </div>
           </div>
           

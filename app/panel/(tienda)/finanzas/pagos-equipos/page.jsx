@@ -59,6 +59,8 @@ export default function PagosEquiposPage() {
   const [movGlobales, setMovGlobales] = useState([]);
   const [showFormCuenta, setShowFormCuenta] = useState(false);
   const [formCuenta, setFormCuenta] = useState({ tipo: 'entrada', cuentaOrigen: '', cuentaDestino: '', montoBs: '', montoUsd: '', monedaOrigen: 'USD', monedaDestino: 'USDT', tasa: 36.5, nota: '' });
+  const [cuentasInternas, setCuentasInternas] = useState([]);
+  const [nuevaCuentaInterna, setNuevaCuentaInterna] = useState('');
 
   useEffect(() => {
     const cargarCuentas = async () => {
@@ -99,6 +101,11 @@ export default function PagosEquiposPage() {
     return () => window.removeEventListener('voltech-data-updated', handleAct);
   }, []);
 
+  // ✅ Cargar cuentas internas propias (creadas en esta página)
+  useEffect(() => {
+    try { setCuentasInternas(JSON.parse(localStorage.getItem('voltech_cuentas_internas') || '[]')); } catch { setCuentasInternas([]); }
+  }, []);
+
   const saldoCartera = (nombre) => {
     let saldo = 0;
     movGlobales.forEach(m => {
@@ -110,6 +117,30 @@ export default function PagosEquiposPage() {
       }
     });
     return saldo;
+  };
+
+  // ✅ Cuentas disponibles = Carteras de Ajustes + cuentas internas propias
+  const todasCuentas = [...new Set([...carteras.map(c => c.nombre), ...cuentasInternas])];
+
+  const agregarCuentaInterna = () => {
+    const nombre = (nuevaCuentaInterna || '').trim();
+    if (!nombre) { toast.error('Escribe el nombre de la cuenta'); return; }
+    if (todasCuentas.some(c => c.toLowerCase() === nombre.toLowerCase())) { toast.error('Esa cuenta ya existe'); return; }
+    const nuevas = [...cuentasInternas, nombre];
+    setCuentasInternas(nuevas);
+    localStorage.setItem('voltech_cuentas_internas', JSON.stringify(nuevas));
+    setNuevaCuentaInterna('');
+    toast.success(`Cuenta "${nombre}" creada`);
+    window.dispatchEvent(new Event('voltech-data-updated'));
+  };
+
+  const eliminarCuentaInterna = (nombre) => {
+    if (!confirm(`¿Eliminar la cuenta "${nombre}"?`)) return;
+    const nuevas = cuentasInternas.filter(c => c !== nombre);
+    setCuentasInternas(nuevas);
+    localStorage.setItem('voltech_cuentas_internas', JSON.stringify(nuevas));
+    toast.success(`Cuenta "${nombre}" eliminada`);
+    window.dispatchEvent(new Event('voltech-data-updated'));
   };
 
   const setMontoBs = (v) => setFormCuenta(prev => ({ ...prev, montoBs: v, montoUsd: (Number(v || 0) / Number(prev.tasa || 36.5)).toFixed(2) }));
@@ -1616,11 +1647,11 @@ useEffect(() => {
               </div>
               <div>
                 <label className="block text-xs text-voltech-muted mb-1 ml-1">Cuenta Origen</label>
-                <CustomSelect value={formCuenta.cuentaOrigen} onChange={(v) => setFormCuenta({ ...formCuenta, cuentaOrigen: v })} options={carteras.map(c => ({ value: c.nombre, label: c.nombre }))} placeholder="-- Origen --" className="w-full" />
+                <CustomSelect value={formCuenta.cuentaOrigen} onChange={(v) => setFormCuenta({ ...formCuenta, cuentaOrigen: v })} options={todasCuentas.map(c => ({ value: c, label: c }))} placeholder="-- Origen --" className="w-full" />
               </div>
               <div>
                 <label className="block text-xs text-voltech-muted mb-1 ml-1">Cuenta Destino</label>
-                <CustomSelect value={formCuenta.cuentaDestino} onChange={(v) => setFormCuenta({ ...formCuenta, cuentaDestino: v })} options={carteras.map(c => ({ value: c.nombre, label: c.nombre }))} placeholder="-- Destino --" className="w-full" />
+                <CustomSelect value={formCuenta.cuentaDestino} onChange={(v) => setFormCuenta({ ...formCuenta, cuentaDestino: v })} options={todasCuentas.map(c => ({ value: c, label: c }))} placeholder="-- Destino --" className="w-full" />
               </div>
               <div>
                 <label className="block text-xs text-voltech-muted mb-1 ml-1">Moneda Origen</label>
@@ -1653,11 +1684,19 @@ useEffect(() => {
             </div>
           )}
 
+          <div className="p-6 border-b border-voltech-border flex flex-col sm:flex-row gap-2">
+            <input type="text" value={nuevaCuentaInterna} onChange={(e) => setNuevaCuentaInterna(e.target.value)} placeholder="Nueva cuenta interna (ej: Ahorros, Publicidad, Caja Principal $)" className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" />
+            <button onClick={agregarCuentaInterna} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 flex items-center gap-2"><Plus className="w-4 h-4" /> Crear Cuenta</button>
+          </div>
+
           <div className="p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {carteras.map(c => (
-              <div key={c.id} className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4">
-                <p className="text-xs text-voltech-muted mb-1 truncate">{c.nombre}</p>
-                <p className="text-xl font-bold text-voltech-cyan">{saldoCartera(c.nombre).toFixed(2)}</p>
+            {todasCuentas.map(nombre => (
+              <div key={nombre} className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 relative">
+                {cuentasInternas.includes(nombre) && (
+                  <button onClick={() => eliminarCuentaInterna(nombre)} className="absolute top-2 right-2 p-1 text-voltech-error hover:bg-voltech-error/10 rounded" title="Eliminar cuenta"><Trash2 className="w-3 h-3" /></button>
+                )}
+                <p className="text-xs text-voltech-muted mb-1 truncate">{nombre}</p>
+                <p className="text-xl font-bold text-voltech-cyan">{saldoCartera(nombre).toFixed(2)}</p>
               </div>
             ))}
           </div>
@@ -1667,11 +1706,11 @@ useEffect(() => {
               <thead className="bg-voltech-dark border-b border-voltech-border">
                 <tr>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Fecha</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Tipo</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Origen</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Ingreso</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Egreso</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Cartera</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Destino</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-voltech-muted">Monto</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Nota</th>
                 </tr>
               </thead>
               <tbody>
@@ -1680,14 +1719,12 @@ useEffect(() => {
                 ) : (
                   movGlobales.map(m => (
                     <tr key={m.id} className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
-                      <td className="px-4 py-3 text-sm text-voltech-muted">{m.fecha}</td>
-                      <td className="px-4 py-3 text-sm text-white">{m.fuente}</td>
-                      <td className="px-4 py-3 text-sm text-voltech-muted truncate max-w-[160px]">{m.concepto || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-voltech-muted">{m.tipo === 'transferencia' ? `${m.cuentaOrigen} → ${m.cuentaDestino}` : (m.cuenta || '-')}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <span className={`text-[10px] px-2 py-1 rounded-full font-semibold ${m.tipo === 'entrada' ? 'bg-voltech-success/20 text-voltech-success' : m.tipo === 'salida' ? 'bg-voltech-error/20 text-voltech-error' : 'bg-voltech-cyan/20 text-voltech-cyan'}`}>{m.tipo === 'entrada' ? '⬆ Entrada' : m.tipo === 'salida' ? '⬇ Salida' : '🔄 Transf'}</span>
-                      </td>
-                      <td className={`px-4 py-3 text-right text-sm font-bold ${m.tipo === 'entrada' ? 'text-voltech-success' : 'text-voltech-error'}`}>{m.tipo === 'entrada' ? '+' : '-'}${Number(m.monto).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-sm text-voltech-muted whitespace-nowrap">{m.fecha}</td>
+                      <td className="px-4 py-3 text-sm text-white truncate max-w-[200px]">{m.fuente}{m.concepto ? ` · ${m.concepto}` : ''}</td>
+                      <td className="px-4 py-3 text-right text-sm font-bold text-voltech-success">{m.tipo === 'entrada' ? `+$${Number(m.monto).toFixed(2)}` : ''}</td>
+                      <td className="px-4 py-3 text-right text-sm font-bold text-voltech-error">{(m.tipo === 'salida' || m.tipo === 'transferencia') ? `$${Number(m.monto).toFixed(2)}` : ''}</td>
+                      <td className="px-4 py-3 text-sm text-voltech-muted">{m.tipo === 'transferencia' ? m.cuentaOrigen : (m.cuenta || '-')}</td>
+                      <td className="px-4 py-3 text-sm text-voltech-muted">{m.tipo === 'transferencia' ? m.cuentaDestino : (m.tipo === 'entrada' ? '-' : (m.nota || m.fuente))}</td>
                     </tr>
                   ))
                 )}

@@ -144,7 +144,10 @@ export default function AlertasPage() {
       });
       setNotisDB(rNotis.data || []);
 
-      setAlertas(out);
+      try {
+        const descartadas = JSON.parse(localStorage.getItem('voltech_alertas_descartadas') || '[]');
+        setAlertas(out.filter(a => !descartadas.includes(a.id)));
+      } catch (e) { setAlertas(out); }
     };
     cargar();
     window.addEventListener('voltech-data-updated', cargar);
@@ -228,6 +231,28 @@ export default function AlertasPage() {
     setAlertas(prev => prev.filter(a => a.id !== alerta.id));
     window.dispatchEvent(new Event('voltech-data-updated'));
     toast.success('Notificación eliminada en todo el sistema');
+  };
+
+  // ✅ Limpia TODAS las notificaciones vistas/aprobadas (BD + oculta completadas)
+  const limpiarVistas = async () => {
+    if (supabase) await supabase.from('notificaciones').delete().eq('leida', true);
+    const arr = JSON.parse(localStorage.getItem('voltech_alertas_descartadas') || '[]');
+    alertas.filter(a => a.status === 'completado').forEach(a => { if (!arr.includes(a.id)) arr.push(a.id); });
+    localStorage.setItem('voltech_alertas_descartadas', JSON.stringify(arr));
+    setAlertas(prev => prev.filter(a => a.status !== 'completado'));
+    window.dispatchEvent(new Event('voltech-data-updated'));
+    toast.success('Notificaciones vistas eliminadas');
+  };
+
+  // ✅ Elimina UNA alerta individual (de la BD si es notificación, o la oculta persistente)
+  const descartarAlerta = async (alerta) => {
+    if (alerta.metadata?.notiId && supabase) await supabase.from('notificaciones').delete().eq('id', alerta.metadata.notiId);
+    const arr = JSON.parse(localStorage.getItem('voltech_alertas_descartadas') || '[]');
+    if (!arr.includes(alerta.id)) arr.push(alerta.id);
+    localStorage.setItem('voltech_alertas_descartadas', JSON.stringify(arr));
+    setAlertas(prev => prev.filter(a => a.id !== alerta.id));
+    window.dispatchEvent(new Event('voltech-data-updated'));
+    toast.success('Alerta eliminada');
   };
 
   const badgeEstado = (status) => {
@@ -318,10 +343,22 @@ export default function AlertasPage() {
                 className="w-full sm:w-auto"
               />
             </div>
-            <div className="flex items-center gap-2 w-full overflow-x-auto no-scrollbar py-2 min-w-0">
-              {CATEGORIAS.map(c => (
-                <button key={c.id} onClick={() => setCatActiva(c.id)} className={`shrink-0 whitespace-nowrap text-xs py-1.5 px-3 rounded-full border transition-all ${catActiva === c.id ? 'bg-voltech-cyan/20 text-voltech-cyan border-voltech-cyan/40' : 'text-voltech-muted border-voltech-border hover:text-white'}`}>{c.label}</button>
-              ))}
+            <div className="flex items-center gap-2 w-full">
+              <CustomSelect
+                value={catActiva}
+                onChange={setCatActiva}
+                options={CATEGORIAS.map(c => ({ value: c.id, label: c.label }))}
+                placeholder="Categoría"
+                className="flex-1"
+              />
+              <button
+                onClick={limpiarVistas}
+                className="shrink-0 text-xs py-2 px-3 bg-red-600/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-600/30 transition-colors flex items-center gap-1.5"
+                title="Eliminar todas las notificaciones vistas/aprobadas"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Limpiar vistas</span>
+              </button>
             </div>
           </div>
 
@@ -343,7 +380,12 @@ export default function AlertasPage() {
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0">
                       {badgeEstado(a.status)}
-                      {accionRapida(a)}
+                      <div className="flex items-center gap-1">
+                        {accionRapida(a)}
+                        <button onClick={(e) => { e.stopPropagation(); descartarAlerta(a); }} className="text-xs px-2 py-1 rounded bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-600/40 transition-colors" title="Eliminar alerta">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -373,6 +415,7 @@ export default function AlertasPage() {
             </div>
             <div className="flex gap-2">
               {accionRapida(detalle)}
+              <button onClick={() => { descartarAlerta(detalle); setDetalle(null); }} className="text-sm px-3 py-2 rounded-lg bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-600/40 flex items-center gap-1"><Trash2 className="w-3.5 h-3.5" /> Eliminar</button>
               <button onClick={() => { router.push(RUTAS[detalle.category] + (detalle.metadata?.miembro ? `?miembro=${encodeURIComponent(detalle.metadata.miembro)}` : '')); setDetalle(null); }} className="flex-1 text-sm px-3 py-2 rounded-lg bg-voltech-purple/20 text-voltech-purple hover:bg-voltech-purple/30">Ir al módulo</button>
             </div>
           </div>
