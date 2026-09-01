@@ -1,6 +1,7 @@
 // hooks/useVoltech.js
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase'; // ✅ CAMBIADO: Ruta relativa infalible
+import { getUser } from '../lib/session'; // ✅ NUEVO: Para detectar app vs navegador
 
 // ✅ Helper: guarda en localStorage solo si hay espacio disponible
 const setLocalSafe = (clave, valor) => {
@@ -46,24 +47,92 @@ export function useProductos() {
 
 // 2. Hook para Configuración (Settings)
 export function useSettings() {
-  const [settings, setSettings] = useState({});
+  const [settings, setSettings] = useState({
+    tienda: {
+      nombre: 'VOLTECH STORE.VE',
+      email: '',
+      telefono: '',
+      direccion: '',
+      instagramUrl: '',
+      facebookUrl: '',
+      tiktokUrl: '',
+      whatsappUrl: '',
+      logo: ''
+    },
+    pagos: {},
+    carteras: [],
+    envios: {
+      puntosEntrega: [],
+      deliveryGratisDesde: 0,
+      costoEnvioNacional: 0,
+      montoMinimoEnvioGratis: 0,
+      descripcionEnvioNacional: '',
+      tiempo: '',
+      notas: ''
+    },
+    politicas: {
+      terminos: '',
+      terminos_streaming: '',
+      privacidad: ''
+    },
+    colores: {
+      primario: '#22d3ee',
+      secundario: '#a855f7',
+      acento: '#3b82f6',
+      fondo: '#0a0a0f',
+      texto: '#ffffff',
+      difuminado: 'horizontal'
+    },
+    whatsapp: {
+      plantilla_compra: '',
+      cierre_compra: 'Quiero comprar ✅'
+    },
+    oferta_relampago: {
+      activo: false,
+      texto: '',
+      descuento_pct: 0,
+      duracion_horas: 2,
+      inicio: '',
+      fin: ''
+    },
+    oferta_inferior: {
+      activo: false,
+      texto: '',
+      descuento_pct: 0
+    }
+  });
 
   useEffect(() => {
     const fetchSettings = async () => {
+      let settingsObj = null;
+      
       if (supabase) {
         const { data, error } = await supabase.from('settings').select('clave, valor');
         if (!error && data && data.length > 0) {
-          const settingsObj = {};
+          settingsObj = {};
           data.forEach(item => { settingsObj[item.clave] = item.valor; });
-          setSettings(settingsObj);
           setLocalSafe('voltech_settings', JSON.stringify(settingsObj));
-        } else {
-          const cached = localStorage.getItem('voltech_settings');
-          if (cached) setSettings(JSON.parse(cached));
         }
-      } else {
+      }
+      
+      if (!settingsObj) {
         const cached = localStorage.getItem('voltech_settings');
-        if (cached) setSettings(JSON.parse(cached));
+        if (cached) settingsObj = JSON.parse(cached);
+      }
+      
+      if (settingsObj) {
+        setSettings(prev => ({
+          ...prev,
+          tienda: { ...prev.tienda, ...settingsObj.tienda },
+          pagos: { ...prev.pagos, ...(settingsObj.pagos || {}) },
+          carteras: settingsObj.carteras || prev.carteras,
+          envios: { ...prev.envios, ...(settingsObj.envios || {}) },
+          politicas: { ...prev.politicas, ...(settingsObj.politicas || {}) },
+          colores: { ...prev.colores, ...(settingsObj.colores || {}) },
+          whatsapp: { ...prev.whatsapp, ...(settingsObj.whatsapp || {}) },
+          oferta_relampago: { ...prev.oferta_relampago, ...(settingsObj.oferta_relampago || {}) },
+          oferta_inferior: { ...prev.oferta_inferior, ...(settingsObj.oferta_inferior || {}) }
+        }));
       }
     };
     fetchSettings();
@@ -90,8 +159,8 @@ export function useTasaBCV() {
 export function useAuth() {
   const [currentUser, setCurrentUser] = useState(null);
   useEffect(() => {
-    const userLogged = localStorage.getItem('voltech_user');
-    if (userLogged) setCurrentUser(JSON.parse(userLogged));
+    const userLogged = getUser(); // ✅ Detecta app vs navegador automáticamente
+    if (userLogged) setCurrentUser(userLogged);
   }, []);
   return { currentUser, setCurrentUser };
 }
