@@ -34,6 +34,9 @@ window.open(`https://web.whatsapp.com/send?phone=${limpio}&text=${cod}`, '_blank
 }
 };
 
+// ✅ Solo permite navegar si la URL existe y es http(s) válida (evita links muertos o ajenos)
+const esUrlValida = (u) => typeof u === 'string' && /^https?:\/\/\S+$/i.test(u.trim());
+
 // ✅ CARRUSEL DE IMÁGENES: portada primero + flechas ‹ › + puntitos (para tarjetas y modal)
 const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', iconoVacio = null }) => {
   const [idx, setIdx] = useState(0);
@@ -2084,9 +2087,12 @@ productosAgrupados.map(([cat, items]) => (
             <div>
               <h4 className="font-bold mb-4"> Redes Sociales</h4>
               <div className="space-y-2 text-sm">
-                {settings.tienda?.instagramUrl && <a href={settings.tienda.instagramUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-pink-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg> Instagram</a>}
-                {settings.tienda?.tiktokUrl && <a href={settings.tienda.tiktokUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/></svg> TikTok</a>}
-                {settings.tienda?.facebookUrl && <a href={settings.tienda.facebookUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-blue-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg> Facebook</a>}
+                {esUrlValida(settings.tienda?.instagramUrl) && <a href={settings.tienda.instagramUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-pink-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg> Instagram</a>}
+                {esUrlValida(settings.tienda?.tiktokUrl) && <a href={settings.tienda.tiktokUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/></svg> TikTok</a>}
+                {esUrlValida(settings.tienda?.facebookUrl) && <a href={settings.tienda.facebookUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-slate-400 hover:text-blue-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg> Facebook</a>}
+                {!esUrlValida(settings.tienda?.instagramUrl) && !esUrlValida(settings.tienda?.tiktokUrl) && !esUrlValida(settings.tienda?.facebookUrl) && (
+                  <p className="text-slate-500 text-xs">Pronto agregaremos nuestras redes sociales 🚀</p>
+                )}
                 <button onClick={() => abrirWhatsAppNat(whatsappNumero, '¡Hola VOLTECH! 👋 Quiero más información.')} className="flex items-center gap-2 text-slate-400 hover:text-green-400 transition-colors"><WhatsAppIcon className="w-4 h-4" /> WhatsApp</button>
               </div>
             </div>
