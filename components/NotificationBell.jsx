@@ -160,105 +160,77 @@ export default function NotificationBell() {
       </button>
 
       {showDropdown && (
-        <div className="fixed left-4 right-4 top-16 w-auto max-h-[80vh] overflow-y-auto sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-h-none sm:overflow-visible bg-voltech-surface border border-voltech-border rounded-xl shadow-2xl z-50">
-          <div className="p-4 border-b border-voltech-border">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-bold text-white">Notificaciones</h3>
-              <button
-                onClick={() => setShowDropdown(false)}
-                className="p-1 rounded hover:bg-voltech-border text-voltech-muted"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={marcarTodasLeidas}
-                className="text-xs text-voltech-cyan hover:text-voltech-cyan/70 flex items-center gap-1"
-              >
-                <CheckCircle className="w-3 h-3" /> Marcar todas leídas
-              </button>
-              <button
-                onClick={limpiarTodas}
-                className="text-xs text-voltech-error hover:text-voltech-error/70 flex items-center gap-1"
-              >
-                <Trash2 className="w-3 h-3" /> Vaciar
-              </button>
-            </div>
-            <button
-              onClick={notifSistema ? desactivarNotifSistema : activarNotifSistema}
-              className={`mt-2 w-full flex items-center justify-center gap-2 text-xs px-2 py-1.5 rounded-lg border transition-colors ${notifSistema ? 'bg-voltech-success/20 text-voltech-success border-voltech-success/40' : 'bg-voltech-dark/50 text-voltech-muted border-voltech-border hover:text-voltech-cyan'}`}
-            >
-              {notifSistema ? <BellRing className="w-3 h-3" /> : <BellOff className="w-3 h-3" />}
-              {notifSistema ? 'Notificaciones: ACTIVADAS' : 'Activar notificaciones (PC/móvil)'}
-            </button>
-          </div>
+        <>
+          {/* ✅ Fondo oscuro solo en móvil (toca fuera para cerrar) */}
+          <div className="fixed inset-0 bg-black/60 z-40 sm:hidden" onClick={() => setShowDropdown(false)} />
 
-          <div className="max-h-96 overflow-y-auto">
-            {ultimas.length === 0 ? (
-              <p className="text-center text-voltech-muted py-8 text-sm">No hay notificaciones</p>
-            ) : (
-              ultimas.map((notificacion, idx) => (
-                <div
-                  key={notificacion.id || idx}
-                  className={`p-4 border-b border-voltech-border hover:bg-voltech-dark/30 transition-colors ${
-                    !notificacion.leida ? 'bg-voltech-cyan/5' : ''
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <button
-                      onClick={() => handleClic(notificacion)}
-                      className="flex-1 text-left"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 rounded-lg bg-voltech-dark">
-                          {getIcono(notificacion.tipo)}
-                        </div>
+          <div className="fixed left-2 right-2 top-14 bottom-4 w-auto flex flex-col overflow-hidden sm:left-auto sm:right-0 sm:top-auto sm:bottom-auto sm:mt-2 sm:w-96 sm:max-h-[80vh] bg-voltech-surface border border-voltech-border rounded-2xl shadow-2xl z-50">
+            <div className="p-4 border-b border-voltech-border shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-bold text-white">Notificaciones</h3>
+                <button onClick={() => setShowDropdown(false)} className="p-1.5 rounded-lg hover:bg-voltech-border text-voltech-muted">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex items-center gap-4">
+                <button onClick={marcarTodasLeidas} className="text-xs text-voltech-cyan flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" /> Marcar todas leídas
+                </button>
+                <button onClick={limpiarTodas} className="text-xs text-voltech-error flex items-center gap-1">
+                  <Trash2 className="w-3 h-3" /> Vaciar
+                </button>
+              </div>
+              <button
+                onClick={notifSistema ? desactivarNotifSistema : activarNotifSistema}
+                className={`mt-2 w-full flex items-center justify-center gap-2 text-xs px-2 py-2 rounded-lg border transition-colors ${notifSistema ? 'bg-voltech-success/20 text-voltech-success border-voltech-success/40' : 'bg-voltech-dark/50 text-voltech-muted border-voltech-border hover:text-voltech-cyan'}`}
+              >
+                {notifSistema ? <BellRing className="w-3 h-3" /> : <BellOff className="w-3 h-3" />}
+                {notifSistema ? 'Notificaciones: ACTIVADAS' : 'Activar notificaciones (PC/móvil)'}
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {ultimas.length === 0 ? (
+                <p className="text-center text-voltech-muted py-8 text-sm">No hay notificaciones</p>
+              ) : (
+                ultimas.map((notificacion, idx) => (
+                  <div key={notificacion.id || idx} className={`p-3 border-b border-voltech-border last:border-b-0 ${!notificacion.leida ? 'bg-voltech-cyan/5' : ''}`}>
+                    <div className="flex items-start gap-2">
+                      <button onClick={() => handleClic(notificacion)} className="flex-1 min-w-0 text-left flex items-start gap-2">
+                        <div className="p-2 rounded-lg bg-voltech-dark shrink-0">{getIcono(notificacion.tipo)}</div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <h4 className="text-xs font-bold text-white truncate">
-                              {notificacion.titulo}
-                            </h4>
+                          <div className="flex items-start justify-between gap-2 mb-0.5">
+                            <h4 className="text-xs font-bold text-white break-words leading-snug">{notificacion.titulo}</h4>
                             {!notificacion.leida && (
-                              <span className="text-[10px] px-1.5 py-0.5 bg-voltech-cyan text-white rounded ml-2">
-                                Nueva
-                              </span>
+                              <span className="shrink-0 text-[9px] px-1.5 py-0.5 bg-voltech-cyan text-white rounded">Nueva</span>
                             )}
                           </div>
-                          <p className="text-xs text-voltech-muted line-clamp-2">
-                            {notificacion.mensaje}
-                          </p>
-                          <p className="text-[10px] text-voltech-muted mt-1">
-                            {new Date(notificacion.created_at || notificacion.hora).toLocaleString('es-VE')}
-                          </p>
+                          <p className="text-[11px] text-voltech-muted break-words">{notificacion.mensaje}</p>
+                          <p className="text-[10px] text-voltech-muted/70 mt-1">{new Date(notificacion.created_at || notificacion.hora).toLocaleString('es-VE')}</p>
                         </div>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => eliminarNotificacion(notificacion.id)}
-                      className="p-1 rounded hover:bg-voltech-error/10 text-voltech-muted hover:text-voltech-error transition-colors"
-                      title="Eliminar notificación"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+                      </button>
+                      <button onClick={() => eliminarNotificacion(notificacion.id)} className="p-1.5 rounded-lg hover:bg-voltech-error/10 text-voltech-muted hover:text-voltech-error shrink-0" title="Eliminar notificación">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
+                ))
+              )}
+            </div>
 
-          <div className="p-3 border-t border-voltech-border">
-            <button
-              onClick={() => {
-                router.push('/panel/alertas');
-                setShowDropdown(false);
-              }}
-              className="w-full text-center text-xs text-voltech-cyan hover:text-voltech-cyan/70"
-            >
-              Ver todas las notificaciones →
-            </button>
+            <div className="p-3 border-t border-voltech-border shrink-0">
+              <button
+                onClick={() => {
+                  router.push('/panel/alertas');
+                  setShowDropdown(false);
+                }}
+                className="w-full text-center text-xs text-voltech-cyan py-1"
+              >
+                Ver todas las notificaciones →
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
