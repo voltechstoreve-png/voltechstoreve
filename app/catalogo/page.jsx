@@ -1235,7 +1235,7 @@ window.location.href = url;
               <button onClick={() => setShowMobileMenu(!showMobileMenu)} className={`md:hidden p-2 rounded-lg ${darkMode ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-700'}`}>
                 <Menu className="w-5 h-5" />
               </button>
-              <h1 className={`text-sm sm:text-base font-bold tracking-tight truncate max-w-[130px] sm:max-w-none ${darkMode ? 'text-white' : 'text-slate-900'}`}>VOLTECH <span className="text-purple-600">STOREVE</span></h1>
+              <h1 className={`text-[13px] sm:text-base font-extrabold tracking-tight leading-tight whitespace-nowrap ${darkMode ? 'text-white' : 'text-slate-900'}`}>VOLTECH <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-fuchsia-500 bg-clip-text text-transparent">STORE.VE</span></h1>
             </div>
 
             <nav className="hidden md:flex gap-6">
