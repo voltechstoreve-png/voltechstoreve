@@ -575,12 +575,12 @@ export default function AjustesPage() {
 
         {activeTab === 'ofertas_relampago' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <h2 className="text-xl font-bold text-white">Ofertas y Banners</h2>
                 <p className="text-sm text-voltech-muted mt-1">Crea promociones sincronizadas con el catálogo</p>
               </div>
-              <button onClick={() => { resetFormOferta(); setOfertaEditando(null); setShowOfertaForm(!showOfertaForm); }} className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium flex items-center gap-2">
+              <button onClick={() => { resetFormOferta(); setOfertaEditando(null); setShowOfertaForm(!showOfertaForm); }} className="w-full sm:w-auto shrink-0 justify-center px-4 py-2.5 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium flex items-center gap-2">
                 <Plus className="w-4 h-4" /> Crear Oferta
               </button>
             </div>
@@ -650,8 +650,49 @@ export default function AjustesPage() {
 
             <div className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
               <div className="p-4 border-b border-voltech-border"><h3 className="text-sm font-bold text-white">Historial de Ofertas</h3></div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px]">
+
+              {/* ✅ Vista Card Móvil (< md) */}
+              <div className="block md:hidden space-y-3 p-3">
+                {ofertasBanners.length === 0 ? (
+                  <div className="bg-voltech-dark/50 border border-voltech-border rounded-2xl p-6 text-center">
+                    <Zap className="w-8 h-8 mx-auto mb-2 text-voltech-muted opacity-40" />
+                    <p className="text-xs text-voltech-muted">No hay ofertas creadas</p>
+                  </div>
+                ) : (
+                  ofertasBanners.map(o => {
+                    const est = estadoOferta(o);
+                    return (
+                      <div key={o.id} className="bg-voltech-dark/50 border border-voltech-border rounded-2xl p-4 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-xs font-medium text-white flex-1 min-w-0 break-words">{o.texto}</p>
+                          <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium ${est === 'activa' ? 'bg-voltech-success/20 text-voltech-success' : est === 'programada' ? 'bg-voltech-cyan/20 text-voltech-cyan' : 'bg-voltech-error/20 text-voltech-error'}`}>{est}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-voltech-purple/20 text-voltech-purple">{o.posicion === 'superior' ? '⬆️ Superior' : '⬇️ Inferior'}</span>
+                          {o.descuento_pct > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-voltech-success/20 text-voltech-success">💰 {o.descuento_pct}%</span>}
+                          {o.monto > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-voltech-success/20 text-voltech-success">💵 ${o.monto}</span>}
+                        </div>
+                        <p className="text-[10px] text-voltech-muted">📅 {o.fecha_inicio} → {o.fecha_fin} · 🕐 {o.hora_inicio} a {o.hora_fin}</p>
+                        <div className="flex items-center gap-2 pt-2 border-t border-voltech-border/50">
+                          <button onClick={() => toggleOferta(o.id)} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-voltech-muted py-2 rounded-lg bg-voltech-border/50 hover:bg-voltech-border transition-colors">
+                            <Eye size={14} /> {o.activo ? 'Desactivar' : 'Activar'}
+                          </button>
+                          <button onClick={() => { setOfertaEditando(o); setFormDataOferta({ posicion: o.posicion, texto: o.texto, descuento_pct: o.descuento_pct, monto: o.monto, fecha_inicio: o.fecha_inicio, duracion_dias: o.duracion_dias, fecha_fin: o.fecha_fin, hora_inicio: o.hora_inicio, hora_fin: o.hora_fin }); setShowOfertaForm(true); }} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-voltech-cyan py-2 rounded-lg bg-voltech-cyan/10 border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-colors">
+                            <Edit3 size={14} /> Editar
+                          </button>
+                          <button onClick={() => eliminarOferta(o.id)} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-voltech-error py-2 rounded-lg bg-voltech-error/10 border border-voltech-error/30 hover:bg-voltech-error/20 transition-colors">
+                            <Trash2 size={14} /> Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* ✅ Vista Tabla Desktop (>= md) */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
                   <thead className="bg-voltech-dark border-b border-voltech-border">
                     <tr>
                       <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Texto</th>
