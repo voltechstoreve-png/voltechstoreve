@@ -822,7 +822,7 @@ useEffect(() => {
           <h1 className="text-2xl font-bold text-white">Finanzas del Equipo</h1>
           <p className="text-sm text-voltech-muted mt-1">Gestiona pagos a vendedores e inversiones de socios</p>
         </div>
-        <div className="flex gap-3 items-center">
+        <div className="flex flex-wrap gap-2 items-center w-full md:w-auto">
           {puedeGestionar && (
             <button
               onClick={() => setVerSoloMi(!verSoloMi)}
@@ -835,7 +835,7 @@ useEffect(() => {
           {activeTab === 'inversiones' && (
             <button
               onClick={() => { resetForm(); setShowForm(true); }}
-              className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all flex items-center gap-2"
+              className="flex-1 md:flex-none justify-center px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
               Nueva Inversión
@@ -844,7 +844,7 @@ useEffect(() => {
           {activeTab === 'cuentas' && (
             <button
               onClick={() => setShowFormCuenta(!showFormCuenta)}
-              className="px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all flex items-center gap-2"
+              className="flex-1 md:flex-none justify-center px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
               Registrar Movimiento
@@ -911,16 +911,18 @@ useEffect(() => {
       </div>
 
       {activeTab === 'cuentas' && (
-        <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => setMostrarMontos(!mostrarMontos)} className="px-3 py-2 rounded-lg text-xs flex items-center gap-2 bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white">
-            {mostrarMontos ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />} {mostrarMontos ? 'Ocultar montos' : 'Ver montos'}
-          </button>
-          <button onClick={() => setCajasVisibles(!cajasVisibles)} className="px-3 py-2 rounded-lg text-xs flex items-center gap-2 bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white">
-            {cajasVisibles ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />} {cajasVisibles ? 'Ocultar Cuentas/Caja' : 'Ver Cuentas/Caja'}
-          </button>
-          <div className="flex-1 min-w-[200px] flex gap-2">
-            <input type="text" value={nuevaCuentaInterna} onChange={(e) => setNuevaCuentaInterna(e.target.value)} placeholder="Nueva cuenta interna (ej: Ahorros, Publicidad)" className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm" />
-            <button onClick={agregarCuentaInterna} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 flex items-center gap-2"><Plus className="w-4 h-4" /> Crear Cuenta</button>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={() => setMostrarMontos(!mostrarMontos)} className="px-3 py-2 rounded-lg text-xs flex items-center gap-2 bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white">
+              {mostrarMontos ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />} {mostrarMontos ? 'Ocultar montos' : 'Ver montos'}
+            </button>
+            <button onClick={() => setCajasVisibles(!cajasVisibles)} className="px-3 py-2 rounded-lg text-xs flex items-center gap-2 bg-voltech-surface border border-voltech-border text-voltech-muted hover:text-white">
+              {cajasVisibles ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />} {cajasVisibles ? 'Ocultar Cuentas/Caja' : 'Ver Cuentas/Caja'}
+            </button>
+          </div>
+          <div className="w-full flex gap-2">
+            <input type="text" value={nuevaCuentaInterna} onChange={(e) => setNuevaCuentaInterna(e.target.value)} placeholder="Nueva cuenta interna (ej: Ahorros)" className="input-voltech flex-1 min-w-0 rounded-lg px-4 py-2 text-sm" />
+            <button onClick={agregarCuentaInterna} className="shrink-0 whitespace-nowrap px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-sm hover:bg-voltech-cyan/30 flex items-center gap-2"><Plus className="w-4 h-4" /> Crear Cuenta</button>
           </div>
         </div>
       )}
@@ -1722,7 +1724,42 @@ useEffect(() => {
               </div>
             </div>
           )}
-          <div className="overflow-x-auto">
+          {/* ✅ Vista Card Móvil (< md) */}
+          <div className="block md:hidden space-y-3 p-3">
+            {movGlobales.length === 0 ? (
+              <div className="bg-voltech-dark/50 border border-voltech-border rounded-2xl p-6 text-center">
+                <Wallet className="w-8 h-8 mx-auto mb-2 text-voltech-muted opacity-40" />
+                <p className="text-xs text-voltech-muted">No hay movimientos aún.</p>
+              </div>
+            ) : (
+              movGlobales.map(m => (
+                <div key={m.id} className="bg-voltech-dark/50 border border-voltech-border rounded-2xl p-4 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white break-words">{m.fuente}{m.concepto ? ` · ${m.concepto}` : ''}</p>
+                      <p className="text-[10px] text-voltech-muted mt-0.5">📅 {m.fecha}</p>
+                    </div>
+                    <span className={`shrink-0 text-sm font-bold ${m.tipo === 'entrada' ? 'text-voltech-success' : 'text-voltech-error'}`}>
+                      {m.tipo === 'entrada' ? `+$${Number(m.monto).toFixed(2)}` : `-$${Number(m.monto).toFixed(2)}`}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${m.tipo === 'entrada' ? 'bg-voltech-success/20 text-voltech-success' : m.tipo === 'salida' ? 'bg-voltech-error/20 text-voltech-error' : 'bg-voltech-cyan/20 text-voltech-cyan'}`}>
+                      {m.tipo === 'entrada' ? '⬆ Entrada' : m.tipo === 'salida' ? '⬇ Salida' : '🔄 Transf'}
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-voltech-purple/20 text-voltech-purple">💼 {m.tipo === 'transferencia' ? m.cuentaOrigen : (m.cuenta || '-')}</span>
+                    {m.tipo === 'transferencia' && <span className="text-[10px] px-2 py-0.5 rounded-full bg-voltech-cyan/20 text-voltech-cyan">→ {m.cuentaDestino}</span>}
+                  </div>
+                  {(m.tipo === 'salida' || m.tipo === 'transferencia') && m.nota && (
+                    <p className="text-[10px] text-voltech-muted">📝 {m.nota}</p>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* ✅ Vista Tabla Desktop (>= md) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead className="bg-voltech-dark border-b border-voltech-border">
                 <tr>
