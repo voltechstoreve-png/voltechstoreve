@@ -1384,11 +1384,11 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
         </div>
       </header>
 
-      <main className="max-w-[1800px] xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full pb-24 md:pb-8">
+      <main className="max-w-[1800px] xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full min-w-0 overflow-x-hidden pb-24 md:pb-8">
 
       {/* 📱 MÓVIL: Buscador + filtros (Inicio y Explorar) */}
       {navTab !== 'gana' && (
-      <div className="md:hidden mb-4 flex flex-col gap-2">
+      <div className="md:hidden mb-4 flex flex-col gap-2 max-w-full">
         <div className="relative w-full">
           <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
           <input type="text" placeholder={activeSection === 'productos' ? 'Buscar productos...' : activeSection === 'streaming' ? 'Buscar plataformas...' : 'Buscar...'} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${inputBg}`} />
@@ -1630,7 +1630,7 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
     </div>
   );
 })()}      
-<div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
+<div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8 max-w-full min-w-0">
           
           {/* ✅ SIDEBAR IZQUIERDO: SOLO si hay publicidad activa */}
           {navTab !== 'gana' && (
@@ -1677,7 +1677,7 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
             </aside>
           )}
 
-          <div className="col-span-1 lg:col-span-10 xl:col-span-10 order-1 lg:order-2">
+          <div className="col-span-1 lg:col-span-10 xl:col-span-10 order-1 lg:order-2 min-w-0 max-w-full">
 {(navTab === 'inicio' || (navTab === 'explorar' && activeSection === 'productos')) && (
 <div>
 <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Productos</h2>
