@@ -88,7 +88,12 @@ export default function AjustesPage() {
   const [showOfertaForm, setShowOfertaForm] = useState(false);
   const [ofertaEditando, setOfertaEditando] = useState(null);
   const [formDataOferta, setFormDataOferta] = useState({
-    posicion: 'superior', texto: '', descuento_pct: 0, monto: 0,
+    tipo_oferta: 'opcional', // 'opcional' | 'recompensa_opinion' | 'descuento_todo' | 'descuento_streaming'
+    posicion: 'superior',
+    texto: '', descuento_pct: 0, monto: 0,
+    modo_descuento: 'pct', // 'pct' | 'monto' | 'tickets' (solo para recompensa_opinion)
+    recompensa_tickets: 2,
+    categoria_aplica: '',
     fecha_inicio: '', duracion_dias: 1, fecha_fin: '',
     hora_inicio: '00:00', hora_fin: '23:59',
   });
@@ -165,6 +170,28 @@ export default function AjustesPage() {
       setFormDataOferta(prev => ({ ...prev, fecha_fin: `${y}-${m}-${d}` }));
     }
   }, [formDataOferta.fecha_inicio, formDataOferta.duracion_dias]);
+
+  // ✅ Categorías existentes en el sistema (para el selector de banners superiores)
+  const [categoriasSistema, setCategoriasSistema] = useState([]);
+  useEffect(() => {
+    const cargarCats = async () => {
+      let prods = [];
+      if (supabase) {
+        const { data } = await supabase.from('productos').select('categoria');
+        if (data && data.length) prods = data;
+      }
+      if (!prods.length) {
+        try { prods = JSON.parse(localStorage.getItem('voltech_productos') || '[]'); } catch (e) {}
+      }
+      setCategoriasSistema(
+        [...new Set((prods || []).map(p => p.categoria).filter(c => c && c.toUpperCase() !== 'STREAMING'))].sort()
+      );
+    };
+    cargarCats();
+    const h = () => cargarCats();
+    window.addEventListener('voltech-data-updated', h);
+    return () => window.removeEventListener('voltech-data-updated', h);
+  }, []);
 
   const handleSave = async () => {
     if (!esAdmin) { toast.error('Solo el administrador puede modificar los ajustes'); return; }
@@ -310,7 +337,7 @@ export default function AjustesPage() {
   };
 
   // ═══════════════ GESTOR DE OFERTAS / BANNERS ═══════════════
-  const resetFormOferta = () => setFormDataOferta({ posicion: 'superior', texto: '', descuento_pct: 0, monto: 0, fecha_inicio: '', duracion_dias: 1, fecha_fin: '', hora_inicio: '00:00', hora_fin: '23:59' });
+  const resetFormOferta = () => setFormDataOferta({ tipo_oferta: 'opcional', posicion: 'superior', texto: '', descuento_pct: 0, monto: 0, modo_descuento: 'pct', recompensa_tickets: 2, categoria_aplica: '', fecha_inicio: '', duracion_dias: 1, fecha_fin: '', hora_inicio: '00:00', hora_fin: '23:59' });
 
   const persistirOfertas = async (arr) => {
     setOfertasBanners(arr);
@@ -331,6 +358,7 @@ export default function AjustesPage() {
   const guardarOferta = async () => {
     if (!formDataOferta.texto.trim()) { toast.error('Escribe el texto del anuncio'); return; }
     if (!formDataOferta.fecha_inicio) { toast.error('Selecciona la fecha de inicio'); return; }
+    
     if (ofertaEditando) {
       await persistirOfertas(ofertasBanners.map(o => o.id === ofertaEditando.id ? { ...o, ...formDataOferta } : o));
       toast.success('Oferta actualizada');
@@ -607,15 +635,80 @@ export default function AjustesPage() {
                   </div>
                 </div>
 
+                {/* 🎁 TIPO DE RECOMPENSA (solo cuando es Banner Inferior) */}
+                {formDataOferta.posicion === 'inferior' && (
+                  <div>
+                    <label className="block text-xs text-voltech-muted mb-2">🎁 Tipo de Recompensa</label>
+                    <CustomSelect
+                      value={formDataOferta.tipo_oferta || 'opcional'}
+                      onChange={(v) => setFormDataOferta({ ...formDataOferta, tipo_oferta: v, modo_descuento: 'pct' })}
+                      options={[
+                        { value: 'opcional', label: '➖ OPCIONAL (solo anuncio)' },
+                        { value: 'recompensa_opinion', label: '🎁 RECOMPENSA POR OPINIÓN' },
+                        { value: 'descuento_todo', label: '🛒 DESCUENTO DE TODOS LOS PRODUCTOS' },
+                        { value: 'descuento_streaming', label: '📺 DESCUENTO DE PLATAFORMAS STREAMING' }
+                      ]}
+                      placeholder="Selecciona tipo"
+                      className="w-full"
+                    />
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-xs text-voltech-muted mb-2">💰 Descuento (%) · 0 = no aplica</label>
-                    <input type="number" min="0" max="100" value={formDataOferta.descuento_pct} onChange={(e) => setFormDataOferta({ ...formDataOferta, descuento_pct: parseInt(e.target.value) || 0 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-voltech-muted mb-2">💵 Monto ($) · 0 = no aplica</label>
-                    <input type="number" min="0" step="0.01" value={formDataOferta.monto} onChange={(e) => setFormDataOferta({ ...formDataOferta, monto: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
-                  </div>
+                  {formDataOferta.posicion === 'inferior' && formDataOferta.tipo_oferta !== 'opcional' && (
+                    <div>
+                      <label className="block text-xs text-voltech-muted mb-2">
+                        {formDataOferta.tipo_oferta === 'recompensa_opinion' ? '🎁 Forma de recompensa' : '💸 Forma de descuento'}
+                      </label>
+                      <CustomSelect
+                        value={formDataOferta.modo_descuento || 'pct'}
+                        onChange={(v) => setFormDataOferta({ ...formDataOferta, modo_descuento: v })}
+                        options={formDataOferta.tipo_oferta === 'recompensa_opinion' ? [
+                          { value: 'pct', label: '💰 % de descuento' },
+                          { value: 'monto', label: '💵 Monto fijo ($)' },
+                          { value: 'tickets', label: '🎟️ Tickets de sorteo' }
+                        ] : [
+                          { value: 'pct', label: '💰 % de descuento' },
+                          { value: 'monto', label: '💵 Monto fijo ($)' }
+                        ]}
+                        placeholder="Selecciona forma"
+                        className="w-full"
+                      />
+                    </div>
+                  )}
+                  {(formDataOferta.modo_descuento || 'pct') === 'pct' && (
+                    <div>
+                      <label className="block text-xs text-voltech-muted mb-2">💰 Descuento (%)</label>
+                      <input type="number" min="0" max="100" value={formDataOferta.descuento_pct} onChange={(e) => setFormDataOferta({ ...formDataOferta, descuento_pct: parseInt(e.target.value) || 0 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+                    </div>
+                  )}
+                  {(formDataOferta.modo_descuento || 'pct') === 'monto' && (
+                    <div>
+                      <label className="block text-xs text-voltech-muted mb-2">💵 Monto ($)</label>
+                      <input type="number" min="0" step="0.01" value={formDataOferta.monto} onChange={(e) => setFormDataOferta({ ...formDataOferta, monto: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+                    </div>
+                  )}
+                  {formDataOferta.tipo_oferta === 'recompensa_opinion' && (formDataOferta.modo_descuento || 'pct') === 'tickets' && (
+                    <div>
+                      <label className="block text-xs text-voltech-muted mb-2">🎟️ Cantidad de tickets</label>
+                      <input type="number" min="1" value={formDataOferta.recompensa_tickets || 2} onChange={(e) => setFormDataOferta({ ...formDataOferta, recompensa_tickets: parseInt(e.target.value) || 2 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+                    </div>
+                  )}
+                  {formDataOferta.tipo_oferta === 'descuento_categoria' && (
+                    <div>
+                      <label className="block text-xs text-voltech-muted mb-2">🎯 Categoría</label>
+                      <CustomSelect
+                        value={formDataOferta.categoria_aplica || ''}
+                        onChange={(v) => setFormDataOferta({ ...formDataOferta, categoria_aplica: v })}
+                        options={categoriasSistema.map(c => ({ value: c, label: c }))}
+                        placeholder="Selecciona categoría"
+                        className="w-full"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div>
                     <label className="block text-xs text-voltech-muted mb-2">📅 Fecha Inicio</label>
                     <input type="date" value={formDataOferta.fecha_inicio} onChange={(e) => setFormDataOferta({ ...formDataOferta, fecha_inicio: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
@@ -624,9 +717,6 @@ export default function AjustesPage() {
                     <label className="block text-xs text-voltech-muted mb-2">⏳ Duración (días)</label>
                     <input type="number" min="1" value={formDataOferta.duracion_dias} onChange={(e) => setFormDataOferta({ ...formDataOferta, duracion_dias: parseInt(e.target.value) || 1 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs text-voltech-muted mb-2">📅 Fecha Fin (auto)</label>
                     <input type="date" value={formDataOferta.fecha_fin} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50" />
@@ -668,7 +758,9 @@ export default function AjustesPage() {
                           <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium ${est === 'activa' ? 'bg-voltech-success/20 text-voltech-success' : est === 'programada' ? 'bg-voltech-cyan/20 text-voltech-cyan' : 'bg-voltech-error/20 text-voltech-error'}`}>{est}</span>
                         </div>
                         <div className="flex flex-wrap gap-1">
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-voltech-purple/20 text-voltech-purple">{o.posicion === 'superior' ? '⬆️ Superior' : '⬇️ Inferior'}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-voltech-purple/20 text-voltech-purple">
+                            {o.tipo_oferta === 'recompensa_opinion' ? '🎁 Opinión' : o.tipo_oferta === 'descuento_categoria' ? '🏷️ Categoría' : o.tipo_oferta === 'descuento_streaming' ? '📺 Streaming' : '🛒 Todo'}
+                          </span>
                           {o.descuento_pct > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-voltech-success/20 text-voltech-success">💰 {o.descuento_pct}%</span>}
                           {o.monto > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-voltech-success/20 text-voltech-success">💵 ${o.monto}</span>}
                         </div>
@@ -677,7 +769,7 @@ export default function AjustesPage() {
                           <button onClick={() => toggleOferta(o.id)} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-voltech-muted py-2 rounded-lg bg-voltech-border/50 hover:bg-voltech-border transition-colors">
                             <Eye size={14} /> {o.activo ? 'Desactivar' : 'Activar'}
                           </button>
-                          <button onClick={() => { setOfertaEditando(o); setFormDataOferta({ posicion: o.posicion, texto: o.texto, descuento_pct: o.descuento_pct, monto: o.monto, fecha_inicio: o.fecha_inicio, duracion_dias: o.duracion_dias, fecha_fin: o.fecha_fin, hora_inicio: o.hora_inicio, hora_fin: o.hora_fin }); setShowOfertaForm(true); }} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-voltech-cyan py-2 rounded-lg bg-voltech-cyan/10 border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-colors">
+                          <button onClick={() => { setOfertaEditando(o); setFormDataOferta({ tipo_oferta: o.tipo_oferta || (o.posicion === 'inferior' ? 'recompensa_opinion' : 'opcional'), posicion: o.posicion, texto: o.texto, descuento_pct: o.descuento_pct, monto: o.monto, modo_descuento: o.modo_descuento || (o.tipo_recompensa || 'pct'), recompensa_tickets: o.recompensa_tickets || 2, categoria_aplica: o.categoria_aplica || '', fecha_inicio: o.fecha_inicio, duracion_dias: o.duracion_dias, fecha_fin: o.fecha_fin, hora_inicio: o.hora_inicio, hora_fin: o.hora_fin }); setShowOfertaForm(true); }} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-voltech-cyan py-2 rounded-lg bg-voltech-cyan/10 border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-colors">
                             <Edit3 size={14} /> Editar
                           </button>
                           <button onClick={() => eliminarOferta(o.id)} className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-voltech-error py-2 rounded-lg bg-voltech-error/10 border border-voltech-error/30 hover:bg-voltech-error/20 transition-colors">
@@ -712,7 +804,9 @@ export default function AjustesPage() {
                         return (
                           <tr key={o.id} className="border-b border-voltech-border hover:bg-voltech-border/30">
                             <td className="px-4 py-3 text-sm text-white">{o.texto}</td>
-                            <td className="px-4 py-3 text-sm text-voltech-muted">{o.posicion === 'superior' ? '⬆️ Superior' : '⬇️ Inferior'}</td>
+                            <td className="px-4 py-3 text-sm text-voltech-muted">
+                              {o.tipo_oferta === 'recompensa_opinion' ? '🎁 Opinión' : o.tipo_oferta === 'descuento_categoria' ? '🏷️ Categoría' : o.tipo_oferta === 'descuento_streaming' ? '📺 Streaming' : '🛒 Todo'}
+                            </td>
                             <td className="px-4 py-3 text-sm text-voltech-success">{o.descuento_pct > 0 ? `${o.descuento_pct}%` : o.monto > 0 ? `$${o.monto}` : '—'}</td>
                             <td className="px-4 py-3 text-xs text-voltech-muted">{o.fecha_inicio} → {o.fecha_fin}<br />{o.hora_inicio} a {o.hora_fin}</td>
                             <td className="px-4 py-3">
@@ -721,7 +815,7 @@ export default function AjustesPage() {
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-1">
                                 <button onClick={() => toggleOferta(o.id)} className="p-2 hover:bg-voltech-border rounded text-voltech-muted" title="Activar/Desactivar"><Eye className="w-4 h-4" /></button>
-                                <button onClick={() => { setOfertaEditando(o); setFormDataOferta({ posicion: o.posicion, texto: o.texto, descuento_pct: o.descuento_pct, monto: o.monto, fecha_inicio: o.fecha_inicio, duracion_dias: o.duracion_dias, fecha_fin: o.fecha_fin, hora_inicio: o.hora_inicio, hora_fin: o.hora_fin }); setShowOfertaForm(true); }} className="p-2 hover:bg-voltech-border rounded text-voltech-cyan" title="Editar"><Edit3 className="w-4 h-4" /></button>
+                                <button onClick={() => { setOfertaEditando(o); setFormDataOferta({ tipo_oferta: o.tipo_oferta || (o.posicion === 'inferior' ? 'recompensa_opinion' : 'opcional'), posicion: o.posicion, texto: o.texto, descuento_pct: o.descuento_pct, monto: o.monto, modo_descuento: o.modo_descuento || (o.tipo_recompensa || 'pct'), recompensa_tickets: o.recompensa_tickets || 2, categoria_aplica: o.categoria_aplica || '', fecha_inicio: o.fecha_inicio, duracion_dias: o.duracion_dias, fecha_fin: o.fecha_fin, hora_inicio: o.hora_inicio, hora_fin: o.hora_fin }); setShowOfertaForm(true); }} className="p-2 hover:bg-voltech-border rounded text-voltech-cyan" title="Editar"><Edit3 className="w-4 h-4" /></button>
                                 <button onClick={() => eliminarOferta(o.id)} className="p-2 hover:bg-voltech-border rounded text-voltech-error" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
                               </div>
                             </td>

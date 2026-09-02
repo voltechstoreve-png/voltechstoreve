@@ -139,6 +139,8 @@ const [showUserMenu, setShowUserMenu] = useState(false);
 const [ofertasTab, setOfertasTab] = useState('productos');
 const [clienteNombre, setClienteNombre] = useState('');
 const [clienteTelefono, setClienteTelefono] = useState('');
+const [opinionVerificada, setOpinionVerificada] = useState(false);
+const [opinionVerificadaId, setOpinionVerificadaId] = useState(null);
 const bannerRef = useRef(null);
 const [bannerIdx, setBannerIdx] = useState(0);
 const [isPaused, setIsPaused] = useState(false);
@@ -202,7 +204,38 @@ const bannersActivos = useMemo(() => (ofertasBanners || []).filter(ofertaEnVigen
 const bannerSuperior = bannersActivos.find(o => o.posicion === 'superior') || null;
 const bannerInferior = bannersActivos.find(o => o.posicion === 'inferior') || null;
 const bannerSuperiorFinal = bannerSuperior || ofertaActiva;
-const pctTotalDescuento = Math.min(100, (Number(bannerSuperiorFinal?.descuento_pct) || 0) + (Number(bannerInferior?.descuento_pct) || 0));
+
+// ✅ Leer descuentos del banner superior (aplica a TODO el carrito, sin filtro por categoría)
+const pctAutoDescuento = Math.min(100, Number(bannerSuperiorFinal?.descuento_pct) || 0);
+const montoAutoDescuento = Number(bannerSuperiorFinal?.monto) || 0;
+
+// ✅ Leer tipo de oferta y recompensa del banner inferior
+const tipoOfertaInferior = bannerInferior?.tipo_oferta || 'opcional';
+
+// Banner inferior: descuentos según tipo
+const pctOpinionDescuento = tipoOfertaInferior === 'recompensa_opinion' && bannerInferior?.modo_descuento === 'pct' ? Math.min(100, Number(bannerInferior?.descuento_pct) || 0) : 0;
+const montoOpinionDescuento = tipoOfertaInferior === 'recompensa_opinion' && bannerInferior?.modo_descuento === 'monto' ? (Number(bannerInferior?.monto) || 0) : 0;
+const ticketsOpinion = tipoOfertaInferior === 'recompensa_opinion' && bannerInferior?.modo_descuento === 'tickets' ? (Number(bannerInferior?.recompensa_tickets) || 2) : 0;
+
+// Descuentos automáticos del banner inferior (descuento_todo y descuento_streaming)
+const pctInferiorAuto = (tipoOfertaInferior === 'descuento_todo' || tipoOfertaInferior === 'descuento_streaming') && bannerInferior?.modo_descuento === 'pct' ? Math.min(100, Number(bannerInferior?.descuento_pct) || 0) : 0;
+const montoInferiorAuto = (tipoOfertaInferior === 'descuento_todo' || tipoOfertaInferior === 'descuento_streaming') && bannerInferior?.modo_descuento === 'monto' ? (Number(bannerInferior?.monto) || 0) : 0;
+
+// ✅ Validar opinión por teléfono (para activar recompensa del banner inferior)
+useEffect(() => {
+  const tel = (clienteTelefono || '').replace(/\D/g, '');
+  if (tel.length < 7 || tipoOfertaInferior !== 'recompensa_opinion' || (pctOpinionDescuento === 0 && montoOpinionDescuento === 0 && ticketsOpinion === 0)) {
+    setOpinionVerificada(false);
+    setOpinionVerificadaId(null);
+    return;
+  }
+  const op = (opiniones || []).find(o => !o.cupon_usado && (o.telefono || '').replace(/\D/g, '') === tel);
+  setOpinionVerificada(!!op);
+  setOpinionVerificadaId(op ? op.id : null);
+}, [clienteTelefono, opiniones, tipoOfertaInferior, pctOpinionDescuento, montoOpinionDescuento, ticketsOpinion]);
+
+// ✅ Descuento total (se usa solo como referencia; el total real se calcula en calculateTotal)
+const pctTotalDescuento = Math.min(100, pctAutoDescuento + (opinionVerificada ? pctOpinionDescuento : 0));
 
 // 🔴 NUEVO ESTADO: Guarda la relación de aspecto dinámica de cada imagen
 const [ratios, setRatios] = useState({});
@@ -607,11 +640,35 @@ if (subtotal >= gratisDesde) return { gratis: true, texto: 'GRATIS' };
 return { gratis: false, costo, texto: `Cobro a destino ($${costo.toFixed(2)})` };
 };
 
+  // ✅ Subtotal aplicable al descuento automático del banner superior (todo el carrito)
+  const subtotalAplicableAuto = () => {
+    return cart.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0);
+  };
+
+  // ✅ Subtotal aplicable al descuento del banner inferior (según tipo de oferta)
+  const subtotalAplicableInferior = () => {
+    if (tipoOfertaInferior === 'descuento_streaming') {
+      const items = cart.filter(i => i.tipo === 'streaming' || (i.categoria || '').toUpperCase() === 'STREAMING');
+      return items.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0);
+    }
+    // descuento_todo: todo el carrito
+    return cart.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0);
+  };
+
   const calculateTotal = () => {
     let subtotal = cart.reduce((sum, item) => sum + (getPrecioMostrar(item).precioPrincipal * item.cantidad), 0);
     const descuentoCupon = appliedCoupon ? appliedCoupon.descuentoCalculado : 0;
-    const descuentoOferta = subtotal * (pctTotalDescuento / 100);
-    return Math.max(0, subtotal - descuentoCupon - descuentoOferta + calcularEnvio());
+    
+    // Banner superior: descuento automático sobre todo el carrito
+    const descuentoAutoSuperior = (subtotalAplicableAuto() * (pctAutoDescuento / 100)) + montoAutoDescuento;
+    
+    // Banner inferior: descuentos automáticos (descuento_todo y descuento_streaming)
+    const descuentoAutoInferior = (subtotalAplicableInferior() * (pctInferiorAuto / 100)) + montoInferiorAuto;
+    
+    // Banner inferior: recompensa por opinión (solo si está verificada)
+    const descuentoOpinion = opinionVerificada ? (subtotal * (pctOpinionDescuento / 100) + montoOpinionDescuento) : 0;
+    
+    return Math.max(0, subtotal - descuentoCupon - descuentoAutoSuperior - descuentoAutoInferior - descuentoOpinion + calcularEnvio());
   };
 
   const finalizarPedido = async () => {
@@ -639,10 +696,22 @@ return { gratis: false, costo, texto: `Cobro a destino ($${costo.toFixed(2)})` }
     if (appliedCoupon) {
       mensaje += `\n 🎟️ Cupón: ${appliedCoupon.codigo} (-$${appliedCoupon.descuentoCalculado.toFixed(2)})`;
     }
-    if (pctTotalDescuento > 0) {
-      const descRel = subtotalSinEnvio * pctTotalDescuento / 100;
-      const nombres = [bannerSuperiorFinal?.texto, bannerInferior?.texto].filter(Boolean).join(' + ');
-      mensaje += `\n ⚡ Oferta (${pctTotalDescuento}%): -$${descRel.toFixed(2)}${nombres ? ` (${nombres})` : ''}`;
+    const descAutoSuperior = (subtotalAplicableAuto() * (pctAutoDescuento / 100)) + montoAutoDescuento;
+    const descAutoInferior = (subtotalAplicableInferior() * (pctInferiorAuto / 100)) + montoInferiorAuto;
+    const descOpinion = opinionVerificada ? (subtotalSinEnvio * (pctOpinionDescuento / 100) + montoOpinionDescuento) : 0;
+    
+    if (pctAutoDescuento > 0 || montoAutoDescuento > 0) {
+      mensaje += `\n ⚡ Oferta${pctAutoDescuento > 0 ? ` (${pctAutoDescuento}%)` : ''}${montoAutoDescuento > 0 ? ` ($${montoAutoDescuento})` : ''}: -$${descAutoSuperior.toFixed(2)}${bannerSuperiorFinal?.texto ? ` (${bannerSuperiorFinal.texto})` : ''}`;
+    }
+    if (descAutoInferior > 0) {
+      const tipoLabel = tipoOfertaInferior === 'descuento_streaming' ? 'Streaming' : 'Productos';
+      mensaje += `\n ⚡ ${tipoLabel}${pctInferiorAuto > 0 ? ` (${pctInferiorAuto}%)` : ''}${montoInferiorAuto > 0 ? ` ($${montoInferiorAuto})` : ''}: -$${descAutoInferior.toFixed(2)}${bannerInferior?.texto ? ` (${bannerInferior.texto})` : ''}`;
+    }
+    if (opinionVerificada && descOpinion > 0) {
+      mensaje += `\n ⭐ Opinión verificada: -$${descOpinion.toFixed(2)} (${bannerInferior?.texto || 'opinión'})`;
+    }
+    if (opinionVerificada && ticketsOpinion > 0) {
+      mensaje += `\n 🎟️ Opinión verificada: +${ticketsOpinion} tickets de sorteo`;
     }
     if (autoReferrer) {
       mensaje += `\n Referido por: ${autoReferrer}`;
@@ -690,7 +759,7 @@ return { gratis: false, costo, texto: `Cobro a destino ($${costo.toFixed(2)})` }
             id: `web-${Date.now()}`, numeroOrden: `W-${dia}-${mes}-${String((cF || 0) + 1).padStart(3, '0')}`, fecha: fechaHoy,
             vendedor: vendedorWeb, cliente: clienteNombre.trim(), telefono: clienteTelefono.trim(),
             productos: fisicos.map(i => ({ productoId: i.id, sku: i.sku || '', nombre: i.producto || i.plataforma, categoria: i.categoria, marca: i.marca, cantidad: i.cantidad, precioUnitario: getPrecioMostrar(i).precioPrincipal, total: (getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad, tipo: 'fisico', esKit: false })),
-            subtotal: subF, total: subF, total_con_descuento: subF - (subF * pctTotalDescuento / 100), descuento_aplicado: subF * pctTotalDescuento / 100, descuento_origen: pctTotalDescuento > 0 ? `Banner ${pctTotalDescuento}%` : null,
+            subtotal: subF, total: subF, total_con_descuento: subF - ((descAutoSuperior + descAutoInferior + descOpinion) * (subF / (subtotalSinEnvio || 1))), descuento_aplicado: (descAutoSuperior + descAutoInferior + descOpinion) * (subF / (subtotalSinEnvio || 1)), descuento_origen: (descAutoSuperior + descAutoInferior + descOpinion) > 0 ? `Banner${opinionVerificada ? ' + Opinión' : ''}` : null,
             enCuotas: false, montoAbonado: 0, montoPendiente: subF, metodoPago: paymentMethod, carteraId: '',
             porcentaje_comision: 5, estado: 'pendiente', origen: 'web', stock_descontado: false,
             fechaRegistro: new Date().toISOString(), tipo: 'producto'
@@ -703,12 +772,23 @@ return { gratis: false, costo, texto: `Cobro a destino ($${costo.toFixed(2)})` }
             id: `webs-${Date.now()}`, numeroOrden: `W-${dia}-${mes}-${String((cS || 0) + 1).padStart(3, '0')}`, fecha: fechaHoy,
             vendedor: vendedorWeb, cliente: clienteNombre.trim(), telefono: clienteTelefono.trim(),
             plataformas: streamings.map(i => ({ plataforma: i.plataforma || i.producto, cantidad: i.cantidad, precioDetal: getPrecioMostrar(i).precioPrincipal, fechaVencimiento: '', diasDisponibles: 30 })),
-            subtotal: subS, total: subS, descuento_aplicado: subS * pctTotalDescuento / 100, descuento_origen: pctTotalDescuento > 0 ? `Banner ${pctTotalDescuento}%` : null, metodoPago: paymentMethod, cartera: '',
+            subtotal: subS, total: subS, descuento_aplicado: (descAutoSuperior + descAutoInferior + descOpinion) * (subS / (subtotalSinEnvio || 1)), descuento_origen: (descAutoSuperior + descAutoInferior + descOpinion) > 0 ? `Banner${opinionVerificada ? ' + Opinión' : ''}` : null, metodoPago: paymentMethod, cartera: '',
             estado: 'pendiente', origen: 'web', fechaRegistro: new Date().toISOString()
           });
         }
       }
     } catch (e) { console.warn('⚠️ No se sincronizó el pedido:', e.message); }
+
+    // ✅ Marcar la opinión como usada (el descuento no se puede reutilizar)
+    if (opinionVerificada && opinionVerificadaId) {
+      try {
+        const opsLoc = (JSON.parse(localStorage.getItem('voltech_opiniones') || '[]')).map(o => o.id === opinionVerificadaId ? { ...o, cupon_usado: true } : o);
+        localStorage.setItem('voltech_opiniones', JSON.stringify(opsLoc));
+        setOpiniones(opsLoc);
+        if (supabase) await supabase.from('opiniones').update({ cupon_usado: true }).eq('id', opinionVerificadaId);
+      } catch (e) { console.warn('No se marcó la opinión como usada:', e.message); }
+    }
+
     abrirWhatsAppNat(whatsappNumero, mensaje);
     toast.success('Pedido enviado ✅ Lo verás en el panel como Pendiente');
     };
@@ -802,7 +882,10 @@ abrirWhatsAppNat(whatsappNumero, mensaje);
     setLoadingSorteo(true);
     setTimeout(async () => {
       const ticketsBase = sorteoActivo.configuracion?.ticketsBase || 1;
-      const totalTickets = ticketsBase + bonusTickets.compra + bonusTickets.referido;
+      const telSorteo = (formDataSorteo.telefono || '').replace(/\D/g, '');
+      const opSorteo = (opiniones || []).find(o => !o.cupon_usado && (o.telefono || '').replace(/\D/g, '') === telSorteo);
+      const bonusOpinion = opSorteo ? ticketsOpinion : 0;
+      const totalTickets = ticketsBase + bonusTickets.compra + bonusTickets.referido + bonusOpinion;
       const ticketsGenerados = [];
       for (let i = 0; i < totalTickets; i++) ticketsGenerados.push(generarTicket());
       
@@ -822,6 +905,16 @@ abrirWhatsAppNat(whatsappNumero, mensaje);
       participantesExistentes.push(nuevoParticipante);
       localStorage.setItem('voltech_participantes', JSON.stringify(participantesExistentes));
       setParticipantes(participantesExistentes);
+
+      // ✅ Marcar opinión como usada si recibió tickets por ella
+      if (opSorteo) {
+        try {
+          const opsLoc = (JSON.parse(localStorage.getItem('voltech_opiniones') || '[]')).map(o => o.id === opSorteo.id ? { ...o, cupon_usado: true } : o);
+          localStorage.setItem('voltech_opiniones', JSON.stringify(opsLoc));
+          setOpiniones(opsLoc);
+          if (supabase) await supabase.from('opiniones').update({ cupon_usado: true }).eq('id', opSorteo.id);
+        } catch (e) { console.warn('No se marcó la opinión como usada:', e.message); }
+      }
       
       if (sorteoActivo.tipo_sorteo === 'votacion' && formDataSorteo.producto_votado_id) {
         const votosExistentes = JSON.parse(localStorage.getItem('voltech_sorteo_votos') || '{}');
@@ -2623,11 +2716,23 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
                         <span>-${appliedCoupon.descuentoCalculado.toFixed(2)}</span>
                         </div>
                         )}
-                        {pctTotalDescuento > 0 && (
+                        {(pctAutoDescuento > 0 || montoAutoDescuento > 0) && (
                         <div className="flex justify-between text-purple-400">
-                        <span>⚡ Oferta ({pctTotalDescuento}%){bannerSuperiorFinal?.texto || bannerInferior?.texto ? ` · ${[bannerSuperiorFinal?.texto, bannerInferior?.texto].filter(Boolean).join(' + ')}` : ''}:</span>
-                        <span>-${(cart.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0) * pctTotalDescuento / 100).toFixed(2)}</span>
+                        <span>⚡ Oferta{pctAutoDescuento > 0 ? ` (${pctAutoDescuento}%)` : ''}{montoAutoDescuento > 0 ? ` ($${montoAutoDescuento})` : ''}{bannerSuperiorFinal?.texto ? ` · ${bannerSuperiorFinal.texto}` : ''}:</span>
+                        <span>-${((subtotalAplicableAuto() * pctAutoDescuento / 100) + montoAutoDescuento).toFixed(2)}</span>
                         </div>
+                        )}
+                        {(pctOpinionDescuento > 0 || montoOpinionDescuento > 0 || ticketsOpinion > 0) && !opinionVerificada && (
+                        <div className="text-[11px] text-voltech-warning leading-relaxed">⭐ Deja tu opinión en "Gana & Opina" y escribe aquí tu teléfono para activar tu recompensa{pctOpinionDescuento > 0 ? ` (${pctOpinionDescuento}%)` : montoOpinionDescuento > 0 ? ` ($${montoOpinionDescuento.toFixed(2)})` : ` (+${ticketsOpinion} 🎟️)`}.</div>
+                        )}
+                        {opinionVerificada && (pctOpinionDescuento > 0 || montoOpinionDescuento > 0) && (
+                        <div className="flex justify-between text-voltech-success">
+                        <span>⭐ Opinión verificada{pctOpinionDescuento > 0 ? ` (${pctOpinionDescuento}%)` : ''}{montoOpinionDescuento > 0 ? ` + $${montoOpinionDescuento.toFixed(2)}` : ''}:</span>
+                        <span>-${((cart.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0) * pctOpinionDescuento / 100) + montoOpinionDescuento).toFixed(2)}</span>
+                        </div>
+                        )}
+                        {opinionVerificada && ticketsOpinion > 0 && (
+                        <div className="text-[11px] text-voltech-success">🎟️ Opinión verificada: recibirás +{ticketsOpinion} tickets al registrarte en el sorteo.</div>
                         )}
                         <div className="flex justify-between"><span className={mutedText}>Envío:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>{deliveryMethod === 'nacional' ? (envioNacionalInfo().gratis ? 'GRATIS' : envioNacionalInfo().texto) : (calcularEnvio() === 0 ? 'GRATIS' : '$' + calcularEnvio().toFixed(2))}</span></div>
                         <div className={`flex justify-between font-bold text-lg border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'} pt-2 mt-2`}><span className={darkMode ? 'text-white' : 'text-slate-900'}>Total:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>${calculateTotal().toFixed(2)}</span></div>
