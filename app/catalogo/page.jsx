@@ -1406,17 +1406,23 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
 
       {/* (Inicio inventado eliminado: Inicio = página de productos existente) */}
 
-      {/* 🔍 EXPLORAR: sub-pestañas CENTRADAS */}
+      {/* 🔍 EXPLORAR: sub-pestañas centradas, todas visibles sin deslizar */}
       {navTab === 'explorar' && (
-        <div className="mb-6 overflow-x-auto no-scrollbar">
-          <div className="flex gap-2 w-max mx-auto">
-          <button onClick={() => setActiveSection('productos')} className={`shrink-0 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all border-2 ${activeSection === 'productos' ? 'border-voltech-cyan bg-voltech-cyan/10 text-voltech-cyan' : `${cardBorder} ${mutedText}`}`}>📦 Productos</button>
-          <button onClick={() => setActiveSection('streaming')} className={`shrink-0 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all border-2 ${activeSection === 'streaming' ? 'border-voltech-purple bg-voltech-purple/10 text-voltech-purple' : `${cardBorder} ${mutedText}`}`}>📺 Streaming</button>
-            <button onClick={() => setActiveSection('ofertas')} className={`shrink-0 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all border-2 ${activeSection === 'ofertas' ? 'border-voltech-warning bg-voltech-warning/10 text-voltech-warning' : `${cardBorder} ${mutedText}`}`}>🔥 Ofertas</button>
-          </div>
+        <div className="flex gap-2 mb-6 justify-center">
+          <button onClick={() => setActiveSection('productos')} className={`flex-1 min-w-0 max-w-[160px] flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 px-1 md:px-4 py-2 rounded-xl text-[10px] md:text-sm font-semibold transition-all border-2 ${activeSection === 'productos' ? 'border-voltech-cyan bg-voltech-cyan/10 text-voltech-cyan' : `${cardBorder} ${mutedText}`}`}>
+            <span className="text-base md:text-sm leading-none">📦</span>
+            <span className="truncate max-w-full">Productos</span>
+          </button>
+          <button onClick={() => setActiveSection('streaming')} className={`flex-1 min-w-0 max-w-[160px] flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 px-1 md:px-4 py-2 rounded-xl text-[10px] md:text-sm font-semibold transition-all border-2 ${activeSection === 'streaming' ? 'border-voltech-purple bg-voltech-purple/10 text-voltech-purple' : `${cardBorder} ${mutedText}`}`}>
+            <span className="text-base md:text-sm leading-none">📺</span>
+            <span className="truncate max-w-full">Streaming</span>
+          </button>
+          <button onClick={() => setActiveSection('ofertas')} className={`flex-1 min-w-0 max-w-[160px] flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 px-1 md:px-4 py-2 rounded-xl text-[10px] md:text-sm font-semibold transition-all border-2 ${activeSection === 'ofertas' ? 'border-voltech-warning bg-voltech-warning/10 text-voltech-warning' : `${cardBorder} ${mutedText}`}`}>
+            <span className="text-base md:text-sm leading-none">🔥</span>
+            <span className="truncate max-w-full">Ofertas</span>
+          </button>
         </div>
       )}
-
       {/* 🎁 GANA & OPINA: sub-pestañas CENTRADAS (Opiniones primero) */}
       {navTab === 'gana' && (
         <div className="mb-6 overflow-x-auto no-scrollbar">
