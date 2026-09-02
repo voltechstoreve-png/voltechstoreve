@@ -71,6 +71,9 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
 
 export default function CatalogoPage() {
   const [activeSection, setActiveSection] = useState('productos');
+  // ✅ NUEVO: Navegación global (bottom-nav móvil + tabs desktop)
+  const [navTab, setNavTab] = useState('inicio'); // 'inicio' | 'explorar' | 'gana'
+  const [ganaTab, setGanaTab] = useState('sorteos'); // 'sorteos' | 'opiniones' (sub-pestañas de Gana & Opina)
   
   const { productos } = useProductos();
   const { settings } = useSettings();
@@ -995,6 +998,9 @@ agregarOfertaAlCarrito(p);
   const ofertas = [...ofertasBase, ...pubsComoOferta];
   const ofertasProductos = ofertas.filter(p => !esItemStreaming(p));
 const ofertasStreaming = ofertas.filter(p => esItemStreaming(p));
+  // ✅ Productos destacados para la sección "Inicio"
+  const pubsActivasInicio = publicidad.filter(p => !p.dispositivos || p.dispositivos.movil !== false);
+
   const bg = darkMode ? 'bg-slate-950' : 'bg-slate-50';
   const text = darkMode ? 'text-slate-100' : 'text-slate-900';
   const cardBg = darkMode ? 'bg-slate-900' : 'bg-white';
@@ -1235,20 +1241,48 @@ window.location.href = url;
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="relative flex items-center justify-between gap-2 mb-4">
             <div className="flex items-center gap-2">
-              <button onClick={() => setShowMobileMenu(!showMobileMenu)} className={`md:hidden p-2 rounded-lg ${darkMode ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-700'}`}>
-                <Menu className="w-5 h-5" />
+              {/* 📱 MÓVIL: Logo a la izquierda (público) / Avatar login (logueado) */}
+              <div className="md:hidden">
+                {currentUser ? (
+                  <button onClick={() => window.location.href = '/panel/dashboard-ventas'} className="w-9 h-9 rounded-full bg-gradient-to-br from-voltech-cyan to-voltech-purple flex items-center justify-center text-white font-bold text-xs" title="Ir al Panel">
+                    {(currentUser.nombre || 'U').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                  </button>
+                ) : (
+                  <img src="/logo.svg" alt="Voltech" className="h-8 w-8 rounded-lg" />
+                )}
+              </div>
+              {/* 🖥️ DESKTOP: Logo + nombre a la izquierda */}
+              <button onClick={() => { setNavTab('inicio'); setActiveSection('productos'); }} className="hidden md:flex items-center gap-2">
+                <img src="/logo.svg" alt="Voltech" className="h-9 w-9 rounded-lg" />
+                <span className={`text-lg font-extrabold tracking-tight whitespace-nowrap ${darkMode ? 'text-white' : 'text-slate-900'}`}>VOLTECH <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-fuchsia-500 bg-clip-text text-transparent">STORE.VE</span></span>
               </button>
-              <nav className="hidden md:flex gap-6">
-                {['productos', 'streaming', 'ofertas', 'opiniones', 'sorteos'].map(s => (
-                  <button key={s} onClick={() => setActiveSection(s)} className={`text-sm font-medium capitalize transition-colors ${activeSection === s ? 'text-purple-600 border-b-2 border-purple-600 pb-1' : darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}>{s}</button>
-                ))}
-              </nav>
             </div>
 
-            <h1 className={`absolute left-1/2 -translate-x-1/2 text-[13px] sm:text-lg font-extrabold tracking-tight leading-tight whitespace-nowrap pointer-events-none ${darkMode ? 'text-white' : 'text-slate-900'}`}>VOLTECH <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-fuchsia-500 bg-clip-text text-transparent">STORE.VE</span></h1>
+            {/* 🖥️ DESKTOP: Pestañas agrupadas al centro */}
+            <nav className="hidden md:flex gap-6">
+              {[{ k: 'inicio', l: 'Inicio' }, { k: 'explorar', l: 'Explorar' }, { k: 'gana', l: 'Gana & Opina' }].map(t => (
+                <button key={t.k} onClick={() => { setNavTab(t.k); if (t.k === 'inicio') setActiveSection('productos'); }} className={`text-sm font-medium transition-colors ${navTab === t.k ? 'text-purple-600 border-b-2 border-purple-600 pb-1' : darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}>{t.l}</button>
+              ))}
+            </nav>
+
+            <h1 className={`md:hidden absolute left-1/2 -translate-x-1/2 text-[13px] sm:text-lg font-extrabold tracking-tight leading-tight whitespace-nowrap pointer-events-none ${darkMode ? 'text-white' : 'text-slate-900'}`}>VOLTECH <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-fuchsia-500 bg-clip-text text-transparent">STORE.VE</span></h1>
 
             <div className="flex items-center gap-3">
-              
+              {/* 🖥️ DESKTOP: Switch de tema */}
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className={`hidden md:flex w-16 h-9 rounded-full border items-center justify-between px-1.5 transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'}`}
+                title={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+              >
+                {darkMode ? <Moon className="w-4 h-4 text-voltech-cyan" /> : <Sun className="w-4 h-4 text-yellow-500" />}
+                <span className={`w-5 h-5 rounded-full shadow ${darkMode ? 'bg-voltech-cyan' : 'bg-slate-900'}`} />
+              </button>
+              {/* 🖥️ DESKTOP: Carrito */}
+              <button onClick={() => setShowCart(true)} className={`hidden md:block relative p-2 ${darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}>
+                <ShoppingCart className="w-6 h-6" />
+                {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{cart.length}</span>}
+              </button>
+
 {currentUser && (
 currentUser.rol?.toLowerCase() === 'admin' ||
 currentUser.rol?.toLowerCase() === 'vendedor' ||
@@ -1308,7 +1342,7 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
 </div>
 )}
               {!currentUser && (
-                <button onClick={() => setShowCart(true)} className={`relative p-2 ${darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}>
+                <button onClick={() => setShowCart(true)} className={`md:hidden relative p-2 ${darkMode ? 'text-slate-300 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}>
                   <ShoppingCart className="w-6 h-6" />
                   {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{cart.length}</span>}
                 </button>
@@ -1316,44 +1350,15 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
             </div>
           </div>
           
-          <AnimatePresence>
-            {showMobileMenu && (
-              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="md:hidden overflow-hidden mb-3">
-                <div className="grid grid-cols-2 gap-2">
-                  {['productos', 'streaming', 'ofertas', 'opiniones', 'sorteos'].map(s => (
-                    <button key={s} onClick={() => { setActiveSection(s); setShowMobileMenu(false); }} className={`px-3 py-2.5 rounded-lg text-sm font-medium capitalize transition-colors ${activeSection === s ? 'bg-purple-600 text-white' : darkMode ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-700'}`}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Menú hamburguesa eliminado en móvil: ahora se usa la Bottom Nav inferior */}
 
-          <div className="mt-4 flex flex-wrap gap-3 items-center max-w-4xl">
+          {/* 🔍 DESKTOP: Buscador centrado + filtro */}
+          <div className="hidden md:flex mt-4 gap-3 items-center justify-center">
             <div className="relative flex-1 min-w-[160px]">
               <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
               <input type="text" placeholder={activeSection === 'productos' ? 'Buscar productos...' : activeSection === 'streaming' ? 'Buscar plataformas...' : 'Buscar...'} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${inputBg}`} />
             </div>
-            <div className="shrink-0 flex flex-col gap-2 items-center">
-              <button
-                onClick={() => setDarkMode(!darkMode)}
-                className={`w-16 h-9 rounded-full border flex items-center justify-between px-1.5 transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'}`}
-                title={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-              >
-                {darkMode ? <Moon className="w-4 h-4 text-voltech-cyan" /> : <Sun className="w-4 h-4 text-yellow-500" />}
-                <span className={`w-5 h-5 rounded-full shadow ${darkMode ? 'bg-voltech-cyan' : 'bg-slate-900'}`} />
-              </button>
-              <button
-                onClick={() => window.dispatchEvent(new CustomEvent('voltech-open-chat'))}
-                className="w-9 h-9 bg-gradient-to-r from-voltech-cyan to-voltech-purple rounded-full shadow-lg shadow-voltech-cyan/30 flex items-center justify-center text-white"
-                title="Ayuda"
-              >
-                💬
-              </button>
-            </div>
-          
-            {activeSection === 'streaming' && (
+            {navTab === 'explorar' && activeSection === 'streaming' && (
               <div className="w-full md:w-56">
                 <CustomSelect
                   value={filterPlatform}
@@ -1364,8 +1369,8 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
                 />
               </div>
             )}
-                        {activeSection === 'productos' && (
-              <div className="w-full md:w-56">
+            {(navTab === 'inicio' || (navTab === 'explorar' && activeSection === 'productos')) && (
+              <div className="w-56">
                 <CustomSelect
                   value={filterCategory}
                   onChange={(v) => setFilterCategory(v)}
@@ -1379,9 +1384,53 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
         </div>
       </header>
 
-      <main className="max-w-[1800px] xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
-{/* ✅ HERO BANNER: oculto en la sección Ofertas */}
-{activeSection !== 'ofertas' && (() => {
+      <main className="max-w-[1800px] xl:max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full pb-24 md:pb-8">
+
+      {/* 📱 MÓVIL: Buscador + filtros (Inicio y Explorar) */}
+      {navTab !== 'gana' && (
+      <div className="md:hidden mb-4 flex flex-col gap-2">
+        <div className="relative w-full">
+          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
+          <input type="text" placeholder={activeSection === 'productos' ? 'Buscar productos...' : activeSection === 'streaming' ? 'Buscar plataformas...' : 'Buscar...'} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${inputBg}`} />
+        </div>
+        <div className="flex gap-2">
+            {(navTab === 'inicio' || activeSection === 'productos') && (
+              <CustomSelect value={filterCategory} onChange={(v) => setFilterCategory(v)} options={[{ value: '', label: 'Todas las categorías' }, ...categorias.map(c => ({ value: c, label: c }))]} placeholder="Todas las categorías" className="flex-1" />
+            )}
+            {navTab === 'explorar' && activeSection === 'streaming' && (
+              <CustomSelect value={filterPlatform} onChange={(v) => setFilterPlatform(v)} options={[{ value: '', label: 'Todas las plataformas' }, ...plataformas.map(p => ({ value: p, label: p }))]} placeholder="Todas las plataformas" className="flex-1" />
+            )}
+        </div>
+      </div>
+      )}
+
+      {/* (Inicio inventado eliminado: Inicio = página de productos existente) */}
+
+      {/* 🔍 EXPLORAR: sub-pestañas Productos / Streaming / Ofertas */}
+      {navTab === 'explorar' && (
+        <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar">
+          <button onClick={() => setActiveSection('productos')} className={`shrink-0 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all border-2 ${activeSection === 'productos' ? 'border-voltech-cyan bg-voltech-cyan/10 text-voltech-cyan' : `${cardBorder} ${mutedText}`}`}>📦 Productos</button>
+          <button onClick={() => setActiveSection('streaming')} className={`shrink-0 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all border-2 ${activeSection === 'streaming' ? 'border-voltech-purple bg-voltech-purple/10 text-voltech-purple' : `${cardBorder} ${mutedText}`}`}>📺 Streaming</button>
+          <button onClick={() => setActiveSection('ofertas')} className={`shrink-0 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all border-2 ${activeSection === 'ofertas' ? 'border-voltech-warning bg-voltech-warning/10 text-voltech-warning' : `${cardBorder} ${mutedText}`}`}>🔥 Ofertas</button>
+        </div>
+      )}
+
+      {/* 🎁 GANA & OPINA: sub-tabs sorteos / opiniones */}
+      {navTab === 'gana' && (
+        <div>
+          <div className="flex gap-2 mb-4">
+            <button onClick={() => setGanaTab('sorteos')} className={`flex-1 md:flex-none px-4 py-2 rounded-xl text-sm font-semibold transition-all border-2 ${ganaTab === 'sorteos' ? 'border-purple-600 bg-purple-600/10 text-purple-600' : `${cardBorder} ${mutedText}`}`}>
+              🎟️ Sorteos
+            </button>
+            <button onClick={() => setGanaTab('opiniones')} className={`flex-1 md:flex-none px-4 py-2 rounded-xl text-sm font-semibold transition-all border-2 ${ganaTab === 'opiniones' ? 'border-purple-600 bg-purple-600/10 text-purple-600' : `${cardBorder} ${mutedText}`}`}>
+              ⭐ Opiniones
+            </button>
+          </div>
+        </div>
+      )}
+
+{/* ✅ HERO BANNER: solo en Inicio */}
+{navTab === 'inicio' && (() => {
   const pubsActivas = publicidad.filter(p => !p.dispositivos || p.dispositivos.movil !== false);
   const mvMovilActivo = hayMasVendidos && (masVendidosConfig?.ubicacion_movil || 'arriba') === 'arriba';
   const totalSlides = pubsActivas.length + (mvMovilActivo ? 1 : 0);
@@ -1582,6 +1631,7 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
           
           {/* ✅ SIDEBAR IZQUIERDO: SOLO si hay publicidad activa */}
+          {navTab !== 'gana' && (
           <aside className="hidden lg:block col-span-1 lg:col-span-2 space-y-4 order-2 lg:order-1">
            <div className={`${cardBg} border ${cardBorder} rounded-xl p-4`}>
             <h3 className={`text-sm font-bold mb-3 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
@@ -1623,9 +1673,10 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
                 </div>
               )}
             </aside>
+          )}
 
           <div className="col-span-1 lg:col-span-10 xl:col-span-10 order-1 lg:order-2">
-{activeSection === 'productos' && (
+{(navTab === 'inicio' || (navTab === 'explorar' && activeSection === 'productos')) && (
 <div>
 <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Productos</h2>
 {productosAgrupados.length > 0 ? (
@@ -1649,7 +1700,7 @@ productosAgrupados.map(([cat, items]) => (
 )}
 </div>
 )}
-            {activeSection === 'streaming' && (
+            {navTab === 'explorar' && activeSection === 'streaming' && (
               <div>
                 <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Streaming</h2>
                 {streamingAgrupados.map(([cat, items]) => (
@@ -1700,7 +1751,7 @@ productosAgrupados.map(([cat, items]) => (
               </div>
             )}
 
-            {activeSection === 'ofertas' && (
+            {navTab === 'explorar' && activeSection === 'ofertas' && (
               <div>
                 <h2 className={`text-2xl md:text-3xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-slate-900'}`}> Ofertas Especiales</h2>
                   <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -1754,7 +1805,7 @@ productosAgrupados.map(([cat, items]) => (
               </div>
             )}
 
-            {activeSection === 'opiniones' && (
+            {(navTab === 'gana' && ganaTab === 'opiniones') || ((navTab === 'explorar' || (typeof window !== 'undefined' && window.innerWidth >= 768)) && activeSection === 'opiniones') ? (
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <h2 className={`text-2xl md:text-3xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>⭐ Opiniones de Clientes</h2>
@@ -1868,9 +1919,9 @@ productosAgrupados.map(([cat, items]) => (
                   </div>
                 )}
               </div>
-            )}
+            ) : null}
 
-            {activeSection === 'sorteos' && (
+            {(navTab === 'gana' && ganaTab === 'sorteos') || ((navTab === 'explorar' || (typeof window !== 'undefined' && window.innerWidth >= 768)) && activeSection === 'sorteos') ? (
               <div>
                 {!sorteoActivo ? (
                   <div className="text-center py-20"><Gift className={`w-20 h-20 mx-auto mb-4 ${darkMode ? 'text-slate-700' : 'text-slate-300'}`} /><h2 className={`text-2xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>No hay sorteos activos</h2><p className={mutedText}>Vuelve pronto para participar en nuestros próximos sorteos.</p></div>
@@ -2076,7 +2127,7 @@ productosAgrupados.map(([cat, items]) => (
                   </div>
                 )}
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </main>
@@ -2592,6 +2643,31 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
       {!showCart && (
       <ChatbotWidget productos={productos} whatsappNumber={whatsappNumero} showFloatingButton={false} />
       )}
+
+      {/* 📱 BOTTOM NAV FIJA (SOLO MÓVIL) — 5 botones */}
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 border-t ${darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'} backdrop-blur-lg safe-area-bottom`}>
+        <div className="grid grid-cols-5 gap-0">
+          {[
+            { k: 'inicio', icon: '🏠', label: 'Inicio' },
+            { k: 'explorar', icon: '🔍', label: 'Explorar' },
+            { k: 'gana', icon: '🎁', label: 'Gana & Opina' },
+            { k: 'tema', icon: darkMode ? '☀️' : '🌙', label: 'Tema', action: () => setDarkMode(!darkMode) },
+            { k: 'ayuda', icon: '💬', label: 'Ayuda', action: () => window.dispatchEvent(new CustomEvent('voltech-open-chat')) },
+          ].map(item => {
+            const activo = navTab === item.k && !item.action;
+            return (
+              <button
+                key={item.k}
+                onClick={() => item.action ? item.action() : setNavTab(item.k)}
+                className={`flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors ${activo ? (darkMode ? 'text-voltech-cyan' : 'text-purple-600') : (darkMode ? 'text-slate-400' : 'text-slate-500')}`}
+              >
+                <span className="text-xl leading-none">{item.icon}</span>
+                <span className="text-[9px] font-semibold leading-none">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 };
