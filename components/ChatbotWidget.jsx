@@ -146,7 +146,7 @@ export default function ChatbotWidget({ productos = [], whatsappNumber = '584121
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           onClick={() => setIsOpen(!isOpen)}
-          className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-gradient-to-r from-voltech-cyan to-voltech-purple rounded-full shadow-lg shadow-voltech-cyan/30 flex items-center justify-center text-white"
+          className="hidden md:flex fixed bottom-6 right-6 z-50 w-14 h-14 bg-gradient-to-r from-voltech-cyan to-voltech-purple rounded-full shadow-lg shadow-voltech-cyan/30 items-center justify-center text-white"
         >
           {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
         </motion.button>

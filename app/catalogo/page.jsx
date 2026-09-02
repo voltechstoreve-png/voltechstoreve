@@ -1224,7 +1224,7 @@ window.location.href = url;
 
       {/* ✨ BANNER INFERIOR FIJO — semi-transparente, se queda al hacer scroll, cerrable con X */}
       {bannerInferior && !bannerInferiorCerrado && (
-        <div className="fixed bottom-3 left-0 right-0 z-50 px-3 pointer-events-none">
+        <div className="fixed bottom-16 md:bottom-3 left-0 right-0 z-50 px-3 pointer-events-none">
           <div className="max-w-3xl mx-auto pointer-events-auto relative rounded-2xl border border-purple-400/40 bg-[#14101f]/80 backdrop-blur-md shadow-[0_8px_30px_rgba(168,85,247,0.35)] px-3 py-2 lg:px-4 lg:py-3 flex items-center gap-2 lg:gap-3">
             <Sparkles className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-purple-300 shrink-0 animate-pulse" />
             <p className="flex-1 text-[10px] sm:text-xs lg:text-sm font-semibold text-white line-clamp-3 leading-snug">{bannerInferior.texto}</p>
@@ -1288,7 +1288,7 @@ currentUser.rol?.toLowerCase() === 'admin' ||
 currentUser.rol?.toLowerCase() === 'vendedor' ||
 currentUser.rol?.toLowerCase() === 'socio'
 ) && (
-<div className="relative">
+<div className="relative hidden md:block">
 <button
 onClick={() => setShowUserMenu(!showUserMenu)}
 className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-800/50 transition-colors"
