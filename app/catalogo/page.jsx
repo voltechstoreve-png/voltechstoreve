@@ -73,7 +73,7 @@ export default function CatalogoPage() {
   const [activeSection, setActiveSection] = useState('productos');
   // ✅ NUEVO: Navegación global (bottom-nav móvil + tabs desktop)
   const [navTab, setNavTab] = useState('inicio'); // 'inicio' | 'explorar' | 'gana'
-  const [ganaTab, setGanaTab] = useState('sorteos'); // 'sorteos' | 'opiniones' (sub-pestañas de Gana & Opina)
+  const [ganaTab, setGanaTab] = useState('opiniones'); // 'opiniones' | 'sorteos' (sub-pestañas de Gana & Opina)
   
   const { productos } = useProductos();
   const { settings } = useSettings();
@@ -1406,24 +1406,26 @@ className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 round
 
       {/* (Inicio inventado eliminado: Inicio = página de productos existente) */}
 
-      {/* 🔍 EXPLORAR: sub-pestañas Productos / Streaming / Ofertas */}
+      {/* 🔍 EXPLORAR: sub-pestañas CENTRADAS */}
       {navTab === 'explorar' && (
-        <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar">
+        <div className="mb-6 overflow-x-auto no-scrollbar">
+          <div className="flex gap-2 w-max mx-auto">
           <button onClick={() => setActiveSection('productos')} className={`shrink-0 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all border-2 ${activeSection === 'productos' ? 'border-voltech-cyan bg-voltech-cyan/10 text-voltech-cyan' : `${cardBorder} ${mutedText}`}`}>📦 Productos</button>
           <button onClick={() => setActiveSection('streaming')} className={`shrink-0 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all border-2 ${activeSection === 'streaming' ? 'border-voltech-purple bg-voltech-purple/10 text-voltech-purple' : `${cardBorder} ${mutedText}`}`}>📺 Streaming</button>
-          <button onClick={() => setActiveSection('ofertas')} className={`shrink-0 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all border-2 ${activeSection === 'ofertas' ? 'border-voltech-warning bg-voltech-warning/10 text-voltech-warning' : `${cardBorder} ${mutedText}`}`}>🔥 Ofertas</button>
+            <button onClick={() => setActiveSection('ofertas')} className={`shrink-0 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all border-2 ${activeSection === 'ofertas' ? 'border-voltech-warning bg-voltech-warning/10 text-voltech-warning' : `${cardBorder} ${mutedText}`}`}>🔥 Ofertas</button>
+          </div>
         </div>
       )}
 
-      {/* 🎁 GANA & OPINA: sub-tabs sorteos / opiniones */}
+      {/* 🎁 GANA & OPINA: sub-pestañas CENTRADAS (Opiniones primero) */}
       {navTab === 'gana' && (
-        <div>
-          <div className="flex gap-2 mb-4">
-            <button onClick={() => setGanaTab('sorteos')} className={`flex-1 md:flex-none px-4 py-2 rounded-xl text-sm font-semibold transition-all border-2 ${ganaTab === 'sorteos' ? 'border-purple-600 bg-purple-600/10 text-purple-600' : `${cardBorder} ${mutedText}`}`}>
-              🎟️ Sorteos
-            </button>
-            <button onClick={() => setGanaTab('opiniones')} className={`flex-1 md:flex-none px-4 py-2 rounded-xl text-sm font-semibold transition-all border-2 ${ganaTab === 'opiniones' ? 'border-purple-600 bg-purple-600/10 text-purple-600' : `${cardBorder} ${mutedText}`}`}>
+        <div className="mb-6 overflow-x-auto no-scrollbar">
+          <div className="flex gap-2 w-max mx-auto">
+            <button onClick={() => setGanaTab('opiniones')} className={`shrink-0 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all border-2 ${ganaTab === 'opiniones' ? 'border-purple-600 bg-purple-600/10 text-purple-600' : `${cardBorder} ${mutedText}`}`}>
               ⭐ Opiniones
+            </button>
+            <button onClick={() => setGanaTab('sorteos')} className={`shrink-0 px-4 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all border-2 ${ganaTab === 'sorteos' ? 'border-purple-600 bg-purple-600/10 text-purple-600' : `${cardBorder} ${mutedText}`}`}>
+              🎟️ Sorteos
             </button>
           </div>
         </div>
@@ -2639,9 +2641,9 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
         )}
       </AnimatePresence>
 
-      {/* ✅ CHATBOT WIDGET: se oculta mientras el carrito está abierto para no estorbar al finalizar */}
+      {/* ✅ CHATBOT WIDGET: botón flotante solo desktop; en móvil se abre con 💬 de la bottom nav */}
       {!showCart && (
-      <ChatbotWidget productos={productos} whatsappNumber={whatsappNumero} showFloatingButton={false} />
+      <ChatbotWidget productos={productos} whatsappNumber={whatsappNumero} showFloatingButton={true} />
       )}
 
       {/* 📱 BOTTOM NAV FIJA (SOLO MÓVIL) — 5 botones */}

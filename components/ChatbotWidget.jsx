@@ -174,6 +174,13 @@ export default function ChatbotWidget({ productos = [], whatsappNumber = '584121
                   En línea
                 </p>
               </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="ml-auto p-2 rounded-full hover:bg-white/20 transition-colors"
+                title="Cerrar chat"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
             </div>
 
             {/* Mensajes */}
