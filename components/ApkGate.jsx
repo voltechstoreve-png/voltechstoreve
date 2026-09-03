@@ -23,8 +23,10 @@ export default function ApkGate({ children }) {
         // 2) Clave remota (opcional) desde Ajustes/Supabase
         try {
           if (supabase) {
-            const { data } = await supabase.from('settings').select('valor').eq('clave', 'clave_apk').maybeSingle();
-            if (data?.valor) setClaveCorrecta(String(data.valor));
+            const { data } = await supabase.from('settings').select('valor').eq('clave', 'tienda').maybeSingle();
+            const val = data?.valor;
+            const claveRemota = typeof val === 'string' ? (JSON.parse(val)?.clave_apk) : val?.clave_apk;
+            if (claveRemota) setClaveCorrecta(String(claveRemota));
           }
         } catch (e) {}
 
