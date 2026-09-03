@@ -3,6 +3,7 @@ import './globals.css'
 import { ThemeProvider } from './context/ThemeContext'
 import { NotificationProvider } from './context/NotificationContext'
 import { PermissionsProvider } from './context/PermissionsContext'
+import ApkGate from '@/components/ApkGate'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -40,7 +41,7 @@ export default function RootLayout({ children }) {
         <ThemeProvider>
           <NotificationProvider>
             <PermissionsProvider>
-              {children}
+              <ApkGate>{children}</ApkGate>
             </PermissionsProvider>
           </NotificationProvider>
         </ThemeProvider>
