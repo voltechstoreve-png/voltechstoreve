@@ -1063,6 +1063,7 @@
       if (tipo === 'categoria') count = productos.filter(p => p.categoria === valor).length;
       else if (tipo === 'marca') count = productos.filter(p => p.marca === valor).length;
       else if (tipo === 'plataforma') count = productos.filter(p => p.plataforma === valor).length;
+      else if (tipo === 'nombre_combo') count = productos.filter(p => p.plataforma === valor && (p.esCombo || (p.categoria || '').toUpperCase() === 'COMBO')).length;
       return { enUso: count > 0, count };
     };
 
@@ -1088,6 +1089,13 @@
           if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_productos', valor: nuevos }, { onConflict: 'clave' });
           setLocalSafe('voltech_nombres_productos', JSON.stringify(nuevos));
         }
+      } else if (tipo === 'nombre_combo') {
+        if (!nombresCombosGuardados.includes(valor)) {
+          const nuevos = [...nombresCombosGuardados, valor].sort((a,b) => a.localeCompare(b, 'es'));
+          setNombresCombosGuardados(nuevos);
+          if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_combos', valor: nuevos }, { onConflict: 'clave' });
+          setLocalSafe('voltech_nombres_combos', JSON.stringify(nuevos));
+        }
       } else if (tipo === 'plataforma_streaming') {
         // Las plataformas streaming se derivan de productos, no hay lista maestra
       }
@@ -1106,6 +1114,10 @@
           nuevo.producto = valorNuevo;
         }
         if (tipo === 'nombre_fisico' && p.plataforma === valorOriginal && p.tipo === 'fisico') {
+          nuevo.plataforma = valorNuevo;
+          nuevo.producto = valorNuevo;
+        }
+        if (tipo === 'nombre_combo' && p.plataforma === valorOriginal && (p.esCombo || (p.categoria || '').toUpperCase() === 'COMBO')) {
           nuevo.plataforma = valorNuevo;
           nuevo.producto = valorNuevo;
         }
@@ -1131,6 +1143,11 @@
         setNombresProductosGuardados(nuevos);
         if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_productos', valor: nuevos }, { onConflict: 'clave' });
         setLocalSafe('voltech_nombres_productos', JSON.stringify(nuevos));
+      } else if (tipo === 'nombre_combo') {
+        const nuevos = nombresCombosGuardados.map(n => n === valorOriginal ? valorNuevo : n).sort((a,b) => a.localeCompare(b, 'es'));
+        setNombresCombosGuardados(nuevos);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_combos', valor: nuevos }, { onConflict: 'clave' });
+        setLocalSafe('voltech_nombres_combos', JSON.stringify(nuevos));
       }
       
       // 3. Sincronizar cambios masivos en Supabase
@@ -1140,7 +1157,7 @@
             await supabase.from('productos').update({ categoria: valorNuevo }).eq('categoria', valorOriginal);
           } else if (tipo === 'marca') {
             await supabase.from('productos').update({ marca: valorNuevo }).eq('marca', valorOriginal);
-          } else if (tipo === 'plataforma' || tipo === 'nombre_fisico') {
+          } else if (tipo === 'plataforma' || tipo === 'nombre_fisico' || tipo === 'nombre_combo') {
             await supabase.from('productos').update({ plataforma: valorNuevo, producto: valorNuevo }).eq('plataforma', valorOriginal);
           }
         } catch (e) {
@@ -1151,7 +1168,7 @@
       toast.success(`"${valorOriginal}" renombrado a "${valorNuevo}" en ${productosActualizados.filter(p => 
         (tipo === 'categoria' && p.categoria === valorNuevo) ||
         (tipo === 'marca' && p.marca === valorNuevo) ||
-        ((tipo === 'plataforma' || tipo === 'nombre_fisico') && p.plataforma === valorNuevo)
+        ((tipo === 'plataforma' || tipo === 'nombre_fisico' || tipo === 'nombre_combo') && p.plataforma === valorNuevo)
       ).length} producto(s)`);
     };
 
@@ -1171,6 +1188,11 @@
         setNombresProductosGuardados(nuevos);
         if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_productos', valor: nuevos }, { onConflict: 'clave' });
         setLocalSafe('voltech_nombres_productos', JSON.stringify(nuevos));
+      } else if (tipo === 'nombre_combo') {
+        const nuevos = nombresCombosGuardados.filter(n => n !== valor);
+        setNombresCombosGuardados(nuevos);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_combos', valor: nuevos }, { onConflict: 'clave' });
+        setLocalSafe('voltech_nombres_combos', JSON.stringify(nuevos));
       }
       toast.success(`"${valor}" eliminado de la lista`);
     };
@@ -2019,12 +2041,24 @@
                             {item.disponibilidad === 'kit' ? 'Nombre del Kit *' : item.disponibilidad === 'combo' ? 'Nombre del Combo Streaming *' : item.tipo === 'streaming' ? 'Nombre Plataforma *' : 'Nombre del Producto *'}
                           </label>
                           <div className="flex items-center gap-2 w-full min-w-0">
-                            {item.disponibilidad === 'kit' || item.disponibilidad === 'combo' ? (
+                            {item.disponibilidad === 'kit' ? (
                               <CustomSelect
                                 value={item.plataforma}
                                 onChange={(value) => handleChange(itemIndex, 'plataforma', value)}
                                 options={productosDisponibles.map(nombre => ({ value: nombre, label: nombre }))}
                                 placeholder="-- Selecciona --"
+                                className="flex-1 min-w-0"
+                              />
+                            ) : item.disponibilidad === 'combo' ? (
+                              <ComboboxEditable
+                                value={item.plataforma}
+                                onChange={(value) => handleChange(itemIndex, 'plataforma', value)}
+                                options={productosDisponibles.map(nombre => ({ value: nombre, label: nombre }))}
+                                onAdd={(val) => agregarOpcionLista('nombre_combo', val)}
+                                onRename={(old, nw) => renombrarOpcionLista('nombre_combo', old, nw)}
+                                onDelete={(val) => eliminarOpcionLista('nombre_combo', val)}
+                                onCheckUsage={(val) => verificarUso('nombre_combo', val)}
+                                placeholder="-- Selecciona o escribe --"
                                 className="flex-1 min-w-0"
                               />
                             ) : (
