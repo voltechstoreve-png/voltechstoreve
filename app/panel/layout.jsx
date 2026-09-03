@@ -61,7 +61,7 @@ export default function PanelTiendaLayout({ children }) {
         </main>
       </div>
 
-      <InstallAppButton />
+      <DescargarApk />
     </div>
   );
 }
