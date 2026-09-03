@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { getUser } from '@/lib/session';
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
-import InstallAppButton from '@/components/InstallAppButton';
+import DescargarApk from '@/components/DescargarApk';
 
 export default function PanelTiendaLayout({ children }) {
   const router = useRouter();
