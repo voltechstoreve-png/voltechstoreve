@@ -536,9 +536,21 @@ export default function VentasStreamingPage() {
       }
       
       if (formDataNueva.cliente && formDataNueva.telefono) {
-        const clienteExistente = clientes.find(c => c.telefono === formDataNueva.telefono || c.nombre?.toLowerCase() === formDataNueva.cliente.toLowerCase());
+        const telNorm = (formDataNueva.telefono || '').replace(/\D/g, '');
+        const clienteExistente = clientes.find(c => (c.telefono || '').replace(/\D/g, '') === telNorm || (c.nombre || '').toLowerCase() === (formDataNueva.cliente || '').toLowerCase());
         const fechaHoy = new Date().toISOString().split('T')[0];
         const vendedorRegistro = formDataNueva.vendedor || currentUser?.nombre || 'Admin';
+
+        // ✅ Sincroniza el cliente con localStorage para que aparezca en la sección Clientes
+        const guardarClienteLocal = (cliente) => {
+          try {
+            const local = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
+            const idx = local.findIndex(c => c.id === cliente.id);
+            if (idx >= 0) local[idx] = { ...local[idx], ...cliente };
+            else local.push(cliente);
+            localStorage.setItem('voltech_clientes', JSON.stringify(local));
+          } catch (e) { console.warn('⚠️ No se pudo guardar cliente en localStorage:', e); }
+        };
         
         if (!clienteExistente) {
           const nuevoCliente = {
@@ -588,11 +600,9 @@ export default function VentasStreamingPage() {
             clienteGuardado = true;
           }
           
-          if (clienteGuardado || !supabase) {
-            setClientes(prev => [...prev, nuevoCliente]);
-          } else {
-            setClientes(prev => [...prev, nuevoCliente]);
-          }
+          guardarClienteLocal(nuevoCliente);
+          setClientes(prev => [...prev, nuevoCliente]);
+          toast.success(`Cliente "${nuevoCliente.nombre}" guardado en Clientes`);
         } else {
           const clienteActualizado = {
             ...clienteExistente,
@@ -621,6 +631,7 @@ export default function VentasStreamingPage() {
               toast.error(`Error al actualizar cliente: ${e.message}`);
             }
           }
+          guardarClienteLocal(clienteActualizado);
           setClientes(prev => prev.map(c => c.id === clienteExistente.id ? clienteActualizado : c));
         }
       }
