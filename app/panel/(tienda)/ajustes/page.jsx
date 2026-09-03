@@ -676,34 +676,22 @@ export default function AjustesPage() {
                       />
                     </div>
                   )}
-                  {(formDataOferta.modo_descuento || 'pct') === 'pct' && (
+                  {(formDataOferta.posicion === 'superior' || (formDataOferta.posicion === 'inferior' && formDataOferta.tipo_oferta !== 'opcional' && (formDataOferta.modo_descuento || 'pct') === 'pct')) && (
                     <div>
-                      <label className="block text-xs text-voltech-muted mb-2">💰 Descuento (%)</label>
+                      <label className="block text-xs text-voltech-muted mb-2">💰 Descuento (%) · 0 = no aplica</label>
                       <input type="number" min="0" max="100" value={formDataOferta.descuento_pct} onChange={(e) => setFormDataOferta({ ...formDataOferta, descuento_pct: parseInt(e.target.value) || 0 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
                     </div>
                   )}
-                  {(formDataOferta.modo_descuento || 'pct') === 'monto' && (
+                  {(formDataOferta.posicion === 'superior' || (formDataOferta.posicion === 'inferior' && formDataOferta.tipo_oferta !== 'opcional' && (formDataOferta.modo_descuento || 'pct') === 'monto')) && (
                     <div>
-                      <label className="block text-xs text-voltech-muted mb-2">💵 Monto ($)</label>
+                      <label className="block text-xs text-voltech-muted mb-2">💵 Monto ($) · 0 = no aplica</label>
                       <input type="number" min="0" step="0.01" value={formDataOferta.monto} onChange={(e) => setFormDataOferta({ ...formDataOferta, monto: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
                     </div>
                   )}
-                  {formDataOferta.tipo_oferta === 'recompensa_opinion' && (formDataOferta.modo_descuento || 'pct') === 'tickets' && (
+                  {formDataOferta.posicion === 'inferior' && formDataOferta.tipo_oferta === 'recompensa_opinion' && (formDataOferta.modo_descuento || 'pct') === 'tickets' && (
                     <div>
                       <label className="block text-xs text-voltech-muted mb-2">🎟️ Cantidad de tickets</label>
                       <input type="number" min="1" value={formDataOferta.recompensa_tickets || 2} onChange={(e) => setFormDataOferta({ ...formDataOferta, recompensa_tickets: parseInt(e.target.value) || 2 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
-                    </div>
-                  )}
-                  {formDataOferta.tipo_oferta === 'descuento_categoria' && (
-                    <div>
-                      <label className="block text-xs text-voltech-muted mb-2">🎯 Categoría</label>
-                      <CustomSelect
-                        value={formDataOferta.categoria_aplica || ''}
-                        onChange={(v) => setFormDataOferta({ ...formDataOferta, categoria_aplica: v })}
-                        options={categoriasSistema.map(c => ({ value: c, label: c }))}
-                        placeholder="Selecciona categoría"
-                        className="w-full"
-                      />
                     </div>
                   )}
                 </div>
