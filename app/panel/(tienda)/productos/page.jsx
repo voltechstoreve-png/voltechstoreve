@@ -80,6 +80,160 @@
     return texto.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
   };
 
+  // ✅ COMBOBOX EDITABLE: buscador + editar + eliminar + crear (para Nombre, Categoría, Marca)
+  const ComboboxEditable = ({ 
+    label, value, onChange, options, onAdd, onRename, onDelete, onCheckUsage,
+    placeholder = '-- Selecciona o escribe --', className = ''
+  }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const [editingValue, setEditingValue] = useState(null);
+    const [editInput, setEditInput] = useState('');
+    const ref = useRef(null);
+
+    useEffect(() => {
+      const handleClickOutside = (e) => {
+        if (ref.current && !ref.current.contains(e.target)) {
+          setIsOpen(false);
+          setSearch('');
+          setEditingValue(null);
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const filtered = (options || [])
+      .filter(opt => opt.label.toLowerCase().includes(search.toLowerCase()))
+      .sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }));
+
+    const handleSelect = (val) => {
+      onChange(val);
+      setIsOpen(false);
+      setSearch('');
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const exactMatch = options.find(o => o.label.toLowerCase() === search.toLowerCase());
+        if (exactMatch) {
+          handleSelect(exactMatch.value);
+        } else if (search.trim()) {
+          onAdd(search.trim());
+          handleSelect(search.trim());
+        }
+      } else if (e.key === 'Escape') {
+        setIsOpen(false);
+        setSearch('');
+      }
+    };
+
+    const startEdit = (e, opt) => {
+      e.stopPropagation();
+      setEditingValue(opt.value);
+      setEditInput(opt.label);
+    };
+
+    const confirmEdit = (e, opt) => {
+      e.stopPropagation();
+      if (editInput.trim() && editInput.trim() !== opt.label) {
+        onRename(opt.value, editInput.trim());
+        if (value === opt.value) onChange(editInput.trim());
+      }
+      setEditingValue(null);
+      setEditInput('');
+    };
+
+    const handleDelete = (e, opt) => {
+      e.stopPropagation();
+      const usage = onCheckUsage(opt.value);
+      if (usage.enUso) {
+        toast.error(`No se puede eliminar: ${usage.count} producto(s) lo están usando`);
+        return;
+      }
+      if (confirm(`¿Eliminar "${opt.label}"?`)) {
+        onDelete(opt.value);
+        if (value === opt.value) onChange('');
+      }
+    };
+
+    return (
+      <div className={`relative min-w-0 ${className}`} ref={ref}>
+        {label && <label className="block text-xs text-voltech-muted mb-1 ml-1">{label}</label>}
+        <div
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full min-w-0 bg-voltech-dark border border-voltech-cyan/30 rounded-md px-3 md:px-4 py-2 text-sm cursor-pointer flex items-center justify-between transition-colors hover:border-voltech-cyan"
+        >
+          <span className={`${value ? 'text-white' : 'text-voltech-muted'} truncate flex-1 min-w-0`}>
+            {value || placeholder}
+          </span>
+          <ChevronDown className={`w-4 h-4 text-voltech-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
+        
+        {isOpen && (
+          <div className="absolute top-full left-0 w-full mt-1 bg-voltech-dark border border-voltech-cyan/30 rounded-md z-50 shadow-xl">
+            <div className="p-2 border-b border-voltech-border">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Escribe para buscar o crear..."
+                className="w-full bg-voltech-surface border border-voltech-border rounded px-3 py-1.5 text-sm text-white placeholder-voltech-muted focus:border-voltech-cyan focus:outline-none"
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+            <div className="max-h-60 overflow-y-auto">
+              {filtered.length === 0 && !search && (
+                <div className="px-4 py-2 text-sm text-voltech-muted">No hay opciones. Escribe para crear una.</div>
+              )}
+              {filtered.map((opt) => (
+                <div
+                  key={opt.value}
+                  className={`flex items-center gap-1 px-2 py-1.5 text-sm transition-colors ${
+                    value === opt.value ? 'bg-voltech-purple text-white' : 'bg-voltech-surface text-white hover:bg-voltech-purple/50'
+                  }`}
+                >
+                  {editingValue === opt.value ? (
+                    <>
+                      <input
+                        type="text"
+                        value={editInput}
+                        onChange={(e) => setEditInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') confirmEdit(e, opt); if (e.key === 'Escape') setEditingValue(null); }}
+                        className="flex-1 bg-voltech-dark border border-voltech-cyan rounded px-2 py-1 text-sm text-white focus:outline-none"
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <button onClick={(e) => confirmEdit(e, opt)} className="p-1 text-voltech-success hover:bg-voltech-success/20 rounded"><CheckCircle className="w-3.5 h-3.5" /></button>
+                      <button onClick={(e) => { e.stopPropagation(); setEditingValue(null); }} className="p-1 text-voltech-muted hover:bg-voltech-border rounded"><X className="w-3.5 h-3.5" /></button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex-1 truncate cursor-pointer px-1" onClick={() => handleSelect(opt.value)}>{opt.label}</span>
+                      <button onClick={(e) => startEdit(e, opt)} className="p-1 text-voltech-muted hover:text-voltech-cyan hover:bg-voltech-border rounded" title="Editar (cambia en todos los productos)"><Edit className="w-3.5 h-3.5" /></button>
+                      <button onClick={(e) => handleDelete(e, opt)} className="p-1 text-voltech-muted hover:text-voltech-error hover:bg-voltech-error/10 rounded" title="Eliminar"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </>
+                  )}
+                </div>
+              ))}
+              {search && !filtered.some(o => o.label.toLowerCase() === search.toLowerCase()) && (
+                <div
+                  onClick={() => { onAdd(search.trim()); handleSelect(search.trim()); }}
+                  className="px-4 py-2 text-sm text-voltech-cyan cursor-pointer hover:bg-voltech-cyan/10 flex items-center gap-2 border-t border-voltech-border"
+                >
+                  <Plus className="w-4 h-4" /> Crear "{search.trim()}"
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ✅ Guardado local seguro: si el localStorage está lleno (imágenes base64), NO rompe el guardado en Supabase
   const setLocalSafe = (clave, valor) => {
     try {
@@ -903,6 +1057,124 @@
       toast.success('Actualizado correctamente');
     };
 
+    // ✅ HANDLERS PARA COMBOBOX EDITABLE (Nombre, Categoría, Marca, Plataforma)
+    const verificarUso = (tipo, valor) => {
+      let count = 0;
+      if (tipo === 'categoria') count = productos.filter(p => p.categoria === valor).length;
+      else if (tipo === 'marca') count = productos.filter(p => p.marca === valor).length;
+      else if (tipo === 'plataforma') count = productos.filter(p => p.plataforma === valor).length;
+      return { enUso: count > 0, count };
+    };
+
+    const agregarOpcionLista = async (tipo, valor) => {
+      if (tipo === 'categoria') {
+        if (!categorias.includes(valor)) {
+          const nuevas = [...categorias, valor].sort((a,b) => a.localeCompare(b, 'es'));
+          setCategorias(nuevas);
+          if (supabase) await supabase.from('settings').upsert({ clave: 'categorias', valor: nuevas }, { onConflict: 'clave' });
+          setLocalSafe('voltech_categorias', JSON.stringify(nuevas));
+        }
+      } else if (tipo === 'marca') {
+        if (!marcas.includes(valor)) {
+          const nuevas = [...marcas, valor].sort((a,b) => a.localeCompare(b, 'es'));
+          setMarcas(nuevas);
+          if (supabase) await supabase.from('settings').upsert({ clave: 'marcas', valor: nuevas }, { onConflict: 'clave' });
+          setLocalSafe('voltech_marcas', JSON.stringify(nuevas));
+        }
+      } else if (tipo === 'nombre_fisico') {
+        if (!nombresProductosGuardados.includes(valor)) {
+          const nuevos = [...nombresProductosGuardados, valor].sort((a,b) => a.localeCompare(b, 'es'));
+          setNombresProductosGuardados(nuevos);
+          if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_productos', valor: nuevos }, { onConflict: 'clave' });
+          setLocalSafe('voltech_nombres_productos', JSON.stringify(nuevos));
+        }
+      } else if (tipo === 'plataforma_streaming') {
+        // Las plataformas streaming se derivan de productos, no hay lista maestra
+      }
+    };
+
+    const renombrarOpcionLista = async (tipo, valorOriginal, valorNuevo) => {
+      if (valorOriginal === valorNuevo) return;
+      
+      // 1. Propagar el cambio a TODOS los productos existentes
+      const productosActualizados = productos.map(p => {
+        const nuevo = { ...p };
+        if (tipo === 'categoria' && p.categoria === valorOriginal) nuevo.categoria = valorNuevo;
+        if (tipo === 'marca' && p.marca === valorOriginal) nuevo.marca = valorNuevo;
+        if (tipo === 'plataforma' && p.plataforma === valorOriginal) {
+          nuevo.plataforma = valorNuevo;
+          nuevo.producto = valorNuevo;
+        }
+        if (tipo === 'nombre_fisico' && p.plataforma === valorOriginal && p.tipo === 'fisico') {
+          nuevo.plataforma = valorNuevo;
+          nuevo.producto = valorNuevo;
+        }
+        return nuevo;
+      });
+      
+      setProductos(productosActualizados);
+      setLocalSafe('voltech_productos', JSON.stringify(productosActualizados));
+      
+      // 2. Actualizar la lista maestra
+      if (tipo === 'categoria') {
+        const nuevas = categorias.map(c => c === valorOriginal ? valorNuevo : c).sort((a,b) => a.localeCompare(b, 'es'));
+        setCategorias(nuevas);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'categorias', valor: nuevas }, { onConflict: 'clave' });
+        setLocalSafe('voltech_categorias', JSON.stringify(nuevas));
+      } else if (tipo === 'marca') {
+        const nuevas = marcas.map(m => m === valorOriginal ? valorNuevo : m).sort((a,b) => a.localeCompare(b, 'es'));
+        setMarcas(nuevas);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'marcas', valor: nuevas }, { onConflict: 'clave' });
+        setLocalSafe('voltech_marcas', JSON.stringify(nuevas));
+      } else if (tipo === 'nombre_fisico') {
+        const nuevos = nombresProductosGuardados.map(n => n === valorOriginal ? valorNuevo : n).sort((a,b) => a.localeCompare(b, 'es'));
+        setNombresProductosGuardados(nuevos);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_productos', valor: nuevos }, { onConflict: 'clave' });
+        setLocalSafe('voltech_nombres_productos', JSON.stringify(nuevos));
+      }
+      
+      // 3. Sincronizar cambios masivos en Supabase
+      if (supabase) {
+        try {
+          if (tipo === 'categoria') {
+            await supabase.from('productos').update({ categoria: valorNuevo }).eq('categoria', valorOriginal);
+          } else if (tipo === 'marca') {
+            await supabase.from('productos').update({ marca: valorNuevo }).eq('marca', valorOriginal);
+          } else if (tipo === 'plataforma' || tipo === 'nombre_fisico') {
+            await supabase.from('productos').update({ plataforma: valorNuevo, producto: valorNuevo }).eq('plataforma', valorOriginal);
+          }
+        } catch (e) {
+          console.error('Error propagando cambio a Supabase:', e);
+        }
+      }
+      
+      toast.success(`"${valorOriginal}" renombrado a "${valorNuevo}" en ${productosActualizados.filter(p => 
+        (tipo === 'categoria' && p.categoria === valorNuevo) ||
+        (tipo === 'marca' && p.marca === valorNuevo) ||
+        ((tipo === 'plataforma' || tipo === 'nombre_fisico') && p.plataforma === valorNuevo)
+      ).length} producto(s)`);
+    };
+
+    const eliminarOpcionLista = async (tipo, valor) => {
+      if (tipo === 'categoria') {
+        const nuevas = categorias.filter(c => c !== valor);
+        setCategorias(nuevas);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'categorias', valor: nuevas }, { onConflict: 'clave' });
+        setLocalSafe('voltech_categorias', JSON.stringify(nuevas));
+      } else if (tipo === 'marca') {
+        const nuevas = marcas.filter(m => m !== valor);
+        setMarcas(nuevas);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'marcas', valor: nuevas }, { onConflict: 'clave' });
+        setLocalSafe('voltech_marcas', JSON.stringify(nuevas));
+      } else if (tipo === 'nombre_fisico') {
+        const nuevos = nombresProductosGuardados.filter(n => n !== valor);
+        setNombresProductosGuardados(nuevos);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_productos', valor: nuevos }, { onConflict: 'clave' });
+        setLocalSafe('voltech_nombres_productos', JSON.stringify(nuevos));
+      }
+      toast.success(`"${valor}" eliminado de la lista`);
+    };
+
     const abrirComboModal = () => {
       setComboPlataformas(productos.filter(p => p.tipo === 'streaming' && !p.esCombo).map(p => p.plataforma));
       setShowComboModal(true);
@@ -1229,7 +1501,11 @@
             precio_individual_total: 0,
             descripcion_detallada: ''
           }]);
-          setShowForm(false);
+          // ✅ Cierre automático garantizado del formulario
+          setTimeout(() => {
+            setShowForm(false);
+            window.dispatchEvent(new CustomEvent('voltech-data-updated'));
+          }, 300);
         } catch (error) {
           console.error('Error guardando productos:', error);
           toast.error('Error: ' + error.message);
@@ -1743,13 +2019,27 @@
                             {item.disponibilidad === 'kit' ? 'Nombre del Kit *' : item.disponibilidad === 'combo' ? 'Nombre del Combo Streaming *' : item.tipo === 'streaming' ? 'Nombre Plataforma *' : 'Nombre del Producto *'}
                           </label>
                           <div className="flex items-center gap-2 w-full min-w-0">
-                            <CustomSelect
-                              value={item.plataforma}
-                              onChange={(value) => handleChange(itemIndex, 'plataforma', value)}
-                              options={productosDisponibles.map(nombre => ({ value: nombre, label: nombre }))}
-                              placeholder="-- Selecciona --"
-                              className="flex-1 min-w-0"
-                            />
+                            {item.disponibilidad === 'kit' || item.disponibilidad === 'combo' ? (
+                              <CustomSelect
+                                value={item.plataforma}
+                                onChange={(value) => handleChange(itemIndex, 'plataforma', value)}
+                                options={productosDisponibles.map(nombre => ({ value: nombre, label: nombre }))}
+                                placeholder="-- Selecciona --"
+                                className="flex-1 min-w-0"
+                              />
+                            ) : (
+                              <ComboboxEditable
+                                value={item.plataforma}
+                                onChange={(value) => handleChange(itemIndex, 'plataforma', value)}
+                                options={productosDisponibles.map(nombre => ({ value: nombre, label: nombre }))}
+                                onAdd={(val) => agregarOpcionLista(item.tipo === 'streaming' ? 'plataforma_streaming' : 'nombre_fisico', val)}
+                                onRename={(old, nw) => renombrarOpcionLista(item.tipo === 'streaming' ? 'plataforma' : 'nombre_fisico', old, nw)}
+                                onDelete={(val) => eliminarOpcionLista(item.tipo === 'streaming' ? 'plataforma_streaming' : 'nombre_fisico', val)}
+                                onCheckUsage={(val) => verificarUso('plataforma', val)}
+                                placeholder="-- Selecciona o escribe --"
+                                className="flex-1 min-w-0"
+                              />
+                            )}
                             <button 
                               type="button" 
                               onClick={() => abrirGestionModal(
@@ -1770,11 +2060,15 @@
                           <div className="flex flex-col gap-1 w-full">
                           <label className="text-xs text-voltech-muted font-medium">Categoría *</label>
                             <div className="flex items-center gap-2 w-full min-w-0">
-                              <CustomSelect
+                              <ComboboxEditable
                                 value={item.categoria}
                                 onChange={(value) => handleChange(itemIndex, 'categoria', value)}
                                 options={categoriasDisponibles.map(cat => ({ value: cat, label: cat }))}
-                                placeholder="-- Selecciona --"
+                                onAdd={(val) => agregarOpcionLista('categoria', val)}
+                                onRename={(old, nw) => renombrarOpcionLista('categoria', old, nw)}
+                                onDelete={(val) => eliminarOpcionLista('categoria', val)}
+                                onCheckUsage={(val) => verificarUso('categoria', val)}
+                                placeholder="-- Selecciona o escribe --"
                                 className="flex-1 min-w-0"
                               />
                               <button 
@@ -1798,11 +2092,15 @@
                           <div className="flex flex-col gap-1 w-full">
                             <label className="text-xs text-voltech-muted font-medium">Marca *</label>
                             <div className="flex items-center gap-2 w-full min-w-0">
-                              <CustomSelect
+                              <ComboboxEditable
                                 value={item.marca}
                                 onChange={(value) => handleChange(itemIndex, 'marca', value)}
                                 options={marcasDisponibles.map(marca => ({ value: marca, label: marca }))}
-                                placeholder="-- Selecciona --"
+                                onAdd={(val) => agregarOpcionLista('marca', val)}
+                                onRename={(old, nw) => renombrarOpcionLista('marca', old, nw)}
+                                onDelete={(val) => eliminarOpcionLista('marca', val)}
+                                onCheckUsage={(val) => verificarUso('marca', val)}
+                                placeholder="-- Selecciona o escribe --"
                                 className="flex-1 min-w-0"
                               />
                               <button 
