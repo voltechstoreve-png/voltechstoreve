@@ -279,6 +279,51 @@ export default function VentasStreamingPage() {
     return () => window.removeEventListener('voltech-data-updated', handleActualizacion);
   }, [esVendedor, esAdmin, esSocio, usuarioActual]);
 
+  // ✅ SYNC RETROACTIVO: crea en Clientes los clientes de ventas streaming ya existentes
+  const syncClientesHecho = useRef(false);
+  useEffect(() => {
+    if (syncClientesHecho.current || ventas.length === 0) return;
+    syncClientesHecho.current = true;
+    (async () => {
+      const existentes = [...clientes];
+      const nuevos = [];
+      ventas.forEach(v => {
+        const tel = (v.telefono || '').replace(/\D/g, '');
+        if (!v.cliente || !tel) return;
+        const ya = existentes.some(c => (c.telefono || '').replace(/\D/g, '') === tel || (c.nombre || '').toLowerCase() === (v.cliente || '').toLowerCase());
+        if (!ya) {
+          const nuevo = {
+            id: crypto.randomUUID(),
+            nombre: v.cliente,
+            telefono: v.telefono,
+            email: '',
+            fechaRegistro: v.fecha || new Date().toISOString().split('T')[0],
+            ultimaCompra: v.fecha || '',
+            totalCompras: 1,
+            totalGastado: v.total || 0,
+            etiquetas: ['Streaming'],
+            registradoPor: v.vendedor || 'Admin',
+          };
+          existentes.push(nuevo);
+          nuevos.push(nuevo);
+        }
+      });
+      if (nuevos.length === 0) return;
+      if (supabase) {
+        const { error } = await supabase.from('clientes').insert(nuevos);
+        if (error) console.error('❌ Error sincronizando clientes:', error.message);
+      }
+      try {
+        const local = JSON.parse(localStorage.getItem('voltech_clientes') || '[]');
+        nuevos.forEach(n => { if (!local.some(c => c.id === n.id)) local.push(n); });
+        localStorage.setItem('voltech_clientes', JSON.stringify(local));
+      } catch (e) {}
+      setClientes(existentes);
+      window.dispatchEvent(new Event('voltech-data-updated'));
+      toast.success(`${nuevos.length} cliente(s) sincronizado(s) desde ventas streaming`);
+    })();
+  }, [ventas]);
+
   // ✅ NUEVO: Verificar vencimientos y emitir notificación según configuración
   useEffect(() => {
     if (!configRecordatorios.activado || ventas.length === 0) return;
