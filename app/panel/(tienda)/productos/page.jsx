@@ -1064,6 +1064,7 @@
       else if (tipo === 'marca') count = productos.filter(p => p.marca === valor).length;
       else if (tipo === 'plataforma') count = productos.filter(p => p.plataforma === valor).length;
       else if (tipo === 'nombre_combo') count = productos.filter(p => p.plataforma === valor && (p.esCombo || (p.categoria || '').toUpperCase() === 'COMBO')).length;
+      else if (tipo === 'nombre_kit') count = productos.filter(p => p.plataforma === valor && (p.disponibilidad === 'kit' || (p.categoria || '').toUpperCase() === 'KIT')).length;
       return { enUso: count > 0, count };
     };
 
@@ -1096,6 +1097,13 @@
           if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_combos', valor: nuevos }, { onConflict: 'clave' });
           setLocalSafe('voltech_nombres_combos', JSON.stringify(nuevos));
         }
+      } else if (tipo === 'nombre_kit') {
+        if (!nombresKitsGuardados.includes(valor)) {
+          const nuevos = [...nombresKitsGuardados, valor].sort((a,b) => a.localeCompare(b, 'es'));
+          setNombresKitsGuardados(nuevos);
+          if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_kits', valor: nuevos }, { onConflict: 'clave' });
+          setLocalSafe('voltech_nombres_kits', JSON.stringify(nuevos));
+        }
       } else if (tipo === 'plataforma_streaming') {
         // Las plataformas streaming se derivan de productos, no hay lista maestra
       }
@@ -1118,6 +1126,10 @@
           nuevo.producto = valorNuevo;
         }
         if (tipo === 'nombre_combo' && p.plataforma === valorOriginal && (p.esCombo || (p.categoria || '').toUpperCase() === 'COMBO')) {
+          nuevo.plataforma = valorNuevo;
+          nuevo.producto = valorNuevo;
+        }
+        if (tipo === 'nombre_kit' && p.plataforma === valorOriginal && (p.disponibilidad === 'kit' || (p.categoria || '').toUpperCase() === 'KIT')) {
           nuevo.plataforma = valorNuevo;
           nuevo.producto = valorNuevo;
         }
@@ -1148,6 +1160,11 @@
         setNombresCombosGuardados(nuevos);
         if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_combos', valor: nuevos }, { onConflict: 'clave' });
         setLocalSafe('voltech_nombres_combos', JSON.stringify(nuevos));
+      } else if (tipo === 'nombre_kit') {
+        const nuevos = nombresKitsGuardados.map(n => n === valorOriginal ? valorNuevo : n).sort((a,b) => a.localeCompare(b, 'es'));
+        setNombresKitsGuardados(nuevos);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_kits', valor: nuevos }, { onConflict: 'clave' });
+        setLocalSafe('voltech_nombres_kits', JSON.stringify(nuevos));
       }
       
       // 3. Sincronizar cambios masivos en Supabase
@@ -1157,7 +1174,7 @@
             await supabase.from('productos').update({ categoria: valorNuevo }).eq('categoria', valorOriginal);
           } else if (tipo === 'marca') {
             await supabase.from('productos').update({ marca: valorNuevo }).eq('marca', valorOriginal);
-          } else if (tipo === 'plataforma' || tipo === 'nombre_fisico' || tipo === 'nombre_combo') {
+          } else if (tipo === 'plataforma' || tipo === 'nombre_fisico' || tipo === 'nombre_combo' || tipo === 'nombre_kit') {
             await supabase.from('productos').update({ plataforma: valorNuevo, producto: valorNuevo }).eq('plataforma', valorOriginal);
           }
         } catch (e) {
@@ -1168,7 +1185,7 @@
       toast.success(`"${valorOriginal}" renombrado a "${valorNuevo}" en ${productosActualizados.filter(p => 
         (tipo === 'categoria' && p.categoria === valorNuevo) ||
         (tipo === 'marca' && p.marca === valorNuevo) ||
-        ((tipo === 'plataforma' || tipo === 'nombre_fisico' || tipo === 'nombre_combo') && p.plataforma === valorNuevo)
+        ((tipo === 'plataforma' || tipo === 'nombre_fisico' || tipo === 'nombre_combo' || tipo === 'nombre_kit') && p.plataforma === valorNuevo)
       ).length} producto(s)`);
     };
 
@@ -1193,6 +1210,11 @@
         setNombresCombosGuardados(nuevos);
         if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_combos', valor: nuevos }, { onConflict: 'clave' });
         setLocalSafe('voltech_nombres_combos', JSON.stringify(nuevos));
+      } else if (tipo === 'nombre_kit') {
+        const nuevos = nombresKitsGuardados.filter(n => n !== valor);
+        setNombresKitsGuardados(nuevos);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_kits', valor: nuevos }, { onConflict: 'clave' });
+        setLocalSafe('voltech_nombres_kits', JSON.stringify(nuevos));
       }
       toast.success(`"${valor}" eliminado de la lista`);
     };
@@ -2042,11 +2064,15 @@
                           </label>
                           <div className="flex items-center gap-2 w-full min-w-0">
                             {item.disponibilidad === 'kit' ? (
-                              <CustomSelect
+                              <ComboboxEditable
                                 value={item.plataforma}
                                 onChange={(value) => handleChange(itemIndex, 'plataforma', value)}
                                 options={productosDisponibles.map(nombre => ({ value: nombre, label: nombre }))}
-                                placeholder="-- Selecciona --"
+                                onAdd={(val) => agregarOpcionLista('nombre_kit', val)}
+                                onRename={(old, nw) => renombrarOpcionLista('nombre_kit', old, nw)}
+                                onDelete={(val) => eliminarOpcionLista('nombre_kit', val)}
+                                onCheckUsage={(val) => verificarUso('nombre_kit', val)}
+                                placeholder="-- Selecciona o escribe --"
                                 className="flex-1 min-w-0"
                               />
                             ) : item.disponibilidad === 'combo' ? (
