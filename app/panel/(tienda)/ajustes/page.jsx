@@ -473,6 +473,11 @@ export default function AjustesPage() {
               <div><label className="block text-xs text-voltech-muted mb-2 ml-1">TikTok (URL)</label><input type="url" value={settings.tienda.tiktokUrl} onChange={(e) => updateSetting('tienda', 'tiktokUrl', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" /></div>
               <div><label className="block text-xs text-voltech-muted mb-2 ml-1">Facebook (URL)</label><input type="url" value={settings.tienda.facebookUrl} onChange={(e) => updateSetting('tienda', 'facebookUrl', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" /></div>
               <div><label className="block text-xs text-voltech-muted mb-2 ml-1">WhatsApp (URL)</label><input type="url" value={settings.tienda.whatsappUrl} onChange={(e) => updateSetting('tienda', 'whatsappUrl', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" /></div>
+              <div className="md:col-span-2 p-3 bg-voltech-dark/50 border border-voltech-border rounded-lg">
+                <label className="block text-xs text-voltech-muted mb-2 ml-1">🔒 Clave de Acceso APK (protege la app instalada)</label>
+                <input type="text" value={settings.tienda.clave_apk || 'VOLTECH-2026'} onChange={(e) => updateSetting('tienda', 'clave_apk', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm font-mono" placeholder="VOLTECH-2026" />
+                <p className="text-[10px] text-voltech-muted mt-1 ml-1">Esta clave se pide SOLO al abrir la app instalada desde el APK. La web pública sigue abierta.</p>
+              </div>
             </div>
           </div>
         )}

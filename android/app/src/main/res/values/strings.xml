@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Voltech Store</string>
+    <string name="title_activity_main">Voltech Store</string>
+    <string name="package_name">ve.voltech.store</string>
+    <string name="custom_url_scheme">ve.voltech.store</string>
+</resources>

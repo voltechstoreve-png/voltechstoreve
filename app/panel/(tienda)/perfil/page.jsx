@@ -33,13 +33,12 @@ export default function PerfilPage() {
   // ✅ ACTUALIZADO: Carga desde Supabase con fallback a localStorage
   useEffect(() => {
     const cargarPerfil = async () => {
-      const userLoggedStr = localStorage.getItem('voltech_user');
-      if (!userLoggedStr) {
-        router.push('/login');
+      const localUser = getUser();
+      if (!localUser || !localUser.nombre) {
+        router.push('/portal');
         return;
-      }
-      
-      const localUser = JSON.parse(userLoggedStr);
+      }      
+
       let dataToSet = {
         nombre: localUser.nombre || 'Administrador',
         email: localUser.email || 'admin@voltech.store',
@@ -64,8 +63,8 @@ export default function PerfilPage() {
             rol: data.rol || dataToSet.rol,
             avatar: data.avatar || dataToSet.avatar,
           };
-          // Actualizar localStorage con los datos frescos
-          localStorage.setItem('voltech_user', JSON.stringify({ ...localUser, ...data }));
+          // Actualizar sesión con los datos frescos
+          setUser({ ...localUser, ...data });
         }
       }
 
@@ -89,10 +88,8 @@ export default function PerfilPage() {
       return;
     }
 
-    const userLoggedStr = localStorage.getItem('voltech_user');
-    if (!userLoggedStr) return;
-    
-    const localUser = JSON.parse(userLoggedStr);
+    const localUser = getUser();
+    if (!localUser) return;
     const updatedUser = {
       ...localUser,
       nombre: formData.nombre,
@@ -117,8 +114,8 @@ export default function PerfilPage() {
       }
     }
 
-    // Actualizar en localStorage (caché)
-    localStorage.setItem('voltech_user', JSON.stringify(updatedUser));
+    // Actualizar sesión (caché)
+    setUser(updatedUser);
     setUserData(formData);
     setEditMode(false);
     toast.success('Perfil actualizado correctamente');
