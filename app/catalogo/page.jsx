@@ -1808,6 +1808,12 @@ productosAgrupados.map(([cat, items]) => (
 <p className={`text-lg ${mutedText} animate-pulse`}>Cargando productos...</p>
 <p className={`text-sm ${mutedText} mt-2`}>Un momento, estamos preparando el catálogo</p>
 </div>
+) : catalogoCargando ? (
+<div className="text-center py-20">
+<div className="w-12 h-12 mx-auto mb-4 border-4 border-voltech-cyan border-t-transparent rounded-full animate-spin"></div>
+<p className={`text-lg ${mutedText} animate-pulse`}>Cargando productos...</p>
+<p className={`text-sm ${mutedText} mt-2`}>Un momento, estamos preparando el catálogo</p>
+</div>
 ) : (
 <div className="text-center py-20">
 <Package className={`w-16 h-16 mx-auto mb-3 opacity-30 ${mutedText}`} />
