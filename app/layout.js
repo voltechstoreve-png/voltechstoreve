@@ -4,6 +4,7 @@ import { ThemeProvider } from './context/ThemeContext'
 import { NotificationProvider } from './context/NotificationContext'
 import { PermissionsProvider } from './context/PermissionsContext'
 import ApkGate from '@/components/ApkGate'
+import SessionKeeper from '@/components/SessionKeeper'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -41,7 +42,9 @@ export default function RootLayout({ children }) {
         <ThemeProvider>
           <NotificationProvider>
             <PermissionsProvider>
-              <ApkGate>{children}</ApkGate>
+              <SessionKeeper>
+                <ApkGate>{children}</ApkGate>
+              </SessionKeeper>
             </PermissionsProvider>
           </NotificationProvider>
         </ThemeProvider>
