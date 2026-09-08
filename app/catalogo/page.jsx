@@ -240,6 +240,16 @@ const pctTotalDescuento = Math.min(100, pctAutoDescuento + (opinionVerificada ? 
 // 🔴 NUEVO ESTADO: Guarda la relación de aspecto dinámica de cada imagen
 const [ratios, setRatios] = useState({});
 
+// ✅ NUEVO: indicador de carga del catálogo
+const [catalogoCargando, setCatalogoCargando] = useState(true);
+useEffect(() => {
+  if (productos && productos.length > 0) setCatalogoCargando(false);
+}, [productos]);
+useEffect(() => {
+  const t = setTimeout(() => setCatalogoCargando(false), 8000);
+  return () => clearTimeout(t);
+}, []);
+
 useEffect(() => {
   if (!publicidad.length) return;
   let mounted = true;
@@ -1792,6 +1802,12 @@ productosAgrupados.map(([cat, items]) => (
 </div>
 </div>
 ))
+) : catalogoCargando ? (
+<div className="text-center py-20">
+<div className="w-12 h-12 mx-auto mb-4 border-4 border-voltech-cyan border-t-transparent rounded-full animate-spin"></div>
+<p className={`text-lg ${mutedText} animate-pulse`}>Cargando productos...</p>
+<p className={`text-sm ${mutedText} mt-2`}>Un momento, estamos preparando el catálogo</p>
+</div>
 ) : (
 <div className="text-center py-20">
 <Package className={`w-16 h-16 mx-auto mb-3 opacity-30 ${mutedText}`} />

@@ -478,15 +478,7 @@ export default function AjustesPage() {
                 <input type="text" value={settings.tienda.clave_apk || 'VOLTECH-2026'} onChange={(e) => updateSetting('tienda', 'clave_apk', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-3 text-sm font-mono" placeholder="VOLTECH-2026" />
                 <p className="text-[10px] text-voltech-muted mt-1 ml-1">Esta clave se pide SOLO al abrir la app instalada desde el APK. La web pública sigue abierta.</p>
               </div>
-              <div className="md:col-span-2 flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-voltech-dark/50 border border-voltech-border rounded-lg">
-                <div className="flex-1">
-                  <p className="text-xs font-semibold text-white">📱 App interna (APK)</p>
-                  <p className="text-[10px] text-voltech-muted mt-0.5">Descarga el APK para tu equipo. Al abrirlo pedirá la clave de arriba.</p>
-                </div>
-                <a href="/voltech.apk" download="voltech-store.apk" className="shrink-0 px-4 py-2 bg-gradient-to-r from-cyan-500 to-purple-600 text-white text-xs font-bold rounded-lg flex items-center gap-2">
-                  <Download className="w-4 h-4" /> Descargar APK
-                </a>
-              </div>
+
             </div>
           </div>
         )}

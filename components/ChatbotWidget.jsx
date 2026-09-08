@@ -77,22 +77,37 @@ export default function ChatbotWidget({ productos = [], whatsappNumber = '584121
       };
     }
 
-    // 2. Búsqueda inteligente en productos (nombre, plataforma, categoría y descripción detallada)
-    const matchedProducts = productos.filter(p => {
-      const searchableText = normalizeText(
-        `${p.plataforma || ''} ${p.nombre || ''} ${p.categoria || ''} ${p.descripcion_detallada || ''}`
-      );
-      // Dividir la consulta en palabras y verificar si al menos una palabra clave coincide
-      const queryWords = query.split(' ').filter(w => w.length > 2);
-      return queryWords.some(word => searchableText.includes(word));
-    }).slice(0, 2); // Máximo 2 productos para no saturar
+    // 2. Búsqueda inteligente con puntaje (nombre, plataforma, categoría y descripción)
+    const queryWords = query.split(' ').filter(w => w.length > 2);
+    const scored = productos.map(p => {
+      const nombre = normalizeText(`${p.plataforma || ''} ${p.nombre || ''}`);
+      const categoria = normalizeText(p.categoria || '');
+      const desc = normalizeText(p.descripcion_detallada || '');
+      let score = 0;
+      queryWords.forEach(w => {
+        if (nombre.includes(w)) score += 3;
+        if (categoria.includes(w)) score += 2;
+        if (desc.includes(w)) score += 1;
+      });
+      return { p, score };
+    }).filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
 
-    if (matchedProducts.length > 0) {
+    if (scored.length > 0) {
+      const matchedProducts = scored.map(x => {
+        const prod = x.p;
+        // ✅ Extracto que responde EXACTAMENTE lo preguntado
+        const sentences = (prod.descripcion_detallada || '').split(/[\n]+|\.\s+/).map(s => s.trim()).filter(Boolean);
+        const relevant = sentences.filter(s => queryWords.some(w => normalizeText(s).includes(w))).slice(0, 2).join('. ');
+        return { ...prod, respuesta: relevant };
+      });
+      const hayStock = matchedProducts.some(p => (p.cantidad || 0) > 0 || p.disponibilidad === 'bajo_pedido');
       return {
         id: Date.now() + 1,
         sender: 'bot',
         type: 'products',
-        text: `Encontré esto que podría interesarte sobre "${query}":`,
+        text: hayStock
+          ? `Sí, tenemos lo que buscas sobre "${query}". Toca un producto para verlo:`
+          : `Encontré esto sobre "${query}", pero por ahora sin stock inmediato:`,
         products: matchedProducts
       };
     }
@@ -198,7 +213,11 @@ export default function ChatbotWidget({ productos = [], whatsappNumber = '584121
                     {msg.type === 'products' && msg.products && (
                       <div className="mt-3 space-y-2">
                         {msg.products.map((prod, idx) => (
-                          <div key={idx} className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-2 flex gap-2">
+                          <a
+                            key={idx}
+                            href={`/catalogo?producto=${prod.id}`}
+                            className="block bg-voltech-dark/50 border border-voltech-border rounded-lg p-2 flex gap-2 hover:border-voltech-cyan transition-colors"
+                          >
                             {prod.imagen ? (
                               <img src={prod.imagen} alt={prod.plataforma} className="w-12 h-12 rounded object-cover flex-shrink-0" />
                             ) : (
@@ -209,11 +228,15 @@ export default function ChatbotWidget({ productos = [], whatsappNumber = '584121
                             <div className="flex-1 min-w-0">
                               <p className="text-white font-medium text-xs truncate">{prod.plataforma || prod.nombre}</p>
                               <p className="text-voltech-cyan font-bold text-xs">${Number(prod.precioDetal || prod.precioMayor || 0).toFixed(2)}</p>
-                              {prod.descripcion_detallada && (
-                                <p className="text-[10px] text-voltech-muted mt-1 line-clamp-2">{prod.descripcion_detallada}</p>
+                              <p className={`text-[10px] mt-0.5 ${(prod.cantidad || 0) > 0 ? 'text-voltech-success' : 'text-voltech-warning'}`}>
+                                {(prod.cantidad || 0) > 0 ? `✅ Stock: ${prod.cantidad}` : '🛒 Bajo pedido'}
+                              </p>
+                              {prod.respuesta && (
+                                <p className="text-[10px] text-voltech-muted mt-1 line-clamp-3">{prod.respuesta}</p>
                               )}
+                              <p className="text-[10px] text-voltech-cyan mt-1">Ver producto →</p>
                             </div>
-                          </div>
+                          </a>
                         ))}
                       </div>
                     )}

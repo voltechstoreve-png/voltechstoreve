@@ -2,18 +2,16 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useTheme } from '@/app/context/ThemeContext';
 import { usePermissions } from '@/app/context/PermissionsContext';
 import { clearUser } from '@/lib/session';
 import { 
   Package, ShoppingCart, Users, Megaphone, Gift, MessageSquare, 
-  Settings, ChevronLeft, Monitor, Moon, LogOut, PlayCircle, UserCog,
+  Settings, ChevronLeft, Download, LogOut, PlayCircle, UserCog,
   BarChart, Target, DollarSign, Truck, CreditCard, Bell
 } from 'lucide-react';
 
 export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen, mounted }) {
   const pathname = usePathname();
-  const { darkMode, setDarkMode } = useTheme();
   const { usuarioActual, tienePermiso, esAdmin, esSocio } = usePermissions();
 
   // ✅ Mientras NO esté montado, SIEMPRE usa true (para coincidir con el SSR)
@@ -156,13 +154,14 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen, 
               </div>
             )}
 
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-voltech-muted hover:bg-voltech-border hover:text-white transition-colors"
+            <a
+              href="/voltech.apk"
+              download="voltech-store.apk"
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-voltech-cyan hover:bg-voltech-cyan/10 transition-colors"
             >
-              {darkMode ? <Monitor className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              <span className="text-sm">{darkMode ? 'Modo Claro' : 'Modo Oscuro'}</span>
-            </button>
+              <Download className="w-5 h-5" />
+              <span className="text-sm">Descargar APK</span>
+            </a>
 
             <button
               onClick={handleLogout}
@@ -258,13 +257,14 @@ export default function Sidebar({ isOpen, onClose, sidebarOpen, setSidebarOpen, 
               </div>
             )}
 
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-voltech-muted hover:bg-voltech-border hover:text-white transition-colors"
+            <a
+              href="/voltech.apk"
+              download="voltech-store.apk"
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-voltech-cyan hover:bg-voltech-cyan/10 transition-colors"
             >
-              {darkMode ? <Monitor className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              {finalIsOpen && <span className="text-sm">{darkMode ? 'Modo Claro' : 'Modo Oscuro'}</span>}
-            </button>
+              <Download className="w-5 h-5" />
+              {finalIsOpen && <span className="text-sm">Descargar APK</span>}
+            </a>
 
             <button
               onClick={handleLogout}
