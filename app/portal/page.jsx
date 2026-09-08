@@ -185,6 +185,13 @@ export default function LoginPage() {
           return;
         }
 
+        // ✅ Guardar en AMBAS claves + marcar dispositivo como app permanentemente
+        try {
+          const dataStr = JSON.stringify(data);
+          localStorage.setItem('voltech_user', dataStr);
+          localStorage.setItem('voltech_user_app', dataStr);
+          localStorage.setItem('voltech_es_app_persistente', '1');
+        } catch (e) {}
         setUser(data);
         toast.success('¡Bienvenido de vuelta! Redirigiendo...');
         setTimeout(() => {
