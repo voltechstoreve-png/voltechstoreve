@@ -31,6 +31,37 @@ export default function LoginPage() {
     aceptaTerminos: false,
   });
 
+  // ✅ NUEVO: Autocompletar credenciales guardadas + login automático
+  const [rememberMe, setRememberMe] = useState(true);
+  
+  useEffect(() => {
+    // 1. Verificar si ya hay sesión activa
+    try {
+      const userStr = localStorage.getItem('voltech_user_app') || localStorage.getItem('voltech_user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        if (user && user.nombre && user.id) {
+          // Sesión válida, redirigir directo al panel
+          toast.success('Sesión restaurada. Redirigiendo...');
+          setTimeout(() => {
+            window.location.href = '/panel/dashboard-ventas';
+          }, 800);
+          return;
+        }
+      }
+    } catch (e) {}
+
+    // 2. Si no hay sesión, autocompletar credenciales guardadas
+    try {
+      const savedEmail = localStorage.getItem('voltech_remember_email');
+      const savedPassword = localStorage.getItem('voltech_remember_password');
+      if (savedEmail && savedPassword) {
+        setFormData(prev => ({ ...prev, email: savedEmail, password: savedPassword }));
+        setRememberMe(true);
+      }
+    } catch (e) {}
+  }, []);
+
   // ✅ NUEVO: detectar link de invitación (?t=TOKEN) al abrir
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -185,12 +216,21 @@ export default function LoginPage() {
           return;
         }
 
-        // ✅ Guardar en AMBAS claves + marcar dispositivo como app permanentemente
+        // ✅ Guardar sesión + credenciales para autocompletar
         try {
           const dataStr = JSON.stringify(data);
           localStorage.setItem('voltech_user', dataStr);
           localStorage.setItem('voltech_user_app', dataStr);
           localStorage.setItem('voltech_es_app_persistente', '1');
+          
+          // ✅ Guardar credenciales para autocompletar la próxima vez
+          if (rememberMe) {
+            localStorage.setItem('voltech_remember_email', formData.email);
+            localStorage.setItem('voltech_remember_password', formData.password);
+          } else {
+            localStorage.removeItem('voltech_remember_email');
+            localStorage.removeItem('voltech_remember_password');
+          }
         } catch (e) {}
         setUser(data);
         toast.success('¡Bienvenido de vuelta! Redirigiendo...');
@@ -471,9 +511,22 @@ export default function LoginPage() {
                   </span>
                 </label>
               ) : (
-                <a href="/recuperar" className="text-[11px] text-voltech-cyan hover:underline ml-1">
-                  ¿Olvidaste tu contraseña?
-                </a>
+                <div className="flex items-center justify-between w-full">
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan focus:ring-voltech-cyan focus:ring-offset-0"
+                    />
+                    <span className="text-[11px] text-voltech-muted group-hover:text-white transition-colors">
+                      Recordarme
+                    </span>
+                  </label>
+                  <a href="/recuperar" className="text-[11px] text-voltech-cyan hover:underline">
+                    ¿Olvidaste tu contraseña?
+                  </a>
+                </div>
               )}
             </div>
 
