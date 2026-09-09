@@ -1,32 +1,14 @@
-const CACHE = 'voltech-cache-v3';
-
-self.addEventListener('install', () => {
-  self.skipWaiting();
-});
+// ✅ SW kamikaze: limpia TODAS las cachés y se desregistra.
+// Mata cualquier Service Worker viejo que sirva código stale.
+self.addEventListener('install', () => self.skipWaiting());
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => clients.claim())
+      .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+      .then(() => self.registration.unregister())
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-  if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
-  event.respondWith(
-    fetch(event.request)
-      .then((res) => {
-        if (res && res.status === 200) {
-          const copy = res.clone();
-          caches.open(CACHE).then((cache) => cache.put(event.request, copy)).catch(() => {});
-        }
-        return res;
-      })
-      .catch(async () => {
-        const cached = await caches.match(event.request);
-        return cached || Response.error();
-      })
-  );
-});
+// No interceptar nada: que todo venga de la red
+self.addEventListener('fetch', () => {});
