@@ -4,6 +4,21 @@
   "webDir": "public",
   "server": {
     "url": "https://voltechstoreve-6nuj.vercel.app/portal?apk=1",
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "cleartext": false,
+    "allowNavigation": ["*.vercel.app"]
+  },
+  "android": {
+    "webContentsDebuggingEnabled": false,
+    "captureInput": true,
+    "allowsLinkPreview": false,
+    "preserveObjectReferences": true,
+    "backgroundColor": "#0a0a0f"
+  },
+  "plugins": {
+    "WebView": {
+      "enableZoom": false,
+      "mixedContentMode": "always"
+    }
   }
 }
