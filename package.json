@@ -11,6 +11,7 @@
   "dependencies": {
     "@capacitor/android": "^8.5.1",
     "@capacitor/core": "^8.5.1",
+    "@capacitor/push-notifications": "^8.1.2",
     "@supabase/supabase-js": "^2.110.9",
     "emoji-picker-react": "^4.19.1",
     "framer-motion": "^12.42.2",

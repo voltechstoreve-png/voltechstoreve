@@ -1,3 +1,4 @@
+import PushRegistrar from '@/components/PushRegistrar'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from './context/ThemeContext'
@@ -43,6 +44,7 @@ export default function RootLayout({ children }) {
           <NotificationProvider>
             <PermissionsProvider>
               <SessionKeeper>
+                <PushRegistrar />
                 <ApkGate>{children}</ApkGate>
               </SessionKeeper>
             </PermissionsProvider>

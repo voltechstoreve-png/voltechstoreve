@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "25006705164",
+    "project_id": "voltech-push",
+    "storage_bucket": "voltech-push.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:25006705164:android:28e6dcc5c9897999ee3c29",
+        "android_client_info": {
+          "package_name": "ve.voltech.store"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDn_AMsOc8_J2Id0BkoZ4AQyHP_mLE_LgI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
