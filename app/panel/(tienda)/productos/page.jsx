@@ -547,7 +547,7 @@
 
         if (supabase) {
           const [{ data: p, error: eP }, { data: c, error: eC }, { data: s, error: eS }, { data: prv, error: ePrv }] = await Promise.all([
-            supabase.from('productos').select('*'),
+            supabase.from('productos').select('id, tipo, disponibilidad, sku, fecha, fechaCreacion, creado_en, plataforma, producto, categoria, marca, modelo, variante, potencia, cantidad, descripcion, descripcion_detallada, duracion, estado, publicado, porcentaje_comision, productos_kit, precio_costo_total, precio_individual_total, esCombo, plataformasCombo, especificaciones, colores, caracteristicas, precioMayor, preciomayor, precioDetal, preciodetal, precioBs, preciobs, precioOferta, precio_oferta, tipoOferta, proveedor, comprador, imagen, precios_proveedor'),
             supabase.from('carteras').select('*'),
             supabase.from('settings').select('clave, valor'),
             supabase.from('proveedores').select('*')
@@ -1650,6 +1650,8 @@
           normalizarTexto(p.plataforma) === normalizarTexto(item.plataforma) &&
           normalizarTexto(p.categoria || '') === normalizarTexto(item.categoria || '') &&
           normalizarTexto(p.marca || '') === normalizarTexto(item.marca || '') &&
+          normalizarTexto(p.modelo || '') === normalizarTexto(item.modelo || '') &&
+          normalizarTexto(p.variante || '') === normalizarTexto(item.variante || '') &&
           (p.tipo || 'fisico') === (item.tipo || 'fisico') &&
           p.id !== item.id
         );
@@ -1853,12 +1855,15 @@
       }
     };
     
-  const abrirEdicion = (producto) => {
+  const abrirEdicion = async (producto) => {
     setEditandoId(producto.id);
-    // ✅ Cargar imágenes extras desde el array guardado
-    const extras = Array.isArray(producto.imagenes)
-      ? producto.imagenes.filter(img => img && img !== producto.imagen)
-      : [];
+    // ✅ Cargar imágenes completas desde Supabase solo para este producto
+    let imagenesCompleta = Array.isArray(producto.imagenes) ? producto.imagenes : [];
+    if (imagenesCompleta.length === 0 && supabase) {
+      const { data: row } = await supabase.from('productos').select('imagenes').eq('id', producto.id).single();
+      if (row && Array.isArray(row.imagenes)) imagenesCompleta = row.imagenes;
+    }
+    const extras = imagenesCompleta.filter(img => img && img !== producto.imagen);
     setImagenesExtraEdit(extras);
     setEditData({
       tipo: producto.tipo || 'fisico',
@@ -2932,6 +2937,9 @@
                     <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Estado</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Categoría</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Marca</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Modelo</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Variante</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Potencia</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Stock</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">Precio</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-voltech-muted">% Comisión</th>
@@ -2941,7 +2949,7 @@
                 </thead>
                 <tbody>
                   {productosFiltrados.length === 0 ? (
-                    <tr><td colSpan={tienePermiso('puedeVerInventarioCompleto') ? 12 : 10} className="text-center py-12 text-voltech-muted"><Package className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>No hay productos registrados</p><p className="text-xs mt-1">Haz clic en "Nuevo Producto" para comenzar</p></td></tr>
+                    <tr><td colSpan={tienePermiso('puedeVerInventarioCompleto') ? 15 : 13} className="text-center py-12 text-voltech-muted"><Package className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>No hay productos registrados</p><p className="text-xs mt-1">Haz clic en "Nuevo Producto" para comenzar</p></td></tr>
                   ) : (
                     productosFiltrados.map((producto) => (
                       <Fragment key={producto.id}>
@@ -2958,6 +2966,9 @@
                           <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full font-medium ${getEstadoBadge(producto.estado)}`}>{producto.estado ? producto.estado.charAt(0).toUpperCase() + producto.estado.slice(1) : 'Nuevo'}</span></td>
                           <td className="px-4 py-3 text-sm text-voltech-muted">{producto.categoria}</td>
                           <td className="px-4 py-3 text-sm text-voltech-muted">{producto.marca || '—'}</td>
+                          <td className="px-4 py-3 text-sm text-voltech-muted">{producto.modelo || '—'}</td>
+                          <td className="px-4 py-3 text-sm text-voltech-muted">{producto.variante || '—'}</td>
+                          <td className="px-4 py-3 text-sm text-voltech-muted">{Array.isArray(producto.potencia) && producto.potencia.length > 0 ? producto.potencia.join(', ') : '—'}</td>
                           <td className="px-4 py-3">
                             <span className={`text-sm font-medium ${producto.cantidad === 0 ? 'text-voltech-error' : producto.cantidad <= 2 ? 'text-voltech-warning' : 'text-voltech-success'}`}>{producto.cantidad}</span>
                             {producto.disponibilidad === 'bajo_pedido' && <span className="ml-1 text-[9px] px-1.5 py-0.5 rounded-full bg-voltech-warning/20 text-voltech-warning">🛒 Al momento</span>}
@@ -2985,7 +2996,7 @@
                         {/* ✅ FORMULARIO INLINE DE EDICIÓN (DESKTOP) */}
                         {editandoId === producto.id && tienePermiso('puedeVerInventarioCompleto') && (
                           <tr className="bg-voltech-cyan/5 border-b border-voltech-border">
-                            <td colSpan={tienePermiso('puedeVerInventarioCompleto') ? 12 : 10} className="p-4">
+                            <td colSpan={tienePermiso('puedeVerInventarioCompleto') ? 15 : 13} className="p-4">
                               <motion.div 
                                 initial={{ opacity: 0, y: -10 }} 
                                 animate={{ opacity: 1, y: 0 }}
@@ -3081,6 +3092,15 @@
                   <div className="p-4">
                     <h3 className="text-sm font-semibold text-white mb-1 truncate">{producto.plataforma}</h3>
                     <p className="text-xs text-voltech-muted mb-2">{producto.categoria}{producto.marca ? ` • ${producto.marca}` : ''}</p>
+                    {(producto.modelo || producto.variante || (Array.isArray(producto.potencia) && producto.potencia.length > 0)) && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {producto.modelo && <span className="text-[10px] px-2 py-0.5 rounded-full bg-voltech-cyan/15 text-voltech-cyan">{producto.modelo}</span>}
+                        {producto.variante && <span className="text-[10px] px-2 py-0.5 rounded-full bg-voltech-purple/15 text-voltech-purple">{producto.variante}</span>}
+                        {Array.isArray(producto.potencia) && producto.potencia.map(p => (
+                          <span key={p} className="text-[10px] px-2 py-0.5 rounded-full bg-voltech-warning/15 text-voltech-warning">{p}</span>
+                        ))}
+                      </div>
+                    )}
                     {producto.duracion && (<p className="text-xs text-voltech-purple mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" /> {producto.duracion}</p>)}
                     {producto.tipoOferta && (<p className="text-xs text-voltech-warning mb-2 flex items-center gap-1"><Tag className="w-3 h-3" /> {producto.tipoOferta}</p>)}
                     <div className="flex items-center justify-between mb-3">
