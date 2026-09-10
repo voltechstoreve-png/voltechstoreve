@@ -234,6 +234,170 @@
     );
   };
 
+  // ✅ COMBOBOX MÚLTIPLE: selección múltiple con buscar/crear/editar/eliminar (para Potencia)
+  const ComboboxMultiple = ({ 
+    label, value = [], onChange, options, onAdd, onRename, onDelete, onCheckUsage,
+    placeholder = '-- Selecciona varios --', className = ''
+  }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const [editingValue, setEditingValue] = useState(null);
+    const [editInput, setEditInput] = useState('');
+    const ref = useRef(null);
+
+    useEffect(() => {
+      const handleClickOutside = (e) => {
+        if (ref.current && !ref.current.contains(e.target)) {
+          setIsOpen(false);
+          setSearch('');
+          setEditingValue(null);
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selected = Array.isArray(value) ? value : [];
+    const filtered = (options || [])
+      .filter(opt => opt.label.toLowerCase().includes(search.toLowerCase()))
+      .sort((a, b) => a.label.localeCompare(b.label, 'es', { sensitivity: 'base' }));
+
+    const toggleOption = (val) => {
+      const nuevas = selected.includes(val) ? selected.filter(v => v !== val) : [...selected, val];
+      onChange(nuevas);
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const exactMatch = options.find(o => o.label.toLowerCase() === search.toLowerCase());
+        if (exactMatch) {
+          toggleOption(exactMatch.value);
+        } else if (search.trim()) {
+          onAdd(search.trim());
+          toggleOption(search.trim());
+        }
+        setSearch('');
+      } else if (e.key === 'Escape') {
+        setIsOpen(false);
+        setSearch('');
+      }
+    };
+
+    const startEdit = (e, opt) => {
+      e.stopPropagation();
+      setEditingValue(opt.value);
+      setEditInput(opt.label);
+    };
+
+    const confirmEdit = (e, opt) => {
+      e.stopPropagation();
+      if (editInput.trim() && editInput.trim() !== opt.label) {
+        onRename(opt.value, editInput.trim());
+        onChange(selected.map(v => v === opt.value ? editInput.trim() : v));
+      }
+      setEditingValue(null);
+      setEditInput('');
+    };
+
+    const handleDelete = (e, opt) => {
+      e.stopPropagation();
+      const usage = onCheckUsage(opt.value);
+      if (usage.enUso) {
+        toast.error(`No se puede eliminar: ${usage.count} producto(s) lo están usando`);
+        return;
+      }
+      if (confirm(`¿Eliminar "${opt.label}"?`)) {
+        onDelete(opt.value);
+        onChange(selected.filter(v => v !== opt.value));
+      }
+    };
+
+    return (
+      <div className={`relative min-w-0 ${className}`} ref={ref}>
+        {label && <label className="block text-xs text-voltech-muted mb-1 ml-1">{label}</label>}
+        <div
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full min-w-0 bg-voltech-dark border border-voltech-cyan/30 rounded-md px-3 md:px-4 py-2 text-sm cursor-pointer flex items-center justify-between gap-2 transition-colors hover:border-voltech-cyan"
+        >
+          <div className="flex-1 min-w-0 flex flex-wrap gap-1">
+            {selected.length === 0 ? (
+              <span className="text-voltech-muted truncate">{placeholder}</span>
+            ) : (
+              selected.map(v => (
+                <span key={v} className="px-2 py-0.5 bg-voltech-cyan/20 text-voltech-cyan rounded-full text-xs">{v}</span>
+              ))
+            )}
+          </div>
+          <ChevronDown className={`w-4 h-4 text-voltech-muted transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
+        
+        {isOpen && (
+          <div className="absolute top-full left-0 w-full mt-1 bg-voltech-dark border border-voltech-cyan/30 rounded-md z-50 shadow-xl">
+            <div className="p-2 border-b border-voltech-border">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Escribe para buscar o crear..."
+                className="w-full bg-voltech-surface border border-voltech-border rounded px-3 py-1.5 text-sm text-white placeholder-voltech-muted focus:border-voltech-cyan focus:outline-none"
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+            <div className="max-h-60 overflow-y-auto">
+              {filtered.length === 0 && !search && (
+                <div className="px-4 py-2 text-sm text-voltech-muted">No hay opciones. Escribe para crear una.</div>
+              )}
+              {filtered.map((opt) => (
+                <div
+                  key={opt.value}
+                  className={`flex items-center gap-1 px-2 py-1.5 text-sm transition-colors ${
+                    selected.includes(opt.value) ? 'bg-voltech-purple text-white' : 'bg-voltech-surface text-white hover:bg-voltech-purple/50'
+                  }`}
+                >
+                  {editingValue === opt.value ? (
+                    <>
+                      <input
+                        type="text"
+                        value={editInput}
+                        onChange={(e) => setEditInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') confirmEdit(e, opt); if (e.key === 'Escape') setEditingValue(null); }}
+                        className="flex-1 bg-voltech-dark border border-voltech-cyan rounded px-2 py-1 text-sm text-white focus:outline-none"
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <button onClick={(e) => confirmEdit(e, opt)} className="p-1 text-voltech-success hover:bg-voltech-success/20 rounded"><CheckCircle className="w-3.5 h-3.5" /></button>
+                      <button onClick={(e) => { e.stopPropagation(); setEditingValue(null); }} className="p-1 text-voltech-muted hover:bg-voltech-border rounded"><X className="w-3.5 h-3.5" /></button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex-1 truncate cursor-pointer px-1 flex items-center gap-2" onClick={() => toggleOption(opt.value)}>
+                        <input type="checkbox" readOnly checked={selected.includes(opt.value)} className="w-3.5 h-3.5 rounded border-voltech-border pointer-events-none" />
+                        {opt.label}
+                      </span>
+                      <button onClick={(e) => startEdit(e, opt)} className="p-1 text-voltech-muted hover:text-voltech-cyan hover:bg-voltech-border rounded" title="Editar"><Edit className="w-3.5 h-3.5" /></button>
+                      <button onClick={(e) => handleDelete(e, opt)} className="p-1 text-voltech-muted hover:text-voltech-error hover:bg-voltech-error/10 rounded" title="Eliminar"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </>
+                  )}
+                </div>
+              ))}
+              {search && !filtered.some(o => o.label.toLowerCase() === search.toLowerCase()) && (
+                <div
+                  onClick={() => { onAdd(search.trim()); toggleOption(search.trim()); setSearch(''); }}
+                  className="px-4 py-2 text-sm text-voltech-cyan cursor-pointer hover:bg-voltech-cyan/10 flex items-center gap-2 border-t border-voltech-border"
+                >
+                  <Plus className="w-4 h-4" /> Crear "{search.trim()}"
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // ✅ Guardado local seguro: si el localStorage está lleno (imágenes base64), NO rompe el guardado en Supabase
   const setLocalSafe = (clave, valor) => {
     try {
@@ -252,6 +416,9 @@
     const [equipo, setEquipo] = useState([]);
     const [categorias, setCategorias] = useState([]);
     const [marcas, setMarcas] = useState([]);
+    const [modelos, setModelos] = useState([]);
+    const [variantes, setVariantes] = useState([]);
+    const [potencias, setPotencias] = useState([]);
     const [proveedores, setProveedores] = useState([]);
     const [metodosPago, setMetodosPago] = useState([]);
     const [usuarioActual, setUsuarioActual] = useState('');
@@ -472,8 +639,14 @@
 
         const catsBase = Array.isArray(catsData) ? catsData : [];
         const marBase = Array.isArray(marData) ? marData : [];
+        const modBase = Array.isArray(sData.modelos) ? sData.modelos : [];
+        const varBase = Array.isArray(sData.variantes) ? sData.variantes : [];
+        const potBase = Array.isArray(sData.potencias) ? sData.potencias : [];
         const catsFinal = [...new Set([...catsBase, ...pData.map(p => p.categoria).filter(Boolean)])];
         const marFinal = [...new Set([...marBase, ...pData.map(p => p.marca).filter(Boolean)])];
+        const modFinal = [...new Set([...modBase, ...pData.map(p => p.modelo).filter(Boolean)])];
+        const varFinal = [...new Set([...varBase, ...pData.map(p => p.variante).filter(Boolean)])];
+        const potFinal = [...new Set([...potBase, ...pData.flatMap(p => Array.isArray(p.potencia) ? p.potencia : []).filter(Boolean)])];
 
         // 🔧 FIX: aceptar varios nombres de clave
         const carterasRaw = sData.carteras || sData.carteras_config || sData.carterasAjustes || [];
@@ -487,6 +660,9 @@
         setEquipo(eqData);
         setCategorias(catsFinal);
         setMarcas(marFinal);
+        setModelos(modFinal);
+        setVariantes(varFinal);
+        setPotencias(potFinal);
         const kitsG = sData.nombres_kits || (localStorage.getItem('voltech_nombres_kits') ? JSON.parse(localStorage.getItem('voltech_nombres_kits')) : []);
         const combosG = sData.nombres_combos || (localStorage.getItem('voltech_nombres_combos') ? JSON.parse(localStorage.getItem('voltech_nombres_combos')) : []);
         setNombresKitsGuardados(Array.isArray(kitsG) ? kitsG : []);
@@ -1077,6 +1253,9 @@
       else if (tipo === 'plataforma') count = productos.filter(p => p.plataforma === valor).length;
       else if (tipo === 'nombre_combo') count = productos.filter(p => p.plataforma === valor && (p.esCombo || (p.categoria || '').toUpperCase() === 'COMBO')).length;
       else if (tipo === 'nombre_kit') count = productos.filter(p => p.plataforma === valor && (p.disponibilidad === 'kit' || (p.categoria || '').toUpperCase() === 'KIT')).length;
+      else if (tipo === 'modelo') count = productos.filter(p => p.modelo === valor).length;
+      else if (tipo === 'variante') count = productos.filter(p => p.variante === valor).length;
+      else if (tipo === 'potencia') count = productos.filter(p => Array.isArray(p.potencia) && p.potencia.includes(valor)).length;
       return { enUso: count > 0, count };
     };
 
@@ -1116,6 +1295,27 @@
           if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_kits', valor: nuevos }, { onConflict: 'clave' });
           setLocalSafe('voltech_nombres_kits', JSON.stringify(nuevos));
         }
+      } else if (tipo === 'modelo') {
+        if (!modelos.includes(valor)) {
+          const nuevas = [...modelos, valor].sort((a,b) => a.localeCompare(b, 'es'));
+          setModelos(nuevas);
+          if (supabase) await supabase.from('settings').upsert({ clave: 'modelos', valor: nuevas }, { onConflict: 'clave' });
+          setLocalSafe('voltech_modelos', JSON.stringify(nuevas));
+        }
+      } else if (tipo === 'variante') {
+        if (!variantes.includes(valor)) {
+          const nuevas = [...variantes, valor].sort((a,b) => a.localeCompare(b, 'es'));
+          setVariantes(nuevas);
+          if (supabase) await supabase.from('settings').upsert({ clave: 'variantes', valor: nuevas }, { onConflict: 'clave' });
+          setLocalSafe('voltech_variantes', JSON.stringify(nuevas));
+        }
+      } else if (tipo === 'potencia') {
+        if (!potencias.includes(valor)) {
+          const nuevas = [...potencias, valor].sort((a,b) => a.localeCompare(b, 'es'));
+          setPotencias(nuevas);
+          if (supabase) await supabase.from('settings').upsert({ clave: 'potencias', valor: nuevas }, { onConflict: 'clave' });
+          setLocalSafe('voltech_potencias', JSON.stringify(nuevas));
+        }
       } else if (tipo === 'plataforma_streaming') {
         // Las plataformas streaming se derivan de productos, no hay lista maestra
       }
@@ -1145,6 +1345,9 @@
           nuevo.plataforma = valorNuevo;
           nuevo.producto = valorNuevo;
         }
+        if (tipo === 'modelo' && p.modelo === valorOriginal) nuevo.modelo = valorNuevo;
+        if (tipo === 'variante' && p.variante === valorOriginal) nuevo.variante = valorNuevo;
+        if (tipo === 'potencia' && Array.isArray(p.potencia)) nuevo.potencia = p.potencia.map(x => x === valorOriginal ? valorNuevo : x);
         return nuevo;
       });
       
@@ -1177,6 +1380,21 @@
         setNombresKitsGuardados(nuevos);
         if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_kits', valor: nuevos }, { onConflict: 'clave' });
         setLocalSafe('voltech_nombres_kits', JSON.stringify(nuevos));
+      } else if (tipo === 'modelo') {
+        const nuevas = modelos.map(m => m === valorOriginal ? valorNuevo : m).sort((a,b) => a.localeCompare(b, 'es'));
+        setModelos(nuevas);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'modelos', valor: nuevas }, { onConflict: 'clave' });
+        setLocalSafe('voltech_modelos', JSON.stringify(nuevas));
+      } else if (tipo === 'variante') {
+        const nuevas = variantes.map(v => v === valorOriginal ? valorNuevo : v).sort((a,b) => a.localeCompare(b, 'es'));
+        setVariantes(nuevas);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'variantes', valor: nuevas }, { onConflict: 'clave' });
+        setLocalSafe('voltech_variantes', JSON.stringify(nuevas));
+      } else if (tipo === 'potencia') {
+        const nuevas = potencias.map(p => p === valorOriginal ? valorNuevo : p).sort((a,b) => a.localeCompare(b, 'es'));
+        setPotencias(nuevas);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'potencias', valor: nuevas }, { onConflict: 'clave' });
+        setLocalSafe('voltech_potencias', JSON.stringify(nuevas));
       }
       
       // 3. Sincronizar cambios masivos en Supabase
@@ -1227,6 +1445,21 @@
         setNombresKitsGuardados(nuevos);
         if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_kits', valor: nuevos }, { onConflict: 'clave' });
         setLocalSafe('voltech_nombres_kits', JSON.stringify(nuevos));
+      } else if (tipo === 'modelo') {
+        const nuevas = modelos.filter(m => m !== valor);
+        setModelos(nuevas);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'modelos', valor: nuevas }, { onConflict: 'clave' });
+        setLocalSafe('voltech_modelos', JSON.stringify(nuevas));
+      } else if (tipo === 'variante') {
+        const nuevas = variantes.filter(v => v !== valor);
+        setVariantes(nuevas);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'variantes', valor: nuevas }, { onConflict: 'clave' });
+        setLocalSafe('voltech_variantes', JSON.stringify(nuevas));
+      } else if (tipo === 'potencia') {
+        const nuevas = potencias.filter(p => p !== valor);
+        setPotencias(nuevas);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'potencias', valor: nuevas }, { onConflict: 'clave' });
+        setLocalSafe('voltech_potencias', JSON.stringify(nuevas));
       }
       toast.success(`"${valor}" eliminado de la lista`);
     };
