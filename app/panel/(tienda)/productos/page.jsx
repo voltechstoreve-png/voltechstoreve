@@ -1159,6 +1159,36 @@
         } else {
           toast.error('Este nombre ya existe');
         }
+      } else if (gestionTipo === 'modelo') {
+        if (!modelos.includes(gestionValor)) {
+          const nuevas = [...modelos, gestionValor];
+          setModelos(nuevas);
+          if (supabase) await supabase.from('settings').upsert({ clave: 'modelos', valor: nuevas }, { onConflict: 'clave' });
+          localStorage.setItem('voltech_modelos', JSON.stringify(nuevas));
+          toast.success('Modelo agregado');
+        } else {
+          toast.error('Este modelo ya existe');
+        }
+      } else if (gestionTipo === 'variante') {
+        if (!variantes.includes(gestionValor)) {
+          const nuevas = [...variantes, gestionValor];
+          setVariantes(nuevas);
+          if (supabase) await supabase.from('settings').upsert({ clave: 'variantes', valor: nuevas }, { onConflict: 'clave' });
+          localStorage.setItem('voltech_variantes', JSON.stringify(nuevas));
+          toast.success('Variante agregada');
+        } else {
+          toast.error('Esta variante ya existe');
+        }
+      } else if (gestionTipo === 'potencia') {
+        if (!potencias.includes(gestionValor)) {
+          const nuevas = [...potencias, gestionValor];
+          setPotencias(nuevas);
+          if (supabase) await supabase.from('settings').upsert({ clave: 'potencias', valor: nuevas }, { onConflict: 'clave' });
+          localStorage.setItem('voltech_potencias', JSON.stringify(nuevas));
+          toast.success('Potencia agregada');
+        } else {
+          toast.error('Esta potencia ya existe');
+        }
       }
       
       setGestionValor('');
@@ -1206,6 +1236,24 @@
         if (supabase) await supabase.from('settings').upsert({ clave: 'nombres_combos', valor: nuevos }, { onConflict: 'clave' });
         localStorage.setItem('voltech_nombres_combos', JSON.stringify(nuevos));
         toast.success(`Nombre de combo "${valor}" eliminado`);
+      } else if (tipo === 'modelo') {
+        const nuevas = modelos.filter(m => m !== valor);
+        setModelos(nuevas);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'modelos', valor: nuevas }, { onConflict: 'clave' });
+        localStorage.setItem('voltech_modelos', JSON.stringify(nuevas));
+        toast.success(`Modelo "${valor}" eliminado`);
+      } else if (tipo === 'variante') {
+        const nuevas = variantes.filter(v => v !== valor);
+        setVariantes(nuevas);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'variantes', valor: nuevas }, { onConflict: 'clave' });
+        localStorage.setItem('voltech_variantes', JSON.stringify(nuevas));
+        toast.success(`Variante "${valor}" eliminada`);
+      } else if (tipo === 'potencia') {
+        const nuevas = potencias.filter(p => p !== valor);
+        setPotencias(nuevas);
+        if (supabase) await supabase.from('settings').upsert({ clave: 'potencias', valor: nuevas }, { onConflict: 'clave' });
+        localStorage.setItem('voltech_potencias', JSON.stringify(nuevas));
+        toast.success(`Potencia "${valor}" eliminada`);
       }
     };
 
@@ -1632,6 +1680,9 @@
           producto: item.plataforma,
           categoria: item.categoria,
           marca: item.marca,
+          modelo: item.modelo || '',
+          variante: item.variante || '',
+          potencia: Array.isArray(item.potencia) ? item.potencia : [],
           cantidad: item.cantidad,
           descripcion: '',
           descripcion_detallada: item.descripcion_detallada || '',
@@ -1823,6 +1874,11 @@
       duracion: producto.duracion || '',
       tipoOferta: producto.tipoOferta || '',
       plataforma: producto.plataforma || '',
+      categoria: producto.categoria || '',
+      marca: producto.marca || '',
+      modelo: producto.modelo || '',
+      variante: producto.variante || '',
+      potencia: Array.isArray(producto.potencia) ? producto.potencia : [],
       plataformasCombo: producto.plataformasCombo || [],
       porcentaje_comision: producto.porcentaje_comision || 5,
       productos_kit: producto.productos_kit || [],
@@ -2060,7 +2116,7 @@
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-bold text-white">
-                      Gestionar {gestionTipo === 'categoria' ? 'Categorías' : gestionTipo === 'marca' ? 'Marcas' : gestionTipo === 'nombre_kit' ? 'Nombres de Kit' : gestionTipo === 'nombre_combo' ? 'Nombres de Combo Streaming' : 'Nombres de Producto'}
+                      Gestionar {gestionTipo === 'categoria' ? 'Categorías' : gestionTipo === 'marca' ? 'Marcas' : gestionTipo === 'modelo' ? 'Modelos' : gestionTipo === 'variante' ? 'Variantes / Tipos' : gestionTipo === 'potencia' ? 'Potencias' : gestionTipo === 'nombre_kit' ? 'Nombres de Kit' : gestionTipo === 'nombre_combo' ? 'Nombres de Combo Streaming' : 'Nombres de Producto'}
                     </h3>
                     <button onClick={() => { setShowGestionModal(false); setGestionTipo(''); }} className="p-2 rounded-lg hover:bg-voltech-border"><X className="w-5 h-5" /></button>
                   </div>
@@ -2084,10 +2140,10 @@
 
                   <div>
                     <h4 className="text-sm font-semibold text-voltech-purple mb-3">
-                      {gestionTipo === 'categoria' ? 'Categorías Existentes' : gestionTipo === 'marca' ? 'Marcas Existentes' : gestionTipo === 'nombre_fisico' ? 'Nombres de Productos Existentes' : 'Nombres Existentes'}
+                      {gestionTipo === 'categoria' ? 'Categorías Existentes' : gestionTipo === 'marca' ? 'Marcas Existentes' : gestionTipo === 'modelo' ? 'Modelos Existentes' : gestionTipo === 'variante' ? 'Variantes Existentes' : gestionTipo === 'potencia' ? 'Potencias Existentes' : gestionTipo === 'nombre_fisico' ? 'Nombres de Productos Existentes' : 'Nombres Existentes'}
                     </h4>
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                      {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : gestionTipo === 'nombre_fisico' ? nombresProductosGuardados : gestionTipo === 'nombre_kit' ? nombresKits : gestionTipo === 'nombre_combo' ? nombresCombos :
+                      {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : gestionTipo === 'modelo' ? modelos : gestionTipo === 'variante' ? variantes : gestionTipo === 'potencia' ? potencias : gestionTipo === 'nombre_fisico' ? nombresProductosGuardados : gestionTipo === 'nombre_kit' ? nombresKits : gestionTipo === 'nombre_combo' ? nombresCombos :
                         (gestionSubtipo === 'streaming' ? plataformasStreaming : 
                         gestionSubtipo === 'kit' ? nombresKits : productosFisicos)
                       ).map((valor, idx) => (
@@ -2102,7 +2158,7 @@
                           </button>
                         </div>
                       ))}
-                      {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : gestionTipo === 'nombre_fisico' ? nombresProductosGuardados : gestionTipo === 'nombre_kit' ? nombresKits : gestionTipo === 'nombre_combo' ? nombresCombos :
+                      {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : gestionTipo === 'modelo' ? modelos : gestionTipo === 'variante' ? variantes : gestionTipo === 'potencia' ? potencias : gestionTipo === 'nombre_fisico' ? nombresProductosGuardados : gestionTipo === 'nombre_kit' ? nombresKits : gestionTipo === 'nombre_combo' ? nombresCombos :
                         (gestionSubtipo === 'streaming' ? plataformasStreaming : 
                         gestionSubtipo === 'kit' ? nombresKits : productosFisicos)
                       ).length === 0 && (
@@ -2423,75 +2479,81 @@
                         {item.tipo === 'fisico' && item.disponibilidad !== 'kit' && (
                           <div className="flex flex-col gap-1 w-full">
                             <label className="text-xs text-voltech-muted font-medium">Modelo</label>
-                            <input 
-                              type="text" 
-                              value={item.modelo || ''} 
-                              onChange={(e) => handleChange(itemIndex, 'modelo', e.target.value)} 
-                              placeholder="Ej: 2da Gen, Tipo C, Lightning, Note 40..." 
-                              className="input-voltech w-full rounded-lg px-4 py-2 text-sm" 
-                            />
-                            <p className="text-[10px] text-voltech-muted ml-1">Diferencia variantes del mismo producto (generación, conector, etc.)</p>
+                            <div className="flex items-center gap-2 w-full min-w-0">
+                              <ComboboxEditable
+                                value={item.modelo}
+                                onChange={(value) => handleChange(itemIndex, 'modelo', value)}
+                                options={modelos.map(m => ({ value: m, label: m }))}
+                                onAdd={(val) => agregarOpcionLista('modelo', val)}
+                                onRename={(old, nw) => renombrarOpcionLista('modelo', old, nw)}
+                                onDelete={(val) => eliminarOpcionLista('modelo', val)}
+                                onCheckUsage={(val) => verificarUso('modelo', val)}
+                                placeholder="-- Selecciona o escribe --"
+                                className="flex-1 min-w-0"
+                              />
+                              <button 
+                                type="button" 
+                                onClick={() => abrirGestionModal('modelo')} 
+                                className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
+                                title="Gestionar"
+                              >
+                                <Plus className="w-5 h-5"/>
+                              </button>
+                            </div>
                           </div>
                         )}
 
                         {item.tipo === 'fisico' && item.disponibilidad !== 'kit' && (
                           <div className="flex flex-col gap-1 w-full">
                             <label className="text-xs text-voltech-muted font-medium">Variante / Tipo</label>
-                            <input 
-                              type="text" 
-                              value={item.variante || ''} 
-                              onChange={(e) => handleChange(itemIndex, 'variante', e.target.value)} 
-                              placeholder="Ej: Solo cubo, Con cable, Inalámbrico, Alámbrico..." 
-                              className="input-voltech w-full rounded-lg px-4 py-2 text-sm" 
-                            />
+                            <div className="flex items-center gap-2 w-full min-w-0">
+                              <ComboboxEditable
+                                value={item.variante}
+                                onChange={(value) => handleChange(itemIndex, 'variante', value)}
+                                options={variantes.map(v => ({ value: v, label: v }))}
+                                onAdd={(val) => agregarOpcionLista('variante', val)}
+                                onRename={(old, nw) => renombrarOpcionLista('variante', old, nw)}
+                                onDelete={(val) => eliminarOpcionLista('variante', val)}
+                                onCheckUsage={(val) => verificarUso('variante', val)}
+                                placeholder="-- Selecciona o escribe --"
+                                className="flex-1 min-w-0"
+                              />
+                              <button 
+                                type="button" 
+                                onClick={() => abrirGestionModal('variante')} 
+                                className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
+                                title="Gestionar"
+                              >
+                                <Plus className="w-5 h-5"/>
+                              </button>
+                            </div>
                           </div>
                         )}
 
                         {item.tipo === 'fisico' && item.disponibilidad !== 'kit' && (
                           <div className="flex flex-col gap-1 w-full lg:col-span-2">
                             <label className="text-xs text-voltech-muted font-medium">Potencia (selección múltiple)</label>
-                            <div className="flex flex-wrap gap-2 p-2 bg-voltech-dark/50 border border-voltech-border rounded-lg min-h-[42px]">
-                              {['33W', '45W', '67W', '100W', '120W', '5W', '10W', '18W', '20W', '25W'].map(pot => {
-                                const seleccionada = Array.isArray(item.potencia) && item.potencia.includes(pot);
-                                return (
-                                  <button
-                                    key={pot}
-                                    type="button"
-                                    onClick={() => {
-                                      const actuales = Array.isArray(item.potencia) ? item.potencia : [];
-                                      const nuevas = seleccionada 
-                                        ? actuales.filter(p => p !== pot) 
-                                        : [...actuales, pot];
-                                      handleChange(itemIndex, 'potencia', nuevas);
-                                    }}
-                                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                                      seleccionada 
-                                        ? 'bg-voltech-cyan text-black shadow-[0_0_8px_rgba(6,182,212,0.6)]' 
-                                        : 'bg-voltech-surface text-voltech-muted border border-voltech-border hover:border-voltech-cyan'
-                                    }`}
-                                  >
-                                    {pot}
-                                  </button>
-                                );
-                              })}
-                              <input
-                                type="text"
-                                placeholder="+ otra (Enter)"
-                                className="flex-1 min-w-[100px] bg-transparent border-none focus:outline-none text-xs text-white placeholder-voltech-muted px-2 py-1"
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' && e.target.value.trim()) {
-                                    e.preventDefault();
-                                    const val = e.target.value.trim();
-                                    const actuales = Array.isArray(item.potencia) ? item.potencia : [];
-                                    if (!actuales.includes(val)) {
-                                      handleChange(itemIndex, 'potencia', [...actuales, val]);
-                                    }
-                                    e.target.value = '';
-                                  }
-                                }}
+                            <div className="flex items-center gap-2 w-full min-w-0">
+                              <ComboboxMultiple
+                                value={item.potencia}
+                                onChange={(value) => handleChange(itemIndex, 'potencia', value)}
+                                options={potencias.map(p => ({ value: p, label: p }))}
+                                onAdd={(val) => agregarOpcionLista('potencia', val)}
+                                onRename={(old, nw) => renombrarOpcionLista('potencia', old, nw)}
+                                onDelete={(val) => eliminarOpcionLista('potencia', val)}
+                                onCheckUsage={(val) => verificarUso('potencia', val)}
+                                placeholder="-- Selecciona varias --"
+                                className="flex-1 min-w-0"
                               />
+                              <button 
+                                type="button" 
+                                onClick={() => abrirGestionModal('potencia')} 
+                                className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
+                                title="Gestionar"
+                              >
+                                <Plus className="w-5 h-5"/>
+                              </button>
                             </div>
-                            <p className="text-[10px] text-voltech-muted ml-1">Selecciona todas las potencias disponibles o agrega una personalizada</p>
                           </div>
                         )}
 
