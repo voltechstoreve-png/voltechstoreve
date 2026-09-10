@@ -300,6 +300,9 @@
       plataforma: '',
       categoria: '',
       marca: '',
+      modelo: '',
+      variante: '',
+      potencia: [],
       cantidad: 1,
       metodoPago: 'efectivo',
       cartera: '',
@@ -334,6 +337,11 @@
       duracion: '',
       tipoOferta: '',
       plataforma: '',
+      categoria: '',
+      marca: '',
+      modelo: '',
+      variante: '',
+      potencia: [],
       plataformasCombo: [],
       porcentaje_comision: 5,
       productos_kit: [],
@@ -347,12 +355,16 @@
       return (t.substring(0, 3) || 'XXX').padEnd(3, 'X');
     };
 
-    const generarSKU = (plataforma, categoria, marca, num) => {
-      return `${prefijoSKU(plataforma)}-${prefijoSKU(categoria)}-${prefijoSKU(marca)}-${String(num).padStart(3, '0')}`;
+    const generarSKU = (plataforma, categoria, marca, modelo, num) => {
+      const mod = prefijoSKU(modelo);
+      const modeloPart = mod === 'XXX' ? '' : `-${mod}`;
+      return `${prefijoSKU(plataforma)}-${prefijoSKU(categoria)}-${prefijoSKU(marca)}${modeloPart}-${String(num).padStart(3, '0')}`;
     };
 
-    const obtenerSiguienteNumero = (plataforma, categoria, marca, lista) => {
-      const base = `${prefijoSKU(plataforma)}-${prefijoSKU(categoria)}-${prefijoSKU(marca)}`;
+    const obtenerSiguienteNumero = (plataforma, categoria, marca, modelo, lista) => {
+      const mod = prefijoSKU(modelo);
+      const modeloPart = mod === 'XXX' ? '' : `-${mod}`;
+      const base = `${prefijoSKU(plataforma)}-${prefijoSKU(categoria)}-${prefijoSKU(marca)}${modeloPart}`;
       const usados = (lista && lista.length > 0 ? lista : productos)
         .filter(p => p.sku && String(p.sku).startsWith(base + '-'))
         .map(p => parseInt(String(p.sku).split('-').pop(), 10))
@@ -520,8 +532,8 @@
     const actualizarSKU = (index) => {
       const item = items[index];
       if (item.plataforma && item.categoria) {
-        const siguienteNum = obtenerSiguienteNumero(item.plataforma, item.categoria, item.marca, productos);
-        const nuevoSKU = generarSKU(item.plataforma, item.categoria, item.marca, siguienteNum);
+        const siguienteNum = obtenerSiguienteNumero(item.plataforma, item.categoria, item.marca, item.modelo, productos);
+        const nuevoSKU = generarSKU(item.plataforma, item.categoria, item.marca, item.modelo, siguienteNum);
         const nuevosItems = [...items];
         nuevosItems[index].sku = nuevoSKU;
         setItems(nuevosItems);
@@ -638,13 +650,13 @@
 
       setItems(nuevosItems);
 
-      if (['plataforma', 'categoria', 'marca', 'tipo'].includes(name)) {
+      if (['plataforma', 'categoria', 'marca', 'modelo', 'variante', 'tipo'].includes(name)) {
         setTimeout(() => {
           const itemActualizado = nuevosItems[index];
           if (itemActualizado.plataforma && itemActualizado.categoria) {
             const siguientesItems = [...nuevosItems];
-            const siguienteNum = obtenerSiguienteNumero(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca, productos);
-            const nuevoSKU = generarSKU(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca, siguienteNum);
+            const siguienteNum = obtenerSiguienteNumero(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca, itemActualizado.modelo, productos);
+            const nuevoSKU = generarSKU(itemActualizado.plataforma, itemActualizado.categoria, itemActualizado.marca, itemActualizado.modelo, siguienteNum);
             siguientesItems[index].sku = nuevoSKU;
             setItems(siguientesItems);
           }
@@ -2172,6 +2184,81 @@
                                 <Plus className="w-5 h-5"/>
                               </button>
                             </div>
+                          </div>
+                        )}
+
+                        {item.tipo === 'fisico' && item.disponibilidad !== 'kit' && (
+                          <div className="flex flex-col gap-1 w-full">
+                            <label className="text-xs text-voltech-muted font-medium">Modelo</label>
+                            <input 
+                              type="text" 
+                              value={item.modelo || ''} 
+                              onChange={(e) => handleChange(itemIndex, 'modelo', e.target.value)} 
+                              placeholder="Ej: 2da Gen, Tipo C, Lightning, Note 40..." 
+                              className="input-voltech w-full rounded-lg px-4 py-2 text-sm" 
+                            />
+                            <p className="text-[10px] text-voltech-muted ml-1">Diferencia variantes del mismo producto (generación, conector, etc.)</p>
+                          </div>
+                        )}
+
+                        {item.tipo === 'fisico' && item.disponibilidad !== 'kit' && (
+                          <div className="flex flex-col gap-1 w-full">
+                            <label className="text-xs text-voltech-muted font-medium">Variante / Tipo</label>
+                            <input 
+                              type="text" 
+                              value={item.variante || ''} 
+                              onChange={(e) => handleChange(itemIndex, 'variante', e.target.value)} 
+                              placeholder="Ej: Solo cubo, Con cable, Inalámbrico, Alámbrico..." 
+                              className="input-voltech w-full rounded-lg px-4 py-2 text-sm" 
+                            />
+                          </div>
+                        )}
+
+                        {item.tipo === 'fisico' && item.disponibilidad !== 'kit' && (
+                          <div className="flex flex-col gap-1 w-full lg:col-span-2">
+                            <label className="text-xs text-voltech-muted font-medium">Potencia (selección múltiple)</label>
+                            <div className="flex flex-wrap gap-2 p-2 bg-voltech-dark/50 border border-voltech-border rounded-lg min-h-[42px]">
+                              {['33W', '45W', '67W', '100W', '120W', '5W', '10W', '18W', '20W', '25W'].map(pot => {
+                                const seleccionada = Array.isArray(item.potencia) && item.potencia.includes(pot);
+                                return (
+                                  <button
+                                    key={pot}
+                                    type="button"
+                                    onClick={() => {
+                                      const actuales = Array.isArray(item.potencia) ? item.potencia : [];
+                                      const nuevas = seleccionada 
+                                        ? actuales.filter(p => p !== pot) 
+                                        : [...actuales, pot];
+                                      handleChange(itemIndex, 'potencia', nuevas);
+                                    }}
+                                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                                      seleccionada 
+                                        ? 'bg-voltech-cyan text-black shadow-[0_0_8px_rgba(6,182,212,0.6)]' 
+                                        : 'bg-voltech-surface text-voltech-muted border border-voltech-border hover:border-voltech-cyan'
+                                    }`}
+                                  >
+                                    {pot}
+                                  </button>
+                                );
+                              })}
+                              <input
+                                type="text"
+                                placeholder="+ otra (Enter)"
+                                className="flex-1 min-w-[100px] bg-transparent border-none focus:outline-none text-xs text-white placeholder-voltech-muted px-2 py-1"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && e.target.value.trim()) {
+                                    e.preventDefault();
+                                    const val = e.target.value.trim();
+                                    const actuales = Array.isArray(item.potencia) ? item.potencia : [];
+                                    if (!actuales.includes(val)) {
+                                      handleChange(itemIndex, 'potencia', [...actuales, val]);
+                                    }
+                                    e.target.value = '';
+                                  }
+                                }}
+                              />
+                            </div>
+                            <p className="text-[10px] text-voltech-muted ml-1">Selecciona todas las potencias disponibles o agrega una personalizada</p>
                           </div>
                         )}
 
