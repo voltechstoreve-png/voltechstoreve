@@ -10,9 +10,8 @@
   AlertTriangle, CheckCircle, Image as ImageIcon, Save, Minus,
   Upload, Eye, EyeOff, Globe, LayoutGrid, Table, Download,
   Database, MonitorPlay, Tag, Layers, Calendar, Percent, Gift,
-  ChevronDown, MoreVertical, Filter, ShoppingCart, Share2
-} from 'lucide-react';
-  import toast, { Toaster } from 'react-hot-toast';
+  ChevronDown, MoreVertical, Filter, ShoppingCart, Share2, Trophy
+  } from 'lucide-react';  import toast, { Toaster } from 'react-hot-toast';
   import { motion, AnimatePresence } from 'framer-motion';
 
   // ✅ COMPONENTE CUSTOM SELECT UNIFICADO CON PALETA VOLTECH
