@@ -447,9 +447,34 @@ useEffect(() => {
     }
   }, [productos]);
 
-  useEffect(() => {
-    if (!sorteoActivo) return;
-    const interval = setInterval(() => {
+    // ✅ CARGA BAJO DEMANDA: cuando se abre el modal de un producto,
+    // trae el array `imagenes` (que no vino en el select liviano del hook).
+    // Así el catálogo lista al instante y el carrusel del modal funciona completo.
+    useEffect(() => {
+      if (!selectedProduct || !supabase) return;
+      // Si ya tiene el array, no hace nada
+      if (Array.isArray(selectedProduct.imagenes) && selectedProduct.imagenes.length > 0) return;
+      let mounted = true;
+      (async () => {
+        try {
+          const { data } = await supabase
+            .from('productos')
+            .select('imagenes')
+            .eq('id', selectedProduct.id)
+            .maybeSingle();
+          if (!mounted) return;
+          if (data && Array.isArray(data.imagenes) && data.imagenes.length > 0) {
+            setSelectedProduct(prev => prev && prev.id === selectedProduct.id ? { ...prev, imagenes: data.imagenes } : prev);
+          }
+        } catch (e) {
+          console.warn('No se pudieron cargar imágenes extra:', e.message);
+        }
+      })();
+      return () => { mounted = false; };
+    }, [selectedProduct?.id]);
+
+    useEffect(() => {
+    if (!sorteoActivo) return;    const interval = setInterval(() => {
       const now = new Date().getTime();
       const end = new Date(sorteoActivo.fecha_fin).getTime();
       const distance = end - now;
