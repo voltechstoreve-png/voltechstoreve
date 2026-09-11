@@ -749,7 +749,7 @@
       setItems(nuevosItems);
     };
 
-    const handleChange = (index, name, value) => {    const handleChange = (index, name, value) => {
+    const handleChange = (index, name, value) => {
       const nuevosItems = [...items];
       const item = nuevosItems[index];
       const disponibilidadAnterior = item.disponibilidad;
@@ -842,32 +842,8 @@
             if (candidatos[0].categoria && !item.categoria) item.categoria = candidatos[0].categoria;
           }
         }
-      }          if (prod) {
-            if (prod.categoria) item.categoria = prod.categoria;
-            if (prod.marca) item.marca = prod.marca;
-          }
-        }
-        
-        if (name === 'categoria' && value) {
-          let candidatos = productos.filter(p => p.tipo === 'fisico' && p.categoria && normalizarTexto(p.categoria) === normalizarTexto(value));
-          if (item.marca) candidatos = candidatos.filter(p => normalizarTexto(p.marca) === normalizarTexto(item.marca));
-          if (candidatos.length === 1) {
-            item.plataforma = candidatos[0].plataforma;
-            if (candidatos[0].marca) item.marca = candidatos[0].marca;
-          }
-        }
-
-        if (name === 'marca' && value) {
-          let candidatos = productos.filter(p => p.tipo === 'fisico' && p.marca && normalizarTexto(p.marca) === normalizarTexto(value));
-          if (item.categoria) candidatos = candidatos.filter(p => normalizarTexto(p.categoria) === normalizarTexto(item.categoria));
-          if (candidatos.length === 1) {
-            item.plataforma = candidatos[0].plataforma;
-            if (candidatos[0].categoria) item.categoria = candidatos[0].categoria;
-          }
-        }
-      }
-
-      const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
+}
+const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
       const qty = parseInt(item.cantidad) || 1;
       let precioUnitario = 0;
 
