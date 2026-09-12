@@ -749,10 +749,9 @@
     };
 
     const handleChange = (index, name, value) => {
-    const nuevosItems = [...items];
-    const item = nuevosItems[index];
-    const disponibilidadAnterior = item.disponibilidad;
-
+      const nuevosItems = [...items];
+      const item = nuevosItems[index];
+      const disponibilidadAnterior = item.disponibilidad;
       if (name === 'tipo') {
         item.plataforma = '';
         item.categoria = '';
@@ -1010,6 +1009,203 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
   };
 
   const todasImagenesEdit = Array.from(new Set([editData.imagen, ...imagenesExtraEdit].filter(Boolean)));
+
+  // ✅ HANDLERS DE PRECIOS POR PROVEEDOR EN EDICIÓN
+  const aggPrecioEdit = () => setEditData(d => ({ ...d, precios_proveedor: [...(d.precios_proveedor || []), { proveedor: '', precio: 0 }] }));
+  const quitPrecioEdit = (i) => setEditData(d => {
+    const arr = (d.precios_proveedor || []).filter((_, x) => x !== i);
+    const mejor = arr.length > 0 ? Math.min(...arr.map(p => parseFloat(p.precio) || 0).filter(v => v > 0)) : 0;
+    return { ...d, precios_proveedor: arr, precioMayor: mejor };
+  });
+  const cambPrecioEdit = (i, campo, val) => setEditData(d => {
+    const arr = [...(d.precios_proveedor || [])];
+    arr[i] = { ...arr[i], [campo]: val };
+    let pm = d.precioMayor;
+    if (campo === 'precio') {
+      pm = arr.length > 0 ? Math.min(...arr.map(p => parseFloat(p.precio) || 0).filter(v => v > 0)) : 0;
+    }
+    return { ...d, precios_proveedor: arr, precioMayor: pm };
+  });
+
+  // ✅ FORMULARIO DE EDICIÓN COMPLETO (igual al de compra, sin método de pago / cartera / proveedor)
+  const FormularioEdicion = ({ producto }) => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-bold text-voltech-cyan flex items-center gap-2">
+          <Edit className="w-4 h-4" /> Editando: {producto.plataforma}
+        </h4>
+        <button onClick={cancelarEdicion} className="p-1 hover:bg-voltech-border rounded"><X className="w-4 h-4 text-voltech-muted" /></button>
+      </div>
+      <p className="text-[10px] text-voltech-muted">SKU: <span className="text-voltech-cyan font-mono">{producto.sku || 'N/A'}</span></p>
+
+      <div>
+        <label className="block text-xs text-voltech-muted mb-1 ml-1">🖼️ Imágenes del Producto <span className="text-[10px]">(agrega todas las que quieras)</span></label>
+        <div
+          onDragOver={(e) => { e.preventDefault(); setIsDragOverEdit(true); }}
+          onDragLeave={() => setIsDragOverEdit(false)}
+          onDrop={(e) => { e.preventDefault(); setIsDragOverEdit(false); handleImagenesEdit(e.dataTransfer.files); }}
+          onClick={() => fileInputEditRef.current?.click()}
+          className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer ${isDragOverEdit ? 'border-voltech-cyan bg-voltech-cyan/10' : 'border-voltech-border'}`}
+        >
+          <Upload className="w-5 h-5 text-voltech-muted mx-auto" />
+          <p className="text-xs text-voltech-muted mt-1">Arrastra o haz clic (puedes elegir varias)</p>
+        </div>
+        <input ref={fileInputEditRef} type="file" accept="image/*" multiple onChange={(e) => { handleImagenesEdit(e.target.files); e.target.value = ''; }} className="hidden" />
+        {todasImagenesEdit.length > 0 && (
+          <div className="flex gap-3 flex-wrap mt-3">
+            {todasImagenesEdit.map((img, i) => {
+              const esPortada = editData.imagen === img;
+              return (
+                <div key={i} className="w-24">
+                  <div className="relative">
+                    <img src={img} alt={`Img ${i + 1}`} className={`w-24 h-24 object-cover rounded-lg border-2 ${esPortada ? 'border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.6)]' : 'border-voltech-border'}`} />
+                    <button type="button" onClick={() => quitarImagenEdit(img)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]"><X className="w-3 h-3" /></button>
+                  </div>
+                  <button type="button" onClick={() => setPortadaEdit(img)} className={`w-full text-[9px] px-1.5 py-1 rounded-full mt-1.5 ${esPortada ? 'bg-cyan-500 text-black font-bold' : 'bg-gray-800/80 text-gray-400 opacity-70 hover:opacity-100'}`}>
+                    {esPortada ? '★ Portada' : 'Portada'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <label className="block text-xs text-voltech-muted mb-1 ml-1">Nombre del Producto *</label>
+          <input type="text" value={editData.plataforma} onChange={(e) => setEditData({ ...editData, plataforma: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs text-voltech-muted mb-1 ml-1">Categoría *</label>
+          <input type="text" value={editData.categoria} onChange={(e) => setEditData({ ...editData, categoria: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs text-voltech-muted mb-1 ml-1">Marca *</label>
+          <input type="text" value={editData.marca} onChange={(e) => setEditData({ ...editData, marca: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs text-voltech-muted mb-1 ml-1">Modelo</label>
+          <input type="text" value={editData.modelo} onChange={(e) => setEditData({ ...editData, modelo: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs text-voltech-muted mb-1 ml-1">Variante / Tipo</label>
+          <input type="text" value={editData.variante} onChange={(e) => setEditData({ ...editData, variante: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+        </div>
+        <div className="lg:col-span-2">
+          <label className="block text-xs text-voltech-muted mb-1 ml-1">Potencia (separa con comas)</label>
+          <input type="text" value={(editData.potencia || []).join(', ')} onChange={(e) => setEditData({ ...editData, potencia: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs text-voltech-muted mb-1 ml-1">Cantidad / Stock</label>
+          <input type="number" min="0" value={editData.cantidad || 0} onChange={(e) => setEditData({ ...editData, cantidad: parseInt(e.target.value) || 0 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+        </div>
+
+        <div className="lg:col-span-3 bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs text-voltech-muted font-semibold flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-voltech-cyan" />
+              Precios por Proveedor (compara y marca el MEJOR)
+            </label>
+            <button type="button" onClick={aggPrecioEdit} className="px-3 py-1 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors flex items-center gap-1">
+              <Plus className="w-3 h-3" /> Agregar precio
+            </button>
+          </div>
+          {(editData.precios_proveedor || []).length === 0 && (
+            <p className="text-xs text-voltech-muted text-center py-2">No hay precios registrados. Haz clic en "Agregar precio".</p>
+          )}
+          {(editData.precios_proveedor || []).map((row, i) => {
+            const num = parseFloat(row.precio) || 0;
+            const validos = (editData.precios_proveedor || []).map(p => parseFloat(p.precio) || 0).filter(v => v > 0);
+            const min = validos.length > 0 ? Math.min(...validos) : 0;
+            const esMejor = num > 0 && num === min;
+            return (
+              <div key={i} className={`grid grid-cols-[1fr_100px_auto] gap-2 items-end p-3 rounded-lg border transition-all ${esMejor ? 'bg-voltech-success/10 border-voltech-success' : 'bg-voltech-surface border-voltech-border'}`}>
+                <div>
+                  <label className="block text-[10px] text-voltech-muted mb-1">Proveedor</label>
+                  <input type="text" value={row.proveedor} onChange={(e) => cambPrecioEdit(i, 'proveedor', e.target.value)} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-voltech-muted mb-1">Precio ($)</label>
+                  <input type="number" step="0.01" value={row.precio} onChange={(e) => cambPrecioEdit(i, 'precio', e.target.value)} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                </div>
+                <div className="flex items-center gap-1">
+                  {esMejor && (
+                    <span className="px-2 py-1 bg-voltech-success text-white text-[9px] font-bold rounded-full flex items-center gap-1">
+                      <Trophy className="w-3 h-3" /> MEJOR
+                    </span>
+                  )}
+                  <button type="button" onClick={() => quitPrecioEdit(i)} className="p-1.5 text-voltech-error hover:bg-voltech-error/10 rounded transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          {editData.precioMayor > 0 && (
+            <div className="flex items-center justify-between pt-2 border-t border-voltech-border">
+              <span className="text-xs text-voltech-muted">Precio Mayor (MEJOR):</span>
+              <span className="text-sm font-bold text-voltech-success">${editData.precioMayor.toFixed(2)}</span>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Detal ($) <span className="text-voltech-success">(Venta al público)</span></label>
+          <input type="number" step="0.01" value={editData.precioDetal} onChange={(e) => setEditData({ ...editData, precioDetal: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs text-voltech-muted mb-1 ml-1">Estado</label>
+          <CustomSelect
+            value={editData.estado}
+            onChange={(v) => setEditData({ ...editData, estado: v })}
+            options={[
+              { value: 'nuevo', label: 'Nuevo' },
+              { value: 'oferta', label: 'Oferta' },
+              { value: 'kit', label: 'Kit' },
+              { value: 'combo', label: 'Combo Streaming' },
+              { value: 'agotado', label: 'Agotado' }
+            ]}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Oferta ($) <span className="text-voltech-warning">(Opcional)</span></label>
+          <input type="number" step="0.01" value={editData.precioOferta} onChange={(e) => setEditData({ ...editData, precioOferta: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs text-voltech-muted mb-1 ml-1">Precio (Bs)</label>
+          <input type="text" value={((editData.precioOferta > 0 ? editData.precioOferta : editData.precioDetal || 0) * (usarTasaBCV ? tasaBCV : tasaPersonalizada)).toFixed(2)} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-cyan bg-voltech-dark/50" />
+        </div>
+        <div>
+          <label className="block text-xs text-voltech-muted mb-1 ml-1">Total</label>
+          <input type="text" value={((editData.precioOferta > 0 ? editData.precioOferta : editData.precioDetal || 0) * (editData.cantidad || 0)).toFixed(2)} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-success bg-voltech-dark/50" />
+        </div>
+        <div>
+          <label className="block text-xs text-voltech-muted mb-1 ml-1">% Comisión por Venta</label>
+          <input type="number" step="0.01" value={editData.porcentaje_comision} onChange={(e) => setEditData({ ...editData, porcentaje_comision: parseFloat(e.target.value) || 5 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
+        </div>
+        <div className="lg:col-span-3">
+          <label className="block text-xs text-voltech-muted mb-1 ml-1">Descripción Detallada (para Chatbot)</label>
+          <textarea value={editData.descripcion_detallada || ''} onChange={(e) => setEditData({ ...editData, descripcion_detallada: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-24 resize-none" placeholder="Ej: Batería de 5000mAh, carga rápida 25W..." />
+        </div>
+        <div className="lg:col-span-3">
+          <label className="block text-xs text-voltech-muted mb-1 ml-1">Descripción</label>
+          <textarea value={editData.descripcion} onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm h-16" />
+        </div>
+        <div className="lg:col-span-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={!!editData.publicado} onChange={(e) => setEditData({ ...editData, publicado: e.target.checked })} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" />
+            <span className="text-xs text-voltech-muted">Publicado en la tienda</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="flex gap-3 pt-2">
+        <button onClick={() => guardarEdicion(producto.id)} className="flex-1 bg-voltech-cyan text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all"><Save className="w-4 h-4" /> Guardar Cambios</button>
+        <button onClick={cancelarEdicion} className="px-6 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white transition-all flex items-center justify-center gap-2"><X className="w-4 h-4" /> Cancelar</button>
+      </div>
+    </div>
+  );
 
     const agregarItem = () => {
       setItems([...items, {
@@ -2947,115 +3143,9 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
                         <motion.div 
                           initial={{ opacity: 0, height: 0 }} 
                           animate={{ opacity: 1, height: 'auto' }} 
-                          className="bg-voltech-surface border-2 border-voltech-cyan rounded-xl p-4 space-y-3 mt-2"
+                          className="bg-voltech-surface border-2 border-voltech-cyan rounded-xl p-4 mt-2"
                         >
-                          <h4 className="text-sm font-bold text-voltech-cyan flex items-center gap-2">
-                            <Edit className="w-4 h-4" /> Editando: {producto.plataforma}
-                          </h4>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="col-span-2">
-                              <label className="text-xs text-voltech-muted">Nombre del Producto</label>
-                              <input type="text" value={editData.plataforma} onChange={(e) => setEditData({ ...editData, plataforma: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
-                            </div>
-                            <div>
-                              <label className="text-xs text-voltech-muted">Categoría</label>
-                              <input type="text" value={editData.categoria} onChange={(e) => setEditData({ ...editData, categoria: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
-                            </div>
-                            <div>
-                              <label className="text-xs text-voltech-muted">Marca</label>
-                              <input type="text" value={editData.marca} onChange={(e) => setEditData({ ...editData, marca: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
-                            </div>
-                            <div>
-                              <label className="text-xs text-voltech-muted">Modelo</label>
-                              <input type="text" value={editData.modelo} onChange={(e) => setEditData({ ...editData, modelo: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
-                            </div>
-                            <div>
-                              <label className="text-xs text-voltech-muted">Variante</label>
-                              <input type="text" value={editData.variante} onChange={(e) => setEditData({ ...editData, variante: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
-                            </div>
-                            <div className="col-span-2">
-                              <label className="text-xs text-voltech-muted">Potencia (separa con comas)</label>
-                              <input type="text" value={(editData.potencia || []).join(', ')} onChange={(e) => setEditData({ ...editData, potencia: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
-                            </div>
-                            <div>
-                              <label className="text-xs text-voltech-muted">Stock</label>
-                              <input type="number" min="0" value={editData.cantidad || 0} onChange={(e) => setEditData({ ...editData, cantidad: parseInt(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
-                            </div>
-                            <div>
-                              <label className="text-xs text-voltech-muted">Estado</label>
-                              <select value={editData.estado} onChange={(e) => setEditData({ ...editData, estado: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm">
-                                <option value="nuevo">Nuevo</option>
-                                <option value="oferta">Oferta</option>
-                                <option value="agotado">Agotado</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="text-xs text-voltech-muted">% Comisión</label>
-                              <input type="number" step="0.01" value={editData.porcentaje_comision} onChange={(e) => setEditData({ ...editData, porcentaje_comision: parseFloat(e.target.value) || 5 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
-                            </div>
-                            <div className="col-span-2">
-                              <label className="text-xs text-voltech-muted">Descripción Detallada (Chatbot)</label>
-                              <textarea value={editData.descripcion_detallada || ''} onChange={(e) => setEditData({ ...editData, descripcion_detallada: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm h-16" />
-                            </div>
-                          </div>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={!!editData.publicado} onChange={(e) => setEditData({ ...editData, publicado: e.target.checked })} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" />
-                            <span className="text-xs text-voltech-muted">Publicado en la tienda</span>
-                          </label>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="text-xs text-voltech-muted">Precio Mayor ($)</label>
-                              <input type="number" step="0.01" value={editData.precioMayor} onChange={(e) => setEditData({ ...editData, precioMayor: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
-                            </div>
-                            <div>
-                              <label className="text-xs text-voltech-muted">Precio Detal ($)</label>
-                              <input type="number" step="0.01" value={editData.precioDetal} onChange={(e) => setEditData({ ...editData, precioDetal: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
-                            </div>
-                            <div>
-                              <label className="text-xs text-voltech-muted">Precio Oferta ($)</label>
-                              <input type="number" step="0.01" value={editData.precioOferta} onChange={(e) => setEditData({ ...editData, precioOferta: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="text-xs text-voltech-muted">Descripción</label>
-                            <textarea value={editData.descripcion} onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm h-16" />
-                          </div>
-                                                  <div className="col-span-2">
-                          <label className="text-xs text-voltech-muted">🖼️ Imágenes del Producto <span className="text-[10px]">(múltiples + portada)</span></label>
-                          <div
-                            onDragOver={(e) => { e.preventDefault(); setIsDragOverEdit(true); }}
-                            onDragLeave={() => setIsDragOverEdit(false)}
-                            onDrop={(e) => { e.preventDefault(); setIsDragOverEdit(false); handleImagenesEdit(e.dataTransfer.files); }}
-                            onClick={() => fileInputEditRef.current?.click()}
-                            className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer ${isDragOverEdit ? 'border-voltech-cyan bg-voltech-cyan/10' : 'border-voltech-border'}`}
-                          >
-                            <Upload className="w-5 h-5 text-voltech-muted mx-auto" />
-                            <p className="text-xs text-voltech-muted mt-1">Arrastra o haz clic (varias imágenes)</p>
-                          </div>
-                          <input ref={fileInputEditRef} type="file" accept="image/*" multiple onChange={(e) => { handleImagenesEdit(e.target.files); e.target.value = ''; }} className="hidden" />
-                          {todasImagenesEdit.length > 0 && (
-                            <div className="flex gap-2 flex-wrap mt-2">
-                              {todasImagenesEdit.map((img, i) => {
-                                const esPortada = editData.imagen === img;
-                                return (
-                                  <div key={i} className="w-20">
-                                    <div className="relative">
-                                      <img src={img} alt={`Img ${i+1}`} className={`w-20 h-20 object-cover rounded border-2 ${esPortada ? 'border-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.6)]' : 'border-voltech-border'}`} />
-                                      <button type="button" onClick={() => quitarImagenEdit(img)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px]"><X className="w-2.5 h-2.5" /></button>
-                                    </div>
-                                    <button type="button" onClick={() => setPortadaEdit(img)} className={`w-full text-[8px] px-1 py-0.5 rounded-full mt-1 ${esPortada ? 'bg-cyan-500 text-black font-bold' : 'bg-gray-800/80 text-gray-400'}`}>
-                                      {esPortada ? '★ Portada' : 'Portada'}
-                                    </button>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                          <div className="flex gap-2 pt-2">
-                            <button onClick={() => guardarEdicion(producto.id)} className="flex-1 bg-voltech-cyan text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-1"><Save className="w-4 h-4" /> Guardar</button>
-                            <button onClick={cancelarEdicion} className="flex-1 bg-voltech-surface border border-voltech-border text-voltech-muted py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-1 hover:text-white"><X className="w-4 h-4" /> Cancelar</button>
-                          </div>
+                          <FormularioEdicion producto={producto} />
                         </motion.div>
                       )}
                     </div>
