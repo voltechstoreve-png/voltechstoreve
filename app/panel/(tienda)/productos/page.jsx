@@ -9,8 +9,8 @@
   Plus, Search, Edit, Trash2, X, Package, DollarSign, TrendingUp,
   AlertTriangle, CheckCircle, Image as ImageIcon, Save, Minus,
   Upload, Eye, EyeOff, Globe, LayoutGrid, Table, Download,
-  Database, MonitorPlay, Tag, Layers, Calendar, Percent, Gift,
-  ChevronDown, MoreVertical, Filter, ShoppingCart, Share2, Trophy
+  Database, MonitorPlay, Tag, Layers, Calendar, Percent, Gift, Trophy,
+  ChevronDown, MoreVertical, Filter, ShoppingCart, Share2
   } from 'lucide-react';  import toast, { Toaster } from 'react-hot-toast';
   import { motion, AnimatePresence } from 'framer-motion';
 
@@ -749,9 +749,9 @@
     };
 
     const handleChange = (index, name, value) => {
-      const nuevosItems = [...items];
-      const item = nuevosItems[index];
-      const disponibilidadAnterior = item.disponibilidad;
+    const nuevosItems = [...items];
+    const item = nuevosItems[index];
+    const disponibilidadAnterior = item.disponibilidad;
 
       if (name === 'tipo') {
         item.plataforma = '';
@@ -809,11 +809,6 @@
           item.precio_individual_total = 0;
         }
       }
-      if (name === 'disponibilidad') {
-      if (value === 'kit') { item.categoria = 'KIT'; item.marca = item.marca || 'Voltech'; }
-      else if (value === 'combo') { item.categoria = 'COMBO'; item.marca = 'Voltech'; }
-      else if (item.tipo === 'fisico') { item.categoria = ''; }
-}
       if (item.tipo === 'fisico') {
         if (name === 'plataforma' && value) {
           const registros = productos.filter(p => p.tipo === 'fisico' && normalizarTexto(p.plataforma) === normalizarTexto(value));
@@ -823,7 +818,6 @@
             if (prod.marca && !item.marca) item.marca = prod.marca;
           }
         }
-        
         if (name === 'categoria' && value) {
           let candidatos = productos.filter(p => p.tipo === 'fisico' && p.categoria && normalizarTexto(p.categoria) === normalizarTexto(value));
           if (item.marca) candidatos = candidatos.filter(p => normalizarTexto(p.marca) === normalizarTexto(item.marca));
@@ -832,7 +826,6 @@
             if (candidatos[0].marca && !item.marca) item.marca = candidatos[0].marca;
           }
         }
-
         if (name === 'marca' && value) {
           let candidatos = productos.filter(p => p.tipo === 'fisico' && p.marca && normalizarTexto(p.marca) === normalizarTexto(value));
           if (item.categoria) candidatos = candidatos.filter(p => normalizarTexto(p.categoria) === normalizarTexto(item.categoria));
@@ -841,7 +834,7 @@
             if (candidatos[0].categoria && !item.categoria) item.categoria = candidatos[0].categoria;
           }
         }
-}
+      }
 const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
       const qty = parseInt(item.cantidad) || 1;
       let precioUnitario = 0;
