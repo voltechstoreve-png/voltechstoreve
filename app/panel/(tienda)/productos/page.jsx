@@ -9,10 +9,9 @@
   Plus, Search, Edit, Trash2, X, Package, DollarSign, TrendingUp,
   AlertTriangle, CheckCircle, Image as ImageIcon, Save, Minus,
   Upload, Eye, EyeOff, Globe, LayoutGrid, Table, Download,
-  Database, MonitorPlay, Tag, Layers, Calendar, Percent, Gift,
+  Database, MonitorPlay, Tag, Layers, Calendar, Percent, Gift, Trophy,
   ChevronDown, MoreVertical, Filter, ShoppingCart, Share2
-} from 'lucide-react';
-  import toast, { Toaster } from 'react-hot-toast';
+  } from 'lucide-react';  import toast, { Toaster } from 'react-hot-toast';
   import { motion, AnimatePresence } from 'framer-motion';
 
   // ✅ COMPONENTE CUSTOM SELECT UNIFICADO CON PALETA VOLTECH
@@ -488,7 +487,8 @@
       productos_kit: [],
       precio_costo_total: 0,
       precio_individual_total: 0,
-      descripcion_detallada: ''
+      descripcion_detallada: '',
+      precios_proveedor: []
     }]);
 
     const [editData, setEditData] = useState({
@@ -716,10 +716,42 @@
       }
     };
     
-    const handleChange = (index, name, value) => {
+    // ✅ PRECIOS POR PROVEEDOR: agregar/quitar/editar filas
+    const agregarPrecioProveedor = (index) => {
       const nuevosItems = [...items];
-      const item = nuevosItems[index];
-      const disponibilidadAnterior = item.disponibilidad;
+      const precios = nuevosItems[index].precios_proveedor || [];
+      nuevosItems[index].precios_proveedor = [...precios, { proveedor: '', precio: 0 }];
+      setItems(nuevosItems);
+    };
+
+    const quitarPrecioProveedor = (index, idxPrecio) => {
+      const nuevosItems = [...items];
+      const precios = nuevosItems[index].precios_proveedor || [];
+      nuevosItems[index].precios_proveedor = precios.filter((_, i) => i !== idxPrecio);
+      // Actualizar precioMayor con el MEJOR (más bajo)
+      const restantes = nuevosItems[index].precios_proveedor;
+      const mejor = restantes.length > 0 ? Math.min(...restantes.map(p => parseFloat(p.precio) || 0).filter(p => p > 0)) : 0;
+      nuevosItems[index].precioMayor = mejor;
+      setItems(nuevosItems);
+    };
+
+    const cambiarPrecioProveedor = (index, idxPrecio, campo, valor) => {
+      const nuevosItems = [...items];
+      const precios = nuevosItems[index].precios_proveedor || [];
+      precios[idxPrecio][campo] = valor;
+      // Si cambió el precio, recalcular el MEJOR
+      if (campo === 'precio') {
+        const mejor = precios.length > 0 ? Math.min(...precios.map(p => parseFloat(p.precio) || 0).filter(p => p > 0)) : 0;
+        nuevosItems[index].precioMayor = mejor;
+      }
+      nuevosItems[index].precios_proveedor = precios;
+      setItems(nuevosItems);
+    };
+
+    const handleChange = (index, name, value) => {
+    const nuevosItems = [...items];
+    const item = nuevosItems[index];
+    const disponibilidadAnterior = item.disponibilidad;
 
       if (name === 'tipo') {
         item.plataforma = '';
@@ -786,31 +818,8 @@
         if (name === 'plataforma' && value) {
           const registros = productos.filter(p => p.tipo === 'fisico' && normalizarTexto(p.plataforma) === normalizarTexto(value));
           const prod = registros.find(p => p.categoria && p.marca) || registros[0];
-          if (prod) {
-            if (prod.categoria) item.categoria = prod.categoria;
-            if (prod.marca) item.marca = prod.marca;
-          }
-        }
-        
-        if (name === 'categoria' && value) {
-          let candidatos = productos.filter(p => p.tipo === 'fisico' && p.categoria && normalizarTexto(p.categoria) === normalizarTexto(value));
-          if (item.marca) candidatos = candidatos.filter(p => normalizarTexto(p.marca) === normalizarTexto(item.marca));
-          if (candidatos.length === 1) {
-            item.plataforma = candidatos[0].plataforma;
-            if (candidatos[0].marca) item.marca = candidatos[0].marca;
-          }
-        }
-
-        if (name === 'marca' && value) {
-          let candidatos = productos.filter(p => p.tipo === 'fisico' && p.marca && normalizarTexto(p.marca) === normalizarTexto(value));
-          if (item.categoria) candidatos = candidatos.filter(p => normalizarTexto(p.categoria) === normalizarTexto(item.categoria));
-          if (candidatos.length === 1) {
-            item.plataforma = candidatos[0].plataforma;
-            if (candidatos[0].categoria) item.categoria = candidatos[0].categoria;
-          }
-        }
       }
-
+      }
       const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
       const qty = parseInt(item.cantidad) || 1;
       let precioUnitario = 0;
@@ -1710,7 +1719,8 @@
           precio_oferta: item.precioOferta || 0,
           tipoOferta: item.tipoOferta || '',
           proveedor: item.proveedor || '',
-          comprador: item.comprador || usuarioActual || 'Administrador'
+          comprador: item.comprador || usuarioActual || 'Administrador',
+          precios_proveedor: item.precios_proveedor || []
         };
 
         if (productoExistente) {
@@ -2647,11 +2657,64 @@
 
                         {item.tipo !== 'kit' && (
                           <>
-                            {item.tipo === 'fisico' && tienePermiso('puedeVerInventarioCompleto') && (<div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Mayor ($) <span className="text-voltech-warning">(Tu costo)</span></label><input type="number" step="0.01" value={item.precioMayor} onChange={(e) => handleChange(itemIndex, 'precioMayor', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>)}
+                            {item.tipo === 'fisico' && tienePermiso('puedeVerInventarioCompleto') && (
+                              <div className="lg:col-span-3 bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <label className="block text-xs text-voltech-muted font-semibold flex items-center gap-2">
+                                    <DollarSign className="w-4 h-4 text-voltech-cyan" />
+                                    Precios por Proveedor (compara y marca el MEJOR)
+                                  </label>
+                                  <button type="button" onClick={() => agregarPrecioProveedor(itemIndex)} className="px-3 py-1 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors flex items-center gap-1">
+                                    <Plus className="w-3 h-3" /> Agregar precio
+                                  </button>
+                                </div>
+                                {(item.precios_proveedor || []).length === 0 && (
+                                  <p className="text-xs text-voltech-muted text-center py-2">No hay precios registrados. Haz clic en "Agregar precio".</p>
+                                )}
+                                {(item.precios_proveedor || []).map((precioRow, idxPrecio) => {
+                                  const precioNum = parseFloat(precioRow.precio) || 0;
+                                  const preciosValidos = (item.precios_proveedor || []).map(p => parseFloat(p.precio) || 0).filter(p => p > 0);
+                                  const precioMinimo = preciosValidos.length > 0 ? Math.min(...preciosValidos) : 0;
+                                  const esMejor = precioNum > 0 && precioNum === precioMinimo;
+                                  return (
+                                    <div key={idxPrecio} className={`grid grid-cols-[1fr_100px_auto] gap-2 items-end p-3 rounded-lg border transition-all ${esMejor ? 'bg-voltech-success/10 border-voltech-success' : 'bg-voltech-surface border-voltech-border'}`}>
+                                      <div>
+                                        <label className="block text-[10px] text-voltech-muted mb-1">Proveedor</label>
+                                        <CustomSelect
+                                          value={precioRow.proveedor}
+                                          onChange={(val) => cambiarPrecioProveedor(itemIndex, idxPrecio, 'proveedor', val)}
+                                          options={[{ value: '', label: '-- Selecciona --' }, ...opcionesProveedores]}
+                                          placeholder="-- Selecciona --"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[10px] text-voltech-muted mb-1">Precio ($)</label>
+                                        <input type="number" step="0.01" value={precioRow.precio} onChange={(e) => cambiarPrecioProveedor(itemIndex, idxPrecio, 'precio', e.target.value)} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        {esMejor && (
+                                          <span className="px-2 py-1 bg-voltech-success text-white text-[9px] font-bold rounded-full flex items-center gap-1">
+                                            <Trophy className="w-3 h-3" /> MEJOR
+                                          </span>
+                                        )}
+                                        <button type="button" onClick={() => quitarPrecioProveedor(itemIndex, idxPrecio)} className="p-1.5 text-voltech-error hover:bg-voltech-error/10 rounded transition-colors">
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                                {item.precioMayor > 0 && (
+                                  <div className="flex items-center justify-between pt-2 border-t border-voltech-border">
+                                    <span className="text-xs text-voltech-muted">Precio Mayor (MEJOR):</span>
+                                    <span className="text-sm font-bold text-voltech-success">${item.precioMayor.toFixed(2)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Detal ($) <span className="text-voltech-success">(Venta al público)</span></label><input type="number" step="0.01" value={item.precioDetal} onChange={(e) => handleChange(itemIndex, 'precioDetal', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Precio de venta" />{item.tipo === 'fisico' && tienePermiso('puedeVerInventarioCompleto') && item.precioMayor > 0 && item.precioDetal > 0 && (<p className="text-xs text-voltech-success mt-1">Ganancia: ${(item.precioDetal - item.precioMayor).toFixed(2)} ({((item.precioDetal - item.precioMayor) / item.precioMayor * 100).toFixed(0)}%)</p>)}</div>
                           </>
-                        )}
-                        
+                        )}                        
                         <div>
                           <CustomSelect
                             label="Estado"
@@ -2975,8 +3038,8 @@
                           </td>
                           <td className="px-4 py-3">
                             {producto.precioOferta > 0 && producto.estado === 'oferta' ? (
-                              <div className="flex flex-col"><span className="text-xs text-gray-400 line-through">$${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</span><span className="text-sm font-bold text-voltech-warning">${parseFloat(producto.precioOferta || 0).toFixed(2)}</span></div>
-                            ) : (<span className="text-sm text-white">$${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</span>)}
+                              <div className="flex flex-col"><span className="text-xs text-gray-400 line-through">${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</span><span className="text-sm font-bold text-voltech-warning">${parseFloat(producto.precioOferta || 0).toFixed(2)}</span></div>
+                            ) : (<span className="text-sm text-white">${Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2)}</span>)}
                           </td>
                           <td className="px-4 py-3">{tienePermiso('puedeVerInventarioCompleto') ? (<input type="number" step="0.01" value={producto.porcentaje_comision || 5} onChange={(e) => { const nuevosProductos = productos.map(p => p.id === producto.id ? { ...p, porcentaje_comision: parseFloat(e.target.value) } : p); setProductos(nuevosProductos); localStorage.setItem('voltech_productos', JSON.stringify(nuevosProductos)); }} className="input-voltech w-20 rounded-lg px-2 py-1 text-sm" />) : (<span className="text-sm text-voltech-muted">{producto.porcentaje_comision || 5}%</span>)}</td>
                           <td className="px-4 py-3 text-center">
@@ -3114,6 +3177,39 @@
                     </div>
                     {tienePermiso('puedeVerInventarioCompleto') && (<div className="flex gap-2"><button onClick={() => compartirProducto(producto)} className="py-2 px-3 bg-voltech-dark border border-voltech-border rounded-lg text-xs text-voltech-muted hover:text-voltech-cyan hover:border-voltech-cyan transition-colors flex items-center justify-center gap-1"><Share2 className="w-3 h-3" />Compartir</button><button onClick={() => abrirEdicion(producto)} className="flex-1 py-2 bg-voltech-dark border border-voltech-border rounded-lg text-xs text-voltech-muted hover:text-voltech-cyan hover:border-voltech-cyan transition-colors flex items-center justify-center gap-1"><Edit className="w-3 h-3" />Editar</button><button onClick={() => eliminarProducto(producto.id)} className="py-2 px-3 bg-voltech-dark border border-voltech-border rounded-lg text-xs text-voltech-muted hover:text-voltech-error hover:border-voltech-error transition-colors"><Trash2 className="w-3 h-3" /></button></div>)}
                   </div>
+                  {editandoId === producto.id && tienePermiso('puedeVerInventarioCompleto') && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }} 
+                      animate={{ opacity: 1, height: 'auto' }} 
+                      className="border-t-2 border-voltech-cyan p-4 space-y-3 bg-voltech-dark/30"
+                    >
+                      <h4 className="text-sm font-bold text-voltech-cyan flex items-center gap-2">
+                        <Edit className="w-4 h-4" /> Editando: {producto.plataforma}
+                      </h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-voltech-muted">Precio Mayor ($)</label>
+                          <input type="number" step="0.01" value={editData.precioMayor} onChange={(e) => setEditData({ ...editData, precioMayor: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-voltech-muted">Precio Detal ($)</label>
+                          <input type="number" step="0.01" value={editData.precioDetal} onChange={(e) => setEditData({ ...editData, precioDetal: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-xs text-voltech-muted">Precio Oferta ($)</label>
+                          <input type="number" step="0.01" value={editData.precioOferta} onChange={(e) => setEditData({ ...editData, precioOferta: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-voltech-muted">Descripción</label>
+                        <textarea value={editData.descripcion} onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm h-16" />
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <button onClick={() => guardarEdicion(producto.id)} className="flex-1 bg-voltech-cyan text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-1"><Save className="w-4 h-4" /> Guardar</button>
+                        <button onClick={cancelarEdicion} className="flex-1 bg-voltech-surface border border-voltech-border text-voltech-muted py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-1 hover:text-white"><X className="w-4 h-4" /> Cancelar</button>
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
               ))
             )}

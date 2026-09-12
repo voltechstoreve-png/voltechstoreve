@@ -20,14 +20,19 @@ export function useProductos() {
   useEffect(() => {
     const fetchProductos = async () => {
       if (supabase) {
+        // ✅ SELECT LIVIANO: NO trae el array `imagenes` (base64 pesado).
+        // Solo trae metadatos + `imagen` (portada, liviana). El array completo
+        // se carga bajo demanda cuando el cliente abre el modal de detalle.
+        // Esto reduce el egress ~90% y evita el throttle de Supabase.
         const { data, error } = await supabase
           .from('productos')
-          .select('*')
+          .select('id, tipo, disponibilidad, sku, fecha, fechaCreacion, creado_en, plataforma, producto, categoria, marca, modelo, variante, potencia, cantidad, descripcion, descripcion_detallada, duracion, estado, publicado, porcentaje_comision, productos_kit, precio_costo_total, precio_individual_total, esCombo, plataformasCombo, especificaciones, colores, caracteristicas, precioMayor, preciomayor, precioDetal, preciodetal, precioBs, preciobs, precioOferta, precio_oferta, tipoOferta, proveedor, comprador, imagen, precios_proveedor, categoria_promo')
           .eq('publicado', true)
           .order('creado_en', { ascending: false });
 
         if (!error && data && data.length > 0) {
           setProductos(data);
+          // Caché sin el array `imagenes` (ligero)
           setLocalSafe('voltech_productos', JSON.stringify(data));
         } else {
           const cached = localStorage.getItem('voltech_productos');
