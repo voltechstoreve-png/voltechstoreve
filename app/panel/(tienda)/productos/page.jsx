@@ -818,7 +818,27 @@
         if (name === 'plataforma' && value) {
           const registros = productos.filter(p => p.tipo === 'fisico' && normalizarTexto(p.plataforma) === normalizarTexto(value));
           const prod = registros.find(p => p.categoria && p.marca) || registros[0];
-      }
+          if (prod) {
+            if (prod.categoria && !item.categoria) item.categoria = prod.categoria;
+            if (prod.marca && !item.marca) item.marca = prod.marca;
+          }
+        }
+        if (name === 'categoria' && value) {
+          let candidatos = productos.filter(p => p.tipo === 'fisico' && p.categoria && normalizarTexto(p.categoria) === normalizarTexto(value));
+          if (item.marca) candidatos = candidatos.filter(p => normalizarTexto(p.marca) === normalizarTexto(item.marca));
+          if (candidatos.length === 1) {
+            if (!item.plataforma) item.plataforma = candidatos[0].plataforma;
+            if (candidatos[0].marca && !item.marca) item.marca = candidatos[0].marca;
+          }
+        }
+        if (name === 'marca' && value) {
+          let candidatos = productos.filter(p => p.tipo === 'fisico' && p.marca && normalizarTexto(p.marca) === normalizarTexto(value));
+          if (item.categoria) candidatos = candidatos.filter(p => normalizarTexto(p.categoria) === normalizarTexto(item.categoria));
+          if (candidatos.length === 1) {
+            if (!item.plataforma) item.plataforma = candidatos[0].plataforma;
+            if (candidatos[0].categoria && !item.categoria) item.categoria = candidatos[0].categoria;
+          }
+        }
       }
       const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
       const qty = parseInt(item.cantidad) || 1;
@@ -2010,9 +2030,11 @@
     );
 
     const totalProductos = productos.length;
-    const stockBajo = productos.filter(p => p.cantidad <= 2).length;
-    const agotados = productos.filter(p => p.cantidad === 0).length;
-    const valorInventario = productos.reduce((acc, p) => acc + (parseFloat(p.precioMayor || 0) * (p.cantidad || 0)), 0);
+    // ✅ LOTE A: los "Compra al momento" (bajo_pedido) NO cuentan como stock bajo ni agotados
+    const stockBajo = productos.filter(p => p.disponibilidad !== 'bajo_pedido' && p.cantidad <= 2).length;
+    const agotados = productos.filter(p => p.disponibilidad !== 'bajo_pedido' && p.cantidad === 0).length;
+    const porComprar = productos.filter(p => p.disponibilidad === 'bajo_pedido').length;
+    const valorInventario = productos.reduce((acc, p) => acc + (parseFloat(p.precioMayor || 0) * (parseFloat(p.cantidad) || 0)), 0);
 
     const getEstadoBadge = (estado) => {
       const estilos = { nuevo: 'bg-voltech-success/20 text-voltech-success', oferta: 'bg-voltech-warning/20 text-voltech-warning', kit: 'bg-voltech-cyan/20 text-voltech-cyan', agotado: 'bg-voltech-error/20 text-voltech-error', combo: 'bg-voltech-purple/20 text-voltech-purple' };
@@ -2088,9 +2110,10 @@
       return [...new Set([...asociadas, ...marcas])];
     };
 
-    const opcionesProveedores = proveedores
+    // ✅ LOTE A: deduplicar proveedores (evita opciones repetidas en el selector)
+    const opcionesProveedores = [...new Set(proveedores
       .map(pr => pr.nombre || pr.name || pr.razon_social || pr.proveedor || '')
-      .filter(Boolean)
+      .filter(Boolean))]
       .map(n => ({ value: n, label: n }));
 
     // ✅ Opciones de Métodos de Pago sincronizadas con Ajustes
@@ -2138,16 +2161,16 @@
                   
                   <div className="mb-6 p-4 bg-voltech-dark/50 rounded-lg border border-voltech-border">
                     <h4 className="text-sm font-semibold text-voltech-cyan mb-3">Agregar Nuevo</h4>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <input 
                         type="text" 
                         value={gestionValor}
                         onChange={(e) => setGestionValor(e.target.value)}
                         placeholder="Ingresa el nombre..."
-                        className="input-voltech flex-1 rounded-lg px-4 py-2 text-sm"
+                        className="input-voltech flex-1 min-w-0 rounded-lg px-4 py-2 text-sm"
                         onKeyDown={(e) => e.key === 'Enter' && agregarDesdeGestion()}
                       />
-                      <button onClick={agregarDesdeGestion} className="px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors flex items-center gap-2">
+                      <button onClick={agregarDesdeGestion} className="w-full sm:w-auto px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors flex items-center justify-center gap-2 shrink-0">
                         <Plus className="w-4 h-4" /> Agregar
                       </button>
                     </div>
@@ -2187,7 +2210,7 @@
           )}
         </AnimatePresence>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
           <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-voltech-cyan/20"><Package className="w-5 h-5 text-voltech-cyan" /></div>
@@ -2210,6 +2233,12 @@
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-voltech-success/20"><TrendingUp className="w-5 h-5 text-voltech-success" /></div>
               <div><p className="text-xs text-voltech-muted">Valor Inventario</p><p className="text-xl font-bold text-white">{tienePermiso('puedeVerInventarioCompleto') ? `$${valorInventario.toFixed(2)}` : '---'}</p></div>
+            </div>
+          </div>
+          <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-voltech-warning/20"><ShoppingCart className="w-5 h-5 text-voltech-warning" /></div>
+              <div><p className="text-xs text-voltech-muted">Por Comprar</p><p className="text-xl font-bold text-white">{porComprar}</p></div>
             </div>
           </div>
         </div>
