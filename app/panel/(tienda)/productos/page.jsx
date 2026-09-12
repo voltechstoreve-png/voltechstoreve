@@ -3239,47 +3239,107 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                                   <div className="col-span-2">
-                                    <label className="text-xs text-voltech-muted">Nombre del Producto</label>
-                                    <input type="text" value={editData.plataforma} onChange={(e) => setEditData({ ...editData, plataforma: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                                    <label className="text-xs text-voltech-muted mb-1 block">Nombre del Producto</label>
+                                    <ComboboxEditable
+                                      value={editData.plataforma}
+                                      onChange={(v) => setEditData({ ...editData, plataforma: v })}
+                                      options={(producto.disponibilidad === 'kit' ? nombresKits : producto.disponibilidad === 'combo' ? nombresCombos : producto.tipo === 'streaming' ? plataformasStreaming : nombresFisicos).map(nombre => ({ value: nombre, label: nombre }))}
+                                      onAdd={(val) => agregarOpcionLista(producto.disponibilidad === 'kit' ? 'nombre_kit' : producto.disponibilidad === 'combo' ? 'nombre_combo' : producto.tipo === 'streaming' ? 'plataforma_streaming' : 'nombre_fisico', val)}
+                                      onRename={(old, nw) => renombrarOpcionLista(producto.disponibilidad === 'kit' ? 'nombre_kit' : producto.disponibilidad === 'combo' ? 'nombre_combo' : producto.tipo === 'streaming' ? 'plataforma' : 'nombre_fisico', old, nw)}
+                                      onDelete={(val) => eliminarOpcionLista(producto.disponibilidad === 'kit' ? 'nombre_kit' : producto.disponibilidad === 'combo' ? 'nombre_combo' : producto.tipo === 'streaming' ? 'plataforma_streaming' : 'nombre_fisico', val)}
+                                      onCheckUsage={(val) => verificarUso('plataforma', val)}
+                                      placeholder="-- Selecciona o escribe --"
+                                    />
                                   </div>
                                   <div>
-                                    <label className="text-xs text-voltech-muted">Categoría</label>
-                                    <input type="text" value={editData.categoria} onChange={(e) => setEditData({ ...editData, categoria: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                                    <label className="text-xs text-voltech-muted mb-1 block">Categoría</label>
+                                    <ComboboxEditable
+                                      value={editData.categoria}
+                                      onChange={(v) => setEditData({ ...editData, categoria: v })}
+                                      options={getCategoriasFiltradas(editData.marca).map(cat => ({ value: cat, label: cat }))}
+                                      onAdd={(val) => agregarOpcionLista('categoria', val)}
+                                      onRename={(old, nw) => renombrarOpcionLista('categoria', old, nw)}
+                                      onDelete={(val) => eliminarOpcionLista('categoria', val)}
+                                      onCheckUsage={(val) => verificarUso('categoria', val)}
+                                      placeholder="-- Selecciona o escribe --"
+                                    />
                                   </div>
                                   <div>
-                                    <label className="text-xs text-voltech-muted">Marca</label>
-                                    <input type="text" value={editData.marca} onChange={(e) => setEditData({ ...editData, marca: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                                    <label className="text-xs text-voltech-muted mb-1 block">Marca</label>
+                                    <ComboboxEditable
+                                      value={editData.marca}
+                                      onChange={(v) => setEditData({ ...editData, marca: v })}
+                                      options={getMarcasFiltradas(editData.categoria).map(marca => ({ value: marca, label: marca }))}
+                                      onAdd={(val) => agregarOpcionLista('marca', val)}
+                                      onRename={(old, nw) => renombrarOpcionLista('marca', old, nw)}
+                                      onDelete={(val) => eliminarOpcionLista('marca', val)}
+                                      onCheckUsage={(val) => verificarUso('marca', val)}
+                                      placeholder="-- Selecciona o escribe --"
+                                    />
                                   </div>
                                   <div>
-                                    <label className="text-xs text-voltech-muted">Modelo</label>
-                                    <input type="text" value={editData.modelo} onChange={(e) => setEditData({ ...editData, modelo: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                                    <label className="text-xs text-voltech-muted mb-1 block">Modelo</label>
+                                    <ComboboxEditable
+                                      value={editData.modelo}
+                                      onChange={(v) => setEditData({ ...editData, modelo: v })}
+                                      options={modelos.map(m => ({ value: m, label: m }))}
+                                      onAdd={(val) => agregarOpcionLista('modelo', val)}
+                                      onRename={(old, nw) => renombrarOpcionLista('modelo', old, nw)}
+                                      onDelete={(val) => eliminarOpcionLista('modelo', val)}
+                                      onCheckUsage={(val) => verificarUso('modelo', val)}
+                                      placeholder="-- Selecciona o escribe --"
+                                    />
                                   </div>
                                   <div>
-                                    <label className="text-xs text-voltech-muted">Variante</label>
-                                    <input type="text" value={editData.variante} onChange={(e) => setEditData({ ...editData, variante: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                                    <label className="text-xs text-voltech-muted mb-1 block">Variante / Tipo</label>
+                                    <ComboboxEditable
+                                      value={editData.variante}
+                                      onChange={(v) => setEditData({ ...editData, variante: v })}
+                                      options={variantes.map(v2 => ({ value: v2, label: v2 }))}
+                                      onAdd={(val) => agregarOpcionLista('variante', val)}
+                                      onRename={(old, nw) => renombrarOpcionLista('variante', old, nw)}
+                                      onDelete={(val) => eliminarOpcionLista('variante', val)}
+                                      onCheckUsage={(val) => verificarUso('variante', val)}
+                                      placeholder="-- Selecciona o escribe --"
+                                    />
                                   </div>
                                   <div>
-                                    <label className="text-xs text-voltech-muted">Stock</label>
+                                    <label className="text-xs text-voltech-muted mb-1 block">Stock</label>
                                     <input type="number" min="0" value={editData.cantidad || 0} onChange={(e) => setEditData({ ...editData, cantidad: parseInt(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
                                   </div>
                                   <div>
-                                    <label className="text-xs text-voltech-muted">Estado</label>
-                                    <select value={editData.estado} onChange={(e) => setEditData({ ...editData, estado: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm">
-                                      <option value="nuevo">Nuevo</option>
-                                      <option value="oferta">Oferta</option>
-                                      <option value="agotado">Agotado</option>
-                                    </select>
+                                    <label className="text-xs text-voltech-muted mb-1 block">Estado</label>
+                                    <CustomSelect
+                                      value={editData.estado}
+                                      onChange={(v) => setEditData({ ...editData, estado: v })}
+                                      options={[
+                                        { value: 'nuevo', label: 'Nuevo' },
+                                        { value: 'oferta', label: 'Oferta' },
+                                        { value: 'kit', label: 'Kit' },
+                                        { value: 'combo', label: 'Combo Streaming' },
+                                        { value: 'agotado', label: 'Agotado' }
+                                      ]}
+                                    />
                                   </div>
                                   <div className="col-span-2">
-                                    <label className="text-xs text-voltech-muted">Potencia (separa con comas)</label>
-                                    <input type="text" value={(editData.potencia || []).join(', ')} onChange={(e) => setEditData({ ...editData, potencia: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                                    <label className="text-xs text-voltech-muted mb-1 block">Potencia (selección múltiple)</label>
+                                    <ComboboxMultiple
+                                      value={editData.potencia}
+                                      onChange={(v) => setEditData({ ...editData, potencia: v })}
+                                      options={potencias.map(p2 => ({ value: p2, label: p2 }))}
+                                      onAdd={(val) => agregarOpcionLista('potencia', val)}
+                                      onRename={(old, nw) => renombrarOpcionLista('potencia', old, nw)}
+                                      onDelete={(val) => eliminarOpcionLista('potencia', val)}
+                                      onCheckUsage={(val) => verificarUso('potencia', val)}
+                                      placeholder="-- Selecciona varias --"
+                                    />
                                   </div>
                                   <div>
-                                    <label className="text-xs text-voltech-muted">% Comisión</label>
+                                    <label className="text-xs text-voltech-muted mb-1 block">% Comisión</label>
                                     <input type="number" step="0.01" value={editData.porcentaje_comision} onChange={(e) => setEditData({ ...editData, porcentaje_comision: parseFloat(e.target.value) || 5 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
                                   </div>
                                   <div className="col-span-2 md:col-span-4">
-                                    <label className="text-xs text-voltech-muted">Descripción Detallada (Chatbot)</label>
+                                    <label className="text-xs text-voltech-muted mb-1 block">Descripción Detallada (Chatbot)</label>
                                     <textarea value={editData.descripcion_detallada || ''} onChange={(e) => setEditData({ ...editData, descripcion_detallada: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm h-16" />
                                   </div>
                                   <div className="col-span-2 md:col-span-4">
@@ -3405,6 +3465,102 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
                         <Edit className="w-4 h-4" /> Editando: {producto.plataforma}
                       </h4>
                       <div className="grid grid-cols-2 gap-3">
+                        <div className="col-span-2">
+                          <label className="text-xs text-voltech-muted mb-1 block">Nombre del Producto</label>
+                          <ComboboxEditable
+                            value={editData.plataforma}
+                            onChange={(v) => setEditData({ ...editData, plataforma: v })}
+                            options={(producto.disponibilidad === 'kit' ? nombresKits : producto.disponibilidad === 'combo' ? nombresCombos : producto.tipo === 'streaming' ? plataformasStreaming : nombresFisicos).map(nombre => ({ value: nombre, label: nombre }))}
+                            onAdd={(val) => agregarOpcionLista(producto.disponibilidad === 'kit' ? 'nombre_kit' : producto.disponibilidad === 'combo' ? 'nombre_combo' : producto.tipo === 'streaming' ? 'plataforma_streaming' : 'nombre_fisico', val)}
+                            onRename={(old, nw) => renombrarOpcionLista(producto.disponibilidad === 'kit' ? 'nombre_kit' : producto.disponibilidad === 'combo' ? 'nombre_combo' : producto.tipo === 'streaming' ? 'plataforma' : 'nombre_fisico', old, nw)}
+                            onDelete={(val) => eliminarOpcionLista(producto.disponibilidad === 'kit' ? 'nombre_kit' : producto.disponibilidad === 'combo' ? 'nombre_combo' : producto.tipo === 'streaming' ? 'plataforma_streaming' : 'nombre_fisico', val)}
+                            onCheckUsage={(val) => verificarUso('plataforma', val)}
+                            placeholder="-- Selecciona o escribe --"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-voltech-muted mb-1 block">Categoría</label>
+                          <ComboboxEditable
+                            value={editData.categoria}
+                            onChange={(v) => setEditData({ ...editData, categoria: v })}
+                            options={getCategoriasFiltradas(editData.marca).map(cat => ({ value: cat, label: cat }))}
+                            onAdd={(val) => agregarOpcionLista('categoria', val)}
+                            onRename={(old, nw) => renombrarOpcionLista('categoria', old, nw)}
+                            onDelete={(val) => eliminarOpcionLista('categoria', val)}
+                            onCheckUsage={(val) => verificarUso('categoria', val)}
+                            placeholder="-- Selecciona o escribe --"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-voltech-muted mb-1 block">Marca</label>
+                          <ComboboxEditable
+                            value={editData.marca}
+                            onChange={(v) => setEditData({ ...editData, marca: v })}
+                            options={getMarcasFiltradas(editData.categoria).map(marca => ({ value: marca, label: marca }))}
+                            onAdd={(val) => agregarOpcionLista('marca', val)}
+                            onRename={(old, nw) => renombrarOpcionLista('marca', old, nw)}
+                            onDelete={(val) => eliminarOpcionLista('marca', val)}
+                            onCheckUsage={(val) => verificarUso('marca', val)}
+                            placeholder="-- Selecciona o escribe --"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-voltech-muted mb-1 block">Modelo</label>
+                          <ComboboxEditable
+                            value={editData.modelo}
+                            onChange={(v) => setEditData({ ...editData, modelo: v })}
+                            options={modelos.map(m => ({ value: m, label: m }))}
+                            onAdd={(val) => agregarOpcionLista('modelo', val)}
+                            onRename={(old, nw) => renombrarOpcionLista('modelo', old, nw)}
+                            onDelete={(val) => eliminarOpcionLista('modelo', val)}
+                            onCheckUsage={(val) => verificarUso('modelo', val)}
+                            placeholder="-- Selecciona o escribe --"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-voltech-muted mb-1 block">Variante / Tipo</label>
+                          <ComboboxEditable
+                            value={editData.variante}
+                            onChange={(v) => setEditData({ ...editData, variante: v })}
+                            options={variantes.map(v2 => ({ value: v2, label: v2 }))}
+                            onAdd={(val) => agregarOpcionLista('variante', val)}
+                            onRename={(old, nw) => renombrarOpcionLista('variante', old, nw)}
+                            onDelete={(val) => eliminarOpcionLista('variante', val)}
+                            onCheckUsage={(val) => verificarUso('variante', val)}
+                            placeholder="-- Selecciona o escribe --"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-xs text-voltech-muted mb-1 block">Potencia (selección múltiple)</label>
+                          <ComboboxMultiple
+                            value={editData.potencia}
+                            onChange={(v) => setEditData({ ...editData, potencia: v })}
+                            options={potencias.map(p2 => ({ value: p2, label: p2 }))}
+                            onAdd={(val) => agregarOpcionLista('potencia', val)}
+                            onRename={(old, nw) => renombrarOpcionLista('potencia', old, nw)}
+                            onDelete={(val) => eliminarOpcionLista('potencia', val)}
+                            onCheckUsage={(val) => verificarUso('potencia', val)}
+                            placeholder="-- Selecciona varias --"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-voltech-muted">Stock</label>
+                          <input type="number" min="0" value={editData.cantidad || 0} onChange={(e) => setEditData({ ...editData, cantidad: parseInt(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-voltech-muted">Estado</label>
+                          <CustomSelect
+                            value={editData.estado}
+                            onChange={(v) => setEditData({ ...editData, estado: v })}
+                            options={[
+                              { value: 'nuevo', label: 'Nuevo' },
+                              { value: 'oferta', label: 'Oferta' },
+                              { value: 'kit', label: 'Kit' },
+                              { value: 'combo', label: 'Combo Streaming' },
+                              { value: 'agotado', label: 'Agotado' }
+                            ]}
+                          />
+                        </div>
                         <div>
                           <label className="text-xs text-voltech-muted">Precio Mayor ($)</label>
                           <input type="number" step="0.01" value={editData.precioMayor} onChange={(e) => setEditData({ ...editData, precioMayor: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
@@ -3422,6 +3578,10 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
                         <label className="text-xs text-voltech-muted">Descripción</label>
                         <textarea value={editData.descripcion} onChange={(e) => setEditData({ ...editData, descripcion: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm h-16" />
                       </div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={!!editData.publicado} onChange={(e) => setEditData({ ...editData, publicado: e.target.checked })} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" />
+                        <span className="text-xs text-voltech-muted">Publicado en la tienda</span>
+                      </label>
                       <div className="flex gap-2 pt-2">
                         <button onClick={() => guardarEdicion(producto.id)} className="flex-1 bg-voltech-cyan text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-1"><Save className="w-4 h-4" /> Guardar</button>
                         <button onClick={cancelarEdicion} className="flex-1 bg-voltech-surface border border-voltech-border text-voltech-muted py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-1 hover:text-white"><X className="w-4 h-4" /> Cancelar</button>
