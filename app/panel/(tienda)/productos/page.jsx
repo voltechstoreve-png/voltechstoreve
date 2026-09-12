@@ -1909,6 +1909,7 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
       modelo: producto.modelo || '',
       variante: producto.variante || '',
       potencia: Array.isArray(producto.potencia) ? producto.potencia : [],
+      cantidad: producto.cantidad || 0,
       plataformasCombo: producto.plataformasCombo || [],
       porcentaje_comision: producto.porcentaje_comision || 5,
       productos_kit: producto.productos_kit || [],
@@ -1920,6 +1921,7 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
     const imagenesFinal = [editData.imagen, ...imagenesExtraEdit].filter(Boolean);
     const dataFinal = {
       ...editData,
+      producto: editData.plataforma,
       imagenes: Array.from(new Set(imagenesFinal)),
       precioMayor: editData.precioMayor || 0,
       precioDetal: editData.precioDetal || editData.precioMayor || 0,
@@ -2951,6 +2953,56 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
                             <Edit className="w-4 h-4" /> Editando: {producto.plataforma}
                           </h4>
                           <div className="grid grid-cols-2 gap-3">
+                            <div className="col-span-2">
+                              <label className="text-xs text-voltech-muted">Nombre del Producto</label>
+                              <input type="text" value={editData.plataforma} onChange={(e) => setEditData({ ...editData, plataforma: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-voltech-muted">Categoría</label>
+                              <input type="text" value={editData.categoria} onChange={(e) => setEditData({ ...editData, categoria: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-voltech-muted">Marca</label>
+                              <input type="text" value={editData.marca} onChange={(e) => setEditData({ ...editData, marca: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-voltech-muted">Modelo</label>
+                              <input type="text" value={editData.modelo} onChange={(e) => setEditData({ ...editData, modelo: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-voltech-muted">Variante</label>
+                              <input type="text" value={editData.variante} onChange={(e) => setEditData({ ...editData, variante: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                            </div>
+                            <div className="col-span-2">
+                              <label className="text-xs text-voltech-muted">Potencia (separa con comas)</label>
+                              <input type="text" value={(editData.potencia || []).join(', ')} onChange={(e) => setEditData({ ...editData, potencia: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-voltech-muted">Stock</label>
+                              <input type="number" min="0" value={editData.cantidad || 0} onChange={(e) => setEditData({ ...editData, cantidad: parseInt(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-voltech-muted">Estado</label>
+                              <select value={editData.estado} onChange={(e) => setEditData({ ...editData, estado: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm">
+                                <option value="nuevo">Nuevo</option>
+                                <option value="oferta">Oferta</option>
+                                <option value="agotado">Agotado</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs text-voltech-muted">% Comisión</label>
+                              <input type="number" step="0.01" value={editData.porcentaje_comision} onChange={(e) => setEditData({ ...editData, porcentaje_comision: parseFloat(e.target.value) || 5 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                            </div>
+                            <div className="col-span-2">
+                              <label className="text-xs text-voltech-muted">Descripción Detallada (Chatbot)</label>
+                              <textarea value={editData.descripcion_detallada || ''} onChange={(e) => setEditData({ ...editData, descripcion_detallada: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm h-16" />
+                            </div>
+                          </div>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={!!editData.publicado} onChange={(e) => setEditData({ ...editData, publicado: e.target.checked })} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" />
+                            <span className="text-xs text-voltech-muted">Publicado en la tienda</span>
+                          </label>
+                          <div className="grid grid-cols-2 gap-3">
                             <div>
                               <label className="text-xs text-voltech-muted">Precio Mayor ($)</label>
                               <input type="number" step="0.01" value={editData.precioMayor} onChange={(e) => setEditData({ ...editData, precioMayor: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
@@ -3095,6 +3147,58 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
                                   </h4>
                                   <button onClick={cancelarEdicion} className="p-1 hover:bg-voltech-border rounded"><X className="w-4 h-4 text-voltech-muted" /></button>
                                 </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                                  <div className="col-span-2">
+                                    <label className="text-xs text-voltech-muted">Nombre del Producto</label>
+                                    <input type="text" value={editData.plataforma} onChange={(e) => setEditData({ ...editData, plataforma: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-voltech-muted">Categoría</label>
+                                    <input type="text" value={editData.categoria} onChange={(e) => setEditData({ ...editData, categoria: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-voltech-muted">Marca</label>
+                                    <input type="text" value={editData.marca} onChange={(e) => setEditData({ ...editData, marca: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-voltech-muted">Modelo</label>
+                                    <input type="text" value={editData.modelo} onChange={(e) => setEditData({ ...editData, modelo: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-voltech-muted">Variante</label>
+                                    <input type="text" value={editData.variante} onChange={(e) => setEditData({ ...editData, variante: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-voltech-muted">Stock</label>
+                                    <input type="number" min="0" value={editData.cantidad || 0} onChange={(e) => setEditData({ ...editData, cantidad: parseInt(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-voltech-muted">Estado</label>
+                                    <select value={editData.estado} onChange={(e) => setEditData({ ...editData, estado: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm">
+                                      <option value="nuevo">Nuevo</option>
+                                      <option value="oferta">Oferta</option>
+                                      <option value="agotado">Agotado</option>
+                                    </select>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <label className="text-xs text-voltech-muted">Potencia (separa con comas)</label>
+                                    <input type="text" value={(editData.potencia || []).join(', ')} onChange={(e) => setEditData({ ...editData, potencia: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-voltech-muted">% Comisión</label>
+                                    <input type="number" step="0.01" value={editData.porcentaje_comision} onChange={(e) => setEditData({ ...editData, porcentaje_comision: parseFloat(e.target.value) || 5 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                                  </div>
+                                  <div className="col-span-2 md:col-span-4">
+                                    <label className="text-xs text-voltech-muted">Descripción Detallada (Chatbot)</label>
+                                    <textarea value={editData.descripcion_detallada || ''} onChange={(e) => setEditData({ ...editData, descripcion_detallada: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm h-16" />
+                                  </div>
+                                  <div className="col-span-2 md:col-span-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                      <input type="checkbox" checked={!!editData.publicado} onChange={(e) => setEditData({ ...editData, publicado: e.target.checked })} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" />
+                                      <span className="text-xs text-voltech-muted">Publicado en la tienda</span>
+                                    </label>
+                                  </div>
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                   <div>
                                     <label className="block text-xs text-voltech-muted mb-1">Precio Mayor ($)</label>
@@ -3210,6 +3314,56 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
                       <h4 className="text-sm font-bold text-voltech-cyan flex items-center gap-2">
                         <Edit className="w-4 h-4" /> Editando: {producto.plataforma}
                       </h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="col-span-2">
+                          <label className="text-xs text-voltech-muted">Nombre del Producto</label>
+                          <input type="text" value={editData.plataforma} onChange={(e) => setEditData({ ...editData, plataforma: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-voltech-muted">Categoría</label>
+                          <input type="text" value={editData.categoria} onChange={(e) => setEditData({ ...editData, categoria: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-voltech-muted">Marca</label>
+                          <input type="text" value={editData.marca} onChange={(e) => setEditData({ ...editData, marca: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-voltech-muted">Modelo</label>
+                          <input type="text" value={editData.modelo} onChange={(e) => setEditData({ ...editData, modelo: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-voltech-muted">Variante</label>
+                          <input type="text" value={editData.variante} onChange={(e) => setEditData({ ...editData, variante: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-xs text-voltech-muted">Potencia (separa con comas)</label>
+                          <input type="text" value={(editData.potencia || []).join(', ')} onChange={(e) => setEditData({ ...editData, potencia: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-voltech-muted">Stock</label>
+                          <input type="number" min="0" value={editData.cantidad || 0} onChange={(e) => setEditData({ ...editData, cantidad: parseInt(e.target.value) || 0 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-voltech-muted">Estado</label>
+                          <select value={editData.estado} onChange={(e) => setEditData({ ...editData, estado: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm">
+                            <option value="nuevo">Nuevo</option>
+                            <option value="oferta">Oferta</option>
+                            <option value="agotado">Agotado</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-voltech-muted">% Comisión</label>
+                          <input type="number" step="0.01" value={editData.porcentaje_comision} onChange={(e) => setEditData({ ...editData, porcentaje_comision: parseFloat(e.target.value) || 5 })} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-xs text-voltech-muted">Descripción Detallada (Chatbot)</label>
+                          <textarea value={editData.descripcion_detallada || ''} onChange={(e) => setEditData({ ...editData, descripcion_detallada: e.target.value })} className="input-voltech w-full rounded px-2 py-1.5 text-sm h-16" />
+                        </div>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={!!editData.publicado} onChange={(e) => setEditData({ ...editData, publicado: e.target.checked })} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" />
+                        <span className="text-xs text-voltech-muted">Publicado en la tienda</span>
+                      </label>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs text-voltech-muted">Precio Mayor ($)</label>
