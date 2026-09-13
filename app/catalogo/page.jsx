@@ -2830,4 +2830,4 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
       </nav>
     </div>
   );
-};
+}
