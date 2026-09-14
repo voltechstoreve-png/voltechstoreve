@@ -1847,12 +1847,27 @@ productosAgrupados.map(([cat, items]) => (
 <p className={`text-sm ${mutedText} mt-2`}>Un momento, estamos preparando el catálogo</p>
 </div>
 ) : (
-<div className="text-center py-20">
-<Package className={`w-16 h-16 mx-auto mb-3 opacity-30 ${mutedText}`} />
-<p className={`text-lg ${mutedText}`}>No hay productos disponibles</p>
-<p className={`text-sm ${mutedText} mt-2`}>Total en sistema: {(productos || []).length}</p>
-</div>
-)}
+                <div className="text-center py-20 px-4">
+                  <Package className={`w-16 h-16 mx-auto mb-3 opacity-30 ${mutedText}`} />
+                  <p className={`text-lg ${mutedText}`}>No hay productos disponibles</p>
+                  <p className={`text-sm ${mutedText} mt-2`}>Total en sistema: {(productos || []).length}</p>
+                  
+                  {/* 🚨 BOTÓN DE PÁNICO: Borra caché local y recarga */}
+                  <button 
+                    onClick={() => {
+                      localStorage.removeItem('voltech_productos');
+                      localStorage.removeItem('voltech_settings');
+                      window.location.reload();
+                    }}
+                    className="mt-6 px-6 py-3 bg-red-600 text-white rounded-lg font-bold text-sm shadow-lg hover:bg-red-700 transition-colors flex items-center gap-2 mx-auto"
+                  >
+                     Forzar Recarga (Borrar Caché)
+                  </button>
+                  <p className="text-xs text-slate-500 mt-3 max-w-xs mx-auto">
+                    Si ves esto en el móvil, toca este botón. A veces el navegador guarda una versión vieja y vacía.
+                  </p>
+                </div>
+              )}
 </div>
 )}
             {navTab === 'explorar' && activeSection === 'streaming' && (
