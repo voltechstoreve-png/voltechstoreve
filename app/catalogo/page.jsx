@@ -70,6 +70,13 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
 };
 
 export default function CatalogoPage() {
+   useEffect(() => {
+     console.log('📦 PRODUCTOS CARGADOS:', productos.length);
+     if (productos.length === 0) {
+       console.warn('⚠️ NO HAY PRODUCTOS - Forzando recarga...');
+       localStorage.removeItem('voltech_productos');
+     }
+   }, [productos]);
   const [activeSection, setActiveSection] = useState('productos');
   // ✅ NUEVO: Navegación global (bottom-nav móvil + tabs desktop)
   const [navTab, setNavTab] = useState('inicio'); // 'inicio' | 'explorar' | 'gana'
