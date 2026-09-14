@@ -6,6 +6,7 @@ import { NotificationProvider } from './context/NotificationContext'
 import { PermissionsProvider } from './context/PermissionsContext'
 import ApkGate from '@/components/ApkGate'
 import SessionKeeper from '@/components/SessionKeeper'
+import ClearSW from './ClearSW' // ✅ NUEVO: Importamos el limpiador
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -16,7 +17,6 @@ export const metadata = {
   appleMobileWebAppCapable: 'yes',
   appleMobileWebAppStatusBarStyle: 'black-translucent',
   appleMobileWebAppTitle: 'Voltech Store',
-  // ✅ ELIMINADO: themeColor ya no va aquí
 }
 
 export const viewport = {
@@ -24,7 +24,7 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#00d4ff', // ✅ CORRECTO: themeColor va únicamente aquí
+  themeColor: '#00d4ff',
 }
 
 export default function RootLayout({ children }) {
@@ -40,6 +40,9 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-title" content="Voltech Store" />
       </head>
       <body className={inter.className}>
+        {/* ✅ NUEVO: Esto limpiará la caché corrupta automáticamente */}
+        <ClearSW />
+        
         <ThemeProvider>
           <NotificationProvider>
             <PermissionsProvider>
