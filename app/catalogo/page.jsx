@@ -1185,6 +1185,13 @@ return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0], 'es', { se
         <div className="p-3 flex flex-col flex-1">
           <div className="mb-1"><p className={`text-[10px] font-medium uppercase tracking-wide ${mutedText} truncate`}>{p.marca} • {p.categoria}</p></div>
           <h3 className={`font-semibold text-sm mb-2 line-clamp-2 leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto}</h3>
+          {(p.modelo || p.variante || p.potencia) && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {p.modelo && <span className={`text-[9px] px-1.5 py-0.5 rounded ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Mod: {p.modelo}</span>}
+            {p.variante && <span className={`text-[9px] px-1.5 py-0.5 rounded ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Var: {p.variante}</span>}
+            {p.potencia && <span className={`text-[9px] px-1.5 py-0.5 rounded ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Pot: {p.potencia}</span>}
+          </div>
+        )}
           <div className="mt-auto space-y-2">
             <div>
               {precioInfo.tieneOferta && <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)}</p>}
@@ -2406,9 +2413,6 @@ productosAgrupados.map(([cat, items]) => (
                     {getPrecioMostrar(selectedProduct).tieneOferta && (
                 <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">OFERTA</div>
                 )}
-                {selectedProduct.disponibilidad === 'bajo_pedido' && (
-                <div className="absolute bottom-4 left-4 bg-amber-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md">🛒 BAJO PEDIDO</div>
-                )}
                 </div>
                   {selectedProduct.colores && selectedProduct.colores.length > 0 && (
                     <div className="flex gap-2 justify-center">
@@ -2423,7 +2427,14 @@ productosAgrupados.map(([cat, items]) => (
                   <div>
                     <p className="text-sm text-voltech-muted uppercase tracking-wide">{selectedProduct.marca} • {selectedProduct.categoria || selectedProduct.tipo}</p>
                     <h2 className="text-3xl font-bold mt-1">{selectedProduct.producto || selectedProduct.plataforma}</h2>
-                  </div>
+                    {(selectedProduct.modelo || selectedProduct.variante || selectedProduct.potencia) && (
+                    <div className="flex flex-wrap gap-2 mt-2 mb-3">
+                      {selectedProduct.modelo && <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Modelo: {selectedProduct.modelo}</span>}
+                      {selectedProduct.variante && <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Variante: {selectedProduct.variante}</span>}
+                      {selectedProduct.potencia && <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Potencia: {selectedProduct.potencia}</span>}
+                    </div>
+                    )}
+                      </div>
                   
                   <div className="flex items-baseline gap-3 flex-wrap">
                     {getPrecioMostrar(selectedProduct).tieneOferta && (
