@@ -20,27 +20,34 @@ export function useProductos() {
   useEffect(() => {
     const fetchProductos = async () => {
       if (supabase) {
-        // ✅ SELECT LIVIANO: NO trae el array `imagenes` (base64 pesado).
-        // Solo trae metadatos + `imagen` (portada, liviana). El array completo
-        // se carga bajo demanda cuando el cliente abre el modal de detalle.
-        // Esto reduce el egress ~90% y evita el throttle de Supabase.
+        // ✅ QUITAMOS .eq('publicado', true) para no filtrar productos con valor null
         const { data, error } = await supabase
           .from('productos')
           .select('id, tipo, disponibilidad, sku, fecha, fechaCreacion, creado_en, plataforma, producto, categoria, marca, modelo, variante, potencia, cantidad, descripcion, descripcion_detallada, duracion, estado, publicado, porcentaje_comision, productos_kit, precio_costo_total, precio_individual_total, esCombo, plataformasCombo, especificaciones, colores, caracteristicas, precioMayor, preciomayor, precioDetal, preciodetal, precioBs, preciobs, precioOferta, precio_oferta, tipoOferta, proveedor, comprador, imagen, precios_proveedor, categoria_promo')
-          .eq('publicado', true)
           .order('creado_en', { ascending: false });
 
-        if (!error && data && data.length > 0) {
-          setProductos(data);
-          // Caché sin el array `imagenes` (ligero)
-          setLocalSafe('voltech_productos', JSON.stringify(data));
+        if (error) {
+          console.error('❌ ERROR SUPABASE EN useProductos:', error.message);
+        }
+
+        if (!error && data) {
+          // ✅ Filtramos en el cliente: mostramos los que son true O null/undefined (más permisivo)
+          const productosVisibles = data.filter(p => p.publicado !== false);
+          setProductos(productosVisibles);
+          setLocalSafe('voltech_productos', JSON.stringify(productosVisibles));
         } else {
           const cached = localStorage.getItem('voltech_productos');
-          if (cached) setProductos(JSON.parse(cached).filter(p => p.publicado === true || p.publicado === undefined));
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            setProductos(Array.isArray(parsed) ? parsed.filter(p => p.publicado !== false) : []);
+          }
         }
       } else {
         const cached = localStorage.getItem('voltech_productos');
-        if (cached) setProductos(JSON.parse(cached).filter(p => p.publicado === true || p.publicado === undefined));
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          setProductos(Array.isArray(parsed) ? parsed.filter(p => p.publicado !== false) : []);
+        }
       }
       setLoading(false);
     };
