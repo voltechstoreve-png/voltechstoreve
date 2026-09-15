@@ -3064,7 +3064,17 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
                 <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 text-center">
                   <Package className="w-8 h-8 mx-auto mb-2 text-slate-500" />
                   <p className="text-xs text-slate-400">No hay productos registrados</p>
-                  <p className="text-[10px] text-slate-500 mt-1">Haz clic en "Nuevo Producto" para comenzar</p>
+                  <p className="text-[10px] text-slate-500 mt-1 font-mono bg-slate-900/50 inline-block px-2 py-1 rounded">
+                    Total: {productos.length} | Filtrados: {productosFiltrados.length}
+                  </p>
+                  <br />
+                  <button 
+                    onClick={() => alert(`📊 Diagnóstico Panel:\n\n• Productos totales: ${productos.length}\n• Productos filtrados: ${productosFiltrados.length}\n\n⚠️ Si el Total es 0, Supabase no está trayendo los datos en tu móvil (revisa conexión, DNS privado o políticas RLS).`)}
+                    className="mt-3 px-4 py-2 bg-cyan-600 text-white rounded-lg text-xs font-bold shadow-lg hover:bg-cyan-700 transition-colors"
+                  >
+                    🐛 Ver Diagnóstico
+                  </button>
+                  <p className="text-[10px] text-slate-500 mt-3">Haz clic en "Nuevo Producto" para comenzar</p>
                 </div>
               ) : (
                 productosFiltrados.map((producto) => {
