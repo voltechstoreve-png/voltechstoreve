@@ -1,8 +1,5 @@
 // hooks/useVoltech.js
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase'; // ✅ CAMBIADO: Ruta relativa infalible
-import { getUser } from '../lib/session'; // ✅ NUEVO: Para detectar app vs navegador
-
 // ✅ Helper: guarda en localStorage solo si hay espacio disponible
 const setLocalSafe = (clave, valor) => {
   try {
@@ -20,33 +17,38 @@ export function useProductos() {
   useEffect(() => {
     const fetchProductos = async () => {
       if (supabase) {
-        // ✅ QUITAMOS .eq('publicado', true) para no filtrar productos con valor null
+        // ✅ QUITADO: categoria_promo (no existe en la tabla)
+        // ✅ QUITADO: .eq('publicado', true) para no filtrar productos con null
         const { data, error } = await supabase
           .from('productos')
-          .select('id, tipo, disponibilidad, sku, fecha, fechaCreacion, creado_en, plataforma, producto, categoria, marca, modelo, variante, potencia, cantidad, descripcion, descripcion_detallada, duracion, estado, publicado, porcentaje_comision, productos_kit, precio_costo_total, precio_individual_total, esCombo, plataformasCombo, especificaciones, colores, caracteristicas, precioMayor, preciomayor, precioDetal, preciodetal, precioBs, preciobs, precioOferta, precio_oferta, tipoOferta, proveedor, comprador, imagen, precios_proveedor, categoria_promo')
+          .select('id, tipo, disponibilidad, sku, fecha, fechaCreacion, creado_en, plataforma, producto, categoria, marca, modelo, variante, potencia, cantidad, descripcion, descripcion_detallada, duracion, estado, publicado, porcentaje_comision, productos_kit, precio_costo_total, precio_individual_total, esCombo, plataformasCombo, especificaciones, colores, caracteristicas, precioMayor, preciomayor, precioDetal, preciodetal, precioBs, preciobs, precioOferta, precio_oferta, tipoOferta, proveedor, comprador, imagen, precios_proveedor')
           .order('creado_en', { ascending: false });
 
         if (error) {
-          console.error('❌ ERROR SUPABASE EN useProductos:', error.message);
+          console.error('❌ ERROR SUPABASE:', error.message);
         }
 
         if (!error && data) {
-          // ✅ Filtramos en el cliente: mostramos los que son true O null/undefined (más permisivo)
-          const productosVisibles = data.filter(p => p.publicado !== false);
-          setProductos(productosVisibles);
-          setLocalSafe('voltech_productos', JSON.stringify(productosVisibles));
+          // Filtrar solo los que NO sean explícitamente false (incluye null y true)
+          const visibles = data.filter(p => p.publicado !== false);
+          setProductos(visibles);
+          setLocalSafe('voltech_productos', JSON.stringify(visibles));
         } else {
           const cached = localStorage.getItem('voltech_productos');
           if (cached) {
-            const parsed = JSON.parse(cached);
-            setProductos(Array.isArray(parsed) ? parsed.filter(p => p.publicado !== false) : []);
+            try {
+              const parsed = JSON.parse(cached);
+              setProductos(Array.isArray(parsed) ? parsed.filter(p => p.publicado !== false) : []);
+            } catch (e) {}
           }
         }
       } else {
         const cached = localStorage.getItem('voltech_productos');
         if (cached) {
-          const parsed = JSON.parse(cached);
-          setProductos(Array.isArray(parsed) ? parsed.filter(p => p.publicado !== false) : []);
+          try {
+            const parsed = JSON.parse(cached);
+            setProductos(Array.isArray(parsed) ? parsed.filter(p => p.publicado !== false) : []);
+          } catch (e) {}
         }
       }
       setLoading(false);
