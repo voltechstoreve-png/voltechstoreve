@@ -17,8 +17,8 @@ export function useProductos() {
   useEffect(() => {
     const fetchProductos = async () => {
       if (supabase) {
-        // ✅ QUITADO: categoria_promo (no existe en la tabla)
-        // ✅ QUITADO: .eq('publicado', true) para no filtrar productos con null
+        // ✅ SIN categoria_promo (no existe en la tabla)
+        // ✅ SIN filtro de publicado (para incluir null y true)
         const { data, error } = await supabase
           .from('productos')
           .select('id, tipo, disponibilidad, sku, fecha, fechaCreacion, creado_en, plataforma, producto, categoria, marca, modelo, variante, potencia, cantidad, descripcion, descripcion_detallada, duracion, estado, publicado, porcentaje_comision, productos_kit, precio_costo_total, precio_individual_total, esCombo, plataformasCombo, especificaciones, colores, caracteristicas, precioMayor, preciomayor, precioDetal, preciodetal, precioBs, preciobs, precioOferta, precio_oferta, tipoOferta, proveedor, comprador, imagen, precios_proveedor')
@@ -29,7 +29,7 @@ export function useProductos() {
         }
 
         if (!error && data) {
-          // Filtrar solo los que NO sean explícitamente false (incluye null y true)
+          // Filtrar solo los que NO sean explícitamente false
           const visibles = data.filter(p => p.publicado !== false);
           setProductos(visibles);
           setLocalSafe('voltech_productos', JSON.stringify(visibles));
