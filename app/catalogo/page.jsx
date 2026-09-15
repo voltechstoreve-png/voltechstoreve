@@ -1218,18 +1218,35 @@
             {p.categoria_promo && <div className="absolute top-2 left-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-md z-10">{p.categoria_promo}</div>}
             {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">OFERTA</div>}
             {p.tipo === 'kit' && !p.categoria_promo && <div className="absolute top-2 left-2 bg-voltech-cyan text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">KIT</div>}
-            {p.disponibilidad === 'bajo_pedido' && <div className="absolute bottom-2 left-2 bg-amber-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-md">🛒 BAJO PEDIDO</div>}
+            {p.disponibilidad === 'bajo_pedido' && (
+            <div className="absolute bottom-2 left-2 bg-amber-500/90 backdrop-blur-sm text-white px-2.5 py-1 rounded-lg text-[10px] font-semibold shadow-lg border border-amber-400/30 flex items-center gap-1">
+              <ShoppingCart className="w-3 h-3" />
+              <span>Bajo pedido</span>
+            </div>
+          )}
             </div>
           <div className="p-3 flex flex-col flex-1">
             <div className="mb-1"><p className={`text-[10px] font-medium uppercase tracking-wide ${mutedText} truncate`}>{p.marca} • {p.categoria}</p></div>
             <h3 className={`font-semibold text-sm mb-2 line-clamp-2 leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto}</h3>
-            {(p.modelo || p.variante || p.potencia) && (
-            <div className="flex flex-wrap gap-1 mb-2">
-              {p.modelo && <span className={`text-[9px] px-1.5 py-0.5 rounded ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Mod: {p.modelo}</span>}
-              {p.variante && <span className={`text-[9px] px-1.5 py-0.5 rounded ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Var: {p.variante}</span>}
-              {p.potencia && <span className={`text-[9px] px-1.5 py-0.5 rounded ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Pot: {p.potencia}</span>}
-            </div>
-          )}
+            {(p.modelo || p.variante || (Array.isArray(p.potencia) && p.potencia.length > 0)) && (
+              <div className="flex flex-wrap gap-1 mb-2">
+                {p.modelo && p.modelo.trim() !== '' && (
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                    {p.modelo}
+                  </span>
+                )}
+                {p.variante && p.variante.trim() !== '' && (
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                    {p.variante}
+                  </span>
+                )}
+                {Array.isArray(p.potencia) && p.potencia.length > 0 && p.potencia[0] && p.potencia[0].trim() !== '' && (
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                    {Array.isArray(p.potencia) ? p.potencia.join(', ') : p.potencia}
+                  </span>
+                )}
+              </div>
+            )}           
             <div className="mt-auto space-y-2">
               <div>
                 {precioInfo.tieneOferta && <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)}</p>}
