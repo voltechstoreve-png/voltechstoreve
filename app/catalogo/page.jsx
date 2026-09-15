@@ -571,11 +571,30 @@
       else setCart(cart.map(item => item.id === productoId ? { ...item, cantidad } : item));
     };
 
-    const applyCoupon = () => {
+    const applyCoupon = async () => {
       if (!couponCode.trim()) { toast.error('Ingresa un código'); return; }
       
-      const cupones = JSON.parse(localStorage.getItem('voltech_cupones') || '[]');
-      const cupon = cupones.find(c => c.codigo === couponCode.toUpperCase() && c.estado === 'activo' && new Date(c.fecha_vencimiento) > new Date());
+      let cupon = null;
+      
+      // 1. Intentar buscar en Supabase primero (para que el público vea los cupones creados en el panel)
+      if (supabase) {
+        const { data } = await supabase
+          .from('cupones')
+          .select('*')
+          .eq('codigo', couponCode.toUpperCase())
+          .eq('estado', 'activo')
+          .maybeSingle();
+        
+        if (data && new Date(data.fecha_vencimiento) > new Date()) {
+          cupon = data;
+        }
+      }
+      
+      // 2. Fallback a localStorage si no se encontró en Supabase o falla la conexión
+      if (!cupon) {
+        const cuponesLocal = JSON.parse(localStorage.getItem('voltech_cupones') || '[]');
+        cupon = cuponesLocal.find(c => c.codigo === couponCode.toUpperCase() && c.estado === 'activo' && new Date(c.fecha_vencimiento) > new Date());
+      }
 
       if (!cupon) { toast.error('Cupón inválido o expirado'); return; }
 
@@ -770,9 +789,25 @@
       }
       mensaje += `
       💳 Pago: ${paymentMethod}`;
-      // ✅ SINCRONIZA: crea el pedido en el panel como PENDIENTE (origen WEB)
+      // ✅ SINCRONIZA: crea el pedido en el panel como PENDIENTE (origen WEB) y guarda el cliente
       try {
         if (supabase) {
+          // 1. Guardar o actualizar cliente en la tabla 'clientes' para que aparezca en el Panel
+          await supabase.from('clientes').upsert({
+            nombre: clienteNombre.trim(),
+            telefono: clienteTelefono.trim(),
+            origen: 'web',
+            fecha_registro: new Date().toISOString()
+          }, { onConflict: 'telefono' }).catch(() => {
+            // Fallback por si no hay constraint unique en la columna telefono
+            return supabase.from('clientes').insert({
+              nombre: clienteNombre.trim(),
+              telefono: clienteTelefono.trim(),
+              origen: 'web',
+              fecha_registro: new Date().toISOString()
+            });
+          });
+
           const hoy = new Date();
           const dia = String(hoy.getDate()).padStart(2, '0');
           const mes = String(hoy.getMonth() + 1).padStart(2, '0');
@@ -2310,17 +2345,51 @@
         )}
       </AnimatePresence>
 
-      {/* Modal de Producto - ACTUALIZADO */}
+      {/* Modal de Producto - CON NAVEGACIÓN Y BADGE CORREGIDO */}
       <AnimatePresence>
         {selectedProduct && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-[80] flex items-center justify-center p-4" onClick={() => setSelectedProduct(null)}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className={`${cardBg} border ${cardBorder} rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto`} onClick={(e) => e.stopPropagation()}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className={`${cardBg} border ${cardBorder} rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto relative`} onClick={(e) => e.stopPropagation()}>
+              {/* ✅ BOTONES DE NAVEGACIÓN: Anterior/Siguiente */}
+              {(() => {
+                const productosLista = navTab === 'explorar' && activeSection === 'streaming' 
+                  ? streamingFiltrados 
+                  : productosFiltrados;
+                const idxActual = productosLista.findIndex(p => p.id === selectedProduct.id);
+                const productoAnterior = idxActual > 0 ? productosLista[idxActual - 1] : null;
+                const productoSiguiente = idxActual < productosLista.length - 1 ? productosLista[idxActual + 1] : null;
+                
+                return (
+                  <>
+                    {productoAnterior && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSelectedProduct(productoAnterior); }}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
+                        title="Producto anterior"
+                      >
+                        ‹
+                      </button>
+                    )}
+                    {productoSiguiente && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSelectedProduct(productoSiguiente); }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
+                        title="Producto siguiente"
+                      >
+                        ›
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
+
               <div className={`sticky top-0 ${cardBg} border-b ${cardBorder} p-4 flex justify-between items-center z-10`}>
                 <h3 className="text-xl font-bold truncate pr-4">{selectedProduct.producto || selectedProduct.plataforma}</h3>
                 <button onClick={() => setSelectedProduct(null)} className="p-2 hover:bg-voltech-border rounded-full transition-colors"><X className="w-6 h-6" /></button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
                 <div className="space-y-4">
+                  {/* ✅ IMAGEN SIN BADGE "BAJO PEDIDO" - solo categoría promo y oferta */}
                   <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative ${selectedProduct.tipo === 'streaming' ? 'bg-black' : 'bg-transparent'}`} style={{ minHeight: '280px' }}>
                     <CarruselImagen
                       imagenes={Array.from(new Set([
@@ -2335,9 +2404,9 @@
                     />
                     {selectedProduct.categoria_promo && <div className="absolute top-4 left-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md z-20">{selectedProduct.categoria_promo}</div>}
                     {getPrecioMostrar(selectedProduct).tieneOferta && (
-                <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">OFERTA</div>
-                )}
-                </div>
+                      <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">OFERTA</div>
+                    )}
+                  </div>
                   {selectedProduct.colores && selectedProduct.colores.length > 0 && (
                     <div className="flex gap-2 justify-center">
                       {selectedProduct.colores.map((color, idx) => (
@@ -2351,14 +2420,36 @@
                   <div>
                     <p className="text-sm text-voltech-muted uppercase tracking-wide">{selectedProduct.marca} • {selectedProduct.categoria || selectedProduct.tipo}</p>
                     <h2 className="text-3xl font-bold mt-1">{selectedProduct.producto || selectedProduct.plataforma}</h2>
-                    {(selectedProduct.modelo || selectedProduct.variante || selectedProduct.potencia) && (
-                    <div className="flex flex-wrap gap-2 mt-2 mb-3">
-                      {selectedProduct.modelo && <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Modelo: {selectedProduct.modelo}</span>}
-                      {selectedProduct.variante && <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Variante: {selectedProduct.variante}</span>}
-                      {selectedProduct.potencia && <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>Potencia: {selectedProduct.potencia}</span>}
-                    </div>
-                    )}
+                    
+                    {/* ✅ ETIQUETAS CONDICIONALES: solo muestran si tienen valor */}
+                    {(selectedProduct.modelo || selectedProduct.variante || (Array.isArray(selectedProduct.potencia) && selectedProduct.potencia.length > 0)) && (
+                      <div className="flex flex-wrap gap-2 mt-2 mb-3">
+                        {selectedProduct.modelo && selectedProduct.modelo.trim() !== '' && (
+                          <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                            Modelo: {selectedProduct.modelo}
+                          </span>
+                        )}
+                        {selectedProduct.variante && selectedProduct.variante.trim() !== '' && (
+                          <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                            Variante: {selectedProduct.variante}
+                          </span>
+                        )}
+                        {Array.isArray(selectedProduct.potencia) && selectedProduct.potencia.length > 0 && selectedProduct.potencia[0] && (
+                          <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                            Potencia: {Array.isArray(selectedProduct.potencia) ? selectedProduct.potencia.join(', ') : selectedProduct.potencia}
+                          </span>
+                        )}
                       </div>
+                    )}
+                    
+                    {/* ✅ BADGE "BAJO PEDIDO" MOVIDO AQUÍ - junto a la información del producto */}
+                    {selectedProduct.disponibilidad === 'bajo_pedido' && (
+                      <div className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-600 px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-500/30 mt-2">
+                        <ShoppingCart className="w-3.5 h-3.5" />
+                        <span>Bajo pedido</span>
+                      </div>
+                    )}
+                  </div>
                   
                   <div className="flex items-baseline gap-3 flex-wrap">
                     {getPrecioMostrar(selectedProduct).tieneOferta && (
@@ -2370,17 +2461,13 @@
                     <span className="text-sm text-voltech-muted">Bs {calcularPrecioBs(getPrecioMostrar(selectedProduct).precioPrincipal)}</span>
                   </div>
 
+                  <p className="text-sm">{selectedProduct.descripcion || 'Sin descripción disponible.'}</p>
+                  
                   <div className="text-sm text-voltech-muted space-y-2">
-                    <p>{selectedProduct.descripcion || 'Sin descripción disponible.'}</p>
                     {selectedProduct.tipo === 'streaming' && selectedProduct.duracion && (
-                    <p className="flex items-center gap-2"><Clock className="w-4 h-4" /> Duración: {selectedProduct.duracion}</p>
+                      <p className="flex items-center gap-2"><Clock className="w-4 h-4" /> Duración: {selectedProduct.duracion}</p>
                     )}
-                    {selectedProduct.disponibilidad === 'bajo_pedido' && (
-                    <p className="flex items-center gap-2 text-amber-500 text-xs mt-1">
-                    <ShoppingCart className="w-4 h-4" /> Bajo pedido 
-                    </p>
-                    )}
-                    </div>
+                  </div>
 
                   {/* ✅ NUEVO: Mostrar contenido del Kit o descripción detallada */}
                   {selectedProduct.tipo === 'kit' && selectedProduct.productos_kit && selectedProduct.productos_kit.length > 0 ? (
@@ -2419,14 +2506,14 @@
                   )}
 
                   <div className="flex items-center gap-2 w-full mt-auto pt-3">
-                  <button
-                  onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }}
-                  className="w-full py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-colors"
-                  >
-                  <ShoppingCart className="w-4 h-4 shrink-0" />
-                  <span>Agregar al Carrito</span>
-                  </button>
-                </div>
+                    <button
+                      onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }}
+                      className="w-full py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <ShoppingCart className="w-4 h-4 shrink-0" />
+                      <span>Agregar al Carrito</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>
