@@ -474,7 +474,8 @@
       }, [selectedProduct?.id]);
 
       useEffect(() => {
-      if (!sorteoActivo) return;    const interval = setInterval(() => {
+      if (!sorteoActivo) return;
+      const interval = setInterval(() => {
         const now = new Date().getTime();
         const end = new Date(sorteoActivo.fecha_fin).getTime();
         const distance = end - now;
@@ -493,6 +494,33 @@
       return () => clearInterval(interval);
     }, [sorteoActivo]);
 
+    // ✅ NAVEGACIÓN CON TECLADO (Flechas y Escape)
+    useEffect(() => {
+      if (!selectedProduct) return;
+      
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          setSelectedProduct(null);
+          return;
+        }
+        
+        // Usar variables con fallback por si no están definidas
+        const productosLista = (typeof navTab !== 'undefined' && navTab === 'explorar' && typeof activeSection !== 'undefined' && activeSection === 'streaming') 
+          ? (typeof streamingFiltrados !== 'undefined' ? streamingFiltrados : []) 
+          : (typeof productosFiltrados !== 'undefined' ? productosFiltrados : []);
+        
+        const idxActual = productosLista.findIndex(p => p.id === selectedProduct.id);
+        
+        if (e.key === 'ArrowLeft' && idxActual > 0) {
+          setSelectedProduct(productosLista[idxActual - 1]);
+        } else if (e.key === 'ArrowRight' && idxActual < productosLista.length - 1) {
+          setSelectedProduct(productosLista[idxActual + 1]);
+        }
+      };
+      
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedProduct]); // Solo selectedProduct como dependencia para evitar el error
   const productosMasVendidos = useMemo(() => {
   if (!productos.length) return [];
   const conteo = {};
@@ -1207,7 +1235,7 @@
           ...(Array.isArray(p.productos_kit) ? p.productos_kit.map(k => k.imagen).filter(Boolean) : [])
         ].filter(Boolean)));
         return (
-        <div key={p.id || p.producto || `prod-${idx}`} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between cursor-pointer group`}>
+        <div key={p.id || p.producto || `prod-${idx}`} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col cursor-pointer group h-full`}>
           <div className="aspect-square bg-slate-900 flex items-center justify-center overflow-hidden relative">
             <CarruselImagen
               imagenes={todasImagenes}
@@ -2478,7 +2506,12 @@
                     <span className="text-sm text-voltech-muted">Bs {calcularPrecioBs(getPrecioMostrar(selectedProduct).precioPrincipal)}</span>
                   </div>
 
-                  <p className="text-sm">{selectedProduct.descripcion || 'Sin descripción disponible.'}</p>
+                  {/* ✅ Solo mostrar "Sin descripción" si NO hay descripción corta NI detallada */}
+                  {(selectedProduct.descripcion || selectedProduct.descripcion_detallada) ? (
+                    <p className="text-sm">{selectedProduct.descripcion || selectedProduct.descripcion_detallada}</p>
+                  ) : (
+                    <p className="text-sm text-voltech-muted italic">Sin descripción disponible</p>
+                  )}
                   
                   <div className="text-sm text-voltech-muted space-y-2">
                     {selectedProduct.tipo === 'streaming' && selectedProduct.duracion && (
@@ -2486,30 +2519,51 @@
                     )}
                   </div>
 
-                  {/* ✅ NUEVO: Mostrar contenido del Kit o descripción detallada */}
-                  {selectedProduct.tipo === 'kit' && selectedProduct.productos_kit && selectedProduct.productos_kit.length > 0 ? (
+                  {/* ✅ DESCRIPCIÓN DETALLADA / ESPECIFICACIONES - Siempre mostrar si existe */}
+                  {(selectedProduct.descripcion_detallada || selectedProduct.caracteristicas || selectedProduct.tipo === 'kit') && (
                     <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-4`}>
-                      <h4 className="font-semibold mb-2 flex items-center gap-2">
-                        <Package className="w-4 h-4 text-voltech-cyan" />
-                        Contenido del Kit
-                      </h4>
-                      <ul className="list-disc list-inside text-sm text-voltech-muted space-y-1">
-                        {selectedProduct.productos_kit.map((item, idx) => (
-                          <li key={idx}>{item.nombre || item.producto} (x{item.cantidad})</li>
-                        ))}
-                      </ul>
+                      {selectedProduct.tipo === 'kit' && selectedProduct.productos_kit && selectedProduct.productos_kit.length > 0 ? (
+                        <>
+                          <h4 className="font-semibold mb-2 flex items-center gap-2">
+                            <Package className="w-4 h-4 text-voltech-cyan" />
+                            Contenido del Kit
+                          </h4>
+                          <ul className="list-disc list-inside text-sm text-voltech-muted space-y-1">
+                            {selectedProduct.productos_kit.map((item, idx) => (
+                              <li key={idx}>{item.nombre || item.producto} (x{item.cantidad})</li>
+                            ))}
+                          </ul>
+                        </>
+                      ) : (
+                        <>
+                          {selectedProduct.descripcion_detallada && (
+                            <>
+                              <h4 className="font-semibold mb-2 flex items-center gap-2">
+                                <Info className="w-4 h-4 text-voltech-cyan" />
+                                Especificaciones Técnicas
+                              </h4>
+                              <p className="text-sm text-voltech-muted whitespace-pre-line mb-3">
+                                {selectedProduct.descripcion_detallada}
+                              </p>
+                            </>
+                          )}
+                          {selectedProduct.caracteristicas && Array.isArray(selectedProduct.caracteristicas) && selectedProduct.caracteristicas.length > 0 && (
+                            <>
+                              <h4 className="font-semibold mb-2 flex items-center gap-2">
+                                <CheckCircle className="w-4 h-4 text-voltech-cyan" />
+                                Características
+                              </h4>
+                              <ul className="list-disc list-inside text-sm text-voltech-muted space-y-1">
+                                {selectedProduct.caracteristicas.map((carac, idx) => (
+                                  <li key={idx}>{carac}</li>
+                                ))}
+                              </ul>
+                            </>
+                          )}
+                        </>
+                      )}
                     </div>
-                  ) : selectedProduct.descripcion_detallada ? (
-                    <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-4`}>
-                      <h4 className="font-semibold mb-2 flex items-center gap-2">
-                        <Info className="w-4 h-4 text-voltech-cyan" />
-                        Especificaciones Técnicas
-                      </h4>
-                      <p className="text-sm text-voltech-muted whitespace-pre-line">
-                        {selectedProduct.descripcion_detallada}
-                      </p>
-                    </div>
-                  ) : null}
+                  )}
 
                   {selectedProduct.caracteristicas && Array.isArray(selectedProduct.caracteristicas) && (
                     <div>
