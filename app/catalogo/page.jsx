@@ -75,34 +75,7 @@
     const [navTab, setNavTab] = useState('inicio'); // 'inicio' | 'explorar' | 'gana'
     const [ganaTab, setGanaTab] = useState('opiniones'); // 'opiniones' | 'sorteos' (sub-pestañas de Gana & Opina)
     
-    const { productos } = useProductos();
-    // ✅ DEBUG SEGURO - Solo muestra un cuadro rojo temporal
-useEffect(() => {
-  // Limpiar debug anterior si existe
-  const existingDebug = document.getElementById('debug-voltech');
-  if (existingDebug) existingDebug.remove();
-
-  // Crear nuevo debug
-  const debugDiv = document.createElement('div');
-  debugDiv.id = 'debug-voltech';
-  debugDiv.style.cssText = 'position:fixed;top:0;left:0;background:red;color:white;padding:15px;z-index:9999;font-size:14px;font-family:Arial;box-shadow:0 4px 6px rgba(0,0,0,0.3);border-radius:0 0 8px 0;';
-  debugDiv.innerHTML = `
-    <strong>📊 DEBUG VOLTECH</strong><br/>
-    Productos: ${productos?.length || 0}<br/>
-    Supabase: ${typeof supabase !== 'undefined' && supabase ? '✅ OK' : ' NULL'}<br/>
-    <small>Toca para cerrar</small>
-  `;
-  debugDiv.onclick = () => debugDiv.remove();
-  
-  if (typeof window !== 'undefined') {
-    document.body.appendChild(debugDiv);
-  }
-
-  // Auto-eliminar después de 10 segundos
-  setTimeout(() => {
-    if (debugDiv.parentNode) debugDiv.remove();
-  }, 10000);
-}, [productos]);
+    const { productos } = useProductos();  
     const { settings } = useSettings();
     const { tasa: tasaBCV, setTasa: setTasaBCV } = useTasaBCV();
     const { currentUser, setCurrentUser } = useAuth();
@@ -1783,7 +1756,11 @@ useEffect(() => {
         ) : catalogoCargando ? (
           <div className="text-center py-20"><div className="w-12 h-12 mx-auto mb-4 border-4 border-voltech-cyan border-t-transparent rounded-full animate-spin"></div><p className={`text-lg ${mutedText} animate-pulse`}>Cargando productos...</p><p className={`text-sm ${mutedText} mt-2`}>Un momento, estamos preparando el catálogo</p></div>
         ) : (
-          <div className="text-center py-20 px-4"><Package className={`w-16 h-16 mx-auto mb-3 opacity-30 ${mutedText}`} /><p className={`text-lg ${mutedText}`}>No hay productos disponibles</p><p className={`text-sm ${mutedText} mt-2`}>Total: {(productos || []).length} | Filtrados: {productosFiltrados.length}</p><button onClick={() => { alert(` Diagnóstico:\n\n• Total: ${productos.length}\n• Filtrados: ${productosFiltrados.length}\n\nSi Total > 0 pero Filtrados = 0, el filtro está eliminando todo.`); }} className="mt-6 px-6 py-3 bg-blue-600 text-white rounded-lg font-bold text-sm shadow-lg hover:bg-blue-700 transition-colors">🐛 Ver Diagnóstico</button><button onClick={() => { localStorage.removeItem('voltech_productos'); localStorage.removeItem('voltech_settings'); window.location.reload(); }} className="mt-6 ml-3 px-6 py-3 bg-red-600 text-white rounded-lg font-bold text-sm shadow-lg hover:bg-red-700 transition-colors">🔄 Recargar</button></div>
+          <div className="text-center py-20 px-4">
+            <Package className={`w-16 h-16 mx-auto mb-3 opacity-30 ${mutedText}`} />
+            <p className={`text-lg ${mutedText}`}>No hay productos disponibles</p>
+            <p className={`text-sm ${mutedText} mt-2`}>Haz clic en "Nuevo Producto" para comenzar</p>
+          </div>
         )}
       </div>
     )}
