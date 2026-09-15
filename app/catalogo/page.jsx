@@ -1038,8 +1038,8 @@
       handleFileChange(e.dataTransfer.files[0]);
     };
 
-    // ✅ ACTUALIZADO: Incluir 'kit' en el filtro para que aparezcan en el catálogo
-    const productosFiltrados = (productos || []).filter(p => {
+  // ✅ ACTUALIZADO: Incluir 'kit' y permitir productos sin 'tipo' definido para no ocultarlos por error de datos
+  const productosFiltrados = (productos || []).filter(p => {
     const searchTermLower = searchTerm.toLowerCase();
     const match = (p.producto || '').toLowerCase().includes(searchTermLower) || 
                   (p.marca || '').toLowerCase().includes(searchTermLower) || 
@@ -1048,9 +1048,12 @@
     const precioActual = getPrecioMostrar(p).precioPrincipal;
     const min = precioMin === '' ? 0 : parseFloat(precioMin);
     const max = precioMax === '' ? Infinity : parseFloat(precioMax);
-      return match && (!filterCategory || p.categoria === filterCategory) && (!filterBrand || p.marca === filterBrand) && (p.tipo === 'fisico' || p.tipo === 'kit') && !p.esCombo && precioActual >= min && precioActual <= max;
-      });
-    const streamingFiltrados = (productos || []).filter(p => {
+    
+    // ✅ Si 'tipo' es null, undefined o vacío, lo asumimos como 'fisico' para no ocultarlo
+    const esTipoValido = !p.tipo || p.tipo === 'fisico' || p.tipo === 'kit';
+    
+    return match && (!filterCategory || p.categoria === filterCategory) && (!filterBrand || p.marca === filterBrand) && esTipoValido && !p.esCombo && precioActual >= min && precioActual <= max;
+  });    const streamingFiltrados = (productos || []).filter(p => {
       const searchTermLower = searchTerm.toLowerCase();
       const match = (p.plataforma || '').toLowerCase().includes(searchTermLower) ||
                     (p.descripcion_detallada || '').toLowerCase().includes(searchTermLower);
