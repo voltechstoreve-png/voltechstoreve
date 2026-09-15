@@ -76,6 +76,33 @@
     const [ganaTab, setGanaTab] = useState('opiniones'); // 'opiniones' | 'sorteos' (sub-pestañas de Gana & Opina)
     
     const { productos } = useProductos();
+    // ✅ DEBUG SEGURO - Solo muestra un cuadro rojo temporal
+useEffect(() => {
+  // Limpiar debug anterior si existe
+  const existingDebug = document.getElementById('debug-voltech');
+  if (existingDebug) existingDebug.remove();
+
+  // Crear nuevo debug
+  const debugDiv = document.createElement('div');
+  debugDiv.id = 'debug-voltech';
+  debugDiv.style.cssText = 'position:fixed;top:0;left:0;background:red;color:white;padding:15px;z-index:9999;font-size:14px;font-family:Arial;box-shadow:0 4px 6px rgba(0,0,0,0.3);border-radius:0 0 8px 0;';
+  debugDiv.innerHTML = `
+    <strong>📊 DEBUG VOLTECH</strong><br/>
+    Productos: ${productos?.length || 0}<br/>
+    Supabase: ${typeof supabase !== 'undefined' && supabase ? '✅ OK' : ' NULL'}<br/>
+    <small>Toca para cerrar</small>
+  `;
+  debugDiv.onclick = () => debugDiv.remove();
+  
+  if (typeof window !== 'undefined') {
+    document.body.appendChild(debugDiv);
+  }
+
+  // Auto-eliminar después de 10 segundos
+  setTimeout(() => {
+    if (debugDiv.parentNode) debugDiv.remove();
+  }, 10000);
+}, [productos]);
     const { settings } = useSettings();
     const { tasa: tasaBCV, setTasa: setTasaBCV } = useTasaBCV();
     const { currentUser, setCurrentUser } = useAuth();
