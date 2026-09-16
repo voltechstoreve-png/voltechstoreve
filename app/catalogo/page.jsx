@@ -1205,28 +1205,40 @@
     const headerBg = darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-slate-200';
     const totalVotos = productosVotacion.reduce((sum, p) => sum + (p.votos || 0), 0);
 
-  const productosAgrupados = useMemo(() => {
-  const grupos = {};
-  productosFiltrados.forEach(p => {
-  const cat = (p.categoria || 'OTROS').toUpperCase();
-  (grupos[cat] = grupos[cat] || []).push(p);
-  });
-  Object.keys(grupos).forEach(k => {
-  grupos[k].sort((a, b) => (a.producto || a.plataforma || '').localeCompare(b.producto || b.plataforma || '', 'es', { sensitivity: 'base' }));
-  });
-  return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }));
+    const productosAgrupados = useMemo(() => {
+    const grupos = {};
+    productosFiltrados.forEach(p => {
+      const cat = (p.categoria || 'OTROS').toUpperCase();
+      (grupos[cat] = grupos[cat] || []).push(p);
+    });
+    Object.keys(grupos).forEach(k => {
+      grupos[k].sort((a, b) => {
+        // 1. Primero ordenar por marca
+        const marcaA = (a.marca || '').toUpperCase();
+        const marcaB = (b.marca || '').toUpperCase();
+        if (marcaA !== marcaB) return marcaA.localeCompare(marcaB, 'es', { sensitivity: 'base' });
+        // 2. Si es la misma marca, ordenar por nombre del producto
+        return (a.producto || a.plataforma || '').localeCompare(b.producto || b.plataforma || '', 'es', { sensitivity: 'base' });
+      });
+    });
+    return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }));
   }, [productosFiltrados]);
 
+  // ✅ Array plano con el MISMO orden que el catálogo (para navegación del modal)
+  const productosEnOrdenCatalogo = useMemo(() => {
+    return productosAgrupados.flatMap(([cat, items]) => items);
+  }, [productosAgrupados]);
+
   const streamingAgrupados = useMemo(() => {
-  const grupos = {};
-  streamingFiltrados.forEach(p => {
-  const cat = (p.categoria || 'STREAMING').toUpperCase();
-  (grupos[cat] = grupos[cat] || []).push(p);
-  });
-  Object.keys(grupos).forEach(k => {
-  grupos[k].sort((a, b) => (a.plataforma || '').localeCompare(b.plataforma || '', 'es', { sensitivity: 'base' }));
-  });
-  return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }));
+    const grupos = {};
+    streamingFiltrados.forEach(p => {
+      const cat = (p.categoria || 'STREAMING').toUpperCase();
+      (grupos[cat] = grupos[cat] || []).push(p);
+    });
+    Object.keys(grupos).forEach(k => {
+      grupos[k].sort((a, b) => (a.plataforma || '').localeCompare(b.plataforma || '', 'es', { sensitivity: 'base' }));
+    });
+    return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }));
   }, [streamingFiltrados]);
         const renderProductCard = (p, idx = 0) => {
         const precioInfo = getPrecioMostrar(p);
@@ -2560,9 +2572,10 @@
 
               {/* ✅ FLECHAS DE NAVEGACIÓN ABAJO (fuera del contenido, no tapan la imagen) */}
               {(() => {
+                // ✅ Usar el mismo orden que el catálogo (Categoría → Marca → Producto)
                 const productosLista = navTab === 'explorar' && activeSection === 'streaming' 
                   ? streamingFiltrados 
-                  : productosFiltrados;
+                  : productosEnOrdenCatalogo;
                 const idxActual = productosLista.findIndex(p => p.id === selectedProduct.id);
                 const productoAnterior = idxActual > 0 ? productosLista[idxActual - 1] : null;
                 const productoSiguiente = idxActual < productosLista.length - 1 ? productosLista[idxActual + 1] : null;
