@@ -2539,9 +2539,8 @@
                             )}
                           </div>
                         </div>
-                      </div>
                       )}
-
+                      
                       {/* Características */}
                       {selectedProduct.caracteristicas && Array.isArray(selectedProduct.caracteristicas) && selectedProduct.caracteristicas.length > 0 && (
                         <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-3`}>
