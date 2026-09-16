@@ -2527,6 +2527,7 @@
                             )}
                           </div>
                         </div>
+                      </div>
                       )}
 
                       {/* Características */}
