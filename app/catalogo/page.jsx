@@ -2447,117 +2447,121 @@
                     )}
                   </div>
                   
-                  {/* ✅ COLUMNA DERECHA: INFORMACIÓN (misma altura que imagen, con scroll si es necesario) */}
-                  <div className="flex flex-col h-[420px] overflow-y-auto pr-2 space-y-3">
+                  {/* ✅ COLUMNA DERECHA: INFORMACIÓN (altura fija, botón anclado abajo) */}
+                  <div className="flex flex-col justify-between h-full min-h-[400px]">
                     
-                    {/* Marca y Categoría (Sin repetir el título) */}
-                    <p className="text-sm text-voltech-muted uppercase tracking-wide font-semibold">{selectedProduct.marca} • {selectedProduct.categoria || selectedProduct.tipo}</p>
-                    
-                    {/* Etiquetas condicionales */}
-                    {(selectedProduct.modelo || selectedProduct.variante || (Array.isArray(selectedProduct.potencia) && selectedProduct.potencia.length > 0)) && (
-                      <div className="flex flex-wrap gap-2">
-                        {selectedProduct.modelo && selectedProduct.modelo.trim() !== '' && (
-                          <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                            {selectedProduct.modelo}
-                          </span>
-                        )}
-                        {selectedProduct.variante && selectedProduct.variante.trim() !== '' && (
-                          <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                            {selectedProduct.variante}
-                          </span>
-                        )}
-                        {Array.isArray(selectedProduct.potencia) && selectedProduct.potencia.length > 0 && selectedProduct.potencia[0] && (
-                          <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                            {Array.isArray(selectedProduct.potencia) ? selectedProduct.potencia.join(', ') : selectedProduct.potencia}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Badge Bajo pedido */}
-                    {selectedProduct.disponibilidad === 'bajo_pedido' && (
-                      <div className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-600 px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-500/30 w-fit">
-                        <ShoppingCart className="w-3.5 h-3.5" />
-                        <span>Bajo pedido</span>
-                      </div>
-                    )}
-                    
-                    {/* Precio */}
-                    <div className="flex items-baseline gap-3 flex-wrap pt-2">
-                      {getPrecioMostrar(selectedProduct).tieneOferta && (
-                        <span className="text-lg text-gray-400 line-through">${getPrecioMostrar(selectedProduct).precioTachado?.toFixed(2)}</span>
-                      )}
-                      <span className={`text-3xl font-bold ${getPrecioMostrar(selectedProduct).tieneOferta ? 'text-red-600' : ''}`}>
-                        ${getPrecioMostrar(selectedProduct).precioPrincipal?.toFixed(2)}
-                      </span>
-                      <span className="text-sm text-voltech-muted">Bs {calcularPrecioBs(getPrecioMostrar(selectedProduct).precioPrincipal)}</span>
-                    </div>
-
-                    {/* ✅ DESCRIPCIÓN CORTA */}
-                    {selectedProduct.descripcion && (
-                      <p className="text-sm leading-relaxed">{selectedProduct.descripcion}</p>
-                    )}
-
-                    {/* Duración (streaming) */}
-                    {selectedProduct.tipo === 'streaming' && selectedProduct.duracion && (
-                      <p className="flex items-center gap-2 text-sm text-voltech-muted"><Clock className="w-4 h-4" /> Duración: {selectedProduct.duracion}</p>
-                    )}
-
-                    {/* ✅ ESPECIFICACIONES TÉCNICAS (con botón Ver más / Ver menos) */}
-                    {selectedProduct.descripcion_detallada && (
-                      <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-3`}>
-                        <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm">
-                          <Info className="w-4 h-4 text-voltech-cyan" />
-                          Especificaciones
-                        </h4>
-                        <div className="relative">
-                          <p className={`text-sm text-voltech-muted whitespace-pre-line transition-all duration-300 ${verDescripcionCompleta ? '' : 'line-clamp-4'}`}>
-                            {selectedProduct.descripcion_detallada}
-                          </p>
-                          {selectedProduct.descripcion_detallada.length > 150 && (
-                            <button 
-                              onClick={() => setVerDescripcionCompleta(!verDescripcionCompleta)}
-                              className="text-xs text-voltech-cyan font-semibold mt-1.5 hover:underline flex items-center gap-1"
-                            >
-                              {verDescripcionCompleta ? 'Ver menos ▲' : 'Ver más ▼'}
-                            </button>
+                    {/* Contenido superior con scroll interno si es necesario */}
+                    <div className="flex-1 overflow-y-auto pr-2 space-y-3">
+                      
+                      {/* Marca y Categoría (Sin repetir el título) */}
+                      <p className="text-sm text-voltech-muted uppercase tracking-wide font-semibold">{selectedProduct.marca} • {selectedProduct.categoria || selectedProduct.tipo}</p>
+                      
+                      {/* Etiquetas condicionales */}
+                      {(selectedProduct.modelo || selectedProduct.variante || (Array.isArray(selectedProduct.potencia) && selectedProduct.potencia.length > 0)) && (
+                        <div className="flex flex-wrap gap-2">
+                          {selectedProduct.modelo && selectedProduct.modelo.trim() !== '' && (
+                            <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                              {selectedProduct.modelo}
+                            </span>
+                          )}
+                          {selectedProduct.variante && selectedProduct.variante.trim() !== '' && (
+                            <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                              {selectedProduct.variante}
+                            </span>
+                          )}
+                          {Array.isArray(selectedProduct.potencia) && selectedProduct.potencia.length > 0 && selectedProduct.potencia[0] && (
+                            <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                              {Array.isArray(selectedProduct.potencia) ? selectedProduct.potencia.join(', ') : selectedProduct.potencia}
+                            </span>
                           )}
                         </div>
+                      )}
+                      
+                      {/* Badge Bajo pedido */}
+                      {selectedProduct.disponibilidad === 'bajo_pedido' && (
+                        <div className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-600 px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-500/30 w-fit">
+                          <ShoppingCart className="w-3.5 h-3.5" />
+                          <span>Bajo pedido</span>
+                        </div>
+                      )}
+                      
+                      {/* Precio */}
+                      <div className="flex items-baseline gap-3 flex-wrap pt-2">
+                        {getPrecioMostrar(selectedProduct).tieneOferta && (
+                          <span className="text-lg text-gray-400 line-through">${getPrecioMostrar(selectedProduct).precioTachado?.toFixed(2)}</span>
+                        )}
+                        <span className={`text-3xl font-bold ${getPrecioMostrar(selectedProduct).tieneOferta ? 'text-red-600' : ''}`}>
+                          ${getPrecioMostrar(selectedProduct).precioPrincipal?.toFixed(2)}
+                        </span>
+                        <span className="text-sm text-voltech-muted">Bs {calcularPrecioBs(getPrecioMostrar(selectedProduct).precioPrincipal)}</span>
                       </div>
-                    )}
 
-                    {/* Características */}
-                    {selectedProduct.caracteristicas && Array.isArray(selectedProduct.caracteristicas) && selectedProduct.caracteristicas.length > 0 && (
-                      <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-3`}>
-                        <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm">
-                          <CheckCircle className="w-4 h-4 text-voltech-cyan" />
-                          Características
-                        </h4>
-                        <ul className="list-disc list-inside text-sm text-voltech-muted space-y-1">
-                          {selectedProduct.caracteristicas.map((carac, idx) => (
-                            <li key={idx}>{carac}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                      {/* ✅ DESCRIPCIÓN CORTA */}
+                      {selectedProduct.descripcion && (
+                        <p className="text-sm leading-relaxed">{selectedProduct.descripcion}</p>
+                      )}
 
-                    {/* Kit */}
-                    {selectedProduct.tipo === 'kit' && selectedProduct.productos_kit && selectedProduct.productos_kit.length > 0 && (
-                      <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-3`}>
-                        <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm">
-                          <Package className="w-4 h-4 text-voltech-cyan" />
-                          Contenido del Kit
-                        </h4>
-                        <ul className="list-disc list-inside text-sm text-voltech-muted space-y-1">
-                          {selectedProduct.productos_kit.map((item, idx) => (
-                            <li key={idx}>{item.nombre || item.producto} (x{item.cantidad})</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                      {/* Duración (streaming) */}
+                      {selectedProduct.tipo === 'streaming' && selectedProduct.duracion && (
+                        <p className="flex items-center gap-2 text-sm text-voltech-muted"><Clock className="w-4 h-4" /> Duración: {selectedProduct.duracion}</p>
+                      )}
 
-                    {/* Botón Agregar al Carrito */}
-                    <div className="mt-auto pt-3">
+                      {/* ✅ ESPECIFICACIONES TÉCNICAS (con botón Ver más / Ver menos) */}
+                      {selectedProduct.descripcion_detallada && (
+                        <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-3`}>
+                          <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm">
+                            <Info className="w-4 h-4 text-voltech-cyan" />
+                            Especificaciones
+                          </h4>
+                          <div className="relative">
+                            <p className={`text-sm text-voltech-muted whitespace-pre-line transition-all duration-300 ${verDescripcionCompleta ? '' : 'line-clamp-4'}`}>
+                              {selectedProduct.descripcion_detallada}
+                            </p>
+                            {selectedProduct.descripcion_detallada.length > 150 && (
+                              <button 
+                                onClick={() => setVerDescripcionCompleta(!verDescripcionCompleta)}
+                                className="text-xs text-voltech-cyan font-semibold mt-1.5 hover:underline flex items-center gap-1"
+                              >
+                                {verDescripcionCompleta ? 'Ver menos ▲' : 'Ver más ▼'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Características */}
+                      {selectedProduct.caracteristicas && Array.isArray(selectedProduct.caracteristicas) && selectedProduct.caracteristicas.length > 0 && (
+                        <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-3`}>
+                          <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm">
+                            <CheckCircle className="w-4 h-4 text-voltech-cyan" />
+                            Características
+                          </h4>
+                          <ul className="list-disc list-inside text-sm text-voltech-muted space-y-1">
+                            {selectedProduct.caracteristicas.map((carac, idx) => (
+                              <li key={idx}>{carac}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Kit */}
+                      {selectedProduct.tipo === 'kit' && selectedProduct.productos_kit && selectedProduct.productos_kit.length > 0 && (
+                        <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-3`}>
+                          <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm">
+                            <Package className="w-4 h-4 text-voltech-cyan" />
+                            Contenido del Kit
+                          </h4>
+                          <ul className="list-disc list-inside text-sm text-voltech-muted space-y-1">
+                            {selectedProduct.productos_kit.map((item, idx) => (
+                              <li key={idx}>{item.nombre || item.producto} (x{item.cantidad})</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Botón Agregar al Carrito fijo abajo */}
+                    <div className={`pt-3 mt-2 border-t ${cardBorder}`}>
                       <button
                         onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); setVerDescripcionCompleta(false); }}
                         className="w-full py-2.5 px-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-1.5 transition-colors"
