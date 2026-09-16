@@ -1205,7 +1205,7 @@
     const headerBg = darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/80 border-slate-200';
     const totalVotos = productosVotacion.reduce((sum, p) => sum + (p.votos || 0), 0);
 
-    const productosAgrupados = useMemo(() => {
+  const productosAgrupados = useMemo(() => {
     const grupos = {};
     productosFiltrados.forEach(p => {
       const cat = (p.categoria || 'OTROS').toUpperCase();
@@ -1221,12 +1221,22 @@
         return (a.producto || a.plataforma || '').localeCompare(b.producto || b.plataforma || '', 'es', { sensitivity: 'base' });
       });
     });
-    return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }));
+    // Ordenar categorías alfabéticamente también
+    return Object.entries(grupos)
+      .sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }))
+      .map(([cat, items]) => [cat, [...items]]); // Crear nueva referencia para evitar mutaciones
   }, [productosFiltrados]);
-
+    
   // ✅ Array plano con el MISMO orden que el catálogo (para navegación del modal)
   const productosEnOrdenCatalogo = useMemo(() => {
-    return productosAgrupados.flatMap(([cat, items]) => items);
+    // Aplanar manteniendo el orden: primero ordenar por categoría, luego por marca, luego por nombre
+    const todosProductos = [];
+    productosAgrupados.forEach(([cat, items]) => {
+      items.forEach(producto => {
+        todosProductos.push(producto);
+      });
+    });
+    return todosProductos;
   }, [productosAgrupados]);
 
   const streamingAgrupados = useMemo(() => {
