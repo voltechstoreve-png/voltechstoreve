@@ -2390,85 +2390,62 @@
         )}
       </AnimatePresence>
 
-      {/* Modal de Producto - CON NAVEGACIÓN Y BADGE CORREGIDO */}
+      {/* Modal de Producto - LAYOUT INVERTIDO + TAMAÑO ESTÁNDAR */}
       <AnimatePresence>
         {selectedProduct && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-[80] flex items-center justify-center p-4" onClick={() => setSelectedProduct(null)}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className={`${cardBg} border ${cardBorder} rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto relative`} onClick={(e) => e.stopPropagation()}>
-              {/* ✅ BOTONES DE NAVEGACIÓN: Anterior/Siguiente */}
-              {(() => {
-                const productosLista = navTab === 'explorar' && activeSection === 'streaming' 
-                  ? streamingFiltrados 
-                  : productosFiltrados;
-                const idxActual = productosLista.findIndex(p => p.id === selectedProduct.id);
-                const productoAnterior = idxActual > 0 ? productosLista[idxActual - 1] : null;
-                const productoSiguiente = idxActual < productosLista.length - 1 ? productosLista[idxActual + 1] : null;
-                
-                return (
-                  <>
-                    {productoAnterior && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setSelectedProduct(productoAnterior); }}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
-                        title="Producto anterior"
-                      >
-                        ‹
-                      </button>
-                    )}
-                    {productoSiguiente && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setSelectedProduct(productoSiguiente); }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
-                        title="Producto siguiente"
-                      >
-                        ›
-                      </button>
-                    )}
-                  </>
-                );
-              })()}
-
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className={`${cardBg} border ${cardBorder} rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col relative`} onClick={(e) => e.stopPropagation()}>
+              
+              {/* HEADER */}
               <div className={`sticky top-0 ${cardBg} border-b ${cardBorder} p-4 flex justify-between items-center z-10`}>
                 <h3 className="text-xl font-bold truncate pr-4">{selectedProduct.producto || selectedProduct.plataforma}</h3>
                 <button onClick={() => setSelectedProduct(null)} className="p-2 hover:bg-voltech-border rounded-full transition-colors"><X className="w-6 h-6" /></button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
-                <div className="space-y-4">
-                  {/* ✅ IMAGEN SIN BADGE "BAJO PEDIDO" - solo categoría promo y oferta */}
-                  <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative ${selectedProduct.tipo === 'streaming' ? 'bg-black' : 'bg-transparent'}`} style={{ minHeight: '280px' }}>
-                    <CarruselImagen
-                      imagenes={Array.from(new Set([
-                        selectedProduct.imagen,
-                        ...(Array.isArray(selectedProduct.imagenes) ? selectedProduct.imagenes : []),
-                        ...(Array.isArray(selectedProduct.productos_kit) ? selectedProduct.productos_kit.map(k => k.imagen).filter(Boolean) : [])
-                      ].filter(Boolean)))}
-                      alt={selectedProduct.producto || selectedProduct.plataforma}
-                      className="w-full h-auto max-h-[420px] object-contain mx-auto"
-                      objectFit="contain"
-                      iconoVacio={<Package className="w-24 h-24 text-slate-300" />}
-                    />
-                    {selectedProduct.categoria_promo && <div className="absolute top-4 left-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md z-20">{selectedProduct.categoria_promo}</div>}
-                    {getPrecioMostrar(selectedProduct).tieneOferta && (
-                      <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">OFERTA</div>
+
+              {/* CONTENIDO: Imagen izquierda + Info derecha */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  
+                  {/* ✅ COLUMNA IZQUIERDA: IMAGEN (altura fija 420px) */}
+                  <div className="flex flex-col items-center">
+                    <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative bg-slate-900`} style={{ height: '420px' }}>
+                      <CarruselImagen
+                        imagenes={Array.from(new Set([
+                          selectedProduct.imagen,
+                          ...(Array.isArray(selectedProduct.imagenes) ? selectedProduct.imagenes : []),
+                          ...(Array.isArray(selectedProduct.productos_kit) ? selectedProduct.productos_kit.map(k => k.imagen).filter(Boolean) : [])
+                        ].filter(Boolean)))}
+                        alt={selectedProduct.producto || selectedProduct.plataforma}
+                        className="w-full h-full object-contain"
+                        objectFit="contain"
+                        iconoVacio={<Package className="w-24 h-24 text-slate-300" />}
+                      />
+                      {selectedProduct.categoria_promo && <div className="absolute top-4 left-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md z-20">{selectedProduct.categoria_promo}</div>}
+                      {getPrecioMostrar(selectedProduct).tieneOferta && (
+                        <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">OFERTA</div>
+                      )}
+                    </div>
+                    {selectedProduct.colores && selectedProduct.colores.length > 0 && (
+                      <div className="flex gap-2 justify-center mt-3">
+                        {selectedProduct.colores.map((color, idx) => (
+                          <div key={idx} className="w-8 h-8 rounded-full border-2 border-voltech-border cursor-pointer hover:scale-110 transition-transform shadow-sm" style={{ backgroundColor: color }} title={color} />
+                        ))}
+                      </div>
                     )}
                   </div>
-                  {selectedProduct.colores && selectedProduct.colores.length > 0 && (
-                    <div className="flex gap-2 justify-center">
-                      {selectedProduct.colores.map((color, idx) => (
-                        <div key={idx} className="w-8 h-8 rounded-full border-2 border-voltech-border cursor-pointer hover:scale-110 transition-transform shadow-sm" style={{ backgroundColor: color }} title={color} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-                
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-voltech-muted uppercase tracking-wide">{selectedProduct.marca} • {selectedProduct.categoria || selectedProduct.tipo}</p>
-                    <h2 className="text-3xl font-bold mt-1">{selectedProduct.producto || selectedProduct.plataforma}</h2>
+                  
+                  {/* ✅ COLUMNA DERECHA: INFORMACIÓN (misma altura que imagen) */}
+                  <div className="flex flex-col h-[420px] overflow-y-auto pr-2 space-y-3">
                     
-                    {/* ✅ ETIQUETAS CONDICIONALES: solo muestran si tienen valor */}
+                    {/* Marca y Categoría */}
+                    <p className="text-sm text-voltech-muted uppercase tracking-wide">{selectedProduct.marca} • {selectedProduct.categoria || selectedProduct.tipo}</p>
+                    
+                    {/* Título (NO duplicado, solo aquí) */}
+                    <h2 className="text-2xl md:text-3xl font-bold leading-tight">{selectedProduct.producto || selectedProduct.plataforma}</h2>
+                    
+                    {/* Etiquetas condicionales */}
                     {(selectedProduct.modelo || selectedProduct.variante || (Array.isArray(selectedProduct.potencia) && selectedProduct.potencia.length > 0)) && (
-                      <div className="flex flex-wrap gap-2 mt-2 mb-3">
+                      <div className="flex flex-wrap gap-2">
                         {selectedProduct.modelo && selectedProduct.modelo.trim() !== '' && (
                           <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
                             Modelo: {selectedProduct.modelo}
@@ -2487,111 +2464,137 @@
                       </div>
                     )}
                     
-                    {/* ✅ BADGE "BAJO PEDIDO" MOVIDO AQUÍ - junto a la información del producto */}
+                    {/* Badge Bajo pedido */}
                     {selectedProduct.disponibilidad === 'bajo_pedido' && (
-                      <div className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-600 px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-500/30 mt-2">
+                      <div className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-600 px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-500/30 w-fit">
                         <ShoppingCart className="w-3.5 h-3.5" />
                         <span>Bajo pedido</span>
                       </div>
                     )}
-                  </div>
-                  
-                  <div className="flex items-baseline gap-3 flex-wrap">
-                    {getPrecioMostrar(selectedProduct).tieneOferta && (
-                      <span className="text-lg text-gray-400 line-through">${getPrecioMostrar(selectedProduct).precioTachado?.toFixed(2)}</span>
-                    )}
-                    <span className={`text-3xl font-bold ${getPrecioMostrar(selectedProduct).tieneOferta ? 'text-red-600' : ''}`}>
-                      ${getPrecioMostrar(selectedProduct).precioPrincipal?.toFixed(2)}
-                    </span>
-                    <span className="text-sm text-voltech-muted">Bs {calcularPrecioBs(getPrecioMostrar(selectedProduct).precioPrincipal)}</span>
-                  </div>
-
-                  {/* ✅ Solo mostrar "Sin descripción" si NO hay descripción corta NI detallada */}
-                  {(selectedProduct.descripcion || selectedProduct.descripcion_detallada) ? (
-                    <p className="text-sm">{selectedProduct.descripcion || selectedProduct.descripcion_detallada}</p>
-                  ) : (
-                    <p className="text-sm text-voltech-muted italic">Sin descripción disponible</p>
-                  )}
-                  
-                  <div className="text-sm text-voltech-muted space-y-2">
-                    {selectedProduct.tipo === 'streaming' && selectedProduct.duracion && (
-                      <p className="flex items-center gap-2"><Clock className="w-4 h-4" /> Duración: {selectedProduct.duracion}</p>
-                    )}
-                  </div>
-
-                  {/* ✅ DESCRIPCIÓN DETALLADA / ESPECIFICACIONES - Siempre mostrar si existe */}
-                  {(selectedProduct.descripcion_detallada || selectedProduct.caracteristicas || selectedProduct.tipo === 'kit') && (
-                    <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-4`}>
-                      {selectedProduct.tipo === 'kit' && selectedProduct.productos_kit && selectedProduct.productos_kit.length > 0 ? (
-                        <>
-                          <h4 className="font-semibold mb-2 flex items-center gap-2">
-                            <Package className="w-4 h-4 text-voltech-cyan" />
-                            Contenido del Kit
-                          </h4>
-                          <ul className="list-disc list-inside text-sm text-voltech-muted space-y-1">
-                            {selectedProduct.productos_kit.map((item, idx) => (
-                              <li key={idx}>{item.nombre || item.producto} (x{item.cantidad})</li>
-                            ))}
-                          </ul>
-                        </>
-                      ) : (
-                        <>
-                          {selectedProduct.descripcion_detallada && (
-                            <>
-                              <h4 className="font-semibold mb-2 flex items-center gap-2">
-                                <Info className="w-4 h-4 text-voltech-cyan" />
-                                Especificaciones Técnicas
-                              </h4>
-                              <p className="text-sm text-voltech-muted whitespace-pre-line mb-3">
-                                {selectedProduct.descripcion_detallada}
-                              </p>
-                            </>
-                          )}
-                          {selectedProduct.caracteristicas && Array.isArray(selectedProduct.caracteristicas) && selectedProduct.caracteristicas.length > 0 && (
-                            <>
-                              <h4 className="font-semibold mb-2 flex items-center gap-2">
-                                <CheckCircle className="w-4 h-4 text-voltech-cyan" />
-                                Características
-                              </h4>
-                              <ul className="list-disc list-inside text-sm text-voltech-muted space-y-1">
-                                {selectedProduct.caracteristicas.map((carac, idx) => (
-                                  <li key={idx}>{carac}</li>
-                                ))}
-                              </ul>
-                            </>
-                          )}
-                        </>
+                    
+                    {/* Precio */}
+                    <div className="flex items-baseline gap-3 flex-wrap pt-2">
+                      {getPrecioMostrar(selectedProduct).tieneOferta && (
+                        <span className="text-lg text-gray-400 line-through">${getPrecioMostrar(selectedProduct).precioTachado?.toFixed(2)}</span>
                       )}
+                      <span className={`text-3xl font-bold ${getPrecioMostrar(selectedProduct).tieneOferta ? 'text-red-600' : ''}`}>
+                        ${getPrecioMostrar(selectedProduct).precioPrincipal?.toFixed(2)}
+                      </span>
+                      <span className="text-sm text-voltech-muted">Bs {calcularPrecioBs(getPrecioMostrar(selectedProduct).precioPrincipal)}</span>
                     </div>
-                  )}
 
-                  {selectedProduct.caracteristicas && Array.isArray(selectedProduct.caracteristicas) && (
-                    <div>
-                      <h4 className="font-semibold mb-2">Características:</h4>
-                      <ul className="list-disc list-inside text-sm text-voltech-muted space-y-1">
-                        {selectedProduct.caracteristicas.map((carac, idx) => (
-                          <li key={idx}>{carac}</li>
-                        ))}
-                      </ul>
+                    {/* ✅ DESCRIPCIÓN CORTA (solo descripcion, NO descripcion_detallada) */}
+                    {selectedProduct.descripcion && (
+                      <p className="text-sm leading-relaxed">{selectedProduct.descripcion}</p>
+                    )}
+
+                    {/* Duración (streaming) */}
+                    {selectedProduct.tipo === 'streaming' && selectedProduct.duracion && (
+                      <p className="flex items-center gap-2 text-sm text-voltech-muted"><Clock className="w-4 h-4" /> Duración: {selectedProduct.duracion}</p>
+                    )}
+
+                    {/* ✅ ESPECIFICACIONES TÉCNICAS (solo descripcion_detallada) */}
+                    {selectedProduct.descripcion_detallada && (
+                      <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-3`}>
+                        <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm">
+                          <Info className="w-4 h-4 text-voltech-cyan" />
+                          Especificaciones Técnicas
+                        </h4>
+                        <p className="text-sm text-voltech-muted whitespace-pre-line">
+                          {selectedProduct.descripcion_detallada}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Características */}
+                    {selectedProduct.caracteristicas && Array.isArray(selectedProduct.caracteristicas) && selectedProduct.caracteristicas.length > 0 && (
+                      <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-3`}>
+                        <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm">
+                          <CheckCircle className="w-4 h-4 text-voltech-cyan" />
+                          Características
+                        </h4>
+                        <ul className="list-disc list-inside text-sm text-voltech-muted space-y-1">
+                          {selectedProduct.caracteristicas.map((carac, idx) => (
+                            <li key={idx}>{carac}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Kit */}
+                    {selectedProduct.tipo === 'kit' && selectedProduct.productos_kit && selectedProduct.productos_kit.length > 0 && (
+                      <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-3`}>
+                        <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm">
+                          <Package className="w-4 h-4 text-voltech-cyan" />
+                          Contenido del Kit
+                        </h4>
+                        <ul className="list-disc list-inside text-sm text-voltech-muted space-y-1">
+                          {selectedProduct.productos_kit.map((item, idx) => (
+                            <li key={idx}>{item.nombre || item.producto} (x{item.cantidad})</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Botón Agregar al Carrito */}
+                    <div className="mt-auto pt-3">
+                      <button
+                        onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }}
+                        className="w-full py-2.5 px-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <ShoppingCart className="w-4 h-4 shrink-0" />
+                        <span>Agregar al Carrito</span>
+                      </button>
                     </div>
-                  )}
-
-                  <div className="flex items-center gap-2 w-full mt-auto pt-3">
-                    <button
-                      onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }}
-                      className="w-full py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-colors"
-                    >
-                      <ShoppingCart className="w-4 h-4 shrink-0" />
-                      <span>Agregar al Carrito</span>
-                    </button>
                   </div>
                 </div>
               </div>
+
+              {/* ✅ FLECHAS DE NAVEGACIÓN ABAJO (fuera del contenido) */}
+              {(() => {
+                const productosLista = navTab === 'explorar' && activeSection === 'streaming' 
+                  ? streamingFiltrados 
+                  : productosFiltrados;
+                const idxActual = productosLista.findIndex(p => p.id === selectedProduct.id);
+                const productoAnterior = idxActual > 0 ? productosLista[idxActual - 1] : null;
+                const productoSiguiente = idxActual < productosLista.length - 1 ? productosLista[idxActual + 1] : null;
+                
+                if (!productoAnterior && !productoSiguiente) return null;
+                
+                return (
+                  <div className={`border-t ${cardBorder} p-3 flex items-center justify-between bg-voltech-dark/50`}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); productoAnterior && setSelectedProduct(productoAnterior); }}
+                      disabled={!productoAnterior}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${
+                        productoAnterior 
+                          ? 'bg-voltech-cyan/20 text-voltech-cyan hover:bg-voltech-cyan/30' 
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}
+                    >
+                      <span>←</span> Anterior
+                    </button>
+                    <span className="text-xs text-voltech-muted">
+                      {idxActual + 1} de {productosLista.length}
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); productoSiguiente && setSelectedProduct(productoSiguiente); }}
+                      disabled={!productoSiguiente}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${
+                        productoSiguiente 
+                          ? 'bg-voltech-cyan/20 text-voltech-cyan hover:bg-voltech-cyan/30' 
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}
+                    >
+                      Siguiente <span>→</span>
+                    </button>
+                  </div>
+                );
+              })()}
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-
       {/* Modal de Ticket */}
       <AnimatePresence>
         {showTicketModal && ticketGenerado && (
