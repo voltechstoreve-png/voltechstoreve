@@ -141,6 +141,7 @@
   const [clienteTelefono, setClienteTelefono] = useState('');
   const [opinionVerificada, setOpinionVerificada] = useState(false);
   const [opinionVerificadaId, setOpinionVerificadaId] = useState(null);
+  const [verDescripcionCompleta, setVerDescripcionCompleta] = useState(false); // ✅ NUEVO: Para el botón "Ver más"
   const bannerRef = useRef(null);
   const [bannerIdx, setBannerIdx] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -2390,23 +2391,23 @@
         )}
       </AnimatePresence>
 
-      {/* Modal de Producto - LAYOUT INVERTIDO + TAMAÑO ESTÁNDAR */}
+      {/* Modal de Producto - LAYOUT INVERTIDO + TAMAÑO ESTÁNDAR + VER MÁS */}
       <AnimatePresence>
         {selectedProduct && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-[80] flex items-center justify-center p-4" onClick={() => setSelectedProduct(null)}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-[80] flex items-center justify-center p-4" onClick={() => { setSelectedProduct(null); setVerDescripcionCompleta(false); }}>
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className={`${cardBg} border ${cardBorder} rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col relative`} onClick={(e) => e.stopPropagation()}>
               
-              {/* HEADER */}
+              {/* HEADER: Título solo aquí (NO duplicado en el cuerpo) */}
               <div className={`sticky top-0 ${cardBg} border-b ${cardBorder} p-4 flex justify-between items-center z-10`}>
-                <h3 className="text-xl font-bold truncate pr-4">{selectedProduct.producto || selectedProduct.plataforma}</h3>
-                <button onClick={() => setSelectedProduct(null)} className="p-2 hover:bg-voltech-border rounded-full transition-colors"><X className="w-6 h-6" /></button>
+                <h3 className="text-lg md:text-xl font-bold truncate pr-4">{selectedProduct.producto || selectedProduct.plataforma}</h3>
+                <button onClick={() => { setSelectedProduct(null); setVerDescripcionCompleta(false); }} className="p-2 hover:bg-voltech-border rounded-full transition-colors"><X className="w-6 h-6" /></button>
               </div>
 
               {/* CONTENIDO: Imagen izquierda + Info derecha */}
               <div className="flex-1 overflow-y-auto p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   
-                  {/* ✅ COLUMNA IZQUIERDA: IMAGEN (altura fija 420px) */}
+                  {/* ✅ COLUMNA IZQUIERDA: IMAGEN (altura fija 420px para todas) */}
                   <div className="flex flex-col items-center">
                     <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative bg-slate-900`} style={{ height: '420px' }}>
                       <CarruselImagen
@@ -2434,31 +2435,28 @@
                     )}
                   </div>
                   
-                  {/* ✅ COLUMNA DERECHA: INFORMACIÓN (misma altura que imagen) */}
+                  {/* ✅ COLUMNA DERECHA: INFORMACIÓN (misma altura que imagen, con scroll si es necesario) */}
                   <div className="flex flex-col h-[420px] overflow-y-auto pr-2 space-y-3">
                     
-                    {/* Marca y Categoría */}
-                    <p className="text-sm text-voltech-muted uppercase tracking-wide">{selectedProduct.marca} • {selectedProduct.categoria || selectedProduct.tipo}</p>
-                    
-                    {/* Título (NO duplicado, solo aquí) */}
-                    <h2 className="text-2xl md:text-3xl font-bold leading-tight">{selectedProduct.producto || selectedProduct.plataforma}</h2>
+                    {/* Marca y Categoría (Sin repetir el título) */}
+                    <p className="text-sm text-voltech-muted uppercase tracking-wide font-semibold">{selectedProduct.marca} • {selectedProduct.categoria || selectedProduct.tipo}</p>
                     
                     {/* Etiquetas condicionales */}
                     {(selectedProduct.modelo || selectedProduct.variante || (Array.isArray(selectedProduct.potencia) && selectedProduct.potencia.length > 0)) && (
                       <div className="flex flex-wrap gap-2">
                         {selectedProduct.modelo && selectedProduct.modelo.trim() !== '' && (
                           <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                            Modelo: {selectedProduct.modelo}
+                            {selectedProduct.modelo}
                           </span>
                         )}
                         {selectedProduct.variante && selectedProduct.variante.trim() !== '' && (
                           <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                            Variante: {selectedProduct.variante}
+                            {selectedProduct.variante}
                           </span>
                         )}
                         {Array.isArray(selectedProduct.potencia) && selectedProduct.potencia.length > 0 && selectedProduct.potencia[0] && (
                           <span className={`text-xs px-2 py-1 rounded-md ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                            Potencia: {Array.isArray(selectedProduct.potencia) ? selectedProduct.potencia.join(', ') : selectedProduct.potencia}
+                            {Array.isArray(selectedProduct.potencia) ? selectedProduct.potencia.join(', ') : selectedProduct.potencia}
                           </span>
                         )}
                       </div>
@@ -2483,7 +2481,7 @@
                       <span className="text-sm text-voltech-muted">Bs {calcularPrecioBs(getPrecioMostrar(selectedProduct).precioPrincipal)}</span>
                     </div>
 
-                    {/* ✅ DESCRIPCIÓN CORTA (solo descripcion, NO descripcion_detallada) */}
+                    {/* ✅ DESCRIPCIÓN CORTA */}
                     {selectedProduct.descripcion && (
                       <p className="text-sm leading-relaxed">{selectedProduct.descripcion}</p>
                     )}
@@ -2493,16 +2491,26 @@
                       <p className="flex items-center gap-2 text-sm text-voltech-muted"><Clock className="w-4 h-4" /> Duración: {selectedProduct.duracion}</p>
                     )}
 
-                    {/* ✅ ESPECIFICACIONES TÉCNICAS (solo descripcion_detallada) */}
+                    {/* ✅ ESPECIFICACIONES TÉCNICAS (con botón Ver más / Ver menos) */}
                     {selectedProduct.descripcion_detallada && (
                       <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-3`}>
                         <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm">
                           <Info className="w-4 h-4 text-voltech-cyan" />
-                          Especificaciones Técnicas
+                          Especificaciones
                         </h4>
-                        <p className="text-sm text-voltech-muted whitespace-pre-line">
-                          {selectedProduct.descripcion_detallada}
-                        </p>
+                        <div className="relative">
+                          <p className={`text-sm text-voltech-muted whitespace-pre-line transition-all duration-300 ${verDescripcionCompleta ? '' : 'line-clamp-4'}`}>
+                            {selectedProduct.descripcion_detallada}
+                          </p>
+                          {selectedProduct.descripcion_detallada.length > 150 && (
+                            <button 
+                              onClick={() => setVerDescripcionCompleta(!verDescripcionCompleta)}
+                              className="text-xs text-voltech-cyan font-semibold mt-1.5 hover:underline flex items-center gap-1"
+                            >
+                              {verDescripcionCompleta ? 'Ver menos ▲' : 'Ver más ▼'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
 
@@ -2539,7 +2547,7 @@
                     {/* Botón Agregar al Carrito */}
                     <div className="mt-auto pt-3">
                       <button
-                        onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); }}
+                        onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); setVerDescripcionCompleta(false); }}
                         className="w-full py-2.5 px-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-1.5 transition-colors"
                       >
                         <ShoppingCart className="w-4 h-4 shrink-0" />
@@ -2550,7 +2558,7 @@
                 </div>
               </div>
 
-              {/* ✅ FLECHAS DE NAVEGACIÓN ABAJO (fuera del contenido) */}
+              {/* ✅ FLECHAS DE NAVEGACIÓN ABAJO (fuera del contenido, no tapan la imagen) */}
               {(() => {
                 const productosLista = navTab === 'explorar' && activeSection === 'streaming' 
                   ? streamingFiltrados 
@@ -2574,7 +2582,7 @@
                     >
                       <span>←</span> Anterior
                     </button>
-                    <span className="text-xs text-voltech-muted">
+                    <span className="text-xs text-voltech-muted font-medium">
                       {idxActual + 1} de {productosLista.length}
                     </span>
                     <button
