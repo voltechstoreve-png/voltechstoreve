@@ -2409,12 +2409,23 @@
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-[80] flex items-center justify-center p-4" onClick={() => { setSelectedProduct(null); setVerDescripcionCompleta(false); }}>
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className={`${cardBg} border ${cardBorder} rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col relative`} onClick={(e) => e.stopPropagation()}>
               
-              {/* HEADER: Título solo aquí (NO duplicado en el cuerpo) */}
+              {/* HEADER: Categoría + contador local */}
               <div className={`sticky top-0 ${cardBg} border-b ${cardBorder} p-4 flex justify-between items-center z-10`}>
-                <h3 className="text-lg md:text-xl font-bold truncate pr-4">{selectedProduct.producto || selectedProduct.plataforma}</h3>
+                {(() => {
+                  // Calcular índice dentro de la categoría actual
+                  const categoriaActual = selectedProduct.categoria || 'OTROS';
+                  const productosCategoria = productosAgrupados.find(([cat]) => cat.toUpperCase() === categoriaActual.toUpperCase())?.[1] || [];
+                  const idxCategoria = productosCategoria.findIndex(p => p.id === selectedProduct.id);
+                  
+                  return (
+                    <h3 className="text-lg md:text-xl font-bold truncate pr-4">
+                      {categoriaActual} - {idxCategoria + 1} de {productosCategoria.length}
+                    </h3>
+                  );
+                })()}
                 <button onClick={() => { setSelectedProduct(null); setVerDescripcionCompleta(false); }} className="p-2 hover:bg-voltech-border rounded-full transition-colors"><X className="w-6 h-6" /></button>
               </div>
-
+              
               {/* CONTENIDO: Imagen izquierda + Info derecha */}
               <div className="flex-1 overflow-y-auto p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2453,8 +2464,9 @@
                     {/* Contenido superior con scroll interno si es necesario */}
                     <div className="flex-1 overflow-y-auto pr-2 space-y-3">
                       
-                      {/* Marca y Categoría (Sin repetir el título) */}
-                      <p className="text-sm text-voltech-muted uppercase tracking-wide font-semibold">{selectedProduct.marca} • {selectedProduct.categoria || selectedProduct.tipo}</p>
+                    {/* Marca y Nombre del producto */}
+                    <p className="text-sm text-voltech-muted uppercase tracking-wide font-semibold">{selectedProduct.marca} • {selectedProduct.categoria || selectedProduct.tipo}</p>
+                    <h2 className="text-xl md:text-2xl font-bold mt-1">{selectedProduct.producto || selectedProduct.plataforma}</h2>
                       
                       {/* Etiquetas condicionales */}
                       {(selectedProduct.modelo || selectedProduct.variante || (Array.isArray(selectedProduct.potencia) && selectedProduct.potencia.length > 0)) && (
@@ -2601,7 +2613,7 @@
                       <span>←</span> Anterior
                     </button>
                     <span className="text-xs text-voltech-muted font-medium">
-                      {idxActual + 1} de {productosLista.length}
+                      {idxActual + 1} de {productos.length}
                     </span>
                     <button
                       onClick={(e) => { e.stopPropagation(); productoSiguiente && setSelectedProduct(productoSiguiente); }}
