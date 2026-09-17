@@ -1237,8 +1237,12 @@
       });
     });
     return todosProductos;
+<<<<<<< HEAD
   }, [productosAgrupados]);
 
+=======
+  }, [productosAgrupados]);``
+>>>>>>> 3804ade (Actualización: [actualizacion de sistema])
   const streamingAgrupados = useMemo(() => {
     const grupos = {};
     streamingFiltrados.forEach(p => {
