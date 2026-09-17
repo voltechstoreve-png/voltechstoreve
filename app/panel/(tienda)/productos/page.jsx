@@ -2215,12 +2215,27 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
       toast.success('Catálogo descargado');
     };
 
-    const productosFiltrados = productos.filter(p =>
-      p.plataforma?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.categoria?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.marca?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const productosFiltrados = productos
+      .filter(p =>
+        p.plataforma?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.categoria?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.marca?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .sort((a, b) => {
+        // 1. Primero ordenar por categoría
+        const catA = (a.categoria || '').toUpperCase();
+        const catB = (b.categoria || '').toUpperCase();
+        if (catA !== catB) return catA.localeCompare(catB, 'es', { sensitivity: 'base' });
+        
+        // 2. Luego por marca
+        const marcaA = (a.marca || '').toUpperCase();
+        const marcaB = (b.marca || '').toUpperCase();
+        if (marcaA !== marcaB) return marcaA.localeCompare(marcaB, 'es', { sensitivity: 'base' });
+        
+        // 3. Finalmente por nombre del producto/plataforma
+        return (a.plataforma || a.producto || '').localeCompare(b.plataforma || b.producto || '', 'es', { sensitivity: 'base' });
+      });
 
     const totalProductos = productos.length;
     // ✅ LOTE A: los "Compra al momento" (bajo_pedido) NO cuentan como stock bajo ni agotados
