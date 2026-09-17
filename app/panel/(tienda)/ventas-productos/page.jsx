@@ -483,7 +483,8 @@ export default function VentasProductosPage() {
     ? (subtotal * Number(formData.descuentoValor || 0) / 100)
     : Number(formData.descuentoValor || 0);
   const totalDescuentos = descuentoCupon + descuentoManual;
-  const totalVenta = subtotal + (formData.delivery ? Number(formData.montoDelivery || 0) : 0) - totalDescuentos;
+  const descuentoAplicado = totalDescuentos; // ✅ Alias para compatibilidad con el JSX
+  const totalVenta = subtotal + (formData.delivery ? Number(formData.montoDelivery || 0) : 0) - descuentoAplicado;
   const montoPendiente = formData.enCuotas ? totalVenta - Number(formData.montoAbonado || 0) : 0;
 
   const registrarVenta = async () => {
