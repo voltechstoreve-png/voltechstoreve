@@ -78,6 +78,7 @@ export default function VentasProductosPage() {
     }],
     delivery: false, montoDelivery: 0, enCuotas: false, montoAbonado: 0, fechaPago: '',
     metodoPago: 'efectivo', carteraId: '', referencia: '', porcentaje_comision: 5,
+    tipoDescuento: 'none', descuentoValor: 0, estado: 'pendiente',
   });
 
   useEffect(() => {
@@ -477,8 +478,12 @@ export default function VentasProductosPage() {
   };
 
   const subtotal = formData.productos.reduce((acc, p) => acc + (Number(p.cantidad || 1) * Number(p.precioUnitario || 0)), 0);
-  const descuentoAplicado = cuponAplicado ? Number(cuponAplicado.descuentoCalculado || 0) : 0;
-  const totalVenta = subtotal + (formData.delivery ? Number(formData.montoDelivery || 0) : 0) - descuentoAplicado;
+  const descuentoCupon = cuponAplicado ? Number(cuponAplicado.descuentoCalculado || 0) : 0;
+  const descuentoManual = formData.tipoDescuento === 'porcentaje' 
+    ? (subtotal * Number(formData.descuentoValor || 0) / 100)
+    : Number(formData.descuentoValor || 0);
+  const totalDescuentos = descuentoCupon + descuentoManual;
+  const totalVenta = subtotal + (formData.delivery ? Number(formData.montoDelivery || 0) : 0) - totalDescuentos;
   const montoPendiente = formData.enCuotas ? totalVenta - Number(formData.montoAbonado || 0) : 0;
 
   const registrarVenta = async () => {
@@ -562,11 +567,19 @@ export default function VentasProductosPage() {
         carteraId: formData.carteraId, 
         referencia: formData.referencia,
         porcentaje_comision: formData.porcentaje_comision,
-        estado: formData.enCuotas && montoPendiente > 0 ? 'pendiente' : 'pagado',
+        tipoDescuento: formData.tipoDescuento || 'none',
+        descuentoValor: formData.descuentoValor || 0,
+        descuento_manual: descuentoManual,
+        estado: (() => {
+          if (formData.estado === 'cancelado') return 'cancelado';
+          if (montoPendiente > 0 && Number(formData.montoAbonado || 0) > 0) return 'debe';
+          if (montoPendiente > 0) return 'pendiente';
+          return 'pagado';
+        })(),
         fechaRegistro: new Date().toISOString(),
         tipo: 'producto',
         origen: 'manual',
-        stock_descontado: true
+        stock_descontado: formData.estado !== 'cancelado'
       };
 
       let productosActualizados = [...productos];
@@ -671,6 +684,9 @@ export default function VentasProductosPage() {
       carteraId: '', 
       referencia: '', 
       porcentaje_comision: 5,
+      tipoDescuento: 'none',
+      descuentoValor: 0,
+      estado: 'pendiente',
     });
     setClienteSearch(''); 
     setCuponInput('');
@@ -799,6 +815,9 @@ export default function VentasProductosPage() {
       metodoPago: venta.metodoPago, 
       carteraId: venta.carteraId, 
       referencia: venta.referencia,
+      tipoDescuento: venta.tipoDescuento || 'none',
+      descuentoValor: venta.descuentoValor || 0,
+      estado: venta.estado || 'pendiente',
     });
     setClienteSearch(venta.cliente); 
     setCuponInput(venta.cupon_aplicado || '');
@@ -1118,6 +1137,21 @@ export default function VentasProductosPage() {
                     <label className="block text-xs text-voltech-muted mb-1 ml-1">% Comisión</label>
                     <input type="number" step="0.5" min="0" max="100" value={formData.porcentaje_comision} onChange={(e) => setFormData({ ...formData, porcentaje_comision: parseFloat(e.target.value) || 0 })} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" />
                   </div>
+                  <div>
+                    <CustomSelect
+                      label="Estado"
+                      value={formData.estado}
+                      onChange={(v) => setFormData({ ...formData, estado: v })}
+                      options={[
+                        { value: 'pendiente', label: 'Pendiente' },
+                        { value: 'pagado', label: 'Pagado' },
+                        { value: 'debe', label: 'Debe (Pago Parcial)' },
+                        { value: 'cancelado', label: 'Cancelado' }
+                      ]}
+                      placeholder="-- Selecciona --"
+                      className="w-full"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1262,6 +1296,18 @@ export default function VentasProductosPage() {
                             <label className="block text-xs text-voltech-muted mb-1 ml-1">Marca</label>
                             <input type="text" value={prod.marca} readOnly className="input-voltech w-full rounded-lg px-3 py-2 text-sm bg-voltech-dark/50" placeholder="Auto" />
                           </div>
+                          <div className="col-span-6 md:col-span-2">
+                            <label className="block text-xs text-voltech-muted mb-1 ml-1">Modelo</label>
+                            <input type="text" value={productos.find(p => p.id === prod.productoId)?.modelo || ''} readOnly className="input-voltech w-full rounded-lg px-3 py-2 text-sm bg-voltech-dark/50" placeholder="Auto" />
+                          </div>
+                          <div className="col-span-6 md:col-span-2">
+                            <label className="block text-xs text-voltech-muted mb-1 ml-1">Variante</label>
+                            <input type="text" value={productos.find(p => p.id === prod.productoId)?.variante || ''} readOnly className="input-voltech w-full rounded-lg px-3 py-2 text-sm bg-voltech-dark/50" placeholder="Auto" />
+                          </div>
+                          <div className="col-span-6 md:col-span-2">
+                            <label className="block text-xs text-voltech-muted mb-1 ml-1">Potencia</label>
+                            <input type="text" value={(productos.find(p => p.id === prod.productoId)?.potencia || []).join(', ')} readOnly className="input-voltech w-full rounded-lg px-3 py-2 text-sm bg-voltech-dark/50" placeholder="Auto" />
+                          </div>
                           <div className="col-span-4 md:col-span-1">
                             <label className="block text-xs text-voltech-muted mb-1 ml-1">Cant.</label>
                             <input type="number" min="1" value={prod.cantidad} onChange={(e) => actualizarCampoProducto(index, 'cantidad', Number(e.target.value))} className="input-voltech w-full rounded-lg px-3 py-2 text-sm" />
@@ -1322,7 +1368,7 @@ export default function VentasProductosPage() {
                 )}
               </div>
 
-              <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4">
                   <label className="flex items-center gap-2 cursor-pointer mb-3"><input type="checkbox" checked={formData.delivery} onChange={(e) => setFormData({ ...formData, delivery: e.target.checked })} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" /><Truck className="w-4 h-4 text-voltech-warning" /><span className="text-sm text-white">Incluir Delivery</span></label>
                   {formData.delivery && (<div><label className="block text-xs text-voltech-muted mb-1">Monto Delivery ($)</label><input type="number" step="0.01" value={formData.montoDelivery} onChange={(e) => setFormData({ ...formData, montoDelivery: Number(e.target.value) })} className="input-voltech w-full rounded-lg px-3 py-2 text-sm" /></div>)}
@@ -1330,6 +1376,46 @@ export default function VentasProductosPage() {
                 <div className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4">
                   <label className="flex items-center gap-2 cursor-pointer mb-3"><input type="checkbox" checked={formData.enCuotas} onChange={(e) => setFormData({ ...formData, enCuotas: e.target.checked })} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" /><CreditCard className="w-4 h-4 text-voltech-purple" /><span className="text-sm text-white">Pago en Cuotas</span></label>
                   {formData.enCuotas && (<div className="grid grid-cols-2 gap-2"><div><label className="block text-xs text-voltech-muted mb-1">Abonado ($)</label><input type="number" step="0.01" value={formData.montoAbonado} onChange={(e) => setFormData({ ...formData, montoAbonado: Number(e.target.value) })} className="input-voltech w-full rounded-lg px-3 py-2 text-sm" /></div><div><label className="block text-xs text-voltech-muted mb-1">Próx. Pago</label><input type="date" value={formData.fechaPago} onChange={(e) => setFormData({ ...formData, fechaPago: e.target.value })} className="input-voltech w-full rounded-lg px-3 py-2 text-sm" /></div></div>)}
+                </div>
+                <div className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4">
+                  <label className="block text-xs text-voltech-muted mb-3 font-semibold">Descuento Manual</label>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <select
+                        value={formData.tipoDescuento || 'none'}
+                        onChange={(e) => setFormData({ ...formData, tipoDescuento: e.target.value, descuentoValor: 0 })}
+                        className="input-voltech flex-1 rounded-lg px-3 py-2 text-sm"
+                      >
+                        <option value="none">Sin descuento</option>
+                        <option value="porcentaje">Porcentaje (%)</option>
+                        <option value="monto">Monto fijo ($)</option>
+                      </select>
+                    </div>
+                    {formData.tipoDescuento !== 'none' && (
+                      <div>
+                        <label className="block text-xs text-voltech-muted mb-1">
+                          {formData.tipoDescuento === 'porcentaje' ? 'Porcentaje (%)' : 'Monto ($)'}
+                        </label>
+                        <input
+                          type="number"
+                          step={formData.tipoDescuento === 'porcentaje' ? '0.1' : '0.01'}
+                          min="0"
+                          max={formData.tipoDescuento === 'porcentaje' ? '100' : subtotal}
+                          value={formData.descuentoValor || ''}
+                          onChange={(e) => setFormData({ ...formData, descuentoValor: Number(e.target.value) })}
+                          className="input-voltech w-full rounded-lg px-3 py-2 text-sm"
+                          placeholder={formData.tipoDescuento === 'porcentaje' ? 'Ej: 10' : 'Ej: 5.00'}
+                        />
+                        {formData.descuentoValor > 0 && (
+                          <p className="text-xs text-voltech-success mt-1">
+                            Descuento: -${formData.tipoDescuento === 'porcentaje' 
+                              ? (subtotal * formData.descuentoValor / 100).toFixed(2) 
+                              : Number(formData.descuentoValor).toFixed(2)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1567,7 +1653,18 @@ export default function VentasProductosPage() {
                       <td className="px-4 py-3 text-sm text-voltech-warning">{calcularDiasAtraso(venta) > 0 ? `+${calcularDiasAtraso(venta)}` : '0'}</td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{(venta.metodoPago || '').replace('_', ' ')}</td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{venta.carteraId || 'N/A'}</td>
-                      <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full ${venta.estado === 'pagado' ? 'bg-voltech-success/20 text-voltech-success' : 'bg-voltech-warning/20 text-voltech-warning'}`}>{venta.estado === 'pagado' ? 'Pagado' : 'Pendiente'}</span></td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          venta.estado === 'pagado' ? 'bg-emerald-500/20 text-emerald-300' :
+                          venta.estado === 'debe' ? 'bg-amber-500/20 text-amber-300' :
+                          venta.estado === 'cancelado' ? 'bg-rose-500/20 text-rose-300' :
+                          'bg-voltech-warning/20 text-voltech-warning'
+                        }`}>
+                          {venta.estado === 'pagado' ? 'Pagado' :
+                           venta.estado === 'debe' ? 'Debe' :
+                           venta.estado === 'cancelado' ? 'Cancelado' : 'Pendiente'}
+                        </span>
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
                           <button onClick={() => { setShowWhatsappModal(venta); setWhatsappMode('gracias'); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-success transition-colors" title="Enviar mensaje de gracias"><MessageCircle className="w-4 h-4" /></button>
