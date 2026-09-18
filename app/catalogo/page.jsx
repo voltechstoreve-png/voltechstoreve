@@ -1221,22 +1221,16 @@
         return (a.producto || a.plataforma || '').localeCompare(b.producto || b.plataforma || '', 'es', { sensitivity: 'base' });
       });
     });
-    // Ordenar categorías alfabéticamente también
-    return Object.entries(grupos)
-      .sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }))
-      .map(([cat, items]) => [cat, [...items]]); // Crear nueva referencia para evitar mutaciones
+    return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }));
   }, [productosFiltrados]);
-    
+
   // ✅ Array plano con el MISMO orden que el catálogo (para navegación del modal)
   const productosEnOrdenCatalogo = useMemo(() => {
-    // Aplanar manteniendo el orden: primero ordenar por categoría, luego por marca, luego por nombre
-    const todosProductos = [];
-    productosAgrupados.forEach(([cat, items]) => {
-      items.forEach(producto => {
-        todosProductos.push(producto);
-      });
-    });
-    return todosProductos;
+    if (!productosAgrupados || productosAgrupados.length === 0) return [];
+    // Aplanar manteniendo el orden exacto del catálogo
+    return productosAgrupados.reduce((acc, [_, items]) => {
+      return acc.concat(items);
+    }, []);
   }, [productosAgrupados]);
   const streamingAgrupados = useMemo(() => {
     const grupos = {};
