@@ -2418,12 +2418,24 @@
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-[80] flex items-center justify-center p-4" onClick={() => { setSelectedProduct(null); setVerDescripcionCompleta(false); }}>
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className={`${cardBg} border ${cardBorder} rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col relative`} onClick={(e) => e.stopPropagation()}>
               
-              {/* HEADER: Categoría + contador local */}
+              {/* HEADER: Categoría + contador local (orden estricto) */}
               <div className={`sticky top-0 ${cardBg} border-b ${cardBorder} p-4 flex justify-between items-center z-10`}>
                 {(() => {
-                  // Calcular índice dentro de la categoría actual
+                  const productosOrdenadosHeader = [...productos]
+                    .filter(p => p.publicado !== false)
+                    .sort((a, b) => {
+                      const catA = (a.categoria || '').toUpperCase();
+                      const catB = (b.categoria || '').toUpperCase();
+                      if (catA !== catB) return catA.localeCompare(catB, 'es', { sensitivity: 'base' });
+                      const marcaA = (a.marca || '').toUpperCase();
+                      const marcaB = (b.marca || '').toUpperCase();
+                      if (marcaA !== marcaB) return marcaA.localeCompare(marcaB, 'es', { sensitivity: 'base' });
+                      return (a.producto || a.plataforma || '').localeCompare(b.producto || b.plataforma || '', 'es', { sensitivity: 'base' });
+                    });
                   const categoriaActual = selectedProduct.categoria || 'OTROS';
-                  const productosCategoria = productosAgrupados.find(([cat]) => cat.toUpperCase() === categoriaActual.toUpperCase())?.[1] || [];
+                  const productosCategoria = productosOrdenadosHeader.filter(p => 
+                    (p.categoria || '').toUpperCase() === categoriaActual.toUpperCase()
+                  );
                   const idxCategoria = productosCategoria.findIndex(p => p.id === selectedProduct.id);
                   
                   return (
@@ -2595,42 +2607,59 @@
                 </div>
               </div>
 
-              {/* ✅ FLECHAS DE NAVEGACIÓN ABAJO (fuera del contenido, no tapan la imagen) */}
+              {/* ✅ FLECHAS DE NAVEGACIÓN ABAJO - Orden estricto Categoría→Marca→Nombre */}
               {(() => {
-                // ✅ Usar el mismo orden que el catálogo (Categoría → Marca → Producto)
-                const productosLista = navTab === 'explorar' && activeSection === 'streaming' 
-                  ? streamingFiltrados 
-                  : productosEnOrdenCatalogo;
-                const idxActual = productosLista.findIndex(p => p.id === selectedProduct.id);
-                const productoAnterior = idxActual > 0 ? productosLista[idxActual - 1] : null;
-                const productoSiguiente = idxActual < productosLista.length - 1 ? productosLista[idxActual + 1] : null;
-                
-                if (!productoAnterior && !productoSiguiente) return null;
-                
+                // ✅ Array ordenado estrictamente (Categoría → Marca → Nombre)
+                const productosOrdenados = useMemo(() => {
+                  return [...productos]
+                    .filter(p => p.publicado !== false)
+                    .sort((a, b) => {
+                      const catA = (a.categoria || '').toUpperCase();
+                      const catB = (b.categoria || '').toUpperCase();
+                      if (catA !== catB) return catA.localeCompare(catB, 'es', { sensitivity: 'base' });
+                      const marcaA = (a.marca || '').toUpperCase();
+                      const marcaB = (b.marca || '').toUpperCase();
+                      if (marcaA !== marcaB) return marcaA.localeCompare(marcaB, 'es', { sensitivity: 'base' });
+                      return (a.producto || a.plataforma || '').localeCompare(b.producto || b.plataforma || '', 'es', { sensitivity: 'base' });
+                    });
+                }, [productos]);
+
+                // ✅ Índice global del producto activo
+                const indiceGlobal = productosOrdenados.findIndex(p => p.id === selectedProduct.id);
+
+                // ✅ Productos de la misma categoría (para el header)
+                const productosCategoria = productosOrdenados.filter(p => 
+                  (p.categoria || '').toUpperCase() === (selectedProduct.categoria || '').toUpperCase()
+                );
+                const indiceCategoria = productosCategoria.findIndex(p => p.id === selectedProduct.id);
+
+                // ✅ Botones deshabilitados en los extremos
+                const esPrimerProducto = indiceGlobal === 0;
+                const esUltimoProducto = indiceGlobal === productosOrdenados.length - 1;
+
+                const irAnterior = () => {
+                  if (!esPrimerProducto) setSelectedProduct(productosOrdenados[indiceGlobal - 1]);
+                };
+                const irSiguiente = () => {
+                  if (!esUltimoProducto) setSelectedProduct(productosOrdenados[indiceGlobal + 1]);
+                };
+
                 return (
                   <div className={`border-t ${cardBorder} p-3 flex items-center justify-between bg-voltech-dark/50`}>
                     <button
-                      onClick={(e) => { e.stopPropagation(); productoAnterior && setSelectedProduct(productoAnterior); }}
-                      disabled={!productoAnterior}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${
-                        productoAnterior 
-                          ? 'bg-voltech-cyan/20 text-voltech-cyan hover:bg-voltech-cyan/30' 
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                      }`}
+                      onClick={(e) => { e.stopPropagation(); irAnterior(); }}
+                      disabled={esPrimerProducto}
+                      className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-voltech-cyan/20 text-voltech-cyan hover:bg-voltech-cyan/30"
                     >
                       <span>←</span> Anterior
                     </button>
                     <span className="text-xs text-voltech-muted font-medium">
-                      {idxActual + 1} de {productos.length}
+                      {indiceGlobal + 1} de {productosOrdenados.length}
                     </span>
                     <button
-                      onClick={(e) => { e.stopPropagation(); productoSiguiente && setSelectedProduct(productoSiguiente); }}
-                      disabled={!productoSiguiente}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${
-                        productoSiguiente 
-                          ? 'bg-voltech-cyan/20 text-voltech-cyan hover:bg-voltech-cyan/30' 
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                      }`}
+                      onClick={(e) => { e.stopPropagation(); irSiguiente(); }}
+                      disabled={esUltimoProducto}
+                      className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-voltech-cyan/20 text-voltech-cyan hover:bg-voltech-cyan/30"
                     >
                       Siguiente <span>→</span>
                     </button>
