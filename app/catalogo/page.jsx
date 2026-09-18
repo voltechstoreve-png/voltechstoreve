@@ -1143,6 +1143,7 @@
     };
 
   // ✅ ACTUALIZADO: Incluir 'kit' y permitir productos sin 'tipo' definido para no ocultarlos por error de datos
+  // ✅ Los kits se muestran SIEMPRE, sin importar si están "bajo pedido" o no
   const productosFiltrados = (productos || []).filter(p => {
     const searchTermLower = searchTerm.toLowerCase();
     const match = (p.producto || '').toLowerCase().includes(searchTermLower) || 
@@ -1156,7 +1157,18 @@
     // ✅ Si 'tipo' es null, undefined o vacío, lo asumimos como 'fisico' para no ocultarlo
     const esTipoValido = !p.tipo || p.tipo === 'fisico' || p.tipo === 'kit';
     
-    return match && (!filterCategory || p.categoria === filterCategory) && (!filterBrand || p.marca === filterBrand) && esTipoValido && !p.esCombo && precioActual >= min && precioActual <= max;
+    // ✅ Los kits se muestran siempre (incluso si están "bajo pedido")
+    // Los productos normales solo se ocultan si están explícitamente marcados como no publicados
+    const debeMostrarse = p.tipo === 'kit' || (p.publicado !== false);
+    
+    return match && 
+           (!filterCategory || p.categoria === filterCategory) && 
+           (!filterBrand || p.marca === filterBrand) && 
+           esTipoValido && 
+           !p.esCombo && 
+           debeMostrarse &&
+           precioActual >= min && 
+           precioActual <= max;
   });    const streamingFiltrados = (productos || []).filter(p => {
       const searchTermLower = searchTerm.toLowerCase();
       const match = (p.plataforma || '').toLowerCase().includes(searchTermLower) ||
