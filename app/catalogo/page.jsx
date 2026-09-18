@@ -1278,9 +1278,34 @@
 
   // ✅ Array plano con el MISMO orden que el catálogo (para navegación del modal)
   const productosEnOrdenCatalogo = useMemo(() => {
-    if (!productos || productos.length === 0) return [];
-    return [...productosFiltrados];
-  }, [productosFiltrados]);
+    if (!productosAgrupados || !Array.isArray(productosAgrupados)) return [];
+    // Aplanar manteniendo el orden exacto del catálogo
+    const todos = [];
+    for (let i = 0; i < productosAgrupados.length; i++) {
+      const items = productosAgrupados[i][1];
+      if (Array.isArray(items)) {
+        for (let j = 0; j < items.length; j++) {
+          todos.push(items[j]);
+        }
+      }
+    }
+    return todos;
+  }, [productosAgrupados]);
+
+  // ✅ Array ordenado estrictamente (Categoría → Marca → Nombre) - PARA EL MODAL
+  const productosOrdenadosModal = useMemo(() => {
+    return [...productos]
+      .filter(p => p.publicado !== false)
+      .sort((a, b) => {
+        const catA = (a.categoria || '').toUpperCase();
+        const catB = (b.categoria || '').toUpperCase();
+        if (catA !== catB) return catA.localeCompare(catB, 'es', { sensitivity: 'base' });
+        const marcaA = (a.marca || '').toUpperCase();
+        const marcaB = (b.marca || '').toUpperCase();
+        if (marcaA !== marcaB) return marcaA.localeCompare(marcaB, 'es', { sensitivity: 'base' });
+        return (a.producto || a.plataforma || '').localeCompare(b.producto || b.plataforma || '', 'es', { sensitivity: 'base' });
+      });
+  }, [productos]);
   const streamingAgrupados = useMemo(() => {
     const grupos = {};
     streamingFiltrados.forEach(p => {
@@ -2652,39 +2677,18 @@
 
               {/* ✅ FLECHAS DE NAVEGACIÓN ABAJO - Orden estricto Categoría→Marca→Nombre */}
               {(() => {
-                // ✅ Array ordenado estrictamente (Categoría → Marca → Nombre)
-                const productosOrdenados = useMemo(() => {
-                  return [...productos]
-                    .filter(p => p.publicado !== false)
-                    .sort((a, b) => {
-                      const catA = (a.categoria || '').toUpperCase();
-                      const catB = (b.categoria || '').toUpperCase();
-                      if (catA !== catB) return catA.localeCompare(catB, 'es', { sensitivity: 'base' });
-                      const marcaA = (a.marca || '').toUpperCase();
-                      const marcaB = (b.marca || '').toUpperCase();
-                      if (marcaA !== marcaB) return marcaA.localeCompare(marcaB, 'es', { sensitivity: 'base' });
-                      return (a.producto || a.plataforma || '').localeCompare(b.producto || b.plataforma || '', 'es', { sensitivity: 'base' });
-                    });
-                }, [productos]);
-
                 // ✅ Índice global del producto activo
-                const indiceGlobal = productosOrdenados.findIndex(p => p.id === selectedProduct.id);
-
-                // ✅ Productos de la misma categoría (para el header)
-                const productosCategoria = productosOrdenados.filter(p => 
-                  (p.categoria || '').toUpperCase() === (selectedProduct.categoria || '').toUpperCase()
-                );
-                const indiceCategoria = productosCategoria.findIndex(p => p.id === selectedProduct.id);
+                const indiceGlobal = productosOrdenadosModal.findIndex(p => p.id === selectedProduct.id);
 
                 // ✅ Botones deshabilitados en los extremos
                 const esPrimerProducto = indiceGlobal === 0;
-                const esUltimoProducto = indiceGlobal === productosOrdenados.length - 1;
+                const esUltimoProducto = indiceGlobal === productosOrdenadosModal.length - 1;
 
                 const irAnterior = () => {
-                  if (!esPrimerProducto) setSelectedProduct(productosOrdenados[indiceGlobal - 1]);
+                  if (!esPrimerProducto) setSelectedProduct(productosOrdenadosModal[indiceGlobal - 1]);
                 };
                 const irSiguiente = () => {
-                  if (!esUltimoProducto) setSelectedProduct(productosOrdenados[indiceGlobal + 1]);
+                  if (!esUltimoProducto) setSelectedProduct(productosOrdenadosModal[indiceGlobal + 1]);
                 };
 
                 return (
@@ -2697,7 +2701,7 @@
                       <span>←</span> Anterior
                     </button>
                     <span className="text-xs text-voltech-muted font-medium">
-                      {indiceGlobal + 1} de {productosOrdenados.length}
+                      {indiceGlobal + 1} de {productosOrdenadosModal.length}
                     </span>
                     <button
                       onClick={(e) => { e.stopPropagation(); irSiguiente(); }}
