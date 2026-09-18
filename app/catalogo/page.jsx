@@ -1278,12 +1278,9 @@
 
   // ✅ Array plano con el MISMO orden que el catálogo (para navegación del modal)
   const productosEnOrdenCatalogo = useMemo(() => {
-    if (!productosAgrupados || productosAgrupados.length === 0) return [];
-    // Aplanar manteniendo el orden exacto del catálogo
-    return productosAgrupados.reduce((acc, [_, items]) => {
-      return acc.concat(items);
-    }, []);
-  }, [productosAgrupados]);
+    if (!productos || productos.length === 0) return [];
+    return [...productosFiltrados];
+  }, [productosFiltrados]);
   const streamingAgrupados = useMemo(() => {
     const grupos = {};
     streamingFiltrados.forEach(p => {
