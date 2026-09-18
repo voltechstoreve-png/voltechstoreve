@@ -755,141 +755,181 @@
     };
 
     const finalizarPedido = async () => {
+        // ✅ 1. VALIDACIONES
         if (cart.length === 0) { toast.error('Carrito vacío'); return; }
-        if (!clienteNombre.trim() || !clienteTelefono.trim()) { toast.error('Ingresa tu nombre y teléfono para procesar el pedido'); return; }
-        if (!paymentMethod) { toast.error('Selecciona método de pago'); return; }      if (!terminosAceptados) { toast.error('Debes aceptar los Términos y Condiciones para finalizar tu pedido'); return; }
+        if (!clienteNombre.trim()) { toast.error('Ingresa tu nombre para procesar el pedido'); return; }
+        if (!clienteTelefono.trim()) { toast.error('Ingresa tu teléfono para procesar el pedido'); return; }
+        if (!paymentMethod) { toast.error('Selecciona método de pago'); return; }
+        if (!terminosAceptados) { toast.error('Debes aceptar los Términos y Condiciones para finalizar tu pedido'); return; }
         if (!tieneSoloProductosDigitales) {
-        if (deliveryMethod === 'retiro' && !selectedAddress) { toast.error('Selecciona punto de retiro'); return; }
-        if (deliveryMethod === 'delivery' && !customerLocation) { toast.error('Ingresa tu ubicación'); return; }
-        if (deliveryMethod === 'nacional' && !oficinaDestino) { toast.error('Ingresa la oficina destino'); return; }
-      }
+          if (deliveryMethod === 'retiro' && !selectedAddress) { toast.error('Selecciona punto de retiro'); return; }
+          if (deliveryMethod === 'delivery' && !customerLocation) { toast.error('Ingresa tu ubicación'); return; }
+          if (deliveryMethod === 'nacional' && !oficinaDestino) { toast.error('Ingresa la oficina destino'); return; }
+        }
 
-      const total = calculateTotal();
-      const envio = calcularEnvio();
-      let mensaje = `¡Hola! Quiero realizar el siguiente pedido:\n\n`;
-      cart.forEach(item => {
-        const precioInfo = getPrecioMostrar(item);
-        const subtotal = precioInfo.precioPrincipal * item.cantidad;
-        mensaje += `• ${item.plataforma || item.producto} x${item.cantidad} - $${subtotal.toFixed(2)}\n`;
-      });
-      
-      const subtotalSinEnvio = cart.reduce((sum, item) => sum + (getPrecioMostrar(item).precioPrincipal * item.cantidad), 0);
-      mensaje += `\n Subtotal: $${subtotalSinEnvio.toFixed(2)}`;
-      
-      if (appliedCoupon) {
-        mensaje += `\n 🎟️ Cupón: ${appliedCoupon.codigo} (-$${appliedCoupon.descuentoCalculado.toFixed(2)})`;
-      }
-      const descAutoSuperior = (subtotalAplicableAuto() * (pctAutoDescuento / 100)) + montoAutoDescuento;
-      const descAutoInferior = (subtotalAplicableInferior() * (pctInferiorAuto / 100)) + montoInferiorAuto;
-      const descOpinion = opinionVerificada ? (subtotalSinEnvio * (pctOpinionDescuento / 100) + montoOpinionDescuento) : 0;
-      
-      if (pctAutoDescuento > 0 || montoAutoDescuento > 0) {
-        mensaje += `\n ⚡ Oferta${pctAutoDescuento > 0 ? ` (${pctAutoDescuento}%)` : ''}${montoAutoDescuento > 0 ? ` ($${montoAutoDescuento})` : ''}: -$${descAutoSuperior.toFixed(2)}${bannerSuperiorFinal?.texto ? ` (${bannerSuperiorFinal.texto})` : ''}`;
-      }
-      if (descAutoInferior > 0) {
-        const tipoLabel = tipoOfertaInferior === 'descuento_streaming' ? 'Streaming' : 'Productos';
-        mensaje += `\n ⚡ ${tipoLabel}${pctInferiorAuto > 0 ? ` (${pctInferiorAuto}%)` : ''}${montoInferiorAuto > 0 ? ` ($${montoInferiorAuto})` : ''}: -$${descAutoInferior.toFixed(2)}${bannerInferior?.texto ? ` (${bannerInferior.texto})` : ''}`;
-      }
-      if (opinionVerificada && descOpinion > 0) {
-        mensaje += `\n ⭐ Opinión verificada: -$${descOpinion.toFixed(2)} (${bannerInferior?.texto || 'opinión'})`;
-      }
-      if (opinionVerificada && ticketsOpinion > 0) {
-        mensaje += `\n 🎟️ Opinión verificada: +${ticketsOpinion} tickets de sorteo`;
-      }
-      if (autoReferrer) {
-        mensaje += `\n Referido por: ${autoReferrer}`;
-      }
-      if (deliveryMethod === 'nacional') {
-      const infoNac = envioNacionalInfo();
-      mensaje += `
-      Envío Nacional: ${infoNac.gratis ? 'GRATIS' : infoNac.texto + ' (lo pagas al recibir)'}`;
-      } else {
-      mensaje += `
-      Envío: ${envio === 0 ? 'GRATIS' : '$' + envio.toFixed(2)}`;
-      }
-      mensaje += `\n💵 TOTAL: $${total.toFixed(2)} (Bs ${calcularPrecioBs(total)})\n`;
-      
-      if (!tieneSoloProductosDigitales) {
-        if (deliveryMethod === 'retiro') mensaje += `\n Entrega: Retiro en ${selectedAddress}`;
-        else if (deliveryMethod === 'delivery') mensaje += `\n Entrega: Delivery a ${customerLocation}`;
-        else if (deliveryMethod === 'nacional') mensaje += `\n Envío Nacional: ${agenciaEnvio} - ${oficinaDestino}`;
-      } else {
-        mensaje += `\n Entrega: Digital / WhatsApp`;
-      }
-      mensaje += `
-      💳 Pago: ${paymentMethod}`;
-      // ✅ SINCRONIZA: crea el pedido en el panel como PENDIENTE (origen WEB) y guarda el cliente
-      try {
+        const total = calculateTotal();
+        const envio = calcularEnvio();
+        const subtotalSinEnvio = cart.reduce((sum, item) => sum + (getPrecioMostrar(item).precioPrincipal * item.cantidad), 0);
+
+        // ✅ 2. GENERAR MENSAJE DE WHATSAPP
+        let mensaje = `¡Hola! Quiero realizar el siguiente pedido:\n\n`;
+        cart.forEach(item => {
+          const precioInfo = getPrecioMostrar(item);
+          const subtotal = precioInfo.precioPrincipal * item.cantidad;
+          mensaje += `• ${item.plataforma || item.producto} x${item.cantidad} - $${subtotal.toFixed(2)}\n`;
+        });
+        
+        mensaje += `\n Subtotal: $${subtotalSinEnvio.toFixed(2)}`;
+        
+        if (appliedCoupon) {
+          mensaje += `\n 🎟️ Cupón: ${appliedCoupon.codigo} (-$${appliedCoupon.descuentoCalculado.toFixed(2)})`;
+        }
+        const descAutoSuperior = (subtotalAplicableAuto() * (pctAutoDescuento / 100)) + montoAutoDescuento;
+        const descAutoInferior = (subtotalAplicableInferior() * (pctInferiorAuto / 100)) + montoInferiorAuto;
+        const descOpinion = opinionVerificada ? (subtotalSinEnvio * (pctOpinionDescuento / 100) + montoOpinionDescuento) : 0;
+        
+        if (pctAutoDescuento > 0 || montoAutoDescuento > 0) {
+          mensaje += `\n  Oferta${pctAutoDescuento > 0 ? ` (${pctAutoDescuento}%)` : ''}${montoAutoDescuento > 0 ? ` ($${montoAutoDescuento})` : ''}: -$${descAutoSuperior.toFixed(2)}${bannerSuperiorFinal?.texto ? ` (${bannerSuperiorFinal.texto})` : ''}`;
+        }
+        if (descAutoInferior > 0) {
+          const tipoLabel = tipoOfertaInferior === 'descuento_streaming' ? 'Streaming' : 'Productos';
+          mensaje += `\n  ${tipoLabel}${pctInferiorAuto > 0 ? ` (${pctInferiorAuto}%)` : ''}${montoInferiorAuto > 0 ? ` ($${montoInferiorAuto})` : ''}: -$${descAutoInferior.toFixed(2)}${bannerInferior?.texto ? ` (${bannerInferior.texto})` : ''}`;
+        }
+        if (opinionVerificada && descOpinion > 0) {
+          mensaje += `\n ⭐ Opinión verificada: -$${descOpinion.toFixed(2)} (${bannerInferior?.texto || 'opinión'})`;
+        }
+        if (opinionVerificada && ticketsOpinion > 0) {
+          mensaje += `\n 🎟️ Opinión verificada: +${ticketsOpinion} tickets de sorteo`;
+        }
+        if (autoReferrer) {
+          mensaje += `\n Referido por: ${autoReferrer}`;
+        }
+        if (deliveryMethod === 'nacional') {
+          const infoNac = envioNacionalInfo();
+          mensaje += `\n Envío Nacional: ${infoNac.gratis ? 'GRATIS' : infoNac.texto + ' (lo pagas al recibir)'}`;
+        } else {
+          mensaje += `\n Envío: ${envio === 0 ? 'GRATIS' : '$' + envio.toFixed(2)}`;
+        }
+        mensaje += `\n💵 TOTAL: $${total.toFixed(2)} (Bs ${calcularPrecioBs(total)})\n`;
+        
+        if (!tieneSoloProductosDigitales) {
+          if (deliveryMethod === 'retiro') mensaje += `\n Entrega: Retiro en ${selectedAddress}`;
+          else if (deliveryMethod === 'delivery') mensaje += `\n Entrega: Delivery a ${customerLocation}`;
+          else if (deliveryMethod === 'nacional') mensaje += `\n Envío Nacional: ${agenciaEnvio} - ${oficinaDestino}`;
+        } else {
+          mensaje += `\n Entrega: Digital / WhatsApp`;
+        }
+        mensaje += `\n💳 Pago: ${paymentMethod}`;
+
+        // ✅ 3. GUARDAR EN SUPABASE ANTES DE ABRIR WHATSAPP
+        let clienteId = null;
+        let ventaId = null;
+
         if (supabase) {
-          // 1. Guardar o actualizar cliente en la tabla 'clientes' para que aparezca en el Panel
-          await supabase.from('clientes').upsert({
-            nombre: clienteNombre.trim(),
-            telefono: clienteTelefono.trim(),
-            origen: 'web',
-            fecha_registro: new Date().toISOString()
-          }, { onConflict: 'telefono' }).catch(() => {
-            // Fallback por si no hay constraint unique en la columna telefono
-            return supabase.from('clientes').insert({
-              nombre: clienteNombre.trim(),
-              telefono: clienteTelefono.trim(),
-              origen: 'web',
-              fecha_registro: new Date().toISOString()
-            });
-          });
+          try {
+            // 3.1 UPSERT de Cliente (buscar por teléfono)
+            const { data: clienteExistente } = await supabase
+              .from('clientes')
+              .select('id')
+              .eq('telefono', clienteTelefono.trim())
+              .maybeSingle();
 
-          const hoy = new Date();
-          const dia = String(hoy.getDate()).padStart(2, '0');
-          const mes = String(hoy.getMonth() + 1).padStart(2, '0');
-          const fechaHoy = hoy.toISOString().split('T')[0];
-          // Vendedor: referido interno o aleatorio del equipo
-          let vendedorWeb = '';
-          const { data: eq } = await supabase.from('usuarios').select('*').eq('activo', true);
-          const equipoActivo = eq || [];
-          if (autoReferrer) {
-            vendedorWeb = (equipoActivo.find(m => `VOLTECHSTORE-${(m.nombre || '').substring(0, 5).toUpperCase()}-${String(m.id).slice(-4)}` === autoReferrer) || {}).nombre || '';
-          }
-          if (!vendedorWeb && equipoActivo.length) vendedorWeb = equipoActivo[Math.floor(Math.random() * equipoActivo.length)].nombre;
-          const fisicos = cart.filter(i => i.tipo !== 'streaming' && (i.categoria || '').toUpperCase() !== 'STREAMING');
-          const streamings = cart.filter(i => i.tipo === 'streaming' || (i.categoria || '').toUpperCase() === 'STREAMING');
-          if (fisicos.length) {
-            const { count: cF } = await supabase.from('ventas').select('*', { count: 'exact', head: true }).eq('fecha', fechaHoy).eq('origen', 'web');
-            const subF = fisicos.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0);
-            await supabase.from('ventas').insert({
-              id: `web-${Date.now()}`, numeroOrden: `W-${dia}-${mes}-${String((cF || 0) + 1).padStart(3, '0')}`, fecha: fechaHoy,
-              vendedor: vendedorWeb, cliente: clienteNombre.trim(), telefono: clienteTelefono.trim(),
-              productos: fisicos.map(i => ({ productoId: i.id, sku: i.sku || '', nombre: i.producto || i.plataforma, categoria: i.categoria, marca: i.marca, cantidad: i.cantidad, precioUnitario: getPrecioMostrar(i).precioPrincipal, total: (getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad, tipo: 'fisico', esKit: false })),
-              subtotal: subF, total: subF, total_con_descuento: subF - ((descAutoSuperior + descAutoInferior + descOpinion) * (subF / (subtotalSinEnvio || 1))), descuento_aplicado: (descAutoSuperior + descAutoInferior + descOpinion) * (subF / (subtotalSinEnvio || 1)), descuento_origen: (descAutoSuperior + descAutoInferior + descOpinion) > 0 ? `Banner${opinionVerificada ? ' + Opinión' : ''}` : null,
-              enCuotas: false, montoAbonado: 0, montoPendiente: subF, metodoPago: paymentMethod, carteraId: '',
-              porcentaje_comision: 5, estado: 'pendiente', origen: 'web', stock_descontado: false,
-              fechaRegistro: new Date().toISOString(), tipo: 'producto'
-            });
-          }
-          if (streamings.length) {
-            const { count: cS } = await supabase.from('ventas_streaming').select('*', { count: 'exact', head: true }).eq('fecha', fechaHoy).eq('origen', 'web');
-            const subS = streamings.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0);
-            await supabase.from('ventas_streaming').insert({
-              id: `webs-${Date.now()}`, numeroOrden: `W-${dia}-${mes}-${String((cS || 0) + 1).padStart(3, '0')}`, fecha: fechaHoy,
-              vendedor: vendedorWeb, cliente: clienteNombre.trim(), telefono: clienteTelefono.trim(),
-              plataformas: streamings.map(i => ({ plataforma: i.plataforma || i.producto, cantidad: i.cantidad, precioDetal: getPrecioMostrar(i).precioPrincipal, fechaVencimiento: '', diasDisponibles: 30 })),
-              subtotal: subS, total: subS, descuento_aplicado: (descAutoSuperior + descAutoInferior + descOpinion) * (subS / (subtotalSinEnvio || 1)), descuento_origen: (descAutoSuperior + descAutoInferior + descOpinion) > 0 ? `Banner${opinionVerificada ? ' + Opinión' : ''}` : null, metodoPago: paymentMethod, cartera: '',
-              estado: 'pendiente', origen: 'web', fechaRegistro: new Date().toISOString()
-            });
+            if (clienteExistente) {
+              // Actualizar nombre si cambió
+              await supabase
+                .from('clientes')
+                .update({ nombre: clienteNombre.trim() })
+                .eq('id', clienteExistente.id);
+              clienteId = clienteExistente.id;
+            } else {
+              // Insertar nuevo cliente
+              const { data: nuevoCliente, error: errorCliente } = await supabase
+                .from('clientes')
+                .insert({
+                  nombre: clienteNombre.trim(),
+                  telefono: clienteTelefono.trim(),
+                  origen: 'web',
+                  fecha_registro: new Date().toISOString()
+                })
+                .select('id')
+                .single();
+              
+              if (errorCliente) {
+                console.warn('⚠️ Error al crear cliente:', errorCliente.message);
+              } else {
+                clienteId = nuevoCliente?.id;
+              }
+            }
+
+            // 3.2 INSERT en ventas_productos
+            const hoy = new Date();
+            const dia = String(hoy.getDate()).padStart(2, '0');
+            const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+            const fechaHoy = hoy.toISOString().split('T')[0];
+            const numeroOrden = `W-${dia}-${mes}-${String(Date.now()).slice(-4)}`;
+
+            const { data: nuevaVenta, error: errorVenta } = await supabase
+              .from('ventas_productos')
+              .insert({
+                cliente_id: clienteId,
+                numero_orden: numeroOrden,
+                fecha: fechaHoy,
+                productos: cart.map(item => ({
+                  productoId: item.id,
+                  sku: item.sku || '',
+                  nombre: item.producto || item.plataforma,
+                  categoria: item.categoria,
+                  marca: item.marca,
+                  cantidad: item.cantidad,
+                  precioUnitario: getPrecioMostrar(item).precioPrincipal,
+                  total: (getPrecioMostrar(item).precioPrincipal || 0) * item.cantidad,
+                  tipo: item.tipo || 'fisico'
+                })),
+                monto_total_usd: total,
+                monto_total_bs: parseFloat(calcularPrecioBs(total)),
+                metodo_entrega: deliveryMethod === 'retiro' ? 'Retiro' : deliveryMethod === 'delivery' ? 'Delivery' : deliveryMethod === 'nacional' ? 'Nacional' : 'Digital',
+                ubicacion_entrega: deliveryMethod === 'retiro' ? selectedAddress : deliveryMethod === 'delivery' ? customerLocation : deliveryMethod === 'nacional' ? `${agenciaEnvio} - ${oficinaDestino}` : 'Digital',
+                metodo_pago: paymentMethod,
+                estado: 'Pendiente',
+                origen: 'web',
+                subtotal: subtotalSinEnvio,
+                descuento_aplicado: descAutoSuperior + descAutoInferior + descOpinion + (appliedCoupon?.descuentoCalculado || 0),
+                codigo_cupon: appliedCoupon?.codigo || null,
+                referido: autoReferrer || null,
+                fecha_registro: new Date().toISOString()
+              })
+              .select('id')
+              .single();
+
+            if (errorVenta) {
+              console.warn('⚠️ Error al crear venta:', errorVenta.message);
+              toast.error('Error al registrar la orden. Se abrirá WhatsApp de todas formas.');
+            } else {
+              ventaId = nuevaVenta?.id;
+            }
+
+          } catch (e) {
+            console.warn('⚠️ Error en Supabase:', e.message);
           }
         }
-      } catch (e) { console.warn('⚠️ No se sincronizó el pedido:', e.message); }
 
-      // ✅ Marcar la opinión como usada (el descuento no se puede reutilizar)
-      if (opinionVerificada && opinionVerificadaId) {
-        try {
-          const opsLoc = (JSON.parse(localStorage.getItem('voltech_opiniones') || '[]')).map(o => o.id === opinionVerificadaId ? { ...o, cupon_usado: true } : o);
-          localStorage.setItem('voltech_opiniones', JSON.stringify(opsLoc));
-          setOpiniones(opsLoc);
-          if (supabase) await supabase.from('opiniones').update({ cupon_usado: true }).eq('id', opinionVerificadaId);
-        } catch (e) { console.warn('No se marcó la opinión como usada:', e.message); }
-      }
+        // ✅ 4. MARCAR OPINIÓN COMO USADA
+        if (opinionVerificada && opinionVerificadaId) {
+          try {
+            const opsLoc = (JSON.parse(localStorage.getItem('voltech_opiniones') || '[]')).map(o => o.id === opinionVerificadaId ? { ...o, cupon_usado: true } : o);
+            localStorage.setItem('voltech_opiniones', JSON.stringify(opsLoc));
+            setOpiniones(opsLoc);
+            if (supabase) await supabase.from('opiniones').update({ cupon_usado: true }).eq('id', opinionVerificadaId);
+          } catch (e) { console.warn('No se marcó la opinión como usada:', e.message); }
+        }
 
-      abrirWhatsAppNat(whatsappNumero, mensaje);
-      toast.success('Pedido enviado ✅ Lo verás en el panel como Pendiente');
+        // ✅ 5. ABRIR WHATSAPP
+        abrirWhatsAppNat(whatsappNumero, mensaje);
+
+        // ✅ 6. LIMPIAR CARRITO Y MOSTRAR CONFIRMACIÓN
+        setCart([]);
+        setShowCart(false);
+        toast.success(ventaId ? `✅ Pedido #${numeroOrden} registrado. Te contactaremos pronto.` : '✅ Pedido enviado por WhatsApp');
       };
 
   const comprarRapido = (producto) => {
