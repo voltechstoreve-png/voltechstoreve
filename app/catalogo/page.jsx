@@ -418,10 +418,22 @@
       }
     }, [productos]);
 
-      useEffect(() => {
-      localStorage.setItem('voltech_cart', JSON.stringify(cart));
+    useEffect(() => {
+      try {
+        // ✅ Guardar solo lo esencial del carrito
+        const cartLite = cart.map(item => ({
+          id: item.id,
+          cantidad: item.cantidad,
+          // NO guardar imágenes ni datos pesados
+        }));
+        localStorage.setItem('voltech_cart', JSON.stringify(cartLite));
+      } catch (e) {
+        console.warn('⚠️ No se pudo guardar el carrito:', e.message);
+        // Si falla, limpiar y empezar de cero
+        localStorage.removeItem('voltech_cart');
+      }
       setTerminosAceptados(false);
-      }, [cart]);
+    }, [cart]);
 
     // ✅ NUEVO: Contar visitas públicas (NO cuenta logueados), 1 por sesión
     useEffect(() => {
