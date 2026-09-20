@@ -2581,7 +2581,35 @@
       <AnimatePresence>
         {selectedProduct && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-[80] flex items-center justify-center p-4" onClick={() => { setSelectedProduct(null); setVerDescripcionCompleta(false); }}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className={`${cardBg} border ${cardBorder} rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col relative`} onClick={(e) => e.stopPropagation()}>
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.9, opacity: 0 }} 
+              className={`${cardBg} border ${cardBorder} rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col relative`}
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={(e) => {
+                const touch = e.touches[0];
+                e.currentTarget.dataset.touchStartX = touch.clientX;
+              }}
+              onTouchEnd={(e) => {
+                const touch = e.changedTouches[0];
+                const startX = parseFloat(e.currentTarget.dataset.touchStartX || '0');
+                const endX = touch.clientX;
+                const diff = startX - endX;
+                
+                if (Math.abs(diff) > 50) {
+                  const indiceGlobal = productosOrdenadosModal.findIndex(p => p.id === selectedProduct.id);
+                  const esPrimerProducto = indiceGlobal === 0;
+                  const esUltimoProducto = indiceGlobal === productosOrdenadosModal.length - 1;
+                  
+                  if (diff > 0 && !esUltimoProducto) {
+                    setSelectedProduct(productosOrdenadosModal[indiceGlobal + 1]);
+                  } else if (diff < 0 && !esPrimerProducto) {
+                    setSelectedProduct(productosOrdenadosModal[indiceGlobal - 1]);
+                  }
+                }
+              }}
+            >
               
               {/* HEADER: Categoría + contador local (orden estricto) */}
               <div className={`sticky top-0 ${cardBg} border-b ${cardBorder} p-4 flex justify-between items-center z-10`}>
@@ -2757,9 +2785,9 @@
                         </div>
                       )}
 
-                      {/* ✅ BOTÓN VER MÁS/MENOS - Justo arriba del botón de compra */}
+                      {/* ✅ BOTÓN VER ESPECIFICACIONES - Siempre visible arriba del botón de compra */}
                       {(selectedProduct.descripcion_detallada || (selectedProduct.caracteristicas && selectedProduct.caracteristicas.length > 0)) && (
-                        <div className="pt-2 mt-2 border-t border-slate-700">
+                        <div className="pt-2 mt-2">
                           <button
                             onClick={() => setVerDescripcionCompleta(!verDescripcionCompleta)}
                             className="w-full py-2.5 px-4 border-2 border-voltech-cyan/50 text-voltech-cyan font-semibold text-sm rounded-xl hover:bg-voltech-cyan/10 transition-all flex items-center justify-center gap-2"
@@ -2771,7 +2799,7 @@
                               </>
                             ) : (
                               <>
-                                <span>Ver más...</span>
+                                <span>Ver especificaciones</span>
                                 <span className="text-lg">▼</span>
                               </>
                             )}
@@ -2794,12 +2822,9 @@
                 </div>
               </div>
 
-              {/* ✅ FLECHAS DE NAVEGACIÓN - Desktop: botones | Móvil: swipe + contador */}
+              {/* ✅ BARRA INFERIOR - Desktop: botones | Móvil: solo contador */}
               {(() => {
-                // ✅ Índice global del producto activo
                 const indiceGlobal = productosOrdenadosModal.findIndex(p => p.id === selectedProduct.id);
-
-                // ✅ Botones deshabilitados en los extremos
                 const esPrimerProducto = indiceGlobal === 0;
                 const esUltimoProducto = indiceGlobal === productosOrdenadosModal.length - 1;
 
@@ -2810,36 +2835,8 @@
                   if (!esUltimoProducto) setSelectedProduct(productosOrdenadosModal[indiceGlobal + 1]);
                 };
 
-                // ✅ Manejo de touch/swipe para móvil
-                let touchStartX = 0;
-                let touchEndX = 0;
-
-                const handleTouchStart = (e) => {
-                  touchStartX = e.changedTouches[0].screenX;
-                };
-
-                const handleTouchEnd = (e) => {
-                  touchEndX = e.changedTouches[0].screenX;
-                  const swipeThreshold = 50;
-                  const diff = touchStartX - touchEndX;
-
-                  if (Math.abs(diff) > swipeThreshold) {
-                    if (diff > 0 && !esUltimoProducto) {
-                      // Swipe izquierda → siguiente
-                      irSiguiente();
-                    } else if (diff < 0 && !esPrimerProducto) {
-                      // Swipe derecha → anterior
-                      irAnterior();
-                    }
-                  }
-                };
-
                 return (
-                  <div 
-                    className={`border-t ${cardBorder} p-3 flex items-center justify-between bg-voltech-dark/50`}
-                    onTouchStart={handleTouchStart}
-                    onTouchEnd={handleTouchEnd}
-                  >
+                  <div className={`border-t ${cardBorder} p-3 flex items-center justify-between bg-voltech-dark/50`}>
                     {/* Botón Anterior - Solo desktop */}
                     <button
                       onClick={(e) => { e.stopPropagation(); irAnterior(); }}
@@ -2850,7 +2847,7 @@
                     </button>
 
                     {/* Contador centrado */}
-                    <span className="text-xs text-voltech-muted font-medium">
+                    <span className="text-xs text-voltech-muted font-medium mx-auto md:mx-0">
                       {indiceGlobal + 1} de {productosOrdenadosModal.length}
                     </span>
 
@@ -2862,13 +2859,6 @@
                     >
                       Siguiente <span>→</span>
                     </button>
-
-                    {/* Indicador visual de swipe - Solo móvil */}
-                    <div className="md:hidden text-xs text-voltech-muted flex items-center gap-1">
-                      <span className="text-lg">←</span>
-                      <span>desliza</span>
-                      <span className="text-lg">→</span>
-                    </div>
                   </div>
                 );
               })()}
