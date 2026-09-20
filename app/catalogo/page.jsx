@@ -2732,26 +2732,16 @@
                         <p className="flex items-center gap-2 text-sm text-voltech-muted"><Clock className="w-4 h-4" /> Duración: {selectedProduct.duracion}</p>
                       )}
 
-                      {/* ✅ ESPECIFICACIONES TÉCNICAS (con botón Ver más / Ver menos) */}
-                      {selectedProduct.descripcion_detallada && (
+                      {/* ✅ ESPECIFICACIONES TÉCNICAS - OCULTAS por defecto */}
+                      {verDescripcionCompleta && selectedProduct.descripcion_detallada && (
                         <div className={`${darkMode ? 'bg-slate-800' : 'bg-slate-50'} border ${cardBorder} rounded-lg p-3`}>
                           <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm">
                             <Info className="w-4 h-4 text-voltech-cyan" />
                             Especificaciones
                           </h4>
-                          <div className="relative">
-                            <p className={`text-sm text-voltech-muted whitespace-pre-line transition-all duration-300 ${verDescripcionCompleta ? '' : 'line-clamp-4'}`}>
-                              {selectedProduct.descripcion_detallada}
-                            </p>
-                            {selectedProduct.descripcion_detallada.length > 150 && (
-                              <button 
-                                onClick={() => setVerDescripcionCompleta(!verDescripcionCompleta)}
-                                className="text-xs text-voltech-cyan font-semibold mt-1.5 hover:underline flex items-center gap-1"
-                              >
-                                {verDescripcionCompleta ? 'Ver menos ▲' : 'Ver más ▼'}
-                              </button>
-                            )}
-                          </div>
+                          <p className="text-sm text-voltech-muted whitespace-pre-line">
+                            {selectedProduct.descripcion_detallada}
+                          </p>
                         </div>
                       )}
                       
