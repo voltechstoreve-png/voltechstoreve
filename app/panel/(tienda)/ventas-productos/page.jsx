@@ -984,8 +984,17 @@ export default function VentasProductosPage() {
   const ventasHoy = ventasVisibles.filter(v => v.fecha === new Date().toISOString().split('T')[0]);
   const totalIngresosHoy = ventasHoy.reduce((acc, v) => acc + Number(v.montoAbonado || v.total || 0), 0);
   const totalPendiente = ventasVisibles.reduce((acc, v) => acc + Number(v.montoPendiente || 0), 0);
-  const totalProductosVendidos = ventasVisibles.reduce((acc, v) => acc + v.productos.reduce((a, p) => a + Number(p.cantidad || 1), 0), 0);
-  const ventasFiltradas = ventasVisibles.filter(v => v.cliente.toLowerCase().includes(searchTerm.toLowerCase()) || v.productos.some(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase())));
+  const totalProductosVendidos = ventasVisibles.reduce((acc, v) => acc + (v.productos || []).reduce((a, p) => a + Number(p.cantidad || 1), 0), 0);
+  
+  // ✅ FILTRO SEGURO: Evita errores si cliente o productos son undefined/null
+  const ventasFiltradas = ventasVisibles.filter(v => {
+    const clienteName = (v.cliente || '').toLowerCase();
+    const searchTermLower = (searchTerm || '').toLowerCase();
+    const productosMatch = (v.productos || []).some(p => 
+      (p.nombre || '').toLowerCase().includes(searchTermLower)
+    );
+    return clienteName.includes(searchTermLower) || productosMatch;
+  });
 
   return (
         <div className="space-y-6">
