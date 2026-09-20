@@ -878,23 +878,66 @@
 
         if (supabase) {
           try {
-            // 3.1 UPSERT de Cliente (buscar por teléfono)
-            const { data: clienteExistente } = await supabase
+            console.log('🔍 [DEBUG] Buscando cliente con teléfono:', clienteTelefono.trim());
+            
+            const { data: clienteExistente, error: errorBusqueda } = await supabase
               .from('clientes')
               .select('id')
               .eq('telefono', clienteTelefono.trim())
               .maybeSingle();
 
+            if (errorBusqueda) {
+              console.error('❌ [DEBUG] Error buscando cliente:', errorBusqueda.message, errorBusqueda.details);
+            }
+
             if (clienteExistente) {
-              await supabase.from('clientes').update({ nombre: clienteNombre.trim() }).eq('id', clienteExistente.id);
+              console.log('✅ [DEBUG] Cliente existente encontrado, ID:', clienteExistente.id);
+              const { error: errorUpdate } = await supabase
+                .from('clientes')
+                .update({ nombre: clienteNombre.trim() })
+                .eq('id', clienteExistente.id);
+              
+              if (errorUpdate) {
+                console.error('❌ [DEBUG] Error actualizando cliente:', errorUpdate.message);
+              }
               clienteId = clienteExistente.id;
             } else {
+              console.log('🆕 [DEBUG] Creando nuevo cliente...');
+              const nuevoClienteData = { 
+                nombre: clienteNombre.trim(), 
+                telefono: clienteTelefono.trim(), 
+                origen: 'web', 
+                fecha_registro: new Date().toISOString() 
+              };
+              console.log('📦 [DEBUG] Datos a insertar en clientes:', nuevoClienteData);
+              
               const { data: nuevoCliente, error: errorCliente } = await supabase
                 .from('clientes')
-                .insert({ nombre: clienteNombre.trim(), telefono: clienteTelefono.trim(), origen: 'web', fecha_registro: new Date().toISOString() })
-                .select('id').single();
+                .insert(nuevoClienteData)
+                .select('id')
+                .single();
               
-              if (!errorCliente && nuevoCliente) clienteId = nuevoCliente.id;
+              if (errorCliente) {
+                console.error('❌ [DEBUG] Error creando cliente:', errorCliente.message, errorCliente.details, errorCliente.hint);
+                
+                // ⚠️ PLAN B: Intentar sin fecha_registro por si la columna se llama diferente (ej. fechaRegistro)
+                console.log('⚠️ [DEBUG] Reintentando sin fecha_registro...');
+                const { data: nc2, error: err2 } = await supabase
+                  .from('clientes')
+                  .insert({ nombre: clienteNombre.trim(), telefono: clienteTelefono.trim(), origen: 'web' })
+                  .select('id')
+                  .single();
+                
+                if (err2) {
+                  console.error('❌ [DEBUG] Segundo intento fallido:', err2.message, err2.details);
+                } else {
+                  console.log('✅ [DEBUG] Cliente creado en segundo intento, ID:', nc2?.id);
+                  if (nc2) clienteId = nc2.id;
+                }
+              } else {
+                console.log('✅ [DEBUG] Cliente creado exitosamente, ID:', nuevoCliente?.id);
+                if (nuevoCliente) clienteId = nuevoCliente.id;
+              }
             }
 
             const hoy = new Date();
