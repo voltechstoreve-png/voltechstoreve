@@ -302,7 +302,15 @@
       const opinionesGuardadas = localStorage.getItem('voltech_opiniones');
       const cartGuardado = localStorage.getItem('voltech_cart');
 
-      if (cartGuardado) setCart(JSON.parse(cartGuardado));
+      if (cartGuardado) {
+        const cartLite = JSON.parse(cartGuardado);
+        // ✅ Recuperar datos completos de cada producto
+        const cartCompleto = cartLite.map(item => {
+          const productoCompleto = productos.find(p => p.id === item.id);
+          return productoCompleto ? { ...productoCompleto, cantidad: item.cantidad } : item;
+        });
+        setCart(cartCompleto);
+      }
       if (participantesGuardados) setParticipantes(JSON.parse(participantesGuardados));
       if (opinionesGuardadas) setOpiniones(JSON.parse(opinionesGuardadas));
     }, []);
@@ -798,7 +806,6 @@
         // ✅ 2. GENERAR MENSAJE DE WHATSAPP
         let mensaje = `¡Hola! Quiero realizar el siguiente pedido:\n\n`;
         
-        // Productos físicos
         if (productosFisicos.length > 0) {
           mensaje += `📦 *PRODUCTOS FÍSICOS:*\n`;
           productosFisicos.forEach(item => {
@@ -810,7 +817,6 @@
           mensaje += `\n`;
         }
         
-        // Productos streaming
         if (productosStreaming.length > 0) {
           mensaje += `📺 *PLATAFORMAS STREAMING:*\n`;
           productosStreaming.forEach(item => {
@@ -846,11 +852,11 @@
           mensaje += `🎟️ Opinión verificada: +${ticketsOpinion} tickets de sorteo\n`;
         }
         if (autoReferrer) {
-          mensaje += ` Referido por: ${autoReferrer}\n`;
+          mensaje += `👤 Referido por: ${autoReferrer}\n`;
         }
         if (deliveryMethod === 'nacional') {
           const infoNac = envioNacionalInfo();
-          mensaje += ` Envío Nacional: ${infoNac.gratis ? 'GRATIS' : infoNac.texto + ' (lo pagas al recibir)'}\n`;
+          mensaje += `🚚 Envío Nacional: ${infoNac.gratis ? 'GRATIS' : infoNac.texto + ' (lo pagas al recibir)'}\n`;
         } else {
           mensaje += `🚚 Envío: ${envio === 0 ? 'GRATIS' : '$' + envio.toFixed(2)}\n`;
         }
@@ -868,6 +874,7 @@
         // ✅ 3. GUARDAR EN SUPABASE ANTES DE ABRIR WHATSAPP
         let clienteId = null;
         let ventasCreadas = { fisica: false, streaming: false };
+        let numeroOrden = '';
 
         if (supabase) {
           try {
@@ -879,127 +886,73 @@
               .maybeSingle();
 
             if (clienteExistente) {
-              // Actualizar nombre si cambió
-              await supabase
-                .from('clientes')
-                .update({ nombre: clienteNombre.trim() })
-                .eq('id', clienteExistente.id);
+              await supabase.from('clientes').update({ nombre: clienteNombre.trim() }).eq('id', clienteExistente.id);
               clienteId = clienteExistente.id;
             } else {
-              // Insertar nuevo cliente
               const { data: nuevoCliente, error: errorCliente } = await supabase
                 .from('clientes')
-                .insert({
-                  nombre: clienteNombre.trim(),
-                  telefono: clienteTelefono.trim(),
-                  origen: 'web',
-                  fecha_registro: new Date().toISOString()
-                })
-                .select('id')
-                .single();
+                .insert({ nombre: clienteNombre.trim(), telefono: clienteTelefono.trim(), origen: 'web', fecha_registro: new Date().toISOString() })
+                .select('id').single();
               
-              if (errorCliente) {
-                console.warn('️ Error al crear cliente:', errorCliente.message);
-              } else {
-                clienteId = nuevoCliente?.id;
-              }
+              if (!errorCliente && nuevoCliente) clienteId = nuevoCliente.id;
             }
 
             const hoy = new Date();
             const dia = String(hoy.getDate()).padStart(2, '0');
             const mes = String(hoy.getMonth() + 1).padStart(2, '0');
-            const fechaHoy = hoy.toISOString().split('T')[0];
-            const numeroOrden = `W-${dia}-${mes}-${String(Date.now()).slice(-4)}`;
+            numeroOrden = `W-${dia}-${mes}-${String(Date.now()).slice(-4)}`;
 
-            // Calcular totales por tipo
             const subtotalFisicos = productosFisicos.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0);
             const subtotalStreaming = productosStreaming.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0);
             const totalDescuentos = descAutoSuperior + descAutoInferior + descOpinion + (appliedCoupon?.descuentoCalculado || 0);
             
-            // Proporción de descuentos
             const proporcionFisicos = subtotalSinEnvio > 0 ? subtotalFisicos / subtotalSinEnvio : 0;
             const proporcionStreaming = subtotalSinEnvio > 0 ? subtotalStreaming / subtotalSinEnvio : 0;
             const descuentoFisicos = totalDescuentos * proporcionFisicos;
             const descuentoStreaming = totalDescuentos * proporcionStreaming;
 
-            // 3.2 INSERT en ventas_productos (si hay productos físicos)
+            // 3.2 INSERT en ventas_productos
             if (productosFisicos.length > 0) {
-              const { data: ventaFisica, error: errorFisica } = await supabase
-                .from('ventas_productos')
-                .insert({
-                  cliente_id: clienteId,
-                  numero_orden: numeroOrden,
-                  fecha: fechaHoy,
-                  productos: productosFisicos.map(item => ({
-                    productoId: item.id,
-                    sku: item.sku || '',
-                    nombre: item.producto || item.plataforma,
-                    categoria: item.categoria,
-                    marca: item.marca,
-                    cantidad: item.cantidad,
-                    precioUnitario: getPrecioMostrar(item).precioPrincipal,
-                    total: (getPrecioMostrar(item).precioPrincipal || 0) * item.cantidad,
-                    tipo: item.tipo || 'fisico'
-                  })),
-                  monto_total_usd: subtotalFisicos - descuentoFisicos + (envio > 0 ? envio : 0),
-                  monto_total_bs: parseFloat(calcularPrecioBs(subtotalFisicos - descuentoFisicos + (envio > 0 ? envio : 0))),
-                  metodo_entrega: deliveryMethod === 'retiro' ? 'Retiro' : deliveryMethod === 'delivery' ? 'Delivery' : deliveryMethod === 'nacional' ? 'Nacional' : 'Digital',
-                  ubicacion_entrega: deliveryMethod === 'retiro' ? selectedAddress : deliveryMethod === 'delivery' ? customerLocation : deliveryMethod === 'nacional' ? `${agenciaEnvio} - ${oficinaDestino}` : 'N/A',
-                  metodo_pago: paymentMethod,
-                  estado: 'Pendiente',
-                  origen: 'web',
-                  subtotal: subtotalFisicos,
-                  descuento_aplicado: descuentoFisicos,
-                  codigo_cupon: appliedCoupon?.codigo || null,
-                  referido: autoReferrer || null,
-                  fecha_registro: new Date().toISOString()
-                })
-                .select('id')
-                .single();
-
-              if (errorFisica) {
-                console.warn('️ Error al crear venta física:', errorFisica.message);
-              } else {
-                ventasCreadas.fisica = true;
-              }
+              await supabase.from('ventas_productos').insert({
+                cliente_id: clienteId,
+                numero_orden: numeroOrden,
+                fecha: hoy.toISOString().split('T')[0],
+                productos: productosFisicos.map(item => ({
+                  productoId: item.id, sku: item.sku || '', nombre: item.producto || item.plataforma,
+                  categoria: item.categoria, marca: item.marca, cantidad: item.cantidad,
+                  precioUnitario: getPrecioMostrar(item).precioPrincipal,
+                  total: (getPrecioMostrar(item).precioPrincipal || 0) * item.cantidad, tipo: item.tipo || 'fisico'
+                })),
+                monto_total_usd: subtotalFisicos - descuentoFisicos + (envio > 0 ? envio : 0),
+                monto_total_bs: parseFloat(calcularPrecioBs(subtotalFisicos - descuentoFisicos + (envio > 0 ? envio : 0))),
+                metodo_entrega: deliveryMethod === 'retiro' ? 'Retiro' : deliveryMethod === 'delivery' ? 'Delivery' : deliveryMethod === 'nacional' ? 'Nacional' : 'Digital',
+                ubicacion_entrega: deliveryMethod === 'retiro' ? selectedAddress : deliveryMethod === 'delivery' ? customerLocation : deliveryMethod === 'nacional' ? `${agenciaEnvio} - ${oficinaDestino}` : 'N/A',
+                metodo_pago: paymentMethod, estado: 'Pendiente', origen: 'web', subtotal: subtotalFisicos,
+                descuento_aplicado: descuentoFisicos, codigo_cupon: appliedCoupon?.codigo || null,
+                referido: autoReferrer || null, fecha_registro: new Date().toISOString()
+              });
+              ventasCreadas.fisica = true;
             }
 
-            // 3.3 INSERT en ventas_streaming (si hay plataformas)
+            // 3.3 INSERT en ventas_streaming
             if (productosStreaming.length > 0) {
-              const { data: ventaStreaming, error: errorStreaming } = await supabase
-                .from('ventas_streaming')
-                .insert({
-                  cliente_id: clienteId,
-                  numero_orden: numeroOrden + '-S',
-                  fecha: fechaHoy,
-                  plataformas: productosStreaming.map(item => ({
-                    plataformaId: item.id,
-                    nombre: item.plataforma || item.producto,
-                    cantidad: item.cantidad,
-                    precioUnitario: getPrecioMostrar(item).precioPrincipal,
-                    total: (getPrecioMostrar(item).precioPrincipal || 0) * item.cantidad
-                  })),
-                  monto_total_usd: subtotalStreaming - descuentoStreaming,
-                  monto_total_bs: parseFloat(calcularPrecioBs(subtotalStreaming - descuentoStreaming)),
-                  metodo_pago: paymentMethod,
-                  estado: 'Pendiente',
-                  origen: 'web',
-                  subtotal: subtotalStreaming,
-                  descuento_aplicado: descuentoStreaming,
-                  codigo_cupon: appliedCoupon?.codigo || null,
-                  referido: autoReferrer || null,
-                  fecha_registro: new Date().toISOString()
-                })
-                .select('id')
-                .single();
-
-              if (errorStreaming) {
-                console.warn('⚠️ Error al crear venta streaming:', errorStreaming.message);
-              } else {
-                ventasCreadas.streaming = true;
-              }
+              await supabase.from('ventas_streaming').insert({
+                cliente_id: clienteId,
+                numero_orden: numeroOrden + '-S',
+                fecha: hoy.toISOString().split('T')[0],
+                plataformas: productosStreaming.map(item => ({
+                  plataformaId: item.id, nombre: item.plataforma || item.producto,
+                  cantidad: item.cantidad, precioUnitario: getPrecioMostrar(item).precioPrincipal,
+                  total: (getPrecioMostrar(item).precioPrincipal || 0) * item.cantidad
+                })),
+                monto_total_usd: subtotalStreaming - descuentoStreaming,
+                monto_total_bs: parseFloat(calcularPrecioBs(subtotalStreaming - descuentoStreaming)),
+                metodo_pago: paymentMethod, estado: 'Pendiente', origen: 'web', subtotal: subtotalStreaming,
+                descuento_aplicado: descuentoStreaming, codigo_cupon: appliedCoupon?.codigo || null,
+                referido: autoReferrer || null, fecha_registro: new Date().toISOString()
+              });
+              ventasCreadas.streaming = true;
             }
-
           } catch (e) {
             console.warn('⚠️ Error en Supabase:', e.message);
           }
@@ -1026,7 +979,7 @@
         if (ventasCreadas.fisica) mensajeExito.push('productos');
         if (ventasCreadas.streaming) mensajeExito.push('streaming');
         
-        toast.success(`✅ Pedido #${numeroOrden} registrado en ${mensajeExito.join(' y ')}. Te contactaremos pronto.`);
+        toast.success(`✅ Pedido #${numeroOrden} registrado en ${mensajeExito.join(' y ') || 'sistema'}. Te contactaremos pronto.`);
       };
 
   const comprarRapido = (producto) => {
