@@ -2756,6 +2756,28 @@
                           </ul>
                         </div>
                       )}
+
+                      {/* ✅ BOTÓN VER MÁS/MENOS - Justo arriba del botón de compra */}
+                      {(selectedProduct.descripcion_detallada || (selectedProduct.caracteristicas && selectedProduct.caracteristicas.length > 0)) && (
+                        <div className="pt-2 mt-2 border-t border-slate-700">
+                          <button
+                            onClick={() => setVerDescripcionCompleta(!verDescripcionCompleta)}
+                            className="w-full py-2.5 px-4 border-2 border-voltech-cyan/50 text-voltech-cyan font-semibold text-sm rounded-xl hover:bg-voltech-cyan/10 transition-all flex items-center justify-center gap-2"
+                          >
+                            {verDescripcionCompleta ? (
+                              <>
+                                <span>Ver menos</span>
+                                <span className="text-lg">▲</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>Ver más...</span>
+                                <span className="text-lg">▼</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Botón Agregar al Carrito fijo abajo */}
@@ -2772,7 +2794,7 @@
                 </div>
               </div>
 
-              {/* ✅ FLECHAS DE NAVEGACIÓN ABAJO - Orden estricto Categoría→Marca→Nombre */}
+              {/* ✅ FLECHAS DE NAVEGACIÓN - Desktop: botones | Móvil: swipe + contador */}
               {(() => {
                 // ✅ Índice global del producto activo
                 const indiceGlobal = productosOrdenadosModal.findIndex(p => p.id === selectedProduct.id);
@@ -2788,25 +2810,65 @@
                   if (!esUltimoProducto) setSelectedProduct(productosOrdenadosModal[indiceGlobal + 1]);
                 };
 
+                // ✅ Manejo de touch/swipe para móvil
+                let touchStartX = 0;
+                let touchEndX = 0;
+
+                const handleTouchStart = (e) => {
+                  touchStartX = e.changedTouches[0].screenX;
+                };
+
+                const handleTouchEnd = (e) => {
+                  touchEndX = e.changedTouches[0].screenX;
+                  const swipeThreshold = 50;
+                  const diff = touchStartX - touchEndX;
+
+                  if (Math.abs(diff) > swipeThreshold) {
+                    if (diff > 0 && !esUltimoProducto) {
+                      // Swipe izquierda → siguiente
+                      irSiguiente();
+                    } else if (diff < 0 && !esPrimerProducto) {
+                      // Swipe derecha → anterior
+                      irAnterior();
+                    }
+                  }
+                };
+
                 return (
-                  <div className={`border-t ${cardBorder} p-3 flex items-center justify-between bg-voltech-dark/50`}>
+                  <div 
+                    className={`border-t ${cardBorder} p-3 flex items-center justify-between bg-voltech-dark/50`}
+                    onTouchStart={handleTouchStart}
+                    onTouchEnd={handleTouchEnd}
+                  >
+                    {/* Botón Anterior - Solo desktop */}
                     <button
                       onClick={(e) => { e.stopPropagation(); irAnterior(); }}
                       disabled={esPrimerProducto}
-                      className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-voltech-cyan/20 text-voltech-cyan hover:bg-voltech-cyan/30"
+                      className="hidden md:flex px-4 py-2 rounded-lg text-sm font-medium items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-voltech-cyan/20 text-voltech-cyan hover:bg-voltech-cyan/30"
                     >
                       <span>←</span> Anterior
                     </button>
+
+                    {/* Contador centrado */}
                     <span className="text-xs text-voltech-muted font-medium">
                       {indiceGlobal + 1} de {productosOrdenadosModal.length}
                     </span>
+
+                    {/* Botón Siguiente - Solo desktop */}
                     <button
                       onClick={(e) => { e.stopPropagation(); irSiguiente(); }}
                       disabled={esUltimoProducto}
-                      className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-voltech-cyan/20 text-voltech-cyan hover:bg-voltech-cyan/30"
+                      className="hidden md:flex px-4 py-2 rounded-lg text-sm font-medium items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-voltech-cyan/20 text-voltech-cyan hover:bg-voltech-cyan/30"
                     >
                       Siguiente <span>→</span>
                     </button>
+
+                    {/* Indicador visual de swipe - Solo móvil */}
+                    <div className="md:hidden text-xs text-voltech-muted flex items-center gap-1">
+                      <span className="text-lg">←</span>
+                      <span>desliza</span>
+                      <span className="text-lg">→</span>
+                    </div>
                   </div>
                 );
               })()}
