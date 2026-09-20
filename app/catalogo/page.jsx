@@ -420,13 +420,21 @@
 
     useEffect(() => {
       try {
-        // ✅ Guardar solo lo esencial del carrito
-        const cartLite = cart.map(item => ({
+        // ✅ Guardar carrito completo pero sin imágenes pesadas
+        const cartToSave = cart.map(item => ({
           id: item.id,
           cantidad: item.cantidad,
-          // NO guardar imágenes ni datos pesados
+          producto: item.producto,
+          plataforma: item.plataforma,
+          tipo: item.tipo,
+          categoria: item.categoria,
+          marca: item.marca,
+          precioDetal: item.precioDetal,
+          precio_oferta: item.precio_oferta,
+          sku: item.sku
+          // NO guardar imágenes ni descripción_detallada
         }));
-        localStorage.setItem('voltech_cart', JSON.stringify(cartLite));
+        localStorage.setItem('voltech_cart', JSON.stringify(cartToSave));
       } catch (e) {
         console.warn('⚠️ No se pudo guardar el carrito:', e.message);
         // Si falla, limpiar y empezar de cero
@@ -783,59 +791,83 @@
         const envio = calcularEnvio();
         const subtotalSinEnvio = cart.reduce((sum, item) => sum + (getPrecioMostrar(item).precioPrincipal * item.cantidad), 0);
 
+        // Separar productos físicos y streaming
+        const productosFisicos = cart.filter(item => item.tipo !== 'streaming' && (item.categoria || '').toUpperCase() !== 'STREAMING');
+        const productosStreaming = cart.filter(item => item.tipo === 'streaming' || (item.categoria || '').toUpperCase() === 'STREAMING');
+
         // ✅ 2. GENERAR MENSAJE DE WHATSAPP
         let mensaje = `¡Hola! Quiero realizar el siguiente pedido:\n\n`;
-        cart.forEach(item => {
-          const precioInfo = getPrecioMostrar(item);
-          const subtotal = precioInfo.precioPrincipal * item.cantidad;
-          mensaje += `• ${item.plataforma || item.producto} x${item.cantidad} - $${subtotal.toFixed(2)}\n`;
-        });
         
-        mensaje += `\n Subtotal: $${subtotalSinEnvio.toFixed(2)}`;
+        // Productos físicos
+        if (productosFisicos.length > 0) {
+          mensaje += `📦 *PRODUCTOS FÍSICOS:*\n`;
+          productosFisicos.forEach(item => {
+            const precioInfo = getPrecioMostrar(item);
+            const subtotal = precioInfo.precioPrincipal * item.cantidad;
+            const nombreProducto = item.producto || item.plataforma || 'Producto';
+            mensaje += `• ${nombreProducto} x${item.cantidad} - $${subtotal.toFixed(2)}\n`;
+          });
+          mensaje += `\n`;
+        }
+        
+        // Productos streaming
+        if (productosStreaming.length > 0) {
+          mensaje += `📺 *PLATAFORMAS STREAMING:*\n`;
+          productosStreaming.forEach(item => {
+            const precioInfo = getPrecioMostrar(item);
+            const subtotal = precioInfo.precioPrincipal * item.cantidad;
+            const nombrePlataforma = item.plataforma || item.producto || 'Plataforma';
+            mensaje += `• ${nombrePlataforma} x${item.cantidad} - $${subtotal.toFixed(2)}\n`;
+          });
+          mensaje += `\n`;
+        }
+        
+        mensaje += `💰 *RESUMEN:*\n`;
+        mensaje += `Subtotal: $${subtotalSinEnvio.toFixed(2)}\n`;
         
         if (appliedCoupon) {
-          mensaje += `\n 🎟️ Cupón: ${appliedCoupon.codigo} (-$${appliedCoupon.descuentoCalculado.toFixed(2)})`;
+          mensaje += `🎟️ Cupón: ${appliedCoupon.codigo} (-$${appliedCoupon.descuentoCalculado.toFixed(2)})\n`;
         }
         const descAutoSuperior = (subtotalAplicableAuto() * (pctAutoDescuento / 100)) + montoAutoDescuento;
         const descAutoInferior = (subtotalAplicableInferior() * (pctInferiorAuto / 100)) + montoInferiorAuto;
         const descOpinion = opinionVerificada ? (subtotalSinEnvio * (pctOpinionDescuento / 100) + montoOpinionDescuento) : 0;
         
         if (pctAutoDescuento > 0 || montoAutoDescuento > 0) {
-          mensaje += `\n  Oferta${pctAutoDescuento > 0 ? ` (${pctAutoDescuento}%)` : ''}${montoAutoDescuento > 0 ? ` ($${montoAutoDescuento})` : ''}: -$${descAutoSuperior.toFixed(2)}${bannerSuperiorFinal?.texto ? ` (${bannerSuperiorFinal.texto})` : ''}`;
+          mensaje += `⚡ Oferta${pctAutoDescuento > 0 ? ` (${pctAutoDescuento}%)` : ''}${montoAutoDescuento > 0 ? ` ($${montoAutoDescuento})` : ''}: -$${descAutoSuperior.toFixed(2)}${bannerSuperiorFinal?.texto ? ` (${bannerSuperiorFinal.texto})` : ''}\n`;
         }
         if (descAutoInferior > 0) {
           const tipoLabel = tipoOfertaInferior === 'descuento_streaming' ? 'Streaming' : 'Productos';
-          mensaje += `\n  ${tipoLabel}${pctInferiorAuto > 0 ? ` (${pctInferiorAuto}%)` : ''}${montoInferiorAuto > 0 ? ` ($${montoInferiorAuto})` : ''}: -$${descAutoInferior.toFixed(2)}${bannerInferior?.texto ? ` (${bannerInferior.texto})` : ''}`;
+          mensaje += `⚡ ${tipoLabel}${pctInferiorAuto > 0 ? ` (${pctInferiorAuto}%)` : ''}${montoInferiorAuto > 0 ? ` ($${montoInferiorAuto})` : ''}: -$${descAutoInferior.toFixed(2)}${bannerInferior?.texto ? ` (${bannerInferior.texto})` : ''}\n`;
         }
         if (opinionVerificada && descOpinion > 0) {
-          mensaje += `\n ⭐ Opinión verificada: -$${descOpinion.toFixed(2)} (${bannerInferior?.texto || 'opinión'})`;
+          mensaje += `⭐ Opinión verificada: -$${descOpinion.toFixed(2)} (${bannerInferior?.texto || 'opinión'})\n`;
         }
         if (opinionVerificada && ticketsOpinion > 0) {
-          mensaje += `\n 🎟️ Opinión verificada: +${ticketsOpinion} tickets de sorteo`;
+          mensaje += `🎟️ Opinión verificada: +${ticketsOpinion} tickets de sorteo\n`;
         }
         if (autoReferrer) {
-          mensaje += `\n Referido por: ${autoReferrer}`;
+          mensaje += ` Referido por: ${autoReferrer}\n`;
         }
         if (deliveryMethod === 'nacional') {
           const infoNac = envioNacionalInfo();
-          mensaje += `\n Envío Nacional: ${infoNac.gratis ? 'GRATIS' : infoNac.texto + ' (lo pagas al recibir)'}`;
+          mensaje += ` Envío Nacional: ${infoNac.gratis ? 'GRATIS' : infoNac.texto + ' (lo pagas al recibir)'}\n`;
         } else {
-          mensaje += `\n Envío: ${envio === 0 ? 'GRATIS' : '$' + envio.toFixed(2)}`;
+          mensaje += `🚚 Envío: ${envio === 0 ? 'GRATIS' : '$' + envio.toFixed(2)}\n`;
         }
-        mensaje += `\n💵 TOTAL: $${total.toFixed(2)} (Bs ${calcularPrecioBs(total)})\n`;
+        mensaje += `\n💵 *TOTAL: $${total.toFixed(2)} (Bs ${calcularPrecioBs(total)})*\n`;
         
         if (!tieneSoloProductosDigitales) {
-          if (deliveryMethod === 'retiro') mensaje += `\n Entrega: Retiro en ${selectedAddress}`;
-          else if (deliveryMethod === 'delivery') mensaje += `\n Entrega: Delivery a ${customerLocation}`;
-          else if (deliveryMethod === 'nacional') mensaje += `\n Envío Nacional: ${agenciaEnvio} - ${oficinaDestino}`;
+          if (deliveryMethod === 'retiro') mensaje += `\n📍 Entrega: Retiro en ${selectedAddress}`;
+          else if (deliveryMethod === 'delivery') mensaje += `\n📍 Entrega: Delivery a ${customerLocation}`;
+          else if (deliveryMethod === 'nacional') mensaje += `\n📍 Envío Nacional: ${agenciaEnvio} - ${oficinaDestino}`;
         } else {
-          mensaje += `\n Entrega: Digital / WhatsApp`;
+          mensaje += `\n📍 Entrega: Digital / WhatsApp`;
         }
         mensaje += `\n💳 Pago: ${paymentMethod}`;
 
         // ✅ 3. GUARDAR EN SUPABASE ANTES DE ABRIR WHATSAPP
         let clienteId = null;
-        let ventaId = null;
+        let ventasCreadas = { fisica: false, streaming: false };
 
         if (supabase) {
           try {
@@ -867,57 +899,105 @@
                 .single();
               
               if (errorCliente) {
-                console.warn('⚠️ Error al crear cliente:', errorCliente.message);
+                console.warn('️ Error al crear cliente:', errorCliente.message);
               } else {
                 clienteId = nuevoCliente?.id;
               }
             }
 
-            // 3.2 INSERT en ventas_productos
             const hoy = new Date();
             const dia = String(hoy.getDate()).padStart(2, '0');
             const mes = String(hoy.getMonth() + 1).padStart(2, '0');
             const fechaHoy = hoy.toISOString().split('T')[0];
             const numeroOrden = `W-${dia}-${mes}-${String(Date.now()).slice(-4)}`;
 
-            const { data: nuevaVenta, error: errorVenta } = await supabase
-              .from('ventas_productos')
-              .insert({
-                cliente_id: clienteId,
-                numero_orden: numeroOrden,
-                fecha: fechaHoy,
-                productos: cart.map(item => ({
-                  productoId: item.id,
-                  sku: item.sku || '',
-                  nombre: item.producto || item.plataforma,
-                  categoria: item.categoria,
-                  marca: item.marca,
-                  cantidad: item.cantidad,
-                  precioUnitario: getPrecioMostrar(item).precioPrincipal,
-                  total: (getPrecioMostrar(item).precioPrincipal || 0) * item.cantidad,
-                  tipo: item.tipo || 'fisico'
-                })),
-                monto_total_usd: total,
-                monto_total_bs: parseFloat(calcularPrecioBs(total)),
-                metodo_entrega: deliveryMethod === 'retiro' ? 'Retiro' : deliveryMethod === 'delivery' ? 'Delivery' : deliveryMethod === 'nacional' ? 'Nacional' : 'Digital',
-                ubicacion_entrega: deliveryMethod === 'retiro' ? selectedAddress : deliveryMethod === 'delivery' ? customerLocation : deliveryMethod === 'nacional' ? `${agenciaEnvio} - ${oficinaDestino}` : 'Digital',
-                metodo_pago: paymentMethod,
-                estado: 'Pendiente',
-                origen: 'web',
-                subtotal: subtotalSinEnvio,
-                descuento_aplicado: descAutoSuperior + descAutoInferior + descOpinion + (appliedCoupon?.descuentoCalculado || 0),
-                codigo_cupon: appliedCoupon?.codigo || null,
-                referido: autoReferrer || null,
-                fecha_registro: new Date().toISOString()
-              })
-              .select('id')
-              .single();
+            // Calcular totales por tipo
+            const subtotalFisicos = productosFisicos.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0);
+            const subtotalStreaming = productosStreaming.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0);
+            const totalDescuentos = descAutoSuperior + descAutoInferior + descOpinion + (appliedCoupon?.descuentoCalculado || 0);
+            
+            // Proporción de descuentos
+            const proporcionFisicos = subtotalSinEnvio > 0 ? subtotalFisicos / subtotalSinEnvio : 0;
+            const proporcionStreaming = subtotalSinEnvio > 0 ? subtotalStreaming / subtotalSinEnvio : 0;
+            const descuentoFisicos = totalDescuentos * proporcionFisicos;
+            const descuentoStreaming = totalDescuentos * proporcionStreaming;
 
-            if (errorVenta) {
-              console.warn('⚠️ Error al crear venta:', errorVenta.message);
-              toast.error('Error al registrar la orden. Se abrirá WhatsApp de todas formas.');
-            } else {
-              ventaId = nuevaVenta?.id;
+            // 3.2 INSERT en ventas_productos (si hay productos físicos)
+            if (productosFisicos.length > 0) {
+              const { data: ventaFisica, error: errorFisica } = await supabase
+                .from('ventas_productos')
+                .insert({
+                  cliente_id: clienteId,
+                  numero_orden: numeroOrden,
+                  fecha: fechaHoy,
+                  productos: productosFisicos.map(item => ({
+                    productoId: item.id,
+                    sku: item.sku || '',
+                    nombre: item.producto || item.plataforma,
+                    categoria: item.categoria,
+                    marca: item.marca,
+                    cantidad: item.cantidad,
+                    precioUnitario: getPrecioMostrar(item).precioPrincipal,
+                    total: (getPrecioMostrar(item).precioPrincipal || 0) * item.cantidad,
+                    tipo: item.tipo || 'fisico'
+                  })),
+                  monto_total_usd: subtotalFisicos - descuentoFisicos + (envio > 0 ? envio : 0),
+                  monto_total_bs: parseFloat(calcularPrecioBs(subtotalFisicos - descuentoFisicos + (envio > 0 ? envio : 0))),
+                  metodo_entrega: deliveryMethod === 'retiro' ? 'Retiro' : deliveryMethod === 'delivery' ? 'Delivery' : deliveryMethod === 'nacional' ? 'Nacional' : 'Digital',
+                  ubicacion_entrega: deliveryMethod === 'retiro' ? selectedAddress : deliveryMethod === 'delivery' ? customerLocation : deliveryMethod === 'nacional' ? `${agenciaEnvio} - ${oficinaDestino}` : 'N/A',
+                  metodo_pago: paymentMethod,
+                  estado: 'Pendiente',
+                  origen: 'web',
+                  subtotal: subtotalFisicos,
+                  descuento_aplicado: descuentoFisicos,
+                  codigo_cupon: appliedCoupon?.codigo || null,
+                  referido: autoReferrer || null,
+                  fecha_registro: new Date().toISOString()
+                })
+                .select('id')
+                .single();
+
+              if (errorFisica) {
+                console.warn('️ Error al crear venta física:', errorFisica.message);
+              } else {
+                ventasCreadas.fisica = true;
+              }
+            }
+
+            // 3.3 INSERT en ventas_streaming (si hay plataformas)
+            if (productosStreaming.length > 0) {
+              const { data: ventaStreaming, error: errorStreaming } = await supabase
+                .from('ventas_streaming')
+                .insert({
+                  cliente_id: clienteId,
+                  numero_orden: numeroOrden + '-S',
+                  fecha: fechaHoy,
+                  plataformas: productosStreaming.map(item => ({
+                    plataformaId: item.id,
+                    nombre: item.plataforma || item.producto,
+                    cantidad: item.cantidad,
+                    precioUnitario: getPrecioMostrar(item).precioPrincipal,
+                    total: (getPrecioMostrar(item).precioPrincipal || 0) * item.cantidad
+                  })),
+                  monto_total_usd: subtotalStreaming - descuentoStreaming,
+                  monto_total_bs: parseFloat(calcularPrecioBs(subtotalStreaming - descuentoStreaming)),
+                  metodo_pago: paymentMethod,
+                  estado: 'Pendiente',
+                  origen: 'web',
+                  subtotal: subtotalStreaming,
+                  descuento_aplicado: descuentoStreaming,
+                  codigo_cupon: appliedCoupon?.codigo || null,
+                  referido: autoReferrer || null,
+                  fecha_registro: new Date().toISOString()
+                })
+                .select('id')
+                .single();
+
+              if (errorStreaming) {
+                console.warn('⚠️ Error al crear venta streaming:', errorStreaming.message);
+              } else {
+                ventasCreadas.streaming = true;
+              }
             }
 
           } catch (e) {
@@ -941,7 +1021,12 @@
         // ✅ 6. LIMPIAR CARRITO Y MOSTRAR CONFIRMACIÓN
         setCart([]);
         setShowCart(false);
-        toast.success(ventaId ? `✅ Pedido #${numeroOrden} registrado. Te contactaremos pronto.` : '✅ Pedido enviado por WhatsApp');
+        
+        const mensajeExito = [];
+        if (ventasCreadas.fisica) mensajeExito.push('productos');
+        if (ventasCreadas.streaming) mensajeExito.push('streaming');
+        
+        toast.success(`✅ Pedido #${numeroOrden} registrado en ${mensajeExito.join(' y ')}. Te contactaremos pronto.`);
       };
 
   const comprarRapido = (producto) => {
@@ -2528,12 +2613,12 @@
               </div>
               
               {/* CONTENIDO: Imagen izquierda + Info derecha */}
-              <div className="flex-1 overflow-y-auto p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="flex-1 overflow-y-auto p-4 md:p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                   
-                  {/* ✅ COLUMNA IZQUIERDA: IMAGEN (altura fija 420px para todas) */}
+                  {/* ✅ COLUMNA IZQUIERDA: IMAGEN (altura responsive) */}
                   <div className="flex flex-col items-center">
-                    <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative bg-slate-900`} style={{ height: '420px' }}>
+                    <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative bg-slate-900`} style={{ height: '300px' }}>
                       <CarruselImagen
                         imagenes={Array.from(new Set([
                           selectedProduct.imagen,
@@ -2559,15 +2644,15 @@
                     )}
                   </div>
                   
-                  {/* ✅ COLUMNA DERECHA: INFORMACIÓN (altura fija, botón anclado abajo) */}
-                  <div className="flex flex-col justify-between h-full min-h-[400px]">
+                  {/* ✅ COLUMNA DERECHA: INFORMACIÓN (sin scroll, botón fijo abajo) */}
+                  <div className="flex flex-col justify-between h-full min-h-[300px] md:min-h-[400px]">
                     
-                    {/* Contenido superior con scroll interno si es necesario */}
-                    <div className="flex-1 overflow-y-auto pr-2 space-y-3">
+                    {/* Contenido superior SIN scroll (optimizado para móvil) */}
+                    <div className="space-y-2 md:space-y-3">
                       
                     {/* Marca y Nombre del producto */}
-                    <p className="text-sm text-voltech-muted uppercase tracking-wide font-semibold">{selectedProduct.marca} • {selectedProduct.categoria || selectedProduct.tipo}</p>
-                    <h2 className="text-xl md:text-2xl font-bold mt-1">{selectedProduct.producto || selectedProduct.plataforma}</h2>
+                    <p className="text-xs md:text-sm text-voltech-muted uppercase tracking-wide font-semibold">{selectedProduct.marca} • {selectedProduct.categoria || selectedProduct.tipo}</p>
+                    <h2 className="text-lg md:text-2xl font-bold mt-1 leading-tight">{selectedProduct.producto || selectedProduct.plataforma}</h2>
                       
                       {/* Etiquetas condicionales */}
                       {(selectedProduct.modelo || selectedProduct.variante || (Array.isArray(selectedProduct.potencia) && selectedProduct.potencia.length > 0)) && (
@@ -2674,13 +2759,13 @@
                     </div>
 
                     {/* Botón Agregar al Carrito fijo abajo */}
-                    <div className={`pt-3 mt-2 border-t ${cardBorder}`}>
+                    <div className={`pt-2 md:pt-3 mt-2 border-t ${cardBorder} sticky bottom-0 ${cardBg} pb-2`}>
                       <button
                         onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); setVerDescripcionCompleta(false); }}
-                        className="w-full py-2.5 px-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                        className="w-full py-3 md:py-2.5 px-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm md:text-base rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-lg"
                       >
-                        <ShoppingCart className="w-4 h-4 shrink-0" />
-                        <span>Agregar al Carrito</span>
+                        <ShoppingCart className="w-5 h-5 shrink-0" />
+                        <span className="font-bold">Agregar al Carrito</span>
                       </button>
                     </div>
                   </div>
