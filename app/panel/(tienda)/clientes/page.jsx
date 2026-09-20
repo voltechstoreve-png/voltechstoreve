@@ -65,16 +65,23 @@ function ClientesContent() {
   useEffect(() => {
     const cargarDatos = async () => {
       let clientesData = [], etiquetasData = [], nivelesData = [];
+      let vpData = [], vsData = [], eqp = [];
 
       if (supabase) {
-        const [{ data: cData }, { data: eData }, { data: nData }] = await Promise.all([
+        const [{ data: cData }, { data: eData }, { data: nData }, { data: vpArr }, { data: vsArr }, { data: eqData }] = await Promise.all([
           supabase.from('clientes').select('*'),
           supabase.from('settings').select('valor').eq('clave', 'etiquetas').single(),
-          supabase.from('settings').select('valor').eq('clave', 'niveles_referidos').single()
+          supabase.from('settings').select('valor').eq('clave', 'niveles_referidos').single(),
+          supabase.from('ventas_productos').select('*'),
+          supabase.from('ventas_streaming').select('*'),
+          supabase.from('usuarios').select('*').eq('activo', true)
         ]);
         if (cData) clientesData = cData;
         if (eData?.valor) etiquetasData = eData.valor;
         if (nData?.valor) nivelesData = nData.valor;
+        if (vpArr) vpData = vpArr;
+        if (vsArr) vsData = vsArr;
+        if (eqData) eqp = eqData;
       }
 
       if (clientesData.length === 0) {
@@ -90,41 +97,26 @@ function ClientesContent() {
         if (nivelesGuardados) nivelesData = JSON.parse(nivelesGuardados);
       }
 
-      // ✅ EQUIPO y VENTAS desde Supabase (adiós clientes zombi del localStorage)
-      let vts = [], eqp = [];
-      if (supabase) {
-        const [{ data: vData }, { data: eqData }] = await Promise.all([
-          supabase.from('ventas').select('*'),
-          supabase.from('usuarios').select('*').eq('activo', true)
-        ]);
-        if (vData && vData.length > 0) vts = vData;
-        if (eqData && eqData.length > 0) eqp = eqData;
-      }
-      if (vts.length === 0) {
-        const ventasGuardadas = localStorage.getItem('voltech_ventas');
-        vts = ventasGuardadas ? JSON.parse(ventasGuardadas) : [];
-      }
-      if (eqp.length === 0) {
-        const equipoGuardado = localStorage.getItem('voltech_equipo');
-        eqp = equipoGuardado ? JSON.parse(equipoGuardado) : [];
-      }
+      // ✅ Combinar ventas de productos y streaming para el cálculo de estadísticas
+      const todasLasVentas = [...vpData, ...vsData];
 
-      if (esVendedor && usuarioActual?.nombre) {
-        vts = vts.filter(v => v.vendedor?.toLowerCase() === usuarioActual.nombre.toLowerCase());
-      }
-
-      setVentas(vts);
       setEquipo(eqp);
       setEtiquetas(etiquetasData);
       setNivelesReferidos(nivelesData);
 
+      // ✅ Sincronizar clientes con las ventas reales de Supabase
+      const clientesSincronizados = sincronizarClientesDesdeVentas(clientesData, todasLasVentas);
+      
+      // Filtrar por vendedor si aplica
+      let clientesFinales = clientesSincronizados;
       if (esVendedor && usuarioActual?.nombre) {
-        clientesData = clientesData.filter(c => c.registradoPor === usuarioActual.nombre);
+        clientesFinales = clientesFinales.filter(c => (c.registradoPor || '').toLowerCase() === (usuarioActual.nombre || '').toLowerCase());
       }
 
-      const clientesSincronizados = sincronizarClientesDesdeVentas(clientesData, vts);
-      setClientes(clientesSincronizados);
-      localStorage.setItem('voltech_clientes', JSON.stringify(clientesSincronizados));
+      setClientes(clientesFinales);
+      if (supabase) {
+        localStorage.setItem('voltech_clientes', JSON.stringify(clientesFinales));
+      }
     };
     
     cargarDatos();
@@ -134,28 +126,45 @@ function ClientesContent() {
     const clientesActuales = [...listaClientes];
     
     listaVentas.forEach(venta => {
-      const clienteExistente = clientesActuales.find(c => c.telefono === venta.telefono || c.nombre.toLowerCase() === venta.cliente.toLowerCase());
+      // Buscar por ID de cliente primero, luego por teléfono o nombre
+      let clienteExistente = clientesActuales.find(c => c.id === venta.cliente_id);
+      
+      if (!clienteExistente && venta.telefono) {
+        clienteExistente = clientesActuales.find(c => c.telefono === venta.telefono);
+      }
+      if (!clienteExistente && venta.cliente) {
+        clienteExistente = clientesActuales.find(c => c.nombre && c.nombre.toLowerCase() === venta.cliente.toLowerCase());
+      }
+      
+      const montoVenta = (venta.monto_total_usd || venta.total || 0);
+      const fechaVenta = venta.fecha || venta.fecha_registro || new Date().toISOString().split('T')[0];
+      const vendedorVenta = venta.vendedor || 'Sistema';
+
       if (clienteExistente) {
         clienteExistente.totalCompras = (clienteExistente.totalCompras || 0) + 1;
-        clienteExistente.ultimaCompra = venta.fecha;
-        clienteExistente.totalGastado = (clienteExistente.totalGastado || 0) + (venta.total || 0);
-      } else {
+        clienteExistente.ultimaCompra = fechaVenta;
+        clienteExistente.totalGastado = (clienteExistente.totalGastado || 0) + montoVenta;
+        if (!clienteExistente.registradoPor && vendedorVenta !== 'Sistema') {
+          clienteExistente.registradoPor = vendedorVenta;
+        }
+      } else if (venta.cliente || venta.telefono) {
+        // Si no existe, lo creamos con los datos de la venta
         clientesActuales.push({
-          id: generarUUID(), 
-          nombre: venta.cliente, 
+          id: venta.cliente_id || `temp-${Date.now()}-${Math.random()}`, 
+          nombre: venta.cliente || 'Cliente', 
           apellido: '', 
-          telefono: venta.telefono,
+          telefono: venta.telefono || '',
           correo: '', 
           direccion: '', 
-          registradoPor: venta.vendedor || usuarioActual?.nombre || 'Sistema', 
-          fuenteRegistro: 'normal',
+          registradoPor: vendedorVenta, 
+          fuenteRegistro: 'compra',
           etiquetas: [], 
           referidos: [], 
           notas: '', 
           totalCompras: 1, 
-          ultimaCompra: venta.fecha,
-          totalGastado: venta.total || 0, 
-          fechaRegistro: venta.fecha,
+          ultimaCompra: fechaVenta,
+          totalGastado: montoVenta, 
+          fechaRegistro: fechaVenta,
         });
       }
     });

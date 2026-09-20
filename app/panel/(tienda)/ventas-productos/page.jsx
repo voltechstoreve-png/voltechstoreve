@@ -89,7 +89,7 @@ export default function VentasProductosPage() {
         if (supabase) {
           console.log('🔄 Cargando desde Supabase...');
           const [{ data: d1, error: err1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }, { data: d6 }, { data: d7 }] = await Promise.all([
-            supabase.from('ventas').select('*'),
+            supabase.from('ventas_productos').select('*'),
             supabase.from('productos').select('*'),
             supabase.from('clientes').select('*'),
             supabase.from('usuarios').select('*').eq('activo', true),
@@ -98,7 +98,7 @@ export default function VentasProductosPage() {
             supabase.from('kits').select('*').eq('activo', true)
           ]);
           
-          if (err1) console.error('❌ Error cargando ventas:', err1.message);
+          if (err1) console.error('❌ Error cargando ventas productos:', err1.message);
           if (d1) vts = [...d1].sort((a, b) => String(b.fechaRegistro || b.fecha || '').localeCompare(String(a.fechaRegistro || a.fecha || '')));
           if (d2) prods = d2;
           if (d3) clts = d3;
@@ -117,7 +117,7 @@ export default function VentasProductosPage() {
           if (d6) cpons = d6;
           if (d7) kts = d7;
           
-          console.log('✅ Datos cargados desde Supabase:', vts.length, 'ventas');
+          console.log('✅ Datos cargados desde Supabase:', vts.length, 'ventas productos');
         } else {
           vts = JSON.parse(localStorage.getItem('voltech_ventas') || '[]');
           prods = JSON.parse(localStorage.getItem('voltech_productos') || '[]');
@@ -614,7 +614,7 @@ export default function VentasProductosPage() {
       let cuponesActualizados = [...cupones];
       
       if (supabase) {
-        const rVenta = await supabase.from('ventas').upsert(nuevaVenta, { onConflict: 'id' });
+        const rVenta = await supabase.from('ventas_productos').upsert(nuevaVenta, { onConflict: 'id' });
         if (rVenta.error) console.error('❌ Error guardando venta:', rVenta.error.message);
         const rCliente = await supabase.from('clientes').upsert(nuevoCliente, { onConflict: 'id' });
         if (rCliente.error) console.error('❌ Error guardando cliente:', rCliente.error.message);
@@ -720,7 +720,7 @@ export default function VentasProductosPage() {
       const ventasActualizadas = ventas.map(v => String(v.id) === String(venta.id) ? ventaActualizada : v);
       
       if (supabase) {
-        await supabase.from('ventas').update({ 
+        await supabase.from('ventas_productos').update({ 
           estado: 'pagado', 
           montoPendiente: 0, 
           montoAbonado: Number(venta.total || 0), 
@@ -772,7 +772,7 @@ export default function VentasProductosPage() {
       const ventasActualizadas = ventas.filter(v => String(v.id) !== String(venta.id));
       
       if (supabase) {
-        await supabase.from('ventas').delete().eq('id', venta.id);
+        await supabase.from('ventas_productos').delete().eq('id', venta.id);
         if (debeDevolver) for (const p of productosActualizados) {
           await supabase.from('productos').update({ cantidad: p.cantidad }).eq('id', p.id);
         }
@@ -1672,7 +1672,15 @@ export default function VentasProductosPage() {
                           <button onClick={() => { setShowWhatsappModal(venta); setWhatsappMode('recordatorio'); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-warning transition-colors" title="Enviar recordatorio de pago"><AlertTriangle className="w-4 h-4" /></button>
                           <button onClick={() => generarPDF(venta)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-purple transition-colors" title="Generar PDF"><FileText className="w-4 h-4" /></button>
                           <button onClick={() => editarVenta(venta)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors" title="Editar"><Edit3 className="w-4 h-4" /></button>
-                          {venta.estado !== 'pagado' && (<button onClick={() => marcarPagado(venta)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-success transition-colors" title="Marcar pagado"><CheckCircle className="w-4 h-4" /></button>)}
+                          {venta.estado !== 'pagado' && venta.estado !== 'cancelado' && (
+                            <>
+                              <button onClick={() => marcarPagado(venta)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-success transition-colors" title="Marcar pagado"><CheckCircle className="w-4 h-4" /></button>
+                              <button onClick={() => cancelarVenta(venta)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors" title="Marcar cancelado"><X className="w-4 h-4" /></button>
+                            </>
+                          )}
+                          {venta.estado === 'cancelado' && (
+                            <button onClick={() => reactivarVenta(venta)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-warning transition-colors" title="Reactivar venta"><AlertTriangle className="w-4 h-4" /></button>
+                          )}
                           <button onClick={() => eliminarVenta(venta)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       </td>
