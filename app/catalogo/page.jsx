@@ -45,6 +45,20 @@
       return iconoVacio || <Package className="w-12 h-12 text-slate-300" />;
     }
     const actual = todas[Math.min(idx, todas.length - 1)];
+  // ✅ Limpieza automática de caché cuando cambia la estructura de datos
+  useEffect(() => {
+    const DATA_VERSION = '2.0'; // Cambia esto cuando modifiques la estructura
+    const storedVersion = localStorage.getItem('voltech_data_version');
+    
+    if (storedVersion !== DATA_VERSION) {
+      console.log('🔄 Actualizando estructura de datos...');
+      // Limpiar solo datos específicos, no todo
+      localStorage.removeItem('voltech_cart');
+      localStorage.removeItem('voltech_clientes');
+      localStorage.removeItem('voltech_ventas');
+      localStorage.setItem('voltech_data_version', DATA_VERSION);
+    }
+  }, []);
     return (
       <>
         <img
