@@ -1242,14 +1242,14 @@
           const { data, error: opErr } = await supabase.from('opiniones').insert(nuevaOpinion);
           if (opErr) {
             console.error('❌ Error en Supabase:', opErr);
-            console.warn('⚠️ Se guardó en localStorage pero no en Supabase');
+            console.warn('️ Se guardó en localStorage pero no en Supabase');
           } else {
             console.log('✅ Opinión guardada en Supabase:', data);
           }
         } catch (err) {
           console.error('❌ Error de conexión:', err);
         }
-      }
+      }      
       
       setFormDataOpinion({ nombre: '', telefono: '', rating: 5, comentario: '', producto: '', foto: null, donde_nos_conocio: '' });
       setShowOpinionForm(false);
