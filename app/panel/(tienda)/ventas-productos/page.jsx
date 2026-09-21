@@ -534,9 +534,15 @@ export default function VentasProductosPage() {
       // ✅ Solo advertir si hay stock insuficiente, pero NO bloquear
       if (hayStockInsuficiente) {
         console.warn('⚠️ Productos con stock insuficiente:', productosConStockBajo);
-        // Mostramos toast de advertencia pero continuamos
-        toast.warning(`⚠️ Stock bajo: ${productosConStockBajo.join(', ')}. Se registrará la venta de todas formas.`);
-      }
+        // Usamos toast normal (amarillo por defecto no existe, usamos custom o error suave)
+        toast(`⚠️ Stock bajo: ${productosConStockBajo.join(', ')}. Continuando...`, {
+          icon: '⚠️',
+          style: {
+            background: '#f59e0b',
+            color: '#fff',
+          },
+        });
+      }      
       
       const clienteExistente = clientes.find(c => c.nombre.toLowerCase() === formData.cliente.toLowerCase() || c.telefono === formData.telefono);
       let clientesActualizados = [...clientes];
