@@ -1,14 +1,56 @@
-// ✅ SW kamikaze: limpia TODAS las cachés y se desregistra.
-// Mata cualquier Service Worker viejo que sirva código stale.
-self.addEventListener('install', () => self.skipWaiting());
+// ✅ 1. Importar Firebase (versión compat para Service Workers)
+importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
+
+// ✅ 2. Tu configuración de Firebase (⚠️ REEMPLAZA con tus datos reales de Firebase Console)
+const firebaseConfig = {
+  apiKey: "TU_API_KEY_AQUI",
+  authDomain: "TU_PROYECTO.firebaseapp.com",
+  projectId: "TU_PROYECTO_ID",
+  storageBucket: "TU_PROYECTO.appspot.com",
+  messagingSenderId: "TU_SENDER_ID",
+  appId: "TU_APP_ID"
+};
+
+// Inicializar Firebase solo si no está inicializado
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
+const messaging = firebase.messaging();
+
+// ✅ 3. Manejar notificaciones en SEGUNDO PLANO (app cerrada o en background)
+messaging.onBackgroundMessage((payload) => {
+  console.log('[sw.js] Mensaje recibido en background:', payload);
+  
+  const notificationTitle = payload.notification?.title || 'Voltech Store';
+  const notificationOptions = {
+    body: payload.notification?.body || 'Tienes una nueva actualización',
+    icon: '/voltechstore.png',
+    badge: '/voltechstore.png',
+    data: payload.data // Para que al hacer clic abra una URL específica si quieres
+  };
+
+  self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
+// ✅ 4. Kamikaze controlado: Limpiar cachés viejas de Next.js/PWA 
+self.addEventListener('install', () => {
+  console.log('[sw.js] Instalado, forzando actualización');
+  self.skipWaiting();
+});
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
-      .then(() => self.registration.unregister())
+      .then(() => {
+        console.log('[sw.js] Cachés antiguas eliminadas. SW activo para recibir notificaciones.');
+        // ⚠️ NO desregistres el SW aquí, o las notificaciones de fondo dejarán de funcionar.
+      })
   );
 });
 
-// No interceptar nada: que todo venga de la red
-self.addEventListener('fetch', () => {});
+// ✅ 5. No interceptar fetch: dejar que Next.js maneje la red normalmente
+self.addEventListener('fetch', (event) => {
+  // No hacer nada, el navegador irá directamente a la red (sin caché stale)
+});
