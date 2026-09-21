@@ -4,12 +4,12 @@ importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-comp
 
 // ✅ 2. Tu configuración de Firebase (⚠️ REEMPLAZA con tus datos reales de Firebase Console)
 const firebaseConfig = {
-  apiKey: "TU_API_KEY_AQUI",
-  authDomain: "TU_PROYECTO.firebaseapp.com",
-  projectId: "TU_PROYECTO_ID",
-  storageBucket: "TU_PROYECTO.appspot.com",
-  messagingSenderId: "TU_SENDER_ID",
-  appId: "TU_APP_ID"
+  apiKey: "AIzaSyDn_AMsOc8_J2Id0BkoZ4AQyHP_mLE_LgI",
+  authDomain: "voltech-push.firebaseapp.com",
+  projectId: "voltech-push",
+  storageBucket: "voltech-push.firebasestorage.app",
+  messagingSenderId: "25006705164",
+  appId: "1:25006705164:android:28e6dcc5c9897999ee3c29"
 };
 
 // Inicializar Firebase solo si no está inicializado
