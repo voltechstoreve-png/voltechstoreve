@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // ✅ Headers de seguridad y caché
+  // ✅ 1. Silenciar el error de Turbopack en Next.js 16
+  turbopack: {},
+
+  // ✅ 2. Headers de seguridad y caché
   async headers() {
     return [
       {
@@ -10,7 +13,6 @@ const nextConfig = {
             key: 'Cache-Control',
             value: 'public, max-age=0, must-revalidate',
           },
-          // ✅ Content Security Policy para permitir Service Workers y Firebase
           {
             key: 'Content-Security-Policy',
             value: `
@@ -29,7 +31,7 @@ const nextConfig = {
     ];
   },
 
-  // ✅ Redirecciones de dominio
+  // ✅ 3. Redirecciones de dominio
   async redirects() {
     return [
       {
@@ -55,18 +57,6 @@ const nextConfig = {
         permanent: true,
       },
     ];
-  },
-
-  // ✅ Configuración adicional para PWA y Service Workers
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      // Asegurar que los Service Workers funcionen
-      config.output = {
-        ...config.output,
-        webassemblyModuleFilename: 'static/wasm/[modulehash].wasm',
-      };
-    }
-    return config;
   },
 };
 
