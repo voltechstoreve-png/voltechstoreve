@@ -1284,18 +1284,18 @@ export default function VentasProductosPage() {
                           </div>
 
                           <div className="col-span-12 md:col-span-2">
-                            <label className="block text-xs text-voltech-muted mb-1 ml-1">Filtrar Marca</label>
-                            <select
+                            <CustomSelect
+                              label="Filtrar Marca"
                               value={prod.filtroMarca}
-                              onChange={(e) => actualizarCampoProducto(index, 'filtroMarca', e.target.value)}
-                              className="input-voltech w-full rounded-lg px-3 py-2 text-sm"
+                              onChange={(v) => actualizarCampoProducto(index, 'filtroMarca', v)}
                               disabled={prod.esKit}
-                            >
-                              <option value="">Todas</option>
-                              {marcasDisponibles.map(marca => (
-                                <option key={marca} value={marca}>{marca}</option>
-                              ))}
-                            </select>
+                              options={[
+                                { value: '', label: 'Todas' },
+                                ...marcasDisponibles.map(marca => ({ value: marca, label: marca }))
+                              ]}
+                              placeholder="Todas"
+                              className="w-full"
+                            />
                           </div>
 
                           <div className="col-span-12 md:col-span-4 relative">
