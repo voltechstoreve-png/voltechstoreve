@@ -1223,21 +1223,39 @@
         }
       }
       
-      const nuevaOpinion = { id: `opinion-${Date.now()}`, ...formDataOpinion, estado: 'pendiente', fecha: new Date().toISOString() };
+      // ✅ CAMBIO: estado 'aprobada' para publicación automática
+      const nuevaOpinion = { 
+        id: `opinion-${Date.now()}`, 
+        ...formDataOpinion, 
+        estado: 'aprobada', 
+        fecha: new Date().toISOString() 
+      };
+      
       const opinionesExistentes = JSON.parse(localStorage.getItem('voltech_opiniones') || '[]');
       opinionesExistentes.push(nuevaOpinion);
       localStorage.setItem('voltech_opiniones', JSON.stringify(opinionesExistentes));
       setOpiniones(opinionesExistentes);
-      // ✅ GUARDAR EN SUPABASE (así llega al panel y al público)
+      
+      // ✅ GUARDAR EN SUPABASE con manejo de errores mejorado
       if (supabase) {
-      const { error: opErr } = await supabase.from('opiniones').insert(nuevaOpinion);
-      if (opErr) console.warn('⚠️ No se guardó la opinión en Supabase:', opErr.message);
+        try {
+          const { data, error: opErr } = await supabase.from('opiniones').insert(nuevaOpinion);
+          if (opErr) {
+            console.error('❌ Error en Supabase:', opErr);
+            console.warn('⚠️ Se guardó en localStorage pero no en Supabase');
+          } else {
+            console.log('✅ Opinión guardada en Supabase:', data);
+          }
+        } catch (err) {
+          console.error('❌ Error de conexión:', err);
+        }
       }
+      
       setFormDataOpinion({ nombre: '', telefono: '', rating: 5, comentario: '', producto: '', foto: null, donde_nos_conocio: '' });
       setShowOpinionForm(false);
-      toast.success('Opinión enviada. Será publicada tras aprobación.');
+      toast.success('¡Gracias por tu opinión! Ya está publicada.');
     };
-
+    
     const handleFileChange = (file) => {
       if (file) {
         if (file.size > 2 * 1024 * 1024) { toast.error('La imagen no debe pesar más de 2MB'); return; }
