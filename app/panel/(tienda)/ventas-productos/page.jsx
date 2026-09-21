@@ -45,6 +45,8 @@ export default function VentasProductosPage() {
   const [showClientesDropdown, setShowClientesDropdown] = useState(false);
   const [clientesFiltradosArr, setClientesFiltradosArr] = useState([]);
   const [showKitSelector, setShowKitSelector] = useState(false);
+  const [ventaAEliminar, setVentaAEliminar] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const [cuponInput, setCuponInput] = useState('');
   const [cuponAplicado, setCuponAplicado] = useState(null);
@@ -740,14 +742,19 @@ export default function VentasProductosPage() {
     }
   };
 
-  const eliminarVenta = async (venta) => {
-    if (!confirm('¿Estás seguro de eliminar esta venta? El stock será devuelto.')) return;
+  const confirmarEliminar = (venta) => {
+    setVentaAEliminar(venta);
+    setShowDeleteModal(true);
+  };
+
+  const eliminarVenta = async () => {
+    if (!ventaAEliminar) return;
     
     try {
       let productosActualizados = [...productos];
-      const debeDevolver = (venta.origen || 'manual') === 'manual' || venta.stock_descontado;
+      const debeDevolver = (ventaAEliminar.origen || 'manual') === 'manual' || ventaAEliminar.stock_descontado;
       
-      if (debeDevolver) for (const prod of venta.productos) {
+      if (debeDevolver) for (const prod of ventaAEliminar.productos) {
         if (prod.esKit && prod.productosIncluidos && prod.productosIncluidos.length > 0) {
           for (const prodKit of prod.productosIncluidos) {
             const index = productosActualizados.findIndex(p => String(p.id) === String(prodKit.producto_id));
@@ -769,10 +776,10 @@ export default function VentasProductosPage() {
         }
       }
       
-      const ventasActualizadas = ventas.filter(v => String(v.id) !== String(venta.id));
+      const ventasActualizadas = ventas.filter(v => String(v.id) !== String(ventaAEliminar.id));
       
       if (supabase) {
-        await supabase.from('ventas_productos').delete().eq('id', venta.id);
+        await supabase.from('ventas_productos').delete().eq('id', ventaAEliminar.id);
         if (debeDevolver) for (const p of productosActualizados) {
           await supabase.from('productos').update({ cantidad: p.cantidad }).eq('id', p.id);
         }
@@ -782,6 +789,8 @@ export default function VentasProductosPage() {
       setProductos(productosActualizados);
       toast.success('Venta eliminada y stock devuelto');
       window.dispatchEvent(new Event('voltech-data-updated'));
+      setShowDeleteModal(false);
+      setVentaAEliminar(null);
     } catch (error) {
       console.error('Error eliminando venta:', error);
       toast.error('Error al eliminar venta: ' + error.message);
@@ -1389,17 +1398,29 @@ export default function VentasProductosPage() {
                 </div>
                 <div className="bg-voltech-dark/50 border border-voltech-border rounded-lg p-4">
                   <label className="block text-xs text-voltech-muted mb-3 font-semibold">Descuento Manual</label>
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <select
-                        value={formData.tipoDescuento || 'none'}
-                        onChange={(e) => setFormData({ ...formData, tipoDescuento: e.target.value, descuentoValor: 0 })}
-                        className="input-voltech flex-1 rounded-lg px-3 py-2 text-sm"
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, tipoDescuento: 'none', descuentoValor: 0 })}
+                        className={`p-3 rounded-lg border text-xs sm:text-sm font-medium transition-all ${formData.tipoDescuento === 'none' ? 'border-voltech-cyan bg-voltech-cyan/10 text-voltech-cyan' : 'border-voltech-border text-voltech-muted hover:border-voltech-cyan/50'}`}
                       >
-                        <option value="none">Sin descuento</option>
-                        <option value="porcentaje">Porcentaje (%)</option>
-                        <option value="monto">Monto fijo ($)</option>
-                      </select>
+                        Sin descuento
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, tipoDescuento: 'porcentaje' })}
+                        className={`p-3 rounded-lg border text-xs sm:text-sm font-medium transition-all ${formData.tipoDescuento === 'porcentaje' ? 'border-voltech-cyan bg-voltech-cyan/10 text-voltech-cyan' : 'border-voltech-border text-voltech-muted hover:border-voltech-cyan/50'}`}
+                      >
+                        Porcentaje (%)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, tipoDescuento: 'monto' })}
+                        className={`p-3 rounded-lg border text-xs sm:text-sm font-medium transition-all ${formData.tipoDescuento === 'monto' ? 'border-voltech-cyan bg-voltech-cyan/10 text-voltech-cyan' : 'border-voltech-border text-voltech-muted hover:border-voltech-cyan/50'}`}
+                      >
+                        Monto fijo ($)
+                      </button>
                     </div>
                     {formData.tipoDescuento !== 'none' && (
                       <div>
@@ -1572,7 +1593,7 @@ export default function VentasProductosPage() {
                       <button onClick={() => { setShowWhatsappModal(venta); setWhatsappMode('gracias'); }} className="p-2 text-slate-400 hover:text-emerald-400 rounded-lg hover:bg-emerald-500/10 transition-colors" title="Mensaje de gracias"><MessageCircle size={16} /></button>
                       <button onClick={() => { setShowWhatsappModal(venta); setWhatsappMode('recordatorio'); }} className="p-2 text-slate-400 hover:text-amber-400 rounded-lg hover:bg-amber-500/10 transition-colors" title="Recordatorio de pago"><AlertTriangle size={16} /></button>
                       <button onClick={() => editarVenta(venta)} className="p-2 text-slate-400 hover:text-cyan-400 rounded-lg hover:bg-cyan-500/10 transition-colors" title="Editar"><Edit3 size={16} /></button>
-                      <button onClick={() => eliminarVenta(venta)} className="p-2 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors" title="Eliminar"><Trash2 size={16} /></button>
+                      <button onClick={() => confirmarEliminar(venta)} className="p-2 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors" title="Eliminar"><Trash2 size={16} /></button>
                     </div>
                   </div>
 
@@ -1690,7 +1711,7 @@ export default function VentasProductosPage() {
                           {venta.estado === 'cancelado' && (
                             <button onClick={() => reactivarVenta(venta)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-warning transition-colors" title="Reactivar venta"><AlertTriangle className="w-4 h-4" /></button>
                           )}
-                          <button onClick={() => eliminarVenta(venta)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
+                              <button onClick={() => confirmarEliminar(venta)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       </td>
                     </tr>
@@ -1830,6 +1851,40 @@ export default function VentasProductosPage() {
           monto: Number(whatsappMode === 'gracias' ? (showWhatsappModal?.total || 0) : (showWhatsappModal?.montoPendiente || showWhatsappModal?.total || 0)).toFixed(2),
         }}
         onClose={() => setShowWhatsappModal(null)}
-      />    </div>
+      />
+
+      {/* Modal de Confirmación de Eliminar */}
+      <AnimatePresence>
+        {showDeleteModal && ventaAEliminar && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-voltech-surface border border-voltech-border rounded-2xl w-full max-w-md p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 rounded-full bg-red-500/20">
+                  <AlertTriangle className="w-6 h-6 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">¿Eliminar venta?</h3>
+                  <p className="text-sm text-voltech-muted">El stock será devuelto al inventario automáticamente</p>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button 
+                  onClick={() => { setShowDeleteModal(false); setVentaAEliminar(null); }} 
+                  className="flex-1 px-4 py-3 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={eliminarVenta} 
+                  className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-semibold transition-colors"
+                >
+                  Sí, eliminar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
