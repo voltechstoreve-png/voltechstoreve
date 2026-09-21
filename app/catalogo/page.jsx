@@ -1423,19 +1423,24 @@
 
   // ✅ Array ordenado estrictamente (Categoría → Marca → Nombre) - PARA EL MODAL
   const productosOrdenadosModal = useMemo(() => {
+    console.log(' Ordenando productos para modal con teclado...');
     return [...productos]
       .filter(p => p.publicado !== false)
       .sort((a, b) => {
-        const catA = (a.categoria || '').toUpperCase();
-        const catB = (b.categoria || '').toUpperCase();
+        const catA = (a.categoria || '').trim().toUpperCase();
+        const catB = (b.categoria || '').trim().toUpperCase();
         if (catA !== catB) return catA.localeCompare(catB, 'es', { sensitivity: 'base' });
-        const marcaA = (a.marca || '').toUpperCase();
-        const marcaB = (b.marca || '').toUpperCase();
+        
+        const marcaA = (a.marca || '').trim().toUpperCase();
+        const marcaB = (b.marca || '').trim().toUpperCase();
         if (marcaA !== marcaB) return marcaA.localeCompare(marcaB, 'es', { sensitivity: 'base' });
-        return (a.producto || a.plataforma || '').localeCompare(b.producto || b.plataforma || '', 'es', { sensitivity: 'base' });
+        
+        const nombreA = (a.producto || a.plataforma || '').trim().toUpperCase();
+        const nombreB = (b.producto || b.plataforma || '').trim().toUpperCase();
+        return nombreA.localeCompare(nombreB, 'es', { sensitivity: 'base' });
       });
   }, [productos]);
-  const streamingAgrupados = useMemo(() => {
+    const streamingAgrupados = useMemo(() => {
     const grupos = {};
     streamingFiltrados.forEach(p => {
       const cat = (p.categoria || 'STREAMING').toUpperCase();
