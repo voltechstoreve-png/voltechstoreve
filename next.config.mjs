@@ -1,9 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // ✅ Silenciar error de Turbopack
-  turbopack: {},
-
-  // ✅ Headers simplificados (sin CSP estricto por ahora)
+  // ✅ Headers simples
   async headers() {
     return [
       {
