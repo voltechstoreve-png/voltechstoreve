@@ -1702,7 +1702,7 @@ export default function VentasProductosPage() {
                     <tr className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
                       <td className="px-4 py-3 text-xs font-mono whitespace-nowrap text-voltech-cyan pr-3">
                         <div className="flex items-center gap-1.5">
-                          {venta.numeroOrden || 'N/A'}
+                              {venta.numero_orden || venta.numeroOrden || 'N/A'}
                           <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${(venta.origen || 'manual') === 'web' ? 'bg-sky-500/20 text-sky-300' : 'bg-slate-500/20 text-slate-300'}`}>{(venta.origen || 'manual') === 'web' ? '🌐 WEB' : '✍️ MANUAL'}</span>
                         </div>
                       </td>
