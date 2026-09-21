@@ -5,7 +5,7 @@
   import CustomSelect from '@/components/CustomSelect';
   import { useTheme } from '@/app/context/ThemeContext';
   import { useProductos, useSettings, useTasaBCV, useAuth } from '@/hooks/useVoltech';
-  import { supabase } from '@/lib/supabase';f
+  import { supabase } from '@/lib/supabase';
   import { 
     Search, ShoppingCart, MessageCircle, X, Plus, Minus, Trash2, 
     MapPin, Tag, Star, Gift, CheckCircle, Package, TrendingUp, 
