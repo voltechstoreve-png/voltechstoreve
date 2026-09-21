@@ -1371,20 +1371,31 @@
 
   const productosAgrupados = useMemo(() => {
     const grupos = {};
-    productosFiltrados.forEach(p => {
+    
+    // ✅ Crear una copia para evitar mutar el array original y causar re-renders extraños
+    const productosParaAgrupar = [...productosFiltrados];
+    
+    productosParaAgrupar.forEach(p => {
       const cat = (p.categoria || 'OTROS').toUpperCase();
-      (grupos[cat] = grupos[cat] || []).push(p);
+      if (!grupos[cat]) grupos[cat] = [];
+      grupos[cat].push(p);
     });
+    
     Object.keys(grupos).forEach(k => {
       grupos[k].sort((a, b) => {
         // 1. Primero ordenar por marca
         const marcaA = (a.marca || '').toUpperCase();
         const marcaB = (b.marca || '').toUpperCase();
         if (marcaA !== marcaB) return marcaA.localeCompare(marcaB, 'es', { sensitivity: 'base' });
+        
         // 2. Si es la misma marca, ordenar por nombre del producto
-        return (a.producto || a.plataforma || '').localeCompare(b.producto || b.plataforma || '', 'es', { sensitivity: 'base' });
+        const nombreA = (a.producto || a.plataforma || '').toUpperCase();
+        const nombreB = (b.producto || b.plataforma || '').toUpperCase();
+        return nombreA.localeCompare(nombreB, 'es', { sensitivity: 'base' });
       });
     });
+    
+    // 3. Ordenar las categorías alfabéticamente
     return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }));
   }, [productosFiltrados]);
 

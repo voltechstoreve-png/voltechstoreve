@@ -91,7 +91,7 @@ export default function VentasProductosPage() {
         if (supabase) {
           console.log('🔄 Cargando desde Supabase...');
           const [{ data: d1, error: err1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }, { data: d6 }, { data: d7 }] = await Promise.all([
-            supabase.from('ventas_productos').select('*'),
+            supabase.from('ventas_productos').select('*').order('fecha_registro', { ascending: false }),
             supabase.from('productos').select('*'),
             supabase.from('clientes').select('*'),
             supabase.from('usuarios').select('*').eq('activo', true),
@@ -776,17 +776,31 @@ export default function VentasProductosPage() {
         }
       }
       
-      const ventasActualizadas = ventas.filter(v => String(v.id) !== String(ventaAEliminar.id));
-      
+      // ✅ 1. Eliminar primero en Supabase con verificación de error
       if (supabase) {
-        await supabase.from('ventas_productos').delete().eq('id', ventaAEliminar.id);
-        if (debeDevolver) for (const p of productosActualizados) {
-          await supabase.from('productos').update({ cantidad: p.cantidad }).eq('id', p.id);
+        const { error: deleteError } = await supabase
+          .from('ventas_productos')
+          .delete()
+          .eq('id', ventaAEliminar.id);
+          
+        if (deleteError) {
+          console.error('❌ Error de Supabase al eliminar:', deleteError);
+          toast.error('No se pudo eliminar: ' + deleteError.message);
+          return; // ⛔ Detener si falla la base de datos
+        }
+        
+        if (debeDevolver) {
+          for (const p of productosActualizados) {
+            await supabase.from('productos').update({ cantidad: p.cantidad }).eq('id', p.id);
+          }
         }
       }
       
+      // ✅ 2. Si Supabase tuvo éxito, actualizar el estado local
+      const ventasActualizadas = ventas.filter(v => String(v.id) !== String(ventaAEliminar.id));
       setVentas(ventasActualizadas); 
       setProductos(productosActualizados);
+      
       toast.success('Venta eliminada y stock devuelto');
       window.dispatchEvent(new Event('voltech-data-updated'));
       setShowDeleteModal(false);
