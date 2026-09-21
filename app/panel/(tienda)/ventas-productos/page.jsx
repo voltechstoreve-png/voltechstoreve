@@ -1016,9 +1016,12 @@ export default function VentasProductosPage() {
   const totalPendiente = ventasVisibles.reduce((acc, v) => acc + Number(v.montoPendiente || 0), 0);
   const totalProductosVendidos = ventasVisibles.reduce((acc, v) => acc + (v.productos || []).reduce((a, p) => a + Number(p.cantidad || 1), 0), 0);
   
-  // ✅ FILTRO SEGURO: Evita errores si cliente o productos son undefined/null
+  // ✅ FILTRO SEGURO: Maneja cliente como objeto (web) o string (manual)
   const ventasFiltradas = ventasVisibles.filter(v => {
-    const clienteName = (v.cliente || '').toLowerCase();
+    // Si cliente es objeto (ventas web con JOIN), usar nombre; si es string, usar directamente
+    const clienteName = typeof v.cliente === 'object' 
+      ? (v.cliente?.nombre || '').toLowerCase() 
+      : (v.cliente || '').toLowerCase();
     const searchTermLower = (searchTerm || '').toLowerCase();
     const productosMatch = (v.productos || []).some(p => 
       (p.nombre || '').toLowerCase().includes(searchTermLower)
