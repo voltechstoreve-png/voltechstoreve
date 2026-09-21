@@ -2676,9 +2676,9 @@
               <div className="flex-1 overflow-y-auto p-4 md:p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                   
-                  {/* ✅ COLUMNA IZQUIERDA: IMAGEN (altura responsive) */}
-                  <div className="flex flex-col items-center">
-                    <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative bg-slate-900`} style={{ height: '300px' }}>
+                  {/* ✅ COLUMNA IZQUIERDA: IMAGEN (más grande, menos espacio) */}
+                  <div className="flex flex-col items-center px-0 md:px-2">
+                    <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative bg-slate-900`} style={{ height: '350px' }}>
                       <CarruselImagen
                         imagenes={Array.from(new Set([
                           selectedProduct.imagen,
@@ -2704,11 +2704,11 @@
                     )}
                   </div>
                   
-                  {/* ✅ COLUMNA DERECHA: INFORMACIÓN con scroll interno */}
-                  <div className="flex flex-col h-full min-h-[300px] md:min-h-[400px] relative">
+                  {/* ✅ COLUMNA DERECHA: INFORMACIÓN con botón fijo abajo */}
+                  <div className="flex flex-col h-full min-h-[300px] md:min-h-[400px]">
                     
-                    {/* Contenido con scroll */}
-                    <div className="space-y-2 md:space-y-3 overflow-y-auto max-h-[40vh] md:max-h-[50vh] pr-2">
+                    {/* Contenido con scroll - altura fija */}
+                    <div className="flex-1 overflow-y-auto space-y-2 md:space-y-3 pr-2 min-h-0">
                       
                     {/* Marca y Nombre del producto */}
                     <p className="text-xs md:text-sm text-voltech-muted uppercase tracking-wide font-semibold">{selectedProduct.marca} • {selectedProduct.categoria || selectedProduct.tipo}</p>
@@ -2830,8 +2830,8 @@
                       )}
                     </div>
 
-                    {/* Botón Agregar al Carrito fijo abajo */}
-                    <div className={`pt-2 md:pt-3 mt-2 border-t ${cardBorder} sticky bottom-0 ${cardBg} pb-2`}>
+                    {/* Botón Agregar al Carrito - siempre al fondo */}
+                    <div className={`pt-3 mt-auto border-t ${cardBorder} ${cardBg}`}>
                       <button
                         onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); setVerDescripcionCompleta(false); }}
                         className="w-full py-3 md:py-2.5 px-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm md:text-base rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-lg"
