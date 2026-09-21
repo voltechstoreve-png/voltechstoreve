@@ -5,7 +5,7 @@
   import CustomSelect from '@/components/CustomSelect';
   import { useTheme } from '@/app/context/ThemeContext';
   import { useProductos, useSettings, useTasaBCV, useAuth } from '@/hooks/useVoltech';
-  import { supabase } from '@/lib/supabase';
+  import { supabase } from '@/lib/supabase';f
   import { 
     Search, ShoppingCart, MessageCircle, X, Plus, Minus, Trash2, 
     MapPin, Tag, Star, Gift, CheckCircle, Package, TrendingUp, 
@@ -1423,10 +1423,11 @@
 
   // ✅ Array ordenado estrictamente (Categoría → Marca → Nombre) - PARA EL MODAL
   const productosOrdenadosModal = useMemo(() => {
-    console.log(' Ordenando productos para modal con teclado...');
-    return [...productos]
+    console.log('🔍 Ordenando', productos.length, 'productos para navegación con teclado...');
+    const ordenados = [...productos]
       .filter(p => p.publicado !== false)
       .sort((a, b) => {
+        // Usar .trim() para eliminar espacios invisibles
         const catA = (a.categoria || '').trim().toUpperCase();
         const catB = (b.categoria || '').trim().toUpperCase();
         if (catA !== catB) return catA.localeCompare(catB, 'es', { sensitivity: 'base' });
@@ -1439,6 +1440,9 @@
         const nombreB = (b.producto || b.plataforma || '').trim().toUpperCase();
         return nombreA.localeCompare(nombreB, 'es', { sensitivity: 'base' });
       });
+    
+    console.log('✅ Primeros 5 productos ordenados:', ordenados.slice(0, 5).map(p => `${p.categoria} - ${p.marca} - ${p.producto}`));
+    return ordenados;
   }, [productos]);
     const streamingAgrupados = useMemo(() => {
     const grupos = {};
