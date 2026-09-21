@@ -1709,13 +1709,7 @@ export default function VentasProductosPage() {
                       <td className="px-4 py-3 text-sm text-voltech-muted whitespace-nowrap"><span className="inline-flex items-center gap-2"><Calendar className="w-3 h-3" /> {venta.fecha}</span></td>
                       <td className="px-4 py-3">
                         <p className="text-sm font-medium text-white">
-                          {venta.cliente?.nombre || venta.cliente || 'N/A'}
-                        </p>
-                        <p className="text-xs text-voltech-muted">
-                          {venta.cliente?.telefono || venta.telefono || 'N/A'}
-                        </p>
-                        <p className="text-xs text-voltech-cyan">
-                          {venta.metodo_pago || 'N/A'}
+                          {typeof venta.cliente === 'object' ? venta.cliente?.nombre || 'N/A' : venta.cliente || 'N/A'}
                         </p>
                       </td>
                       <td className="px-4 py-3"><p className="text-sm text-white">{venta.productos[0]?.nombre}{venta.productos[0]?.esKit && <span className="text-xs text-voltech-purple ml-1">(KIT)</span>}{venta.productos.length > 1 && (<span className="text-xs text-voltech-muted ml-1">(+{venta.productos.length - 1} más)</span>)}</p><button onClick={() => setExpandedId(expandedId === venta.id ? null : venta.id)} className="text-xs text-voltech-cyan hover:underline flex items-center gap-1 mt-1"><ChevronDown className={`w-3 h-3 transition-transform ${expandedId === venta.id ? 'rotate-180' : ''}`} /> Ver detalle</button></td>
@@ -1723,10 +1717,9 @@ export default function VentasProductosPage() {
                       <td className="px-4 py-3 text-sm font-bold text-voltech-purple whitespace-nowrap">${Number(getComisionVenta(venta)).toFixed(2)}</td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{venta.fechaPago || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-voltech-warning">{calcularDiasAtraso(venta) > 0 ? `+${calcularDiasAtraso(venta)}` : '0'}</td>
-                      <td className="px-4 py-3 text-sm text-voltech-muted">{(venta.metodoPago || '').replace('_', ' ')}</td>
+                      <td className="px-4 py-3 text-sm text-voltech-muted capitalize">{(venta.metodo_pago || venta.metodoPago || 'N/A').replace('_', ' ')}</td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{venta.carteraId || 'N/A'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-1 rounded-full ${
+                      <td className="px-4 py-3">                        <span className={`text-xs px-2 py-1 rounded-full ${
                           venta.estado === 'pagado' ? 'bg-emerald-500/20 text-emerald-300' :
                           venta.estado === 'debe' ? 'bg-amber-500/20 text-amber-300' :
                           venta.estado === 'cancelado' ? 'bg-rose-500/20 text-rose-300' :
