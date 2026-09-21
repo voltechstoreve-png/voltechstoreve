@@ -509,24 +509,35 @@ export default function VentasProductosPage() {
         return;
       }
 
+      // ✅ Verificar stock pero SOLO mostrar advertencia, NO bloquear
+      let hayStockInsuficiente = false;
+      const productosConStockBajo = [];
+      
       for (const prod of formData.productos) {
         if (prod.esKit) {
           for (const prodKit of prod.productosIncluidos || []) {
             const productoBase = productos.find(p => String(p.id) === String(prodKit.producto_id));
-            if (!productoBase || productoBase.cantidad < prodKit.cantidad * prod.cantidad) {
-              toast.error(`Stock insuficiente para ${productoBase?.plataforma || 'producto'} en el kit`);
-              return;
+            if (productoBase && productoBase.cantidad < prodKit.cantidad * prod.cantidad) {
+              hayStockInsuficiente = true;
+              productosConStockBajo.push(`${productoBase.plataforma} (Stock: ${productoBase.cantidad})`);
             }
           }
         } else {
           const producto = productos.find(p => String(p.id) === String(prod.productoId));
-          if (!producto || producto.cantidad < prod.cantidad) {
-            toast.error(`Stock insuficiente para ${producto?.plataforma || 'producto'}`);
-            return;
+          if (producto && producto.cantidad < prod.cantidad) {
+            hayStockInsuficiente = true;
+            productosConStockBajo.push(`${producto.plataforma} (Stock: ${producto.cantidad})`);
           }
         }
       }
-
+      
+      // ✅ Solo advertir si hay stock insuficiente, pero NO bloquear
+      if (hayStockInsuficiente) {
+        console.warn('⚠️ Productos con stock insuficiente:', productosConStockBajo);
+        // Mostramos toast de advertencia pero continuamos
+        toast.warning(`⚠️ Stock bajo: ${productosConStockBajo.join(', ')}. Se registrará la venta de todas formas.`);
+      }
+      
       const clienteExistente = clientes.find(c => c.nombre.toLowerCase() === formData.cliente.toLowerCase() || c.telefono === formData.telefono);
       let clientesActualizados = [...clientes];
       const nuevoCliente = clienteExistente ? 
