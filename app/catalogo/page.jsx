@@ -903,13 +903,14 @@
               clienteId = clienteExistente.id;
             } else {
               console.log('🆕 [DEBUG] Creando nuevo cliente...');
+              // ✅ CAMBIOS APLICADOS: fuenteRegistro y fechaRegistro (camelCase)
               const nuevoClienteData = { 
                 nombre: clienteNombre.trim(), 
                 telefono: clienteTelefono.trim(), 
-                origen: 'web', 
-                fecha_registro: new Date().toISOString() 
+                fuenteRegistro: 'web', 
+                fechaRegistro: new Date().toISOString() 
               };
-              console.log('📦 [DEBUG] Datos a insertar en clientes:', nuevoClienteData);
+              console.log('📦 [DEBUG] Datos a insertar:', nuevoClienteData);
               
               const { data: nuevoCliente, error: errorCliente } = await supabase
                 .from('clientes')
@@ -918,28 +919,32 @@
                 .single();
               
               if (errorCliente) {
-                console.error('❌ [DEBUG] Error creando cliente:', errorCliente.message, errorCliente.details, errorCliente.hint);
+                console.error('❌ [DEBUG] Error:', errorCliente.message);
+                console.error(' Detalles:', errorCliente.details);
                 
-                // ⚠️ PLAN B: Intentar sin fecha_registro por si la columna se llama diferente (ej. fechaRegistro)
-                console.log('⚠️ [DEBUG] Reintentando sin fecha_registro...');
+                // PLAN B: Solo campos obligatorios
+                console.log('⚠️ [DEBUG] Reintentando con campos mínimos...');
                 const { data: nc2, error: err2 } = await supabase
                   .from('clientes')
-                  .insert({ nombre: clienteNombre.trim(), telefono: clienteTelefono.trim(), origen: 'web' })
+                  .insert({ 
+                    nombre: clienteNombre.trim(), 
+                    telefono: clienteTelefono.trim(), 
+                    fuenteRegistro: 'web' 
+                  })
                   .select('id')
                   .single();
                 
                 if (err2) {
-                  console.error('❌ [DEBUG] Segundo intento fallido:', err2.message, err2.details);
+                  console.error('❌ [DEBUG] Segundo intento fallido:', err2.message);
                 } else {
-                  console.log('✅ [DEBUG] Cliente creado en segundo intento, ID:', nc2?.id);
+                  console.log('✅ [DEBUG] Cliente creado (intento 2), ID:', nc2?.id);
                   if (nc2) clienteId = nc2.id;
                 }
               } else {
-                console.log('✅ [DEBUG] Cliente creado exitosamente, ID:', nuevoCliente?.id);
+                console.log('✅ [DEBUG] Cliente creado, ID:', nuevoCliente?.id);
                 if (nuevoCliente) clienteId = nuevoCliente.id;
               }
             }
-
             const hoy = new Date();
             const dia = String(hoy.getDate()).padStart(2, '0');
             const mes = String(hoy.getMonth() + 1).padStart(2, '0');
