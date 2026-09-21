@@ -2,14 +2,14 @@
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
 
-// ✅ 2. Tu configuración de Firebase (⚠️ REEMPLAZA con tus datos reales de Firebase Console)
+// ✅ 2. Tu configuración REAL de Firebase (ya completada con tus datos)
 const firebaseConfig = {
-  apiKey: "TU_API_KEY_AQUI",
-  authDomain: "TU_PROYECTO.firebaseapp.com",
-  projectId: "TU_PROYECTO_ID",
-  storageBucket: "TU_PROYECTO.appspot.com",
-  messagingSenderId: "TU_SENDER_ID",
-  appId: "TU_APP_ID"
+  apiKey: "AIzaSyDn_AMsOc8_J2Id0BkoZ4AQyHP_mLE_LgI",
+  authDomain: "voltech-push.firebaseapp.com",
+  projectId: "voltech-push",
+  storageBucket: "voltech-push.firebasestorage.app",
+  messagingSenderId: "25006705164",
+  appId: "1:25006705164:android:28e6dcc5c9897999ee3c29"
 };
 
 // Inicializar Firebase solo si no está inicializado
@@ -27,7 +27,7 @@ messaging.onBackgroundMessage((payload) => {
     body: payload.notification?.body || 'Tienes una nueva actualización',
     icon: '/voltechstore.png',
     badge: '/voltechstore.png',
-    data: payload.data // Para que al hacer clic abra una URL específica si quieres
+    data: payload.data
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
@@ -45,12 +45,11 @@ self.addEventListener('activate', (event) => {
       .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
       .then(() => {
         console.log('[sw.js] Cachés antiguas eliminadas. SW activo para recibir notificaciones.');
-        // ⚠️ NO desregistres el SW aquí, o las notificaciones de fondo dejarán de funcionar.
       })
   );
 });
 
 // ✅ 5. No interceptar fetch: dejar que Next.js maneje la red normalmente
 self.addEventListener('fetch', (event) => {
-  // No hacer nada, el navegador irá directamente a la red (sin caché stale)
+  // No hacer nada, el navegador irá directamente a la red
 });
