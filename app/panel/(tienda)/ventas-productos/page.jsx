@@ -91,7 +91,14 @@ export default function VentasProductosPage() {
         if (supabase) {
           console.log('🔄 Cargando desde Supabase...');
           const [{ data: d1, error: err1 }, { data: d2 }, { data: d3 }, { data: d4 }, { data: d5 }, { data: d6 }, { data: d7 }] = await Promise.all([
-            supabase.from('ventas_productos').select('*').order('fecha_registro', { ascending: false }),
+            supabase.from('ventas_productos').select(`
+              *,
+              cliente:clientes!cliente_id (
+                nombre,
+                telefono,
+                email
+              )
+            `).order('fecha_registro', { ascending: false }),
             supabase.from('productos').select('*'),
             supabase.from('clientes').select('*'),
             supabase.from('usuarios').select('*').eq('activo', true),
@@ -1600,8 +1607,15 @@ export default function VentasProductosPage() {
                 <div key={venta.id} className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-4 space-y-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <h4 className="text-xs font-bold text-slate-100 truncate">{venta.cliente}</h4>
-                      <p className="text-[11px] text-slate-400 font-mono truncate">{venta.telefono}</p>
+                      <h4 className="text-xs font-bold text-slate-100 truncate">
+                        {typeof venta.cliente === 'object' ? venta.cliente?.nombre : venta.cliente || 'N/A'}
+                      </h4>
+                      <p className="text-[11px] text-slate-400 font-mono truncate">
+                        {typeof venta.cliente === 'object' ? venta.cliente?.telefono : venta.telefono || 'N/A'}
+                      </p>
+                      <p className="text-[10px] text-voltech-cyan capitalize">
+                        {(venta.metodo_pago || 'N/A').replace('_', ' ')}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <button onClick={() => { setShowWhatsappModal(venta); setWhatsappMode('gracias'); }} className="p-2 text-slate-400 hover:text-emerald-400 rounded-lg hover:bg-emerald-500/10 transition-colors" title="Mensaje de gracias"><MessageCircle size={16} /></button>
@@ -1690,7 +1704,17 @@ export default function VentasProductosPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-voltech-muted whitespace-nowrap"><span className="inline-flex items-center gap-2"><Calendar className="w-3 h-3" /> {venta.fecha}</span></td>
-                      <td className="px-4 py-3"><p className="text-sm font-medium text-white">{venta.cliente}</p><p className="text-xs text-voltech-muted">{venta.telefono}</p></td>
+                      <td className="px-4 py-3">
+                        <p className="text-sm font-medium text-white">
+                          {venta.cliente?.nombre || venta.cliente || 'N/A'}
+                        </p>
+                        <p className="text-xs text-voltech-muted">
+                          {venta.cliente?.telefono || venta.telefono || 'N/A'}
+                        </p>
+                        <p className="text-xs text-voltech-cyan">
+                          {venta.metodo_pago || 'N/A'}
+                        </p>
+                      </td>
                       <td className="px-4 py-3"><p className="text-sm text-white">{venta.productos[0]?.nombre}{venta.productos[0]?.esKit && <span className="text-xs text-voltech-purple ml-1">(KIT)</span>}{venta.productos.length > 1 && (<span className="text-xs text-voltech-muted ml-1">(+{venta.productos.length - 1} más)</span>)}</p><button onClick={() => setExpandedId(expandedId === venta.id ? null : venta.id)} className="text-xs text-voltech-cyan hover:underline flex items-center gap-1 mt-1"><ChevronDown className={`w-3 h-3 transition-transform ${expandedId === venta.id ? 'rotate-180' : ''}`} /> Ver detalle</button></td>
                       <td className="px-4 py-3 text-sm font-bold text-voltech-success whitespace-nowrap">${Number(venta.total || 0).toFixed(2)}</td>
                       <td className="px-4 py-3 text-sm font-bold text-voltech-purple whitespace-nowrap">${Number(getComisionVenta(venta)).toFixed(2)}</td>
@@ -1795,7 +1819,9 @@ export default function VentasProductosPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-voltech-border">
                               <div>
                                 <p className="text-xs text-voltech-muted mb-1">Método de Pago:</p>
-                                <p className="text-sm text-white font-medium">{(venta.metodoPago || 'N/A').replace('_', ' ').toUpperCase()}</p>
+                                <p className="text-sm text-white font-medium capitalize">
+                                  {(venta.metodo_pago || venta.metodoPago || 'N/A').replace('_', ' ')}
+                                </p>
                               </div>
                               <div>
                                 <p className="text-xs text-voltech-muted mb-1">Cartera:</p>

@@ -1370,33 +1370,39 @@
     const totalVotos = productosVotacion.reduce((sum, p) => sum + (p.votos || 0), 0);
 
   const productosAgrupados = useMemo(() => {
+    console.log('🔄 Ordenando productos. Total:', productosFiltrados.length);
     const grupos = {};
     
-    // ✅ Crear una copia para evitar mutar el array original y causar re-renders extraños
+    // ✅ Crear una copia para evitar mutar el array original
     const productosParaAgrupar = [...productosFiltrados];
     
     productosParaAgrupar.forEach(p => {
-      const cat = (p.categoria || 'OTROS').toUpperCase();
+      // ✅ Usar .trim() para eliminar espacios invisibles al inicio/final
+      const cat = (p.categoria || 'OTROS').trim().toUpperCase();
       if (!grupos[cat]) grupos[cat] = [];
       grupos[cat].push(p);
     });
     
     Object.keys(grupos).forEach(k => {
       grupos[k].sort((a, b) => {
-        // 1. Primero ordenar por marca
-        const marcaA = (a.marca || '').toUpperCase();
-        const marcaB = (b.marca || '').toUpperCase();
+        // 1. Primero ordenar por marca (con trim)
+        const marcaA = (a.marca || '').trim().toUpperCase();
+        const marcaB = (b.marca || '').trim().toUpperCase();
         if (marcaA !== marcaB) return marcaA.localeCompare(marcaB, 'es', { sensitivity: 'base' });
         
-        // 2. Si es la misma marca, ordenar por nombre del producto
-        const nombreA = (a.producto || a.plataforma || '').toUpperCase();
-        const nombreB = (b.producto || b.plataforma || '').toUpperCase();
+        // 2. Si es la misma marca, ordenar por nombre del producto (con trim)
+        const nombreA = (a.producto || a.plataforma || '').trim().toUpperCase();
+        const nombreB = (b.producto || b.plataforma || '').trim().toUpperCase();
         return nombreA.localeCompare(nombreB, 'es', { sensitivity: 'base' });
       });
     });
     
     // 3. Ordenar las categorías alfabéticamente
-    return Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }));
+    const resultado = Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }));
+    
+    // ✅ Log para verificar en consola el orden final de las categorías
+    console.log('✅ Categorías ordenadas:', resultado.map(g => g[0]));
+    return resultado;
   }, [productosFiltrados]);
 
   // ✅ Array plano con el MISMO orden que el catálogo (para navegación del modal)
@@ -2698,11 +2704,11 @@
                     )}
                   </div>
                   
-                  {/* ✅ COLUMNA DERECHA: INFORMACIÓN (sin scroll, botón fijo abajo) */}
-                  <div className="flex flex-col justify-between h-full min-h-[300px] md:min-h-[400px]">
+                  {/* ✅ COLUMNA DERECHA: INFORMACIÓN con scroll interno */}
+                  <div className="flex flex-col h-full min-h-[300px] md:min-h-[400px] relative">
                     
-                    {/* Contenido superior SIN scroll (optimizado para móvil) */}
-                    <div className="space-y-2 md:space-y-3">
+                    {/* Contenido con scroll */}
+                    <div className="space-y-2 md:space-y-3 overflow-y-auto max-h-[40vh] md:max-h-[50vh] pr-2">
                       
                     {/* Marca y Nombre del producto */}
                     <p className="text-xs md:text-sm text-voltech-muted uppercase tracking-wide font-semibold">{selectedProduct.marca} • {selectedProduct.categoria || selectedProduct.tipo}</p>
@@ -2801,9 +2807,9 @@
                         </div>
                       )}
 
-                      {/* ✅ BOTÓN VER ESPECIFICACIONES - Siempre visible arriba del botón de compra */}
+                      {/* ✅ BOTÓN VER ESPECIFICACIONES - Sticky en móvil */}
                       {(selectedProduct.descripcion_detallada || (selectedProduct.caracteristicas && selectedProduct.caracteristicas.length > 0)) && (
-                        <div className="pt-2 mt-2">
+                        <div className="pt-2 mt-2 sticky bottom-16 md:bottom-0 bg-transparent z-10">
                           <button
                             onClick={() => setVerDescripcionCompleta(!verDescripcionCompleta)}
                             className="w-full py-2.5 px-4 border-2 border-voltech-cyan/50 text-voltech-cyan font-semibold text-sm rounded-xl hover:bg-voltech-cyan/10 transition-all flex items-center justify-center gap-2"
