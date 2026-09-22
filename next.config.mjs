@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // ✅ 1. Evitar que el navegador guarde en caché la página HTML y los scripts
+  // ✅ Headers simples
   async headers() {
     return [
       {
@@ -15,7 +15,7 @@ const nextConfig = {
     ];
   },
 
-  // ✅ 2. Tus redirecciones de dominio existentes
+  // ✅ Redirecciones de dominio
   async redirects() {
     return [
       {
@@ -40,8 +40,8 @@ const nextConfig = {
         destination: 'https://voltechstoreve.com/:path*',
         permanent: true,
       },
-    ]
+    ];
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;

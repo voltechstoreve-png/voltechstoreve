@@ -3259,13 +3259,18 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
   </div>
 </nav>
 
+<<<<<<< HEAD
 {/* ✅ MODAL DE ZOOM DE IMAGEN - VERSIÓN LIMPIA */}
+=======
+{/* ✅ MODAL DE ZOOM DE IMAGEN */}
+>>>>>>> ca48fa45d29a35c8034592a44adeb0dc0aab0bb7
 <AnimatePresence>
   {showImageZoom && zoomedImage && (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+<<<<<<< HEAD
       className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-0 md:p-4"
       onClick={() => setShowImageZoom(false)}
     >
@@ -3297,3 +3302,36 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
 </AnimatePresence></div>
 );
 };
+=======
+      className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4"
+      onClick={() => setShowImageZoom(false)}
+    >
+      <motion.div
+        initial={{ scale: 0.8 }}
+        animate={{ scale: 1 }}
+        exit={{ scale: 0.8 }}
+        className="relative max-w-5xl max-h-[90vh] overflow-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <img
+          src={zoomedImage}
+          alt="Vista ampliada"
+          className="max-w-full max-h-[90vh] object-contain rounded-lg"
+        />
+        <button
+          onClick={() => setShowImageZoom(false)}
+          className="absolute -top-4 -right-4 bg-white text-slate-900 rounded-full p-2 hover:bg-slate-100 transition-colors shadow-lg"
+        >
+          <X className="w-6 h-6" />
+        </button>
+        <p className="text-white text-center mt-4 text-sm">
+          Haz clic fuera de la imagen o presiona ESC para cerrar
+        </p>
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
+</div>
+);
+};
+>>>>>>> ca48fa45d29a35c8034592a44adeb0dc0aab0bb7
