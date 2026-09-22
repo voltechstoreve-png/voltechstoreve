@@ -558,7 +558,7 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
       return () => clearInterval(interval);
     }, [sorteoActivo]);
 
-    // ✅ NAVEGACIÓN CON TECLADO (Flechas y Escape)
+    // ✅ NAVEGACIÓN CON TECLADO - Usa productosOrdenadosModal (orden correcto)
     useEffect(() => {
       if (!selectedProduct) return;
       
@@ -568,11 +568,8 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
           return;
         }
         
-        // Usar variables con fallback por si no están definidas
-        const productosLista = (typeof navTab !== 'undefined' && navTab === 'explorar' && typeof activeSection !== 'undefined' && activeSection === 'streaming') 
-          ? (typeof streamingFiltrados !== 'undefined' ? streamingFiltrados : []) 
-          : (typeof productosFiltrados !== 'undefined' ? productosFiltrados : []);
-        
+        // ✅ USAR productosOrdenadosModal que ya está ordenado correctamente
+        const productosLista = productosOrdenadosModal;
         const idxActual = productosLista.findIndex(p => p.id === selectedProduct.id);
         
         if (e.key === 'ArrowLeft' && idxActual > 0) {
@@ -584,7 +581,7 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
       
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedProduct]); // Solo selectedProduct como dependencia para evitar el error
+    }, [selectedProduct, productosOrdenadosModal]); // Agregamos productosOrdenadosModal a las dependencias
   const productosMasVendidos = useMemo(() => {
   if (!productos.length) return [];
   const conteo = {};
@@ -1502,8 +1499,8 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
           ...(Array.isArray(p.productos_kit) ? p.productos_kit.map(k => k.imagen).filter(Boolean) : [])
         ].filter(Boolean)));
         return (
-        <div key={p.id || p.producto || `prod-${idx}`} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col cursor-pointer group h-full`}>
-          <div className="aspect-square bg-slate-900 flex items-center justify-center overflow-hidden relative">
+        <div key={p.id || p.producto || `prod-${idx}`} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col cursor-pointer group`} style={{ height: '100%' }}>
+          <div className="relative bg-slate-900 flex items-center justify-center overflow-hidden" style={{ aspectRatio: '1/1', minHeight: '200px' }}>
             <CarruselImagen
               imagenes={todasImagenes}
               alt={p.producto || p.plataforma}
@@ -2691,23 +2688,23 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
               }}
             >
               
-              {/* HEADER: Categoría + contador local (orden estricto) */}
-              <div className={`sticky top-0 ${cardBg} border-b ${cardBorder} p-4 flex justify-between items-center z-10`}>
+              {/* ✅ HEADER: Categoría + contador + Botón X a la derecha */}
+              <div className={`sticky top-0 ${cardBg} border-b ${cardBorder} p-4 flex justify-between items-center z-20`}>
                 {(() => {
                   const productosOrdenadosHeader = [...productos]
                     .filter(p => p.publicado !== false)
                     .sort((a, b) => {
-                      const catA = (a.categoria || '').toUpperCase();
-                      const catB = (b.categoria || '').toUpperCase();
+                      const catA = (a.categoria || '').trim().toUpperCase();
+                      const catB = (b.categoria || '').trim().toUpperCase();
                       if (catA !== catB) return catA.localeCompare(catB, 'es', { sensitivity: 'base' });
-                      const marcaA = (a.marca || '').toUpperCase();
-                      const marcaB = (b.marca || '').toUpperCase();
+                      const marcaA = (a.marca || '').trim().toUpperCase();
+                      const marcaB = (b.marca || '').trim().toUpperCase();
                       if (marcaA !== marcaB) return marcaA.localeCompare(marcaB, 'es', { sensitivity: 'base' });
-                      return (a.producto || a.plataforma || '').localeCompare(b.producto || b.plataforma || '', 'es', { sensitivity: 'base' });
+                      return (a.producto || a.plataforma || '').trim().toUpperCase().localeCompare((b.producto || b.plataforma || '').trim().toUpperCase(), 'es', { sensitivity: 'base' });
                     });
                   const categoriaActual = selectedProduct.categoria || 'OTROS';
                   const productosCategoria = productosOrdenadosHeader.filter(p => 
-                    (p.categoria || '').toUpperCase() === categoriaActual.toUpperCase()
+                    (p.categoria || '').trim().toUpperCase() === categoriaActual.toUpperCase()
                   );
                   const idxCategoria = productosCategoria.findIndex(p => p.id === selectedProduct.id);
                   
@@ -2717,15 +2714,21 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
                     </h3>
                   );
                 })()}
-                <button onClick={() => { setSelectedProduct(null); setVerDescripcionCompleta(false); }} className="p-2 hover:bg-voltech-border rounded-full transition-colors"><X className="w-6 h-6" /></button>
+                <button 
+                  onClick={() => { setSelectedProduct(null); setVerDescripcionCompleta(false); }} 
+                  className="p-2 hover:bg-voltech-border rounded-full transition-colors flex-shrink-0"
+                  title="Cerrar modal"
+                >
+                  <X className="w-6 h-6" />
+                </button>
               </div>
               
               {/* CONTENIDO: Imagen izquierda + Info derecha */}
               <div className="flex-1 overflow-y-auto p-4 md:p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                   
-                  {/* ✅ COLUMNA IZQUIERDA: IMAGEN (más grande, menos espacio) */}                  <div className="flex flex-col items-center px-0 md:px-2">
-                    <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative bg-slate-900`} style={{ height: '350px' }}>
+                  {/* ✅ COLUMNA IZQUIERDA: IMAGEN (altura adaptable, sin recortes) */}                  <div className="flex flex-col items-center px-0 md:px-2">
+                    <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative bg-slate-900`} style={{ minHeight: '300px', maxHeight: '450px' }}>
                       <CarruselImagen
                         imagenes={Array.from(new Set([
                           selectedProduct.imagen,
@@ -2800,7 +2803,7 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
                           <span className="text-lg text-gray-400 line-through">${getPrecioMostrar(selectedProduct).precioTachado?.toFixed(2)}</span>
                         )}
                         <span className={`text-3xl font-bold ${getPrecioMostrar(selectedProduct).tieneOferta ? 'text-red-600' : ''}`}>
-                          ${getPrecioMostrar(selectedProduct).precioPrincipal?.toFixed(2)}
+                          ${getPrecioMostrar(selectedProduct).precioPrincipal?.toFixed(2)} USD
                         </span>
                         <span className="text-sm text-voltech-muted">Bs {calcularPrecioBs(getPrecioMostrar(selectedProduct).precioPrincipal)}</span>
                       </div>
@@ -2858,9 +2861,9 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
                         </div>
                       )}
 
-                      {/* ✅ BOTÓN VER ESPECIFICACIONES - Sticky en móvil */}
+                      {/* ✅ BOTÓN VER ESPECIFICACIONES - Fijo justo arriba del botón de compra */}
                       {(selectedProduct.descripcion_detallada || (selectedProduct.caracteristicas && selectedProduct.caracteristicas.length > 0)) && (
-                        <div className="pt-2 mt-2 sticky bottom-16 md:bottom-0 bg-transparent z-10">
+                        <div className="pt-2 mt-2 bg-transparent z-10">
                           <button
                             onClick={() => setVerDescripcionCompleta(!verDescripcionCompleta)}
                             className="w-full py-2.5 px-4 border-2 border-voltech-cyan/50 text-voltech-cyan font-semibold text-sm rounded-xl hover:bg-voltech-cyan/10 transition-all flex items-center justify-center gap-2"
