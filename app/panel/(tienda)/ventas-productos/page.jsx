@@ -509,24 +509,41 @@ export default function VentasProductosPage() {
         return;
       }
 
+      // ✅ Verificar stock pero SOLO mostrar advertencia, NO bloquear
+      let hayStockInsuficiente = false;
+      const productosConStockBajo = [];
+      
       for (const prod of formData.productos) {
         if (prod.esKit) {
           for (const prodKit of prod.productosIncluidos || []) {
             const productoBase = productos.find(p => String(p.id) === String(prodKit.producto_id));
-            if (!productoBase || productoBase.cantidad < prodKit.cantidad * prod.cantidad) {
-              toast.error(`Stock insuficiente para ${productoBase?.plataforma || 'producto'} en el kit`);
-              return;
+            if (productoBase && productoBase.cantidad < prodKit.cantidad * prod.cantidad) {
+              hayStockInsuficiente = true;
+              productosConStockBajo.push(`${productoBase.plataforma} (Stock: ${productoBase.cantidad})`);
             }
           }
         } else {
           const producto = productos.find(p => String(p.id) === String(prod.productoId));
-          if (!producto || producto.cantidad < prod.cantidad) {
-            toast.error(`Stock insuficiente para ${producto?.plataforma || 'producto'}`);
-            return;
+          if (producto && producto.cantidad < prod.cantidad) {
+            hayStockInsuficiente = true;
+            productosConStockBajo.push(`${producto.plataforma} (Stock: ${producto.cantidad})`);
           }
         }
       }
-
+      
+      // ✅ Solo advertir si hay stock insuficiente, pero NO bloquear
+      if (hayStockInsuficiente) {
+        console.warn('⚠️ Productos con stock insuficiente:', productosConStockBajo);
+        // Usamos toast normal (amarillo por defecto no existe, usamos custom o error suave)
+        toast(`⚠️ Stock bajo: ${productosConStockBajo.join(', ')}. Continuando...`, {
+          icon: '⚠️',
+          style: {
+            background: '#f59e0b',
+            color: '#fff',
+          },
+        });
+      }      
+      
       const clienteExistente = clientes.find(c => c.nombre.toLowerCase() === formData.cliente.toLowerCase() || c.telefono === formData.telefono);
       let clientesActualizados = [...clientes];
       const nuevoCliente = clienteExistente ? 
@@ -1016,9 +1033,12 @@ export default function VentasProductosPage() {
   const totalPendiente = ventasVisibles.reduce((acc, v) => acc + Number(v.montoPendiente || 0), 0);
   const totalProductosVendidos = ventasVisibles.reduce((acc, v) => acc + (v.productos || []).reduce((a, p) => a + Number(p.cantidad || 1), 0), 0);
   
-  // ✅ FILTRO SEGURO: Evita errores si cliente o productos son undefined/null
+  // ✅ FILTRO SEGURO: Maneja cliente como objeto (web) o string (manual)
   const ventasFiltradas = ventasVisibles.filter(v => {
-    const clienteName = (v.cliente || '').toLowerCase();
+    // Si cliente es objeto (ventas web con JOIN), usar nombre; si es string, usar directamente
+    const clienteName = typeof v.cliente === 'object' 
+      ? (v.cliente?.nombre || '').toLowerCase() 
+      : (v.cliente || '').toLowerCase();
     const searchTermLower = (searchTerm || '').toLowerCase();
     const productosMatch = (v.productos || []).some(p => 
       (p.nombre || '').toLowerCase().includes(searchTermLower)
@@ -1699,20 +1719,14 @@ export default function VentasProductosPage() {
                     <tr className="border-b border-voltech-border hover:bg-voltech-border/30 transition-colors">
                       <td className="px-4 py-3 text-xs font-mono whitespace-nowrap text-voltech-cyan pr-3">
                         <div className="flex items-center gap-1.5">
-                          {venta.numeroOrden || 'N/A'}
+                              {venta.numero_orden || venta.numeroOrden || 'N/A'}
                           <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${(venta.origen || 'manual') === 'web' ? 'bg-sky-500/20 text-sky-300' : 'bg-slate-500/20 text-slate-300'}`}>{(venta.origen || 'manual') === 'web' ? '🌐 WEB' : '✍️ MANUAL'}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-voltech-muted whitespace-nowrap"><span className="inline-flex items-center gap-2"><Calendar className="w-3 h-3" /> {venta.fecha}</span></td>
                       <td className="px-4 py-3">
                         <p className="text-sm font-medium text-white">
-                          {venta.cliente?.nombre || venta.cliente || 'N/A'}
-                        </p>
-                        <p className="text-xs text-voltech-muted">
-                          {venta.cliente?.telefono || venta.telefono || 'N/A'}
-                        </p>
-                        <p className="text-xs text-voltech-cyan">
-                          {venta.metodo_pago || 'N/A'}
+                          {typeof venta.cliente === 'object' ? venta.cliente?.nombre || 'N/A' : venta.cliente || 'N/A'}
                         </p>
                       </td>
                       <td className="px-4 py-3"><p className="text-sm text-white">{venta.productos[0]?.nombre}{venta.productos[0]?.esKit && <span className="text-xs text-voltech-purple ml-1">(KIT)</span>}{venta.productos.length > 1 && (<span className="text-xs text-voltech-muted ml-1">(+{venta.productos.length - 1} más)</span>)}</p><button onClick={() => setExpandedId(expandedId === venta.id ? null : venta.id)} className="text-xs text-voltech-cyan hover:underline flex items-center gap-1 mt-1"><ChevronDown className={`w-3 h-3 transition-transform ${expandedId === venta.id ? 'rotate-180' : ''}`} /> Ver detalle</button></td>
@@ -1720,10 +1734,9 @@ export default function VentasProductosPage() {
                       <td className="px-4 py-3 text-sm font-bold text-voltech-purple whitespace-nowrap">${Number(getComisionVenta(venta)).toFixed(2)}</td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{venta.fechaPago || 'N/A'}</td>
                       <td className="px-4 py-3 text-sm text-voltech-warning">{calcularDiasAtraso(venta) > 0 ? `+${calcularDiasAtraso(venta)}` : '0'}</td>
-                      <td className="px-4 py-3 text-sm text-voltech-muted">{(venta.metodoPago || '').replace('_', ' ')}</td>
+                      <td className="px-4 py-3 text-sm text-voltech-muted capitalize">{(venta.metodo_pago || venta.metodoPago || 'N/A').replace('_', ' ')}</td>
                       <td className="px-4 py-3 text-sm text-voltech-muted">{venta.carteraId || 'N/A'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-1 rounded-full ${
+                      <td className="px-4 py-3">                        <span className={`text-xs px-2 py-1 rounded-full ${
                           venta.estado === 'pagado' ? 'bg-emerald-500/20 text-emerald-300' :
                           venta.estado === 'debe' ? 'bg-amber-500/20 text-amber-300' :
                           venta.estado === 'cancelado' ? 'bg-rose-500/20 text-rose-300' :

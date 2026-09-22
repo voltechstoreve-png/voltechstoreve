@@ -37,19 +37,19 @@
   // ✅ Solo permite navegar si la URL existe y es http(s) válida (evita links muertos o ajenos)
   const esUrlValida = (u) => typeof u === 'string' && /^https?:\/\/\S+$/i.test(u.trim());
 
-  // ✅ CARRUSEL DE IMÁGENES: portada primero + flechas ‹ › + puntitos (para tarjetas y modal)
-  const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', iconoVacio = null }) => {
-    const [idx, setIdx] = useState(0);
-    const todas = (imagenes || []).filter(Boolean);
-    if (todas.length === 0) {
-      return iconoVacio || <Package className="w-12 h-12 text-slate-300" />;
-    }
-    const actual = todas[Math.min(idx, todas.length - 1)];
+// ✅ CARRUSEL DE IMÁGENES: portada primero + flechas ‹ › + puntitos + ZOOM (para tarjetas y modal)
+const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', iconoVacio = null, onZoom }) => {
+  const [idx, setIdx] = useState(0);
+  const todas = (imagenes || []).filter(Boolean);
+  if (todas.length === 0) {
+    return iconoVacio || <Package className="w-12 h-12 text-slate-300" />;
+  }
+  const actual = todas[Math.min(idx, todas.length - 1)];
+  
   // ✅ Limpieza automática de caché cuando cambia la estructura de datos
   useEffect(() => {
     const DATA_VERSION = '2.0'; // Cambia esto cuando modifiques la estructura
     const storedVersion = localStorage.getItem('voltech_data_version');
-    
     if (storedVersion !== DATA_VERSION) {
       console.log('🔄 Actualizando estructura de datos...');
       // Limpiar solo datos específicos, no todo
@@ -59,29 +59,38 @@
       localStorage.setItem('voltech_data_version', DATA_VERSION);
     }
   }, []);
-    return (
-      <>
+
+  return (
+    <>
+      <div className="relative group">
         <img
           src={actual}
           alt={alt}
-          className={className}
+          className={`${className} ${onZoom ? 'cursor-zoom-in hover:opacity-90' : ''} transition-opacity`}
           style={{ objectFit }}
+          onClick={() => onZoom && onZoom(actual)}
           onError={(e) => { e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2UyZThmMCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWE5YWE2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+U2luIEltYWdlbjwvdGV4dD48L3N2Zz4='; }}
         />
-        {todas.length > 1 && (
-          <>
-            <button type="button" onClick={(e) => { e.stopPropagation(); setIdx((idx - 1 + todas.length) % todas.length); }} className="absolute left-1 top-1/2 -translate-y-1/2 z-10 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-black/80">‹</button>
-            <button type="button" onClick={(e) => { e.stopPropagation(); setIdx((idx + 1) % todas.length); }} className="absolute right-1 top-1/2 -translate-y-1/2 z-10 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-black/80">›</button>
-            <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10 flex gap-1 bg-black/30 rounded-full px-1.5 py-0.5">
-              {todas.map((_, i) => (
-                <span key={i} className={`h-1 rounded-full transition-all ${i === Math.min(idx, todas.length - 1) ? 'w-3 bg-voltech-cyan' : 'w-1 bg-white/60'}`} />
-              ))}
-            </div>
-          </>
+        {onZoom && (
+          <div className="absolute top-2 right-2 bg-black/60 text-white px-2 py-1 rounded-lg text-xs opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            🔍 Click para ampliar
+          </div>
         )}
-      </>
-    );
-  };
+      </div>
+      {todas.length > 1 && (
+        <>
+          <button type="button" onClick={(e) => { e.stopPropagation(); setIdx((idx - 1 + todas.length) % todas.length); }} className="absolute left-1 top-1/2 -translate-y-1/2 z-10 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-black/80">‹</button>
+          <button type="button" onClick={(e) => { e.stopPropagation(); setIdx((idx + 1) % todas.length); }} className="absolute right-1 top-1/2 -translate-y-1/2 z-10 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-black/80">›</button>
+          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10 flex gap-1 bg-black/30 rounded-full px-1.5 py-0.5">
+            {todas.map((_, i) => (
+              <span key={i} className={`h-1 rounded-full transition-all ${i === Math.min(idx, todas.length - 1) ? 'w-3 bg-voltech-cyan' : 'w-1 bg-white/60'}`} />
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+};
 
   export default function CatalogoPage() {
     const [activeSection, setActiveSection] = useState('productos');
@@ -155,7 +164,9 @@
   const [clienteTelefono, setClienteTelefono] = useState('');
   const [opinionVerificada, setOpinionVerificada] = useState(false);
   const [opinionVerificadaId, setOpinionVerificadaId] = useState(null);
-  const [verDescripcionCompleta, setVerDescripcionCompleta] = useState(false); // ✅ NUEVO: Para el botón "Ver más"
+  const [verDescripcionCompleta, setVerDescripcionCompleta] = useState(false);
+  const [showImageZoom, setShowImageZoom] = useState(false); // ✅ Estado para el modal de zoom
+  const [zoomedImage, setZoomedImage] = useState('');        // ✅ Estado para la imagen ampliada
   const bannerRef = useRef(null);
   const [bannerIdx, setBannerIdx] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -1223,21 +1234,39 @@
         }
       }
       
-      const nuevaOpinion = { id: `opinion-${Date.now()}`, ...formDataOpinion, estado: 'pendiente', fecha: new Date().toISOString() };
+      // ✅ CAMBIO: estado 'aprobada' para publicación automática
+      const nuevaOpinion = { 
+        id: `opinion-${Date.now()}`, 
+        ...formDataOpinion, 
+        estado: 'aprobada', 
+        fecha: new Date().toISOString() 
+      };
+      
       const opinionesExistentes = JSON.parse(localStorage.getItem('voltech_opiniones') || '[]');
       opinionesExistentes.push(nuevaOpinion);
       localStorage.setItem('voltech_opiniones', JSON.stringify(opinionesExistentes));
       setOpiniones(opinionesExistentes);
-      // ✅ GUARDAR EN SUPABASE (así llega al panel y al público)
+      
+      // ✅ GUARDAR EN SUPABASE con manejo de errores mejorado
       if (supabase) {
-      const { error: opErr } = await supabase.from('opiniones').insert(nuevaOpinion);
-      if (opErr) console.warn('⚠️ No se guardó la opinión en Supabase:', opErr.message);
-      }
+        try {
+          const { data, error: opErr } = await supabase.from('opiniones').insert(nuevaOpinion);
+          if (opErr) {
+            console.error('❌ Error en Supabase:', opErr);
+            console.warn('️ Se guardó en localStorage pero no en Supabase');
+          } else {
+            console.log('✅ Opinión guardada en Supabase:', data);
+          }
+        } catch (err) {
+          console.error('❌ Error de conexión:', err);
+        }
+      }      
+      
       setFormDataOpinion({ nombre: '', telefono: '', rating: 5, comentario: '', producto: '', foto: null, donde_nos_conocio: '' });
       setShowOpinionForm(false);
-      toast.success('Opinión enviada. Será publicada tras aprobación.');
+      toast.success('¡Gracias por tu opinión! Ya está publicada.');
     };
-
+    
     const handleFileChange = (file) => {
       if (file) {
         if (file.size > 2 * 1024 * 1024) { toast.error('La imagen no debe pesar más de 2MB'); return; }
@@ -1423,19 +1452,28 @@
 
   // ✅ Array ordenado estrictamente (Categoría → Marca → Nombre) - PARA EL MODAL
   const productosOrdenadosModal = useMemo(() => {
-    return [...productos]
+    console.log('🔍 Ordenando', productos.length, 'productos para navegación con teclado...');
+    const ordenados = [...productos]
       .filter(p => p.publicado !== false)
       .sort((a, b) => {
-        const catA = (a.categoria || '').toUpperCase();
-        const catB = (b.categoria || '').toUpperCase();
+        // Usar .trim() para eliminar espacios invisibles
+        const catA = (a.categoria || '').trim().toUpperCase();
+        const catB = (b.categoria || '').trim().toUpperCase();
         if (catA !== catB) return catA.localeCompare(catB, 'es', { sensitivity: 'base' });
-        const marcaA = (a.marca || '').toUpperCase();
-        const marcaB = (b.marca || '').toUpperCase();
+        
+        const marcaA = (a.marca || '').trim().toUpperCase();
+        const marcaB = (b.marca || '').trim().toUpperCase();
         if (marcaA !== marcaB) return marcaA.localeCompare(marcaB, 'es', { sensitivity: 'base' });
-        return (a.producto || a.plataforma || '').localeCompare(b.producto || b.plataforma || '', 'es', { sensitivity: 'base' });
+        
+        const nombreA = (a.producto || a.plataforma || '').trim().toUpperCase();
+        const nombreB = (b.producto || b.plataforma || '').trim().toUpperCase();
+        return nombreA.localeCompare(nombreB, 'es', { sensitivity: 'base' });
       });
+    
+    console.log('✅ Primeros 5 productos ordenados:', ordenados.slice(0, 5).map(p => `${p.categoria} - ${p.marca} - ${p.producto}`));
+    return ordenados;
   }, [productos]);
-  const streamingAgrupados = useMemo(() => {
+    const streamingAgrupados = useMemo(() => {
     const grupos = {};
     streamingFiltrados.forEach(p => {
       const cat = (p.categoria || 'STREAMING').toUpperCase();
@@ -2676,9 +2714,8 @@
               <div className="flex-1 overflow-y-auto p-4 md:p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                   
-                  {/* ✅ COLUMNA IZQUIERDA: IMAGEN (altura responsive) */}
-                  <div className="flex flex-col items-center">
-                    <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative bg-slate-900`} style={{ height: '300px' }}>
+                  {/* ✅ COLUMNA IZQUIERDA: IMAGEN (más grande, menos espacio) */}                  <div className="flex flex-col items-center px-0 md:px-2">
+                    <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative bg-slate-900`} style={{ height: '350px' }}>
                       <CarruselImagen
                         imagenes={Array.from(new Set([
                           selectedProduct.imagen,
@@ -2689,6 +2726,10 @@
                         className="w-full h-full object-contain"
                         objectFit="contain"
                         iconoVacio={<Package className="w-24 h-24 text-slate-300" />}
+                        onZoom={(img) => {
+                          setZoomedImage(img);
+                          setShowImageZoom(true);
+                        }}
                       />
                       {selectedProduct.categoria_promo && <div className="absolute top-4 left-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md z-20">{selectedProduct.categoria_promo}</div>}
                       {getPrecioMostrar(selectedProduct).tieneOferta && (
@@ -2704,11 +2745,11 @@
                     )}
                   </div>
                   
-                  {/* ✅ COLUMNA DERECHA: INFORMACIÓN con scroll interno */}
-                  <div className="flex flex-col h-full min-h-[300px] md:min-h-[400px] relative">
+                  {/* ✅ COLUMNA DERECHA: INFORMACIÓN con botón fijo abajo */}
+                  <div className="flex flex-col h-full min-h-[300px] md:min-h-[400px]">
                     
-                    {/* Contenido con scroll */}
-                    <div className="space-y-2 md:space-y-3 overflow-y-auto max-h-[40vh] md:max-h-[50vh] pr-2">
+                    {/* Contenido con scroll - altura fija */}
+                    <div className="flex-1 overflow-y-auto space-y-2 md:space-y-3 pr-2 min-h-0">
                       
                     {/* Marca y Nombre del producto */}
                     <p className="text-xs md:text-sm text-voltech-muted uppercase tracking-wide font-semibold">{selectedProduct.marca} • {selectedProduct.categoria || selectedProduct.tipo}</p>
@@ -2830,8 +2871,8 @@
                       )}
                     </div>
 
-                    {/* Botón Agregar al Carrito fijo abajo */}
-                    <div className={`pt-2 md:pt-3 mt-2 border-t ${cardBorder} sticky bottom-0 ${cardBg} pb-2`}>
+                    {/* Botón Agregar al Carrito - siempre al fondo */}
+                    <div className={`pt-3 mt-auto border-t ${cardBorder} ${cardBg}`}>
                       <button
                         onClick={() => { addToCart(selectedProduct); setSelectedProduct(null); setVerDescripcionCompleta(false); }}
                         className="w-full py-3 md:py-2.5 px-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm md:text-base rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-lg"
@@ -3193,30 +3234,66 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
       <ChatbotWidget productos={productos} whatsappNumber={whatsappNumero} showFloatingButton={true} />
       )}
 
-      {/* 📱 BOTTOM NAV FIJA (SOLO MÓVIL) — 5 botones */}
-      <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 border-t ${darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'} backdrop-blur-lg safe-area-bottom`}>
-        <div className="grid grid-cols-5 gap-0">
-          {[
-            { k: 'inicio', icon: '🏠', label: 'Inicio' },
-            { k: 'explorar', icon: '🔍', label: 'Explorar' },
-            { k: 'gana', icon: '🎁', label: 'Gana & Opina' },
-            { k: 'tema', icon: darkMode ? '☀️' : '🌙', label: 'Tema', action: () => setDarkMode(!darkMode) },
-            { k: 'ayuda', icon: '💬', label: 'Ayuda', action: () => window.dispatchEvent(new CustomEvent('voltech-open-chat')) },
-          ].map(item => {
-            const activo = navTab === item.k && !item.action;
-            return (
-              <button
-                key={item.k}
-                onClick={() => item.action ? item.action() : setNavTab(item.k)}
-                className={`flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors ${activo ? (darkMode ? 'text-voltech-cyan' : 'text-purple-600') : (darkMode ? 'text-slate-400' : 'text-slate-500')}`}
-              >
-                <span className="text-xl leading-none">{item.icon}</span>
-                <span className="text-[9px] font-semibold leading-none">{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
-    </div>
-  );
+{/* 📱 BOTTOM NAV FIJA (SOLO MÓVIL) — 5 botones */}
+<nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 border-t ${darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200'} backdrop-blur-lg safe-area-bottom`}>
+  <div className="grid grid-cols-5 gap-0">
+    {[
+      { k: 'inicio', icon: '🏠', label: 'Inicio' },
+      { k: 'explorar', icon: '🔍', label: 'Explorar' },
+      { k: 'gana', icon: '🎁', label: 'Gana & Opina' },
+      { k: 'tema', icon: darkMode ? '☀️' : '🌙', label: 'Tema', action: () => setDarkMode(!darkMode) },
+      { k: 'ayuda', icon: '💬', label: 'Ayuda', action: () => window.dispatchEvent(new CustomEvent('voltech-open-chat')) },
+    ].map(item => {
+      const activo = navTab === item.k && !item.action;
+      return (
+        <button
+          key={item.k}
+          onClick={() => item.action ? item.action() : setNavTab(item.k)}
+          className={`flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors ${activo ? (darkMode ? 'text-voltech-cyan' : 'text-purple-600') : (darkMode ? 'text-slate-400' : 'text-slate-500')}`}
+        >
+          <span className="text-xl leading-none">{item.icon}</span>
+          <span className="text-[9px] font-semibold leading-none">{item.label}</span>
+        </button>
+      );
+    })}
+  </div>
+</nav>
+
+{/* ✅ MODAL DE ZOOM DE IMAGEN - VERSIÓN LIMPIA */}
+<AnimatePresence>
+  {showImageZoom && zoomedImage && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-0 md:p-4"
+      onClick={() => setShowImageZoom(false)}
+    >
+    <motion.div
+      initial={{ scale: 0.8 }}
+      animate={{ scale: 1 }}
+      exit={{ scale: 0.8 }}
+      className="relative w-full h-full max-w-7xl max-h-[100vh] flex items-center justify-center"
+      onClick={(e) => e.stopPropagation()}
+    >
+    {/* ✅ Botón X - Visible siempre */}
+    <button
+      onClick={() => setShowImageZoom(false)}
+      className="absolute top-4 right-4 z-50 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white rounded-full p-3 transition-all shadow-2xl border border-white/20"
+      title="Cerrar"
+    >
+      <X className="w-6 h-6" />
+     </button>
+              
+    {/* ✅ Imagen - Se ve completa sin barras */}
+    <img
+      src={zoomedImage}
+      alt="Vista ampliada"
+      className="max-w-full max-h-[100vh] w-auto h-auto object-contain"
+    />
+  </motion.div>
+</motion.div>
+)}
+</AnimatePresence></div>
+);
 };
