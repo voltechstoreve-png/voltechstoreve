@@ -171,6 +171,16 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
   const [bannerIdx, setBannerIdx] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
+  // ✅ Listener para cerrar zoom con tecla ESC
+  useEffect(() => {
+    if (!showImageZoom) return;
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') setShowImageZoom(false);
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [showImageZoom]);
+
   // ⚡ OFERTA RELÁMPAGO (configurada en Ajustes)
   const [ofertaRelampago, setOfertaRelampago] = useState(null);
   useEffect(() => {
@@ -3259,7 +3269,7 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
   </div>
 </nav>
 
-{/* ✅ MODAL DE ZOOM DE IMAGEN - VERSIÓN LIMPIA */}
+{/* ✅ MODAL DE ZOOM DE IMAGEN - Con ESC y X en esquina */}
 <AnimatePresence>
   {showImageZoom && zoomedImage && (
     <motion.div
@@ -3276,11 +3286,11 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
         className="relative w-full h-full max-w-7xl max-h-[100vh] flex items-center justify-center"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ✅ Botón X - Visible siempre */}
+        {/* ✅ Botón X - Esquina superior derecha */}
         <button
           onClick={() => setShowImageZoom(false)}
           className="absolute top-4 right-4 z-50 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white rounded-full p-3 transition-all shadow-2xl border border-white/20"
-          title="Cerrar"
+          title="Cerrar (ESC)"
         >
           <X className="w-6 h-6" />
         </button>
