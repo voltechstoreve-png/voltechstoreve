@@ -558,7 +558,7 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
       return () => clearInterval(interval);
     }, [sorteoActivo]);
 
-    // ✅ NAVEGACIÓN CON TECLADO - Usa productosOrdenadosModal (orden correcto)
+    // ✅ NAVEGACIÓN CON TECLADO - Usa productosEnOrdenCatalogo para respetar filtros y orden visible
     useEffect(() => {
       if (!selectedProduct) return;
       
@@ -568,8 +568,8 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
           return;
         }
         
-        // ✅ USAR productosOrdenadosModal que ya está ordenado correctamente
-        const productosLista = productosOrdenadosModal;
+        // ✅ USAR productosEnOrdenCatalogo (respeta filtros) o fallback a productosOrdenadosModal
+        const productosLista = productosEnOrdenCatalogo.length > 0 ? productosEnOrdenCatalogo : productosOrdenadosModal;
         const idxActual = productosLista.findIndex(p => p.id === selectedProduct.id);
         
         if (e.key === 'ArrowLeft' && idxActual > 0) {
@@ -581,7 +581,7 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
       
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedProduct, productosOrdenadosModal]); // Agregamos productosOrdenadosModal a las dependencias
+    }, [selectedProduct, productosEnOrdenCatalogo, productosOrdenadosModal]);
   const productosMasVendidos = useMemo(() => {
   if (!productos.length) return [];
   const conteo = {};
@@ -1499,7 +1499,7 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
           ...(Array.isArray(p.productos_kit) ? p.productos_kit.map(k => k.imagen).filter(Boolean) : [])
         ].filter(Boolean)));
         return (
-        <div key={p.id || p.producto || `prod-${idx}`} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col cursor-pointer group`} style={{ height: '100%' }}>
+        <div key={p.id || p.producto || `prod-${idx}`} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col cursor-pointer group h-full`}>
           <div className="relative bg-slate-900 flex items-center justify-center overflow-hidden" style={{ aspectRatio: '1/1', minHeight: '200px' }}>
             <CarruselImagen
               imagenes={todasImagenes}
@@ -1541,8 +1541,8 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
             )}           
             <div className="mt-auto space-y-2">
               <div>
-                {precioInfo.tieneOferta && <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)}</p>}
-                <p className={`text-xl font-bold ${precioInfo.tieneOferta ? 'text-red-600' : darkMode ? 'text-white' : 'text-slate-900'}`}>${precioInfo.precioPrincipal?.toFixed(2)}</p>
+                {precioInfo.tieneOferta && <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)} USD</p>}
+                <p className={`text-xl font-bold ${precioInfo.tieneOferta ? 'text-red-600' : darkMode ? 'text-white' : 'text-slate-900'}`}>${precioInfo.precioPrincipal?.toFixed(2)} USD</p>
                 <p className={`text-xs font-medium ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
               </div>
               <div className="flex gap-1.5 pt-1">
@@ -2144,8 +2144,8 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
                     <h3 className={`font-semibold text-sm mb-2 line-clamp-2 leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.plataforma}</h3>
                     <div className="mt-auto space-y-2">
                       <div>
-                        {precioInfo.tieneOferta && <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)}</p>}
-                        <p className={`text-xl font-bold ${precioInfo.tieneOferta ? 'text-red-600' : darkMode ? 'text-white' : 'text-slate-900'}`}>${precioInfo.precioPrincipal}</p>
+                        {precioInfo.tieneOferta && <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)} USD</p>}
+                        <p className={`text-xl font-bold ${precioInfo.tieneOferta ? 'text-red-600' : darkMode ? 'text-white' : 'text-slate-900'}`}>${precioInfo.precioPrincipal?.toFixed(2)} USD</p>
                         <p className={`text-xs font-medium ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
                       </div>
                       <div className="flex items-center gap-1.5 w-full mt-auto pt-3">
