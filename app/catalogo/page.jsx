@@ -558,30 +558,6 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
       return () => clearInterval(interval);
     }, [sorteoActivo]);
 
-    // ✅ NAVEGACIÓN CON TECLADO - Usa productosEnOrdenCatalogo para respetar filtros y orden visible
-    useEffect(() => {
-      if (!selectedProduct) return;
-      
-      const handleKeyDown = (e) => {
-        if (e.key === 'Escape') {
-          setSelectedProduct(null);
-          return;
-        }
-        
-        // ✅ USAR productosEnOrdenCatalogo (respeta filtros) o fallback a productosOrdenadosModal
-        const productosLista = productosEnOrdenCatalogo.length > 0 ? productosEnOrdenCatalogo : productosOrdenadosModal;
-        const idxActual = productosLista.findIndex(p => p.id === selectedProduct.id);
-        
-        if (e.key === 'ArrowLeft' && idxActual > 0) {
-          setSelectedProduct(productosLista[idxActual - 1]);
-        } else if (e.key === 'ArrowRight' && idxActual < productosLista.length - 1) {
-          setSelectedProduct(productosLista[idxActual + 1]);
-        }
-      };
-      
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedProduct, productosEnOrdenCatalogo, productosOrdenadosModal]);
   const productosMasVendidos = useMemo(() => {
   if (!productos.length) return [];
   const conteo = {};
