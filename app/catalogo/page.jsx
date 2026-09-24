@@ -6,7 +6,7 @@
   import { useTheme } from '@/app/context/ThemeContext';
   import { useProductos, useSettings, useTasaBCV, useAuth } from '@/hooks/useVoltech';
   import { supabase } from '@/lib/supabase';
-  import { 
+import { 
     Search, ShoppingCart, MessageCircle, X, Plus, Minus, Trash2, 
     MapPin, Tag, Star, Gift, CheckCircle, Package, TrendingUp, 
     Sun, Moon, Play, Clock, Zap, Truck,
@@ -48,11 +48,10 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
   
   // ✅ Limpieza automática de caché cuando cambia la estructura de datos
   useEffect(() => {
-    const DATA_VERSION = '2.0'; // Cambia esto cuando modifiques la estructura
+    const DATA_VERSION = '2.0';
     const storedVersion = localStorage.getItem('voltech_data_version');
     if (storedVersion !== DATA_VERSION) {
       console.log('🔄 Actualizando estructura de datos...');
-      // Limpiar solo datos específicos, no todo
       localStorage.removeItem('voltech_cart');
       localStorage.removeItem('voltech_clientes');
       localStorage.removeItem('voltech_ventas');
@@ -170,8 +169,7 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
   const bannerRef = useRef(null);
   const [bannerIdx, setBannerIdx] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-
-  // ✅ Listener para cerrar zoom con tecla ESC
+// ✅ Listener para cerrar zoom con tecla ESC
   useEffect(() => {
     if (!showImageZoom) return;
     const handleEsc = (e) => {
@@ -181,8 +179,54 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
     return () => window.removeEventListener('keydown', handleEsc);
   }, [showImageZoom]);
 
+  // ✅ Sincronizar Tasa BCV en tiempo real desde localStorage
+  useEffect(() => {
+    const actualizarTasa = () => {
+      const tasaGuardada = typeof window !== 'undefined' ? localStorage.getItem('voltech_tasa_bcv') : null;
+      if (tasaGuardada) {
+        const nuevaTasa = parseFloat(tasaGuardada);
+        if (nuevaTasa && !isNaN(nuevaTasa) && nuevaTasa !== tasaBCV) {
+          setTasaBCV(nuevaTasa);
+        }
+      }
+    };
+    actualizarTasa();
+    window.addEventListener('storage', actualizarTasa);
+    window.addEventListener('voltech-tasa-actualizada', actualizarTasa);
+    return () => {
+      window.removeEventListener('storage', actualizarTasa);
+      window.removeEventListener('voltech-tasa-actualizada', actualizarTasa);
+    };
+  }, [tasaBCV, setTasaBCV]);
+
   // ⚡ OFERTA RELÁMPAGO (configurada en Ajustes)
   const [ofertaRelampago, setOfertaRelampago] = useState(null);
+  useEffect(() => {
+    const actualizarTasa = () => {
+      const tasaGuardada = typeof window !== 'undefined' ? localStorage.getItem('voltech_tasa_bcv') : null;
+      if (tasaGuardada) {
+        const nuevaTasa = parseFloat(tasaGuardada);
+        if (nuevaTasa && !isNaN(nuevaTasa) && nuevaTasa !== tasaBCV) {
+          setTasaBCV(nuevaTasa);
+        }
+      }
+    };
+
+    // Ejecutar al montar el componente
+    actualizarTasa();
+
+    // Escuchar cambios en localStorage (cuando el panel de admin la actualiza)
+    window.addEventListener('storage', actualizarTasa);
+    window.addEventListener('voltech-tasa-actualizada', actualizarTasa);
+
+    return () => {
+      window.removeEventListener('storage', actualizarTasa);
+      window.removeEventListener('voltech-tasa-actualizada', actualizarTasa);
+    };
+  }, [tasaBCV, setTasaBCV]);
+
+  // ⚡ OFERTA RELÁMPAGO (configurada en Ajustes)
+  //   const [ofertaRelampago, setOfertaRelampago] = useState(null);
   useEffect(() => {
     const cargarOferta = async () => {
       let cfg = null;
@@ -356,6 +400,21 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
         
         if (supabase) {
           try {
+          // ✅ Leer tasa BCV desde Supabase
+          const { data: tasaData } = await supabase
+            .from('settings')
+            .select('valor')
+            .eq('clave', 'tasa_bcv')
+            .maybeSingle();
+          
+          if (tasaData?.valor) {
+            const nuevaTasa = typeof tasaData.valor === 'string' ? parseFloat(tasaData.valor) : tasaData.valor;
+            if (nuevaTasa && !isNaN(nuevaTasa)) {
+              setTasaBCV(nuevaTasa);
+              console.log('✅ Tasa BCV cargada desde Supabase:', nuevaTasa);
+            }
+          }
+          
           const [{ data: pData }, { data: vData }, { data: mvData }, { data: settingsData }] = await Promise.all([
             supabase.from('publicidad').select('*').eq('estado', 'activo'),
             supabase.from('ventas').select('*'),
@@ -426,11 +485,40 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
     setOpiniones(ops);
     localStorage.setItem('voltech_opiniones', JSON.stringify(ops));
     }
-    };cargarDatosExtras();
-    const handleActualizacion = () => cargarDatosExtras();
-    window.addEventListener('voltech-data-updated', handleActualizacion);
-    return () => window.removeEventListener('voltech-data-updated', handleActualizacion);
-    }, []);
+};cargarDatosExtras();
+        
+        // ✅ Suscribirse a cambios en tiempo real de la tasa BCV
+        let channelTasa;
+        if (supabase) {
+          channelTasa = supabase
+            .channel('tasa_bcv_changes')
+            .on('postgres_changes', 
+              { 
+                event: '*', 
+                schema: 'public', 
+                table: 'settings',
+                filter: 'clave=eq.tasa_bcv'
+              }, 
+              (payload) => {
+                console.log(' Cambio en tasa BCV detectado:', payload.new);
+                const nuevaTasa = typeof payload.new.valor === 'string' ? parseFloat(payload.new.valor) : payload.new.valor;
+                if (nuevaTasa && !isNaN(nuevaTasa)) {
+                  setTasaBCV(nuevaTasa);
+                }
+              }
+            )
+            .subscribe();
+        }
+        
+        const handleActualizacion = () => cargarDatosExtras();
+        window.addEventListener('voltech-data-updated', handleActualizacion);
+        return () => {
+          window.removeEventListener('voltech-data-updated', handleActualizacion);
+          if (channelTasa) {
+            supabase.removeChannel(channelTasa);
+          }
+        };
+        }, []);
 
     useEffect(() => {
       if (productos.length === 0) return;
@@ -579,14 +667,17 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
     const tieneSoloProductosDigitales = cart.length > 0 && cart.every(item => item.tipo === 'streaming' || item.categoria?.toUpperCase() === 'STREAMING');
     
     const getPrecioPub = (pub) => {
-  if (pub.precio_manual) return pub.precio_manual;
-  const prod = productos.find(pr => `/catalogo?producto=${pr.id}` === pub.url_destino);
-  return prod ? `$${Number(prod.precioDetal || 0).toFixed(2)}` : null;
-  };
-  const calcularPrecioBs = (precioUsd) => {
-      const precio = Number(precioUsd) || 0;
-      return (precio * tasaBCV).toFixed(2);
-    };
+        if (pub.precio_manual) return pub.precio_manual;
+          const prod = productos.find(pr => `/catalogo?producto=${pr.id}` === pub.url_destino);
+            return prod ? `$${Number(prod.precioDetal || 0).toFixed(2)}` : null;
+              };
+const calcularPrecioBs = (precioUsd) => {
+  const precio = Number(precioUsd) || 0;
+  // ✅ Forzar lectura de la tasa más reciente desde localStorage
+  const tasaGuardada = typeof window !== 'undefined' ? localStorage.getItem('voltech_tasa_bcv') : null;
+  const tasaActual = tasaGuardada ? parseFloat(tasaGuardada) : tasaBCV;
+  return (precio * (tasaActual || 1)).toFixed(2);
+};
 
     const getPrecioMostrar = (producto) => {
       const precioOferta = Number(producto.precio_oferta || producto.precioOferta) || 0;
@@ -665,7 +756,7 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
 
       const subtotal = cart.reduce((sum, item) => sum + (getPrecioMostrar(item).precioPrincipal * item.cantidad), 0);
       
-      if (cupon.monto_minimo && subtotal < cupon.monto_minimo) {
+      if (cupon.monto_minimo && subtotal < cupo8n.monto_minimo) {
         toast.error(`Monto mínimo de compra: $${cupon.monto_minimo.toFixed(2)}`);
         return;
       }
@@ -1266,20 +1357,21 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
       handleFileChange(e.dataTransfer.files[0]);
     };
 
-  // ✅ ACTUALIZADO: Incluir 'kit' y permitir productos sin 'tipo' definido para no ocultarlos por error de datos
-  // ✅ Los kits se muestran SIEMPRE, sin importar si están "bajo pedido" o no
-  const productosFiltrados = (productos || []).filter(p => {
+    // ✅ ACTUALIZADO: Incluir 'kit' y permitir productos sin 'tipo' definido para no ocultarlos por error de datos
+    // ✅ Los kits se muestran SIEMPRE, sin importar si están "bajo pedido" o no
+    // ✅ EXCLUIR explícitamente productos de tipo 'streaming'
+    const productosFiltrados = (productos || []).filter(p => {
     const searchTermLower = searchTerm.toLowerCase();
-    const match = (p.producto || '').toLowerCase().includes(searchTermLower) || 
-                  (p.marca || '').toLowerCase().includes(searchTermLower) || 
-                  (p.categoria || '').toLowerCase().includes(searchTermLower) ||
-                  (p.descripcion_detallada || '').toLowerCase().includes(searchTermLower);
+    const match = (p.producto || '').toLowerCase().includes(searchTermLower) ||
+    (p.marca || '').toLowerCase().includes(searchTermLower) ||
+    (p.categoria || '').toLowerCase().includes(searchTermLower) ||
+    (p.descripcion_detallada || '').toLowerCase().includes(searchTermLower);
     const precioActual = getPrecioMostrar(p).precioPrincipal;
     const min = precioMin === '' ? 0 : parseFloat(precioMin);
     const max = precioMax === '' ? Infinity : parseFloat(precioMax);
-    
     // ✅ Si 'tipo' es null, undefined o vacío, lo asumimos como 'fisico' para no ocultarlo
-    const esTipoValido = !p.tipo || p.tipo === 'fisico' || p.tipo === 'kit';
+    // ✅ EXCLUIR streaming explícitamente
+    const esTipoValido = (!p.tipo || p.tipo === 'fisico' || p.tipo === 'kit') && p.tipo !== 'streaming';
     
     // ✅ Los kits se muestran siempre (incluso si están "bajo pedido")
     // Los productos normales solo se ocultan si están explícitamente marcados como no publicados
@@ -1291,9 +1383,11 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
            esTipoValido && 
            !p.esCombo && 
            debeMostrarse &&
+           (p.categoria || '').toUpperCase() !== 'STREAMING' &&
            precioActual >= min && 
            precioActual <= max;
-  });    const streamingFiltrados = (productos || []).filter(p => {
+  });    
+      const streamingFiltrados = (productos || []).filter(p => {
       const searchTermLower = searchTerm.toLowerCase();
       const match = (p.plataforma || '').toLowerCase().includes(searchTermLower) ||
                     (p.descripcion_detallada || '').toLowerCase().includes(searchTermLower);
@@ -3280,9 +3374,9 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
           className="max-w-full max-h-[100vh] w-auto h-auto object-contain"
         />
       </motion.div>
-    </motion.div>
-  )}
-</AnimatePresence>
-</div>
-);
-};
+          </motion.div>
+            )}
+            </AnimatePresence>
+            </div>
+            );
+            };

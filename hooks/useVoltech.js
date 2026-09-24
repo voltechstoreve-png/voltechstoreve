@@ -158,14 +158,71 @@ export function useSettings() {
 // 3. Hook para Tasa BCV
 export function useTasaBCV() {
   const [tasa, setTasa] = useState(36.5);
+
   useEffect(() => {
-    const cached = localStorage.getItem('voltech_tasa_bcv');
-    if (cached) setTasa(JSON.parse(cached).tasa || 36.5);
+    const fetchTasa = async () => {
+      // 1. Intentar obtener de Supabase primero (fuente de la verdad)
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('settings')
+          .select('valor')
+          .eq('clave', 'tasa_bcv')
+          .maybeSingle();
+        
+        if (!error && data?.valor) {
+          const tasaData = typeof data.valor === 'string' ? JSON.parse(data.valor) : data.valor;
+          const nuevaTasa = tasaData.tasa || 36.5;
+          setTasa(nuevaTasa);
+          setLocalSafe('voltech_tasa_bcv', JSON.stringify(tasaData));
+          return;
+        }
+      }
+      
+      // 2. Fallback a localStorage (por si falla Supabase o es la primera carga)
+      const cached = localStorage.getItem('voltech_tasa_bcv');
+      if (cached) {
+        try {
+          const tasaData = JSON.parse(cached);
+          setTasa(tasaData.tasa || 36.5);
+        } catch (e) {
+          setTasa(parseFloat(cached) || 36.5);
+        }
+      }
+    };
+
+    fetchTasa();
+
+    // 3. Escuchar cambios en otras pestañas (evento storage)
+    const handleStorageChange = (e) => {
+      if (e.key === 'voltech_tasa_bcv' && e.newValue) {
+        try {
+          const tasaData = JSON.parse(e.newValue);
+          setTasa(tasaData.tasa || 36.5);
+        } catch (err) {
+          setTasa(parseFloat(e.newValue) || 36.5);
+        }
+      }
+    };
+
+    // 4. Escuchar el evento personalizado que dispara tu panel al guardar
+    const handleDataUpdated = () => {
+      fetchTasa();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('voltech-data-updated', handleDataUpdated);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('voltech-data-updated', handleDataUpdated);
+    };
   }, []);
+
   const updateTasa = (nuevaTasa) => {
     setTasa(nuevaTasa);
     setLocalSafe('voltech_tasa_bcv', JSON.stringify({ tasa: nuevaTasa }));
   };
+
   return { tasa, setTasa: updateTasa };
 }
 
