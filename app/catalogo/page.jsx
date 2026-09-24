@@ -673,10 +673,18 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
               };
 const calcularPrecioBs = (precioUsd) => {
   const precio = Number(precioUsd) || 0;
-  // ✅ Forzar lectura de la tasa más reciente desde localStorage
+  // ✅ Leer tasa directamente desde localStorage (respaldo inmediato)
   const tasaGuardada = typeof window !== 'undefined' ? localStorage.getItem('voltech_tasa_bcv') : null;
-  const tasaActual = tasaGuardada ? parseFloat(tasaGuardada) : tasaBCV;
-  return (precio * (tasaActual || 1)).toFixed(2);
+  let tasaActual = tasaBCV;
+  if (tasaGuardada) {
+    try {
+      const tasaData = JSON.parse(tasaGuardada);
+      tasaActual = tasaData.tasa || tasaBCV;
+    } catch (e) {
+      tasaActual = parseFloat(tasaGuardada) || tasaBCV;
+    }
+  }
+  return (precio * tasaActual).toFixed(2);
 };
 
     const getPrecioMostrar = (producto) => {
@@ -1357,21 +1365,24 @@ const calcularPrecioBs = (precioUsd) => {
       handleFileChange(e.dataTransfer.files[0]);
     };
 
-    // ✅ ACTUALIZADO: Incluir 'kit' y permitir productos sin 'tipo' definido para no ocultarlos por error de datos
-    // ✅ Los kits se muestran SIEMPRE, sin importar si están "bajo pedido" o no
-    // ✅ EXCLUIR explícitamente productos de tipo 'streaming'
-    const productosFiltrados = (productos || []).filter(p => {
+  // ✅ ACTUALIZADO: Incluir 'kit' y permitir productos sin 'tipo' definido para no ocultarlos por error de datos
+  // ✅ Los kits se muestran SIEMPRE, sin importar si están "bajo pedido" o no
+  // ✅ EXCLUIR explícitamente productos de tipo 'streaming' y categoría 'STREAMING'
+  const productosFiltrados = (productos || []).filter(p => {
     const searchTermLower = searchTerm.toLowerCase();
-    const match = (p.producto || '').toLowerCase().includes(searchTermLower) ||
-    (p.marca || '').toLowerCase().includes(searchTermLower) ||
-    (p.categoria || '').toLowerCase().includes(searchTermLower) ||
-    (p.descripcion_detallada || '').toLowerCase().includes(searchTermLower);
+    const match = (p.producto || '').toLowerCase().includes(searchTermLower) || 
+                  (p.marca || '').toLowerCase().includes(searchTermLower) || 
+                  (p.categoria || '').toLowerCase().includes(searchTermLower) ||
+                  (p.descripcion_detallada || '').toLowerCase().includes(searchTermLower);
     const precioActual = getPrecioMostrar(p).precioPrincipal;
     const min = precioMin === '' ? 0 : parseFloat(precioMin);
     const max = precioMax === '' ? Infinity : parseFloat(precioMax);
+    
     // ✅ Si 'tipo' es null, undefined o vacío, lo asumimos como 'fisico' para no ocultarlo
-    // ✅ EXCLUIR streaming explícitamente
-    const esTipoValido = (!p.tipo || p.tipo === 'fisico' || p.tipo === 'kit') && p.tipo !== 'streaming';
+    // ✅ EXCLUIR streaming explícitamente (por tipo Y por categoría)
+    const esTipoValido = (!p.tipo || p.tipo === 'fisico' || p.tipo === 'kit') && 
+                         p.tipo !== 'streaming' && 
+                         (p.categoria || '').toUpperCase() !== 'STREAMING';
     
     // ✅ Los kits se muestran siempre (incluso si están "bajo pedido")
     // Los productos normales solo se ocultan si están explícitamente marcados como no publicados
@@ -1383,7 +1394,6 @@ const calcularPrecioBs = (precioUsd) => {
            esTipoValido && 
            !p.esCombo && 
            debeMostrarse &&
-           (p.categoria || '').toUpperCase() !== 'STREAMING' &&
            precioActual >= min && 
            precioActual <= max;
   });    
@@ -2873,7 +2883,7 @@ const calcularPrecioBs = (precioUsd) => {
                           <span className="text-lg text-gray-400 line-through">${getPrecioMostrar(selectedProduct).precioTachado?.toFixed(2)}</span>
                         )}
                         <span className={`text-3xl font-bold ${getPrecioMostrar(selectedProduct).tieneOferta ? 'text-red-600' : ''}`}>
-                          ${getPrecioMostrar(selectedProduct).precioPrincipal?.toFixed(2)} USD
+                          ${getPrecioMostrar(selectedProduct).precioPrincipal?.toFixed(2)}
                         </span>
                         <span className="text-sm text-voltech-muted">Bs {calcularPrecioBs(getPrecioMostrar(selectedProduct).precioPrincipal)}</span>
                       </div>

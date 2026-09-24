@@ -160,6 +160,8 @@ export function useTasaBCV() {
   const [tasa, setTasa] = useState(36.5);
 
   useEffect(() => {
+    let channel;
+    
     const fetchTasa = async () => {
       // 1. Intentar obtener de Supabase primero (fuente de la verdad)
       if (supabase) {
@@ -209,12 +211,38 @@ export function useTasaBCV() {
       fetchTasa();
     };
 
+    // 5. ✅ NUEVO: Suscribirse a cambios en tiempo real de Supabase
+    if (supabase) {
+      channel = supabase
+        .channel('tasa_bcv_realtime')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'settings',
+            filter: 'clave=eq.tasa_bcv'
+          },
+          (payload) => {
+            console.log('🔄 Tasa BCV actualizada en tiempo real:', payload.new);
+            const tasaData = typeof payload.new.valor === 'string' ? JSON.parse(payload.new.valor) : payload.new.valor;
+            const nuevaTasa = tasaData.tasa || 36.5;
+            setTasa(nuevaTasa);
+            setLocalSafe('voltech_tasa_bcv', JSON.stringify(tasaData));
+          }
+        )
+        .subscribe();
+    }
+
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('voltech-data-updated', handleDataUpdated);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('voltech-data-updated', handleDataUpdated);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, []);
 
