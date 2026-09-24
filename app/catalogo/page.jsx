@@ -1378,7 +1378,6 @@ const calcularPrecioBs = (precioUsd) => {
     const min = precioMin === '' ? 0 : parseFloat(precioMin);
     const max = precioMax === '' ? Infinity : parseFloat(precioMax);
     
-    // ✅ Si 'tipo' es null, undefined o vacío, lo asumimos como 'fisico' para no ocultarlo
     // ✅ EXCLUIR streaming explícitamente (por tipo Y por categoría)
     const esTipoValido = (!p.tipo || p.tipo === 'fisico' || p.tipo === 'kit') && 
                          p.tipo !== 'streaming' && 
@@ -1621,7 +1620,7 @@ const calcularPrecioBs = (precioUsd) => {
             )}           
             <div className="mt-auto space-y-2">
               <div>
-                {precioInfo.tieneOferta && <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)} USD</p>}
+                {precioInfo.tieneOferta && <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)}</p>}
                 <p className={`text-xl font-bold ${precioInfo.tieneOferta ? 'text-red-600' : darkMode ? 'text-white' : 'text-slate-900'}`}>${precioInfo.precioPrincipal?.toFixed(2)} USD</p>
                 <p className={`text-xs font-medium ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
               </div>
