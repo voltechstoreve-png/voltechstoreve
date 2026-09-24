@@ -1370,19 +1370,19 @@ const calcularPrecioBs = (precioUsd) => {
   // ✅ EXCLUIR explícitamente productos de tipo 'streaming' y categoría 'STREAMING'
   const productosFiltrados = (productos || []).filter(p => {
     const searchTermLower = searchTerm.toLowerCase();
-    const match = (p.producto || '').toLowerCase().includes(searchTermLower) || 
-                  (p.marca || '').toLowerCase().includes(searchTermLower) || 
-                  (p.categoria || '').toLowerCase().includes(searchTermLower) ||
-                  (p.descripcion_detallada || '').toLowerCase().includes(searchTermLower);
+    const match = (p.producto || '').toLowerCase().includes(searchTermLower) ||
+      (p.marca || '').toLowerCase().includes(searchTermLower) ||
+      (p.categoria || '').toLowerCase().includes(searchTermLower) ||
+      (p.descripcion_detallada || '').toLowerCase().includes(searchTermLower);
     const precioActual = getPrecioMostrar(p).precioPrincipal;
     const min = precioMin === '' ? 0 : parseFloat(precioMin);
     const max = precioMax === '' ? Infinity : parseFloat(precioMax);
     
     // ✅ EXCLUIR streaming explícitamente (por tipo Y por categoría)
-    const esTipoValido = (!p.tipo || p.tipo === 'fisico' || p.tipo === 'kit') && 
-                         p.tipo !== 'streaming' && 
+    const esTipoValido = (!p.tipo || p.tipo === 'fisico' || p.tipo === 'kit') &&
+                         p.tipo !== 'streaming' &&
                          (p.categoria || '').toUpperCase() !== 'STREAMING';
-    
+                         
     // ✅ Los kits se muestran siempre (incluso si están "bajo pedido")
     // Los productos normales solo se ocultan si están explícitamente marcados como no publicados
     const debeMostrarse = p.tipo === 'kit' || (p.publicado !== false);
