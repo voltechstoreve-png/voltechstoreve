@@ -1376,7 +1376,7 @@ const calcularPrecioBs = (precioUsd) => {
       (p.descripcion_detallada || '').toLowerCase().includes(searchTermLower);
     const precioActual = getPrecioMostrar(p).precioPrincipal;
     const min = precioMin === '' ? 0 : parseFloat(precioMin);
-    const max = precioMax === '' ? Infinity : parseFloat(precioMax);
+    const max = precioMax === '' ? Infinity : parseFloat(precioMax)
     
     // ✅ EXCLUIR streaming explícitamente (por tipo Y por categoría)
     const esTipoValido = (!p.tipo || p.tipo === 'fisico' || p.tipo === 'kit') &&
