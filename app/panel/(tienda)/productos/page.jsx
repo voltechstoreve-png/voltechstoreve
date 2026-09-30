@@ -405,6 +405,31 @@
       console.warn('⚠️ localStorage lleno, se omite respaldo local de', clave, ':', e.message);
     }
   };
+  // ✅ Subir imagen a Supabase Storage (CDN) en lugar de base64
+const subirImagenACDN = async (file, productoId = 'temp') => {
+  if (!supabase || !file) return null;
+  try {
+    const timestamp = Date.now();
+    const extension = file.name.split('.').pop() || 'jpg';
+    const fileName = `${productoId}/${timestamp}.${extension}`;
+    const { data, error } = await supabase.storage
+      .from('productos')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type
+      });
+    if (error) {
+      console.error('❌ Error subiendo imagen:', error.message);
+      return null;
+    }
+    const { data: urlData } = supabase.storage.from('productos').getPublicUrl(data.path);
+    return urlData.publicUrl;
+  } catch (err) {
+    console.error('❌ Error en subirImagenACDN:', err);
+    return null;
+  }
+};
 
   export default function ProductosPage() {
     const { tienePermiso } = usePermissions();
@@ -930,39 +955,50 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
       }
     };
 
-    const handleImageUpload = (index, e) => {
+    const handleImageUpload = async (index, e) => {
       const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const nuevosItems = [...items];
-          nuevosItems[index].imagen = reader.result;
-          nuevosItems[index].imagenFile = file;
-          setItems(nuevosItems);
-          toast.success('Imagen cargada');
-        };
-        reader.readAsDataURL(file);
+      if (!file) return;
+      if (!file.type.startsWith('image/')) { toast.error('Solo se permiten imágenes'); return; }
+      if (file.size > 5 * 1024 * 1024) { toast.error('Cada imagen máximo 5MB'); return; }
+      
+      const toastId = toast.loading('Subiendo imagen al CDN...');
+      const url = await subirImagenACDN(file, items[index].id || 'temp');
+      toast.dismiss(toastId);
+      
+      if (url) {
+        const nuevosItems = [...items];
+        nuevosItems[index].imagen = url;
+        nuevosItems[index].imagenFile = file;
+        setItems(nuevosItems);
+        toast.success('Imagen subida al CDN');
+      } else {
+        toast.error('Error al subir imagen');
       }
     };
 
-    // ✅ Subidor múltiple NUEVO PRODUCTO (por item)
-  const handleImagenesItem = (index, files) => {
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith('image/')) { toast.error('Solo se permiten imágenes'); return; }
-      if (file.size > 5 * 1024 * 1024) { toast.error('Cada imagen máximo 5MB'); return; }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const nuevosItems = [...items];
-        const item = nuevosItems[index];
-        const arr = Array.isArray(item.imagenes) ? item.imagenes : (item.imagen ? [item.imagen] : []);
-        if (!arr.includes(reader.result)) arr.push(reader.result);
-        item.imagenes = arr;
-        if (!item.imagen) item.imagen = reader.result;
-        setItems(nuevosItems);
-      };
-      reader.readAsDataURL(file);
-    });
-  };
+    // ✅ Subidor múltiple NUEVO PRODUCTO (por item) - Sube al CDN
+    const handleImagenesItem = async (index, files) => {
+      const nuevosItems = [...items];
+      const item = nuevosItems[index];
+      let arr = Array.isArray(item.imagenes) ? item.imagenes : (item.imagen ? [item.imagen] : []);
+      
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith('image/')) { toast.error('Solo se permiten imágenes'); continue; }
+        if (file.size > 5 * 1024 * 1024) { toast.error('Cada imagen máximo 5MB'); continue; }
+        
+        const toastId = toast.loading(`Subiendo ${file.name.substring(0, 20)}...`);
+        const url = await subirImagenACDN(file, item.id || 'temp');
+        toast.dismiss(toastId);
+        
+        if (url && !arr.includes(url)) {
+          arr.push(url);
+        }
+      }
+      
+      item.imagenes = arr;
+      if (!item.imagen && arr.length > 0) item.imagen = arr[0];
+      setItems(nuevosItems);
+    };
 
   const quitarImagenItem = (index, img) => {
     const nuevosItems = [...items];
@@ -979,20 +1015,22 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
     setItems(nuevosItems);
   };
 
-  // ✅ Subidor múltiple EDICIÓN
-  const handleImagenesEdit = (files) => {
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith('image/')) { toast.error('Solo se permiten imágenes'); return; }
-      if (file.size > 5 * 1024 * 1024) { toast.error('Cada imagen máximo 5MB'); return; }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagenesExtraEdit(prev => prev.includes(reader.result) ? prev : [...prev, reader.result]);
-        setEditData(prev => prev.imagen ? prev : { ...prev, imagen: reader.result });
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
+    // ✅ Subidor múltiple EDICIÓN - Sube al CDN
+    const handleImagenesEdit = async (files) => {
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith('image/')) { toast.error('Solo se permiten imágenes'); continue; }
+        if (file.size > 5 * 1024 * 1024) { toast.error('Cada imagen máximo 5MB'); continue; }
+        
+        const toastId = toast.loading(`Subiendo ${file.name.substring(0, 20)}...`);
+        const url = await subirImagenACDN(file, editandoId || 'temp');
+        toast.dismiss(toastId);
+        
+        if (url) {
+          setImagenesExtraEdit(prev => prev.includes(url) ? prev : [...prev, url]);
+          setEditData(prev => prev.imagen ? prev : { ...prev, imagen: url });
+        }
+      }
+    };
   const quitarImagenEdit = (img) => {
     setImagenesExtraEdit(prev => prev.filter(x => x !== img));
     setEditData(prev => {
