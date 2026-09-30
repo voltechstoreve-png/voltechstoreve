@@ -618,7 +618,7 @@ export default function VentasProductosPage() {
             if (index !== -1) {
               productosActualizados[index] = {
                 ...productosActualizados[index],
-                cantidad: productosActualizados[index].cantidad - (prodKit.cantidad * prod.cantidad)
+                cantidad: (productosActualizados[index].cantidad || 0) - (prodKit.cantidad * prod.cantidad)
               };
             }
           }
@@ -627,12 +627,12 @@ export default function VentasProductosPage() {
           if (index !== -1) {
             productosActualizados[index] = {
               ...productosActualizados[index],
-              cantidad: productosActualizados[index].cantidad - prod.cantidad
+              cantidad: (productosActualizados[index].cantidad || 0) - prod.cantidad
             };
           }
         }
       }
-
+      
       const ventasActualizadas = editingId 
         ? ventas.map(v => String(v.id) === String(editingId) ? nuevaVenta : v)
         : [nuevaVenta, ...ventas];
@@ -785,7 +785,7 @@ export default function VentasProductosPage() {
             if (index !== -1) {
               productosActualizados[index] = {
                 ...productosActualizados[index],
-                cantidad: productosActualizados[index].cantidad + (prodKit.cantidad * prod.cantidad)
+                cantidad: (productosActualizados[index].cantidad || 0) + (prodKit.cantidad * prod.cantidad)
               };
             }
           }
@@ -794,7 +794,7 @@ export default function VentasProductosPage() {
           if (index !== -1) {
             productosActualizados[index] = {
               ...productosActualizados[index],
-              cantidad: productosActualizados[index].cantidad + prod.cantidad
+              cantidad: (productosActualizados[index].cantidad || 0) + prod.cantidad
             };
           }
         }
