@@ -2204,35 +2204,89 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
       }
     };
 
-    // ✅ COMPARTIR PRODUCTO A WHATSAPP (estado o chat): imagen + texto + link
+    // ✅ COMPARTIR PRODUCTO: imagen + info + link en cualquier red social
     const compartirProducto = async (producto) => {
       const url = `${window.location.origin}/catalogo?producto=${producto.id}`;
       const nombre = producto.plataforma || producto.producto || 'Producto';
       const precio = Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2);
-      const texto = `🔥 ${nombre}\n💰 $${precio}\n🔗 ${url}`;
+      const precioBs = Number(producto.precioBs || 0).toFixed(2);
+      const stock = producto.cantidad || 0;
+      const texto = `🔥 ${nombre}\n💰 $${precio} (Bs ${precioBs})\n📦 Stock: ${stock} unid.\n🔗 ${url}`;
+      const titulo = `${nombre} - $${precio}`;
+
       try {
         const img = getImagenProducto(producto);
-        if (img && navigator.canShare) {
-          const resp = await fetch(img);
-          const blob = await resp.blob();
-          const file = new File([blob], `${producto.id}.jpg`, { type: blob.type || 'image/jpeg' });
-          if (navigator.canShare({ files: [file] })) {
-            await navigator.share({ files: [file], text: texto, title: nombre });
-            toast.success('¡Listo para tu estado de WhatsApp!');
-            return;
+        let file = null;
+
+        // Convertir imagen a File (maneja base64 Y URLs)
+        if (img) {
+          try {
+            let blob;
+            if (img.startsWith('data:image')) {
+              // Imagen base64 → convertir a blob directamente
+              const res = await fetch(img);
+              blob = await res.blob();
+            } else {
+              // URL externa → fetch
+              const res = await fetch(img, { mode: 'cors' });
+              blob = await res.blob();
+            }
+            const extension = blob.type?.split('/')[1] || 'jpg';
+            file = new File([blob], `${nombre.replace(/[^a-z0-9]/gi, '_')}.${extension}`, {
+              type: blob.type || 'image/jpeg',
+            });
+          } catch (imgErr) {
+            console.warn('⚠️ No se pudo convertir la imagen:', imgErr.message);
           }
         }
-        await navigator.share({ text: texto, title: nombre });
-        toast.success('Compartido');
+
+        // Opción 1: Web Share API con imagen (móviles y navegadores compatibles)
+        if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            text: texto,
+            title: titulo,
+          });
+          toast.success('¡Compartido con imagen!');
+          return;
+        }
+
+        // Opción 2: Web Share API solo texto (desktop o sin soporte de archivos)
+        if (navigator.share) {
+          await navigator.share({
+            text: texto,
+            title: titulo,
+            url: url,
+          });
+          toast.success('¡Compartido!');
+          return;
+        }
+
+        // Opción 3: Fallback - copiar al portapapeles
+        throw new Error('Web Share no disponible');
       } catch (e) {
         if (e?.name === 'AbortError') return;
+
+        // Fallback: copiar texto + link al portapapeles
         try {
           await navigator.clipboard.writeText(texto);
-          toast.success('Texto copiado. Pégalo en tu estado de WhatsApp.');
-        } catch { toast.error('No se pudo compartir'); }
+          toast.success(' Texto copiado al portapapeles. Pégalo donde quieras.');
+        } catch {
+          // Último recurso: seleccionar texto manualmente
+          const textarea = document.createElement('textarea');
+          textarea.value = texto;
+          document.body.appendChild(textarea);
+          textarea.select();
+          try {
+            document.execCommand('copy');
+            toast.success('📋 Texto copiado.');
+          } catch {
+            toast.error('No se pudo compartir. Copia manualmente: ' + url);
+          }
+          document.body.removeChild(textarea);
+        }
       }
-    };
-
+};
     const guardarTasa = async () => {
       const tasaData = { tasa: usarTasaBCV ? tasaBCV : tasaPersonalizada, usarBCV: usarTasaBCV, tasaPersonalizada };
       if (supabase) await supabase.from('settings').upsert({ clave: 'tasa_bcv', valor: tasaData }, { onConflict: 'clave' });
