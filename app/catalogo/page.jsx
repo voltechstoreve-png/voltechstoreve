@@ -1579,22 +1579,16 @@ const calcularPrecioBs = (precioUsd) => {
         ].filter(Boolean)));
         return (
         <div key={p.id || p.producto || `prod-${idx}`} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col cursor-pointer group h-full`}>
-          <div className="relative bg-slate-900 flex items-center justify-center overflow-hidden" style={{ aspectRatio: '1/1', minHeight: '200px' }}>
+          <div className="relative bg-slate-900 flex items-center justify-center overflow-hidden aspect-square w-full">
             <CarruselImagen
               imagenes={todasImagenes}
               alt={p.producto || p.plataforma}
-              className="w-full h-full group-hover:scale-105 transition-transform duration-300"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               iconoVacio={<Package className="w-12 h-12 text-slate-300" />}
             />
             {p.categoria_promo && <div className="absolute top-2 left-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-md z-10">{p.categoria_promo}</div>}
             {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">OFERTA</div>}
             {p.tipo === 'kit' && !p.categoria_promo && <div className="absolute top-2 left-2 bg-voltech-cyan text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">KIT</div>}
-            {p.disponibilidad === 'bajo_pedido' && (
-            <div className="absolute bottom-2 left-2 bg-amber-500/90 backdrop-blur-sm text-white px-2.5 py-1 rounded-lg text-[10px] font-semibold shadow-lg border border-amber-400/30 flex items-center gap-1">
-              <ShoppingCart className="w-3 h-3" />
-              <span>Bajo pedido</span>
-            </div>
-          )}
             </div>
           <div className="p-3 flex flex-col flex-1">
             <div className="mb-1"><p className={`text-[10px] font-medium uppercase tracking-wide ${mutedText} truncate`}>{p.marca} • {p.categoria}</p></div>
@@ -1621,7 +1615,8 @@ const calcularPrecioBs = (precioUsd) => {
             <div className="mt-auto space-y-2">
               <div>
                 {precioInfo.tieneOferta && <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)}</p>}
-                <p className={`text-xl font-bold ${precioInfo.tieneOferta ? 'text-red-600' : darkMode ? 'text-white' : 'text-slate-900'}`}>${precioInfo.precioPrincipal?.toFixed(2)} USD</p>
+                <p className={`text-xl font-bold ${precioInfo.tieneOferta ? 'text-red-600' : darkMode ? 'text-white' : 'text-slate-900'}`}>${precioInfo.precioPrincipal?.toFixed(2)}</p>
+                {precioInfo.tieneOferta && <p className="text-[10px] font-bold text-voltech-warning mt-0.5">Promo solo en Divisas</p>}
                 <p className={`text-xs font-medium ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
               </div>
               <div className="flex gap-1.5 pt-1">
@@ -2217,14 +2212,14 @@ const calcularPrecioBs = (precioUsd) => {
                     />
                     {p.categoria_promo && <div className="absolute top-2 left-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-md z-10">{p.categoria_promo}</div>}
                     {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md z-10">OFERTA</div>}
-                    {p.disponibilidad === 'bajo_pedido' && <div className="absolute bottom-2 left-2 bg-amber-500 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-md z-10"> BAJO PEDIDO</div>}
                   </div>
                   <div className="p-3 flex flex-col flex-1">
                     <h3 className={`font-semibold text-sm mb-2 line-clamp-2 leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.plataforma}</h3>
                     <div className="mt-auto space-y-2">
                       <div>
-                        {precioInfo.tieneOferta && <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)} USD</p>}
-                        <p className={`text-xl font-bold ${precioInfo.tieneOferta ? 'text-red-600' : darkMode ? 'text-white' : 'text-slate-900'}`}>${precioInfo.precioPrincipal?.toFixed(2)} USD</p>
+                        {precioInfo.tieneOferta && <p className="text-xs text-gray-400 line-through">${precioInfo.precioTachado?.toFixed(2)}</p>}
+                        <p className={`text-xl font-bold ${precioInfo.tieneOferta ? 'text-red-600' : darkMode ? 'text-white' : 'text-slate-900'}`}>${precioInfo.precioPrincipal?.toFixed(2)}</p>
+                        {precioInfo.tieneOferta && <p className="text-[10px] font-bold text-voltech-warning mt-0.5">Promo solo en Divisas</p>}
                         <p className={`text-xs font-medium ${mutedText}`}>Bs {calcularPrecioBs(precioInfo.precioPrincipal)}</p>
                       </div>
                       <div className="flex items-center gap-1.5 w-full mt-auto pt-3">
@@ -2868,14 +2863,6 @@ const calcularPrecioBs = (precioUsd) => {
                         </div>
                       )}
                       
-                      {/* Badge Bajo pedido */}
-                      {selectedProduct.disponibilidad === 'bajo_pedido' && (
-                        <div className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-600 px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-500/30 w-fit">
-                          <ShoppingCart className="w-3.5 h-3.5" />
-                          <span>Bajo pedido</span>
-                        </div>
-                      )}
-                      
                       {/* Precio */}
                       <div className="flex items-baseline gap-3 flex-wrap pt-2">
                         {getPrecioMostrar(selectedProduct).tieneOferta && (
@@ -3239,7 +3226,7 @@ const calcularPrecioBs = (precioUsd) => {
                                   className="w-4 h-4 rounded border-slate-600 text-purple-600 focus:ring-purple-500 mt-0.5 flex-shrink-0"
                                 />
                                 <span className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-700'} leading-relaxed`}>
-                                  He leído y acepto los{' '}
+                                  <span className="font-bold text-red-500">*</span> He leído y acepto los{' '}
                                   <button
                                     type="button"
                                     onClick={(e) => { e.preventDefault(); setShowTermsModal(true); }}
@@ -3250,6 +3237,7 @@ const calcularPrecioBs = (precioUsd) => {
                                   {hayStreaming && hayFisicos && ' (aplican tanto para productos físicos como digitales)'}
                                   {hayStreaming && !hayFisicos && ' para productos streaming'}
                                   {!hayStreaming && hayFisicos && ' para productos físicos'}
+                                  <span className="block text-[10px] text-red-500 mt-1 font-medium">Obligatorio para habilitar el botón de compra</span>
                                 </span>
                               </label>
 <div className={`mt-2 text-[10px] ${mutedText} border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'} pt-2`}>
@@ -3308,7 +3296,11 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
                         <div className="flex justify-between"><span className={mutedText}>Bs:</span><span className={mutedText}>Bs {calcularPrecioBs(calculateTotal())}</span></div>
                       </div>
 
-                    <button onClick={finalizarPedido} className="w-full py-2.5 px-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-md mb-2">
+                    <button 
+                      onClick={finalizarPedido} 
+                      disabled={!terminosAceptados}
+                      className={`w-full py-2.5 px-3 font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md mb-2 ${terminosAceptados ? 'bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer' : 'bg-slate-600 text-slate-400 cursor-not-allowed opacity-50'}`}
+                    >
                       <WhatsAppIcon className="w-4 h-4 shrink-0" />
                       <span className="whitespace-nowrap">Finalizar por WhatsApp</span>
                     </button>

@@ -1899,1209 +1899,1209 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
         }
       }
 
-      let productosGuardados = 0;
-      let productosActualizados = 0;
-      const nuevosProductos = [];
+          let productosGuardados = 0;
+          let productosActualizados = 0;
+          const nuevosProductos = [];
 
-      items.forEach((item, index) => {
-        const mismoCombo = productos.find(p =>
-          normalizarTexto(p.plataforma) === normalizarTexto(item.plataforma) &&
-          normalizarTexto(p.categoria || '') === normalizarTexto(item.categoria || '') &&
-          normalizarTexto(p.marca || '') === normalizarTexto(item.marca || '') &&
-          normalizarTexto(p.modelo || '') === normalizarTexto(item.modelo || '') &&
-          normalizarTexto(p.variante || '') === normalizarTexto(item.variante || '') &&
-          (p.tipo || 'fisico') === (item.tipo || 'fisico') &&
-          p.id !== item.id
-        );
-        const cascaron = productos.find(p =>
-          normalizarTexto(p.plataforma) === normalizarTexto(item.plataforma) &&
-          (p.tipo || 'fisico') === (item.tipo || 'fisico') &&
-          !p.categoria && !p.marca &&
-          p.id !== item.id
-        );
-        const productoExistente = mismoCombo || cascaron;
+          items.forEach((item, index) => {
+            const mismoCombo = productos.find(p =>
+              normalizarTexto(p.plataforma) === normalizarTexto(item.plataforma) &&
+              normalizarTexto(p.categoria || '') === normalizarTexto(item.categoria || '') &&
+              normalizarTexto(p.marca || '') === normalizarTexto(item.marca || '') &&
+              normalizarTexto(p.modelo || '') === normalizarTexto(item.modelo || '') &&
+              normalizarTexto(p.variante || '') === normalizarTexto(item.variante || '') &&
+              (p.tipo || 'fisico') === (item.tipo || 'fisico') &&
+              p.id !== item.id
+            );
+            const cascaron = productos.find(p =>
+              normalizarTexto(p.plataforma) === normalizarTexto(item.plataforma) &&
+              (p.tipo || 'fisico') === (item.tipo || 'fisico') &&
+              !p.categoria && !p.marca &&
+              p.id !== item.id
+            );
+            const productoExistente = mismoCombo || cascaron;
 
-        const baseEsperada = `${prefijoSKU(item.plataforma)}-${prefijoSKU(item.categoria)}-${prefijoSKU(item.marca)}`;
-        if (!item.sku || !String(item.sku).startsWith(baseEsperada + '-')) {
-          item.sku = generarSKU(item.plataforma, item.categoria, item.marca, obtenerSiguienteNumero(item.plataforma, item.categoria, item.marca, productos));
-        }
-
-        const imagenesArr = Array.from(new Set([item.imagen, ...(item.imagenes || [])].filter(Boolean)));
-        const productoData = {
-          tipo: item.tipo,
-          disponibilidad: item.disponibilidad || 'stock',
-          imagen: item.imagen || null,
-          imagenes: imagenesArr,
-          sku: item.sku,
-          fecha: item.fecha,
-          fechaCreacion: new Date().toISOString(),
-          creado_en: new Date().toISOString(),
-          plataforma: item.plataforma,
-          producto: item.plataforma,
-          categoria: item.categoria,
-          marca: item.marca,
-          modelo: item.modelo || '',
-          variante: item.variante || '',
-          potencia: Array.isArray(item.potencia) ? item.potencia : [],
-          cantidad: item.cantidad,
-          descripcion: '',
-          descripcion_detallada: item.descripcion_detallada || '',
-          duracion: item.duracion || '',
-          estado: item.estado || 'nuevo',
-          publicado: false,
-          porcentaje_comision: item.porcentaje_comision || 5,
-          productos_kit: item.productos_kit || [],
-          precio_costo_total: item.precio_costo_total || 0,
-          precio_individual_total: item.precio_individual_total || 0,
-          esCombo: item.esCombo || false,
-          plataformasCombo: item.plataformasCombo || [],
-          especificaciones: null,
-          colores: null,
-          caracteristicas: null,
-          precioMayor: item.precioMayor || 0,
-          preciomayor: item.precioMayor || 0,
-          precioDetal: item.precioDetal || item.precioMayor || 0,
-          preciodetal: item.precioDetal || item.precioMayor || 0,
-          precioBs: item.precioBs || 0,
-          preciobs: item.precioBs || 0,
-          precioOferta: item.precioOferta || 0,
-          precio_oferta: item.precioOferta || 0,
-          tipoOferta: item.tipoOferta || '',
-          proveedor: item.proveedor || '',
-          comprador: item.comprador || usuarioActual || 'Administrador',
-          precios_proveedor: item.precios_proveedor || []
-        };
-
-        if (productoExistente) {
-          const productoActualizado = {
-            ...productoExistente,
-            ...productoData,
-            id: productoExistente.id,
-            cantidad: item.tipo !== 'kit' ? (productoExistente.cantidad || 0) + item.cantidad : item.cantidad,
-          };
-          nuevosProductos.push(productoActualizado);
-          productosActualizados++;
-        } else {
-          const nuevoProducto = {
-            ...productoData,
-            id: item.id || crypto.randomUUID(),
-          };
-          nuevosProductos.push(nuevoProducto);
-          productosGuardados++;
-        }
-      });
-
-      if (productosGuardados > 0 || productosActualizados > 0) {
-        try {
-          if (supabase) {
-            console.log('🔄 Guardando en Supabase:', nuevosProductos);
-            const { data, error } = await supabase.from('productos').upsert(nuevosProductos, { onConflict: 'id' });
-            
-            if (error) {
-              console.error('❌ Error Supabase:', error);
-              toast.error('Error al guardar en base de datos: ' + error.message);
-              return;
+            const baseEsperada = `${prefijoSKU(item.plataforma)}-${prefijoSKU(item.categoria)}-${prefijoSKU(item.marca)}`;
+            if (!item.sku || !String(item.sku).startsWith(baseEsperada + '-')) {
+              item.sku = generarSKU(item.plataforma, item.categoria, item.marca, obtenerSiguienteNumero(item.plataforma, item.categoria, item.marca, productos));
             }
-            console.log('✅ Guardado en Supabase:', data);
-          }
 
-          let productosFinales = [...productos];
-          nuevosProductos.forEach(p => {
-            const index = productosFinales.findIndex(existing => existing.id === p.id);
-            if (index !== -1) {
-              productosFinales[index] = p;
+            const imagenesArr = Array.from(new Set([item.imagen, ...(item.imagenes || [])].filter(Boolean)));
+            const productoData = {
+              tipo: item.tipo,
+              disponibilidad: item.disponibilidad || 'stock',
+              imagen: item.imagen || null,
+              imagenes: imagenesArr,
+              sku: item.sku,
+              fecha: item.fecha,
+              fechaCreacion: new Date().toISOString(),
+              creado_en: new Date().toISOString(),
+              plataforma: item.plataforma,
+              producto: item.plataforma,
+              categoria: item.categoria,
+              marca: item.marca,
+              modelo: item.modelo || '',
+              variante: item.variante || '',
+              potencia: Array.isArray(item.potencia) ? item.potencia : [],
+              cantidad: item.cantidad,
+              descripcion: '',
+              descripcion_detallada: item.descripcion_detallada || '',
+              duracion: item.duracion || '',
+              estado: item.estado || 'nuevo',
+              publicado: false,
+              porcentaje_comision: item.porcentaje_comision || 5,
+              productos_kit: item.productos_kit || [],
+              precio_costo_total: item.precio_costo_total || 0,
+              precio_individual_total: item.precio_individual_total || 0,
+              esCombo: item.esCombo || false,
+              plataformasCombo: item.plataformasCombo || [],
+              especificaciones: null,
+              colores: null,
+              caracteristicas: null,
+              precioMayor: item.precioMayor || 0,
+              preciomayor: item.precioMayor || 0,
+              precioDetal: item.precioDetal || item.precioMayor || 0,
+              preciodetal: item.precioDetal || item.precioMayor || 0,
+              precioBs: item.precioBs || 0,
+              preciobs: item.precioBs || 0,
+              precioOferta: item.precioOferta || 0,
+              precio_oferta: item.precioOferta || 0,
+              tipoOferta: item.tipoOferta || '',
+              proveedor: item.proveedor || '',
+              comprador: item.comprador || usuarioActual || 'Administrador',
+              precios_proveedor: item.precios_proveedor || []
+            };
+
+            if (productoExistente) {
+              const productoActualizado = {
+                ...productoExistente,
+                ...productoData,
+                id: productoExistente.id,
+                cantidad: item.tipo !== 'kit' ? (productoExistente.cantidad || 0) + item.cantidad : item.cantidad,
+              };
+              nuevosProductos.push(productoActualizado);
+              productosActualizados++;
             } else {
-              productosFinales.push(p);
+              const nuevoProducto = {
+                ...productoData,
+                id: item.id || crypto.randomUUID(),
+              };
+              nuevosProductos.push(nuevoProducto);
+              productosGuardados++;
             }
           });
 
-          setProductos(productosFinales);
-          setLocalSafe('voltech_productos', JSON.stringify(productosFinales));
+          if (productosGuardados > 0 || productosActualizados > 0) {
+            try {
+              if (supabase) {
+                console.log('🔄 Guardando en Supabase:', nuevosProductos);
+                const { data, error } = await supabase.from('productos').upsert(nuevosProductos, { onConflict: 'id' });
+                
+                if (error) {
+                  console.error('❌ Error Supabase:', error);
+                  toast.error('Error al guardar en base de datos: ' + error.message);
+                  return;
+                }
+                console.log('✅ Guardado en Supabase:', data);
+              }
 
-          const nuevasCategorias = [...categorias];
-          const nuevasMarcas = [...marcas];
-          nuevosProductos.forEach(p => {
-            if (p.categoria && !nuevasCategorias.includes(p.categoria)) {
-              nuevasCategorias.push(p.categoria);
-            }
-            if (p.marca && !nuevasMarcas.includes(p.marca)) {
-              nuevasMarcas.push(p.marca);
-            }
-          });
-          setCategorias(nuevasCategorias);
-          setMarcas(nuevasMarcas);
-          // ✅ Persistir nombres de productos físicos (como categorías y marcas)
-          const nombresFisicosNuevos = [...new Set([...nombresProductosGuardados, ...nuevosProductos.filter(p => p.tipo === 'fisico' && !p.esCombo).map(p => p.plataforma).filter(Boolean)])];
-          setNombresProductosGuardados(nombresFisicosNuevos);
-          if (supabase) {
-            await supabase.from('settings').upsert({ clave: 'categorias', valor: nuevasCategorias }, { onConflict: 'clave' });
-            await supabase.from('settings').upsert({ clave: 'marcas', valor: nuevasMarcas }, { onConflict: 'clave' });
-            await supabase.from('settings').upsert({ clave: 'nombres_productos', valor: nombresFisicosNuevos }, { onConflict: 'clave' });
-          }
-          setLocalSafe('voltech_categorias', JSON.stringify(nuevasCategorias));
-          setLocalSafe('voltech_marcas', JSON.stringify(nuevasMarcas));
-          setLocalSafe('voltech_nombres_productos', JSON.stringify(nombresFisicosNuevos));
-
-          const mensaje = productosActualizados > 0 
-            ? `${productosGuardados} nuevo(s) y ${productosActualizados} actualizado(s)`
-            : `${productosGuardados} producto(s) guardado(s)`;
-          
-          toast.success(mensaje);
-          
-          // ✅ Notificar al equipo cuando se agregan productos nuevos
-          if (productosGuardados > 0) {
-            const nuevosNombres = nuevosProductos
-              .filter(p => !productos.some(existing => existing.id === p.id))
-              .map(p => p.plataforma || p.producto)
-              .slice(0, 3)
-              .join(', ');
-            
-            if (agregarNotificacion) {
-              agregarNotificacion({
-                tipo: 'producto_nuevo',
-                titulo: `📦 ${productosGuardados} producto(s) nuevo(s) agregado(s)`,
-                mensaje: nuevosNombres 
-                  ? `Nuevos productos: ${nuevosNombres}${productosGuardados > 3 ? '...' : ''}`
-                  : `${productosGuardados} productos nuevos agregados al inventario`,
-                detalle: `Precio detal: $${nuevosProductos[0]?.precioDetal || 0}`,
-                usuario_id: 'todos'
+              let productosFinales = [...productos];
+              nuevosProductos.forEach(p => {
+                const index = productosFinales.findIndex(existing => existing.id === p.id);
+                if (index !== -1) {
+                  productosFinales[index] = p;
+                } else {
+                  productosFinales.push(p);
+                }
               });
+
+              setProductos(productosFinales);
+              setLocalSafe('voltech_productos', JSON.stringify(productosFinales));
+
+              const nuevasCategorias = [...categorias];
+              const nuevasMarcas = [...marcas];
+              nuevosProductos.forEach(p => {
+                if (p.categoria && !nuevasCategorias.includes(p.categoria)) {
+                  nuevasCategorias.push(p.categoria);
+                }
+                if (p.marca && !nuevasMarcas.includes(p.marca)) {
+                  nuevasMarcas.push(p.marca);
+                }
+              });
+              setCategorias(nuevasCategorias);
+              setMarcas(nuevasMarcas);
+              // ✅ Persistir nombres de productos físicos (como categorías y marcas)
+              const nombresFisicosNuevos = [...new Set([...nombresProductosGuardados, ...nuevosProductos.filter(p => p.tipo === 'fisico' && !p.esCombo).map(p => p.plataforma).filter(Boolean)])];
+              setNombresProductosGuardados(nombresFisicosNuevos);
+              if (supabase) {
+                await supabase.from('settings').upsert({ clave: 'categorias', valor: nuevasCategorias }, { onConflict: 'clave' });
+                await supabase.from('settings').upsert({ clave: 'marcas', valor: nuevasMarcas }, { onConflict: 'clave' });
+                await supabase.from('settings').upsert({ clave: 'nombres_productos', valor: nombresFisicosNuevos }, { onConflict: 'clave' });
+              }
+              setLocalSafe('voltech_categorias', JSON.stringify(nuevasCategorias));
+              setLocalSafe('voltech_marcas', JSON.stringify(nuevasMarcas));
+              setLocalSafe('voltech_nombres_productos', JSON.stringify(nombresFisicosNuevos));
+
+              const mensaje = productosActualizados > 0 
+                ? `${productosGuardados} nuevo(s) y ${productosActualizados} actualizado(s)`
+                : `${productosGuardados} producto(s) guardado(s)`;
+              
+              toast.success(mensaje);
+              
+              // ✅ Notificar al equipo cuando se agregan productos nuevos
+              if (productosGuardados > 0) {
+                const nuevosNombres = nuevosProductos
+                  .filter(p => !productos.some(existing => existing.id === p.id))
+                  .map(p => p.plataforma || p.producto)
+                  .slice(0, 3)
+                  .join(', ');
+                
+                if (agregarNotificacion) {
+                  agregarNotificacion({
+                    tipo: 'producto_nuevo',
+                    titulo: `📦 ${productosGuardados} producto(s) nuevo(s) agregado(s)`,
+                    mensaje: nuevosNombres 
+                      ? `Nuevos productos: ${nuevosNombres}${productosGuardados > 3 ? '...' : ''}`
+                      : `${productosGuardados} productos nuevos agregados al inventario`,
+                    detalle: `Precio detal: $${nuevosProductos[0]?.precioDetal || 0}`,
+                    usuario_id: 'todos'
+                  });
+                }
+              }
+              
+              setItems([{
+                id: crypto.randomUUID(),
+                tipo: 'fisico',
+                disponibilidad: 'stock',
+                imagen: '',
+                imagenFile: null,
+                sku: '',
+                fecha: new Date().toISOString().split('T')[0],
+                comprador: '',
+                proveedor: '',
+                plataforma: '',
+                categoria: '',
+                marca: '',
+                cantidad: 1,
+                metodoPago: 'efectivo',
+                cartera: '',
+                precioMayor: 0,
+                precioDetal: 0,
+                precioOferta: 0,
+                estado: 'nuevo',
+                precioBs: 0,
+                total: 0,
+                monedaCompra: 'usd',
+                duracion: '',
+                tipoOferta: '',
+                esCombo: false,
+                plataformasCombo: [],
+                porcentaje_comision: 5,
+                productos_kit: [],
+                precio_costo_total: 0,
+                precio_individual_total: 0,
+                descripcion_detallada: ''
+              }]);
+              // ✅ Cierre automático garantizado del formulario
+              setTimeout(() => {
+                setShowForm(false);
+                window.dispatchEvent(new CustomEvent('voltech-data-updated'));
+              }, 300);
+            } catch (error) {
+              console.error('Error guardando productos:', error);
+              toast.error('Error: ' + error.message);
             }
           }
-          
-          setItems([{
-            id: crypto.randomUUID(),
-            tipo: 'fisico',
-            disponibilidad: 'stock',
-            imagen: '',
-            imagenFile: null,
-            sku: '',
-            fecha: new Date().toISOString().split('T')[0],
-            comprador: '',
-            proveedor: '',
-            plataforma: '',
-            categoria: '',
-            marca: '',
-            cantidad: 1,
-            metodoPago: 'efectivo',
-            cartera: '',
-            precioMayor: 0,
-            precioDetal: 0,
-            precioOferta: 0,
-            estado: 'nuevo',
-            precioBs: 0,
-            total: 0,
-            monedaCompra: 'usd',
-            duracion: '',
-            tipoOferta: '',
-            esCombo: false,
-            plataformasCombo: [],
-            porcentaje_comision: 5,
-            productos_kit: [],
-            precio_costo_total: 0,
-            precio_individual_total: 0,
-            descripcion_detallada: ''
-          }]);
-          // ✅ Cierre automático garantizado del formulario
-          setTimeout(() => {
-            setShowForm(false);
-            window.dispatchEvent(new CustomEvent('voltech-data-updated'));
-          }, 300);
-        } catch (error) {
-          console.error('Error guardando productos:', error);
-          toast.error('Error: ' + error.message);
+        };
+        
+      const abrirEdicion = async (producto) => {
+        setEditandoId(producto.id);
+        // ✅ Cargar imágenes completas desde Supabase solo para este producto
+        let imagenesCompleta = Array.isArray(producto.imagenes) ? producto.imagenes : [];
+        if (imagenesCompleta.length === 0 && supabase) {
+          const { data: row } = await supabase.from('productos').select('imagenes').eq('id', producto.id).single();
+          if (row && Array.isArray(row.imagenes)) imagenesCompleta = row.imagenes;
         }
-      }
-    };
-    
-  const abrirEdicion = async (producto) => {
-    setEditandoId(producto.id);
-    // ✅ Cargar imágenes completas desde Supabase solo para este producto
-    let imagenesCompleta = Array.isArray(producto.imagenes) ? producto.imagenes : [];
-    if (imagenesCompleta.length === 0 && supabase) {
-      const { data: row } = await supabase.from('productos').select('imagenes').eq('id', producto.id).single();
-      if (row && Array.isArray(row.imagenes)) imagenesCompleta = row.imagenes;
-    }
-    const extras = imagenesCompleta.filter(img => img && img !== producto.imagen);
-    setImagenesExtraEdit(extras);
-    setEditData({
-      tipo: producto.tipo || 'fisico',
-      precioDetal: producto.precioDetal || 0,
-      precioMayor: producto.precioMayor || 0,
-      precioOferta: producto.precioOferta || 0,
-      estado: producto.estado || 'nuevo',
-      descripcion: producto.descripcion || '',
-      descripcion_detallada: producto.descripcion_detallada || '',
-      publicado: producto.publicado || false,
-      imagen: producto.imagen || '',
-      imagenes: producto.imagenes || (producto.imagen ? [producto.imagen] : []),
-      duracion: producto.duracion || '',
-      tipoOferta: producto.tipoOferta || '',
-      plataforma: producto.plataforma || '',
-      categoria: producto.categoria || '',
-      marca: producto.marca || '',
-      modelo: producto.modelo || '',
-      variante: producto.variante || '',
-      potencia: Array.isArray(producto.potencia) ? producto.potencia : [],
-      cantidad: producto.cantidad || 0,
-      plataformasCombo: producto.plataformasCombo || [],
-      porcentaje_comision: producto.porcentaje_comision || 5,
-      productos_kit: producto.productos_kit || [],
-      precio_costo_total: producto.precio_costo_total || 0,
-      precio_individual_total: producto.precio_individual_total || 0
-    });
-  };
-      const guardarEdicion = async (id) => {
-    const imagenesFinal = [editData.imagen, ...imagenesExtraEdit].filter(Boolean);
-    const dataFinal = {
-      ...editData,
-      producto: editData.plataforma,
-      imagenes: Array.from(new Set(imagenesFinal)),
-      precioMayor: editData.precioMayor || 0,
-      precioDetal: editData.precioDetal || editData.precioMayor || 0,
-    };
-    if (supabase) {
-      await supabase.from('productos').update(dataFinal).eq('id', id);
-    }
-    const productosActualizados = productos.map(p => 
-      p.id === id ? { ...p, ...dataFinal } : p
-    );
-    setProductos(productosActualizados);
-    localStorage.setItem('voltech_productos', JSON.stringify(productosActualizados));
-    toast.success('Producto actualizado');
-    setEditandoId(null);
-    setImagenesExtraEdit([]);
-  };
-    const cancelarEdicion = () => {
-      setEditandoId(null);
-    };
-
-    const togglePublicado = async (id) => {
-      const producto = productos.find(p => p.id === id);
-      const nuevoEstado = !producto.publicado;
-      
-      if (supabase) {
-        await supabase.from('productos').update({ publicado: nuevoEstado }).eq('id', id);
-      }
-      
-      const productosActualizados = productos.map(p => 
-        p.id === id ? { ...p, publicado: nuevoEstado } : p
-      );
-      setProductos(productosActualizados);
-      localStorage.setItem('voltech_productos', JSON.stringify(productosActualizados));
-      toast.success(`Producto ${nuevoEstado ? 'publicado' : 'ocultado'} en la tienda`);
-    };
-
-    const eliminarProducto = async (id) => {
-      if (confirm('¿Estás seguro de eliminar este producto?')) {
+        const extras = imagenesCompleta.filter(img => img && img !== producto.imagen);
+        setImagenesExtraEdit(extras);
+        setEditData({
+          tipo: producto.tipo || 'fisico',
+          precioDetal: producto.precioDetal || 0,
+          precioMayor: producto.precioMayor || 0,
+          precioOferta: producto.precioOferta || 0,
+          estado: producto.estado || 'nuevo',
+          descripcion: producto.descripcion || '',
+          descripcion_detallada: producto.descripcion_detallada || '',
+          publicado: producto.publicado || false,
+          imagen: producto.imagen || '',
+          imagenes: producto.imagenes || (producto.imagen ? [producto.imagen] : []),
+          duracion: producto.duracion || '',
+          tipoOferta: producto.tipoOferta || '',
+          plataforma: producto.plataforma || '',
+          categoria: producto.categoria || '',
+          marca: producto.marca || '',
+          modelo: producto.modelo || '',
+          variante: producto.variante || '',
+          potencia: Array.isArray(producto.potencia) ? producto.potencia : [],
+          cantidad: producto.cantidad || 0,
+          plataformasCombo: producto.plataformasCombo || [],
+          porcentaje_comision: producto.porcentaje_comision || 5,
+          productos_kit: producto.productos_kit || [],
+          precio_costo_total: producto.precio_costo_total || 0,
+          precio_individual_total: producto.precio_individual_total || 0
+        });
+      };
+          const guardarEdicion = async (id) => {
+        const imagenesFinal = [editData.imagen, ...imagenesExtraEdit].filter(Boolean);
+        const dataFinal = {
+          ...editData,
+          producto: editData.plataforma,
+          imagenes: Array.from(new Set(imagenesFinal)),
+          precioMayor: editData.precioMayor || 0,
+          precioDetal: editData.precioDetal || editData.precioMayor || 0,
+        };
         if (supabase) {
-          await supabase.from('productos').delete().eq('id', id);
+          await supabase.from('productos').update(dataFinal).eq('id', id);
         }
-        const productosActualizados = productos.filter(p => p.id !== id);
+        const productosActualizados = productos.map(p => 
+          p.id === id ? { ...p, ...dataFinal } : p
+        );
         setProductos(productosActualizados);
         localStorage.setItem('voltech_productos', JSON.stringify(productosActualizados));
-        toast.success('Producto eliminado');
-      }
-    };
+        toast.success('Producto actualizado');
+        setEditandoId(null);
+        setImagenesExtraEdit([]);
+      };
+        const cancelarEdicion = () => {
+          setEditandoId(null);
+        };
 
-    // ✅ COMPARTIR PRODUCTO: imagen + info + link en cualquier red social
-    const compartirProducto = async (producto) => {
-      const url = `${window.location.origin}/catalogo?producto=${producto.id}`;
-      const nombre = producto.plataforma || producto.producto || 'Producto';
-      const precio = Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2);
-      const precioBs = Number(producto.precioBs || 0).toFixed(2);
-      const stock = producto.cantidad || 0;
-      const texto = `🔥 ${nombre}\n💰 $${precio} (Bs ${precioBs})\n📦 Stock: ${stock} unid.\n🔗 ${url}`;
-      const titulo = `${nombre} - $${precio}`;
+        const togglePublicado = async (id) => {
+          const producto = productos.find(p => p.id === id);
+          const nuevoEstado = !producto.publicado;
+          
+          if (supabase) {
+            await supabase.from('productos').update({ publicado: nuevoEstado }).eq('id', id);
+          }
+          
+          const productosActualizados = productos.map(p => 
+            p.id === id ? { ...p, publicado: nuevoEstado } : p
+          );
+          setProductos(productosActualizados);
+          localStorage.setItem('voltech_productos', JSON.stringify(productosActualizados));
+          toast.success(`Producto ${nuevoEstado ? 'publicado' : 'ocultado'} en la tienda`);
+        };
 
-      try {
-        const img = getImagenProducto(producto);
-        let file = null;
-
-        // Convertir imagen a File (maneja base64 Y URLs)
-        if (img) {
-          try {
-            let blob;
-            if (img.startsWith('data:image')) {
-              // Imagen base64 → convertir a blob directamente
-              const res = await fetch(img);
-              blob = await res.blob();
-            } else {
-              // URL externa → fetch
-              const res = await fetch(img, { mode: 'cors' });
-              blob = await res.blob();
+        const eliminarProducto = async (id) => {
+          if (confirm('¿Estás seguro de eliminar este producto?')) {
+            if (supabase) {
+              await supabase.from('productos').delete().eq('id', id);
             }
-            const extension = blob.type?.split('/')[1] || 'jpg';
-            file = new File([blob], `${nombre.replace(/[^a-z0-9]/gi, '_')}.${extension}`, {
-              type: blob.type || 'image/jpeg',
-            });
-          } catch (imgErr) {
-            console.warn('⚠️ No se pudo convertir la imagen:', imgErr.message);
+            const productosActualizados = productos.filter(p => p.id !== id);
+            setProductos(productosActualizados);
+            localStorage.setItem('voltech_productos', JSON.stringify(productosActualizados));
+            toast.success('Producto eliminado');
           }
-        }
+        };
 
-        // Opción 1: Web Share API con imagen (móviles y navegadores compatibles)
-        if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            text: texto,
-            title: titulo,
-          });
-          toast.success('¡Compartido con imagen!');
-          return;
-        }
+        // ✅ COMPARTIR PRODUCTO: imagen + info + link en cualquier red social
+        const compartirProducto = async (producto) => {
+          const url = `${window.location.origin}/catalogo?producto=${producto.id}`;
+          const nombre = producto.plataforma || producto.producto || 'Producto';
+          const precio = Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2);
+          const precioBs = Number(producto.precioBs || 0).toFixed(2);
+          const stock = producto.cantidad || 0;
+          const texto = `🔥 ${nombre}\n💰 $${precio} (Bs ${precioBs})\n📦 Stock: ${stock} unid.\n🔗 ${url}`;
+          const titulo = `${nombre} - $${precio}`;
 
-        // Opción 2: Web Share API solo texto (desktop o sin soporte de archivos)
-        if (navigator.share) {
-          await navigator.share({
-            text: texto,
-            title: titulo,
-            url: url,
-          });
-          toast.success('¡Compartido!');
-          return;
-        }
-
-        // Opción 3: Fallback - copiar al portapapeles
-        throw new Error('Web Share no disponible');
-      } catch (e) {
-        if (e?.name === 'AbortError') return;
-
-        // Fallback: copiar texto + link al portapapeles
-        try {
-          await navigator.clipboard.writeText(texto);
-          toast.success(' Texto copiado al portapapeles. Pégalo donde quieras.');
-        } catch {
-          // Último recurso: seleccionar texto manualmente
-          const textarea = document.createElement('textarea');
-          textarea.value = texto;
-          document.body.appendChild(textarea);
-          textarea.select();
           try {
-            document.execCommand('copy');
-            toast.success('📋 Texto copiado.');
-          } catch {
-            toast.error('No se pudo compartir. Copia manualmente: ' + url);
+            const img = getImagenProducto(producto);
+            let file = null;
+
+            // Convertir imagen a File (maneja base64 Y URLs)
+            if (img) {
+              try {
+                let blob;
+                if (img.startsWith('data:image')) {
+                  // Imagen base64 → convertir a blob directamente
+                  const res = await fetch(img);
+                  blob = await res.blob();
+                } else {
+                  // URL externa → fetch
+                  const res = await fetch(img, { mode: 'cors' });
+                  blob = await res.blob();
+                }
+                const extension = blob.type?.split('/')[1] || 'jpg';
+                file = new File([blob], `${nombre.replace(/[^a-z0-9]/gi, '_')}.${extension}`, {
+                  type: blob.type || 'image/jpeg',
+                });
+              } catch (imgErr) {
+                console.warn('⚠️ No se pudo convertir la imagen:', imgErr.message);
+              }
+            }
+
+            // Opción 1: Web Share API con imagen (móviles y navegadores compatibles)
+            if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+              await navigator.share({
+                files: [file],
+                text: texto,
+                title: titulo,
+              });
+              toast.success('¡Compartido con imagen!');
+              return;
+            }
+
+            // Opción 2: Web Share API solo texto (desktop o sin soporte de archivos)
+            if (navigator.share) {
+              await navigator.share({
+                text: texto,
+                title: titulo,
+                url: url,
+              });
+              toast.success('¡Compartido!');
+              return;
+            }
+
+            // Opción 3: Fallback - copiar al portapapeles
+            throw new Error('Web Share no disponible');
+          } catch (e) {
+            if (e?.name === 'AbortError') return;
+
+            // Fallback: copiar texto + link al portapapeles
+            try {
+              await navigator.clipboard.writeText(texto);
+              toast.success(' Texto copiado al portapapeles. Pégalo donde quieras.');
+            } catch {
+              // Último recurso: seleccionar texto manualmente
+              const textarea = document.createElement('textarea');
+              textarea.value = texto;
+              document.body.appendChild(textarea);
+              textarea.select();
+              try {
+                document.execCommand('copy');
+                toast.success('📋 Texto copiado.');
+              } catch {
+                toast.error('No se pudo compartir. Copia manualmente: ' + url);
+              }
+              document.body.removeChild(textarea);
+            }
           }
-          document.body.removeChild(textarea);
-        }
-      }
-};
-    const guardarTasa = async () => {
-      const tasaData = { tasa: usarTasaBCV ? tasaBCV : tasaPersonalizada, usarBCV: usarTasaBCV, tasaPersonalizada };
-      if (supabase) await supabase.from('settings').upsert({ clave: 'tasa_bcv', valor: tasaData }, { onConflict: 'clave' });
-      localStorage.setItem('voltech_tasa_bcv', JSON.stringify(tasaData));
-      toast.success('Tasa actualizada');
     };
+        const guardarTasa = async () => {
+          const tasaData = { tasa: usarTasaBCV ? tasaBCV : tasaPersonalizada, usarBCV: usarTasaBCV, tasaPersonalizada };
+          if (supabase) await supabase.from('settings').upsert({ clave: 'tasa_bcv', valor: tasaData }, { onConflict: 'clave' });
+          localStorage.setItem('voltech_tasa_bcv', JSON.stringify(tasaData));
+          toast.success('Tasa actualizada');
+        };
 
-    const generarPDFCatalogo = () => {
-      const productosPublicados = productos.filter(p => p.publicado);
-      const contenido = `CATALOGO VOLTECH STORE\n======================\nFecha: ${new Date().toLocaleDateString()}\n\nTotal Productos: ${productosPublicados.length}\n\n${productosPublicados.map(p => `${p.plataforma} ${p.tipo === 'streaming' ? '(Streaming)' : ''} ${p.esCombo ? '(Combo)' : ''}\nSKU: ${p.sku}\nCategoría: ${p.categoria}\nMarca: ${p.marca || 'N/A'}\nEstado: ${p.estado || 'nuevo'}\nPrecio Detal: $${(p.precioDetal || p.precioMayor).toFixed(2)}\n${p.precioOferta > 0 ? `Precio Oferta: $${p.precioOferta.toFixed(2)}\n` : ''}(Bs ${p.precioBs.toFixed(2)})\nStock: ${p.cantidad} unidades\nDuración: ${p.duracion || 'N/A'}\nOferta: ${p.tipoOferta || 'N/A'}\nComisión: ${p.porcentaje_comision || 5}%\n---`).join('\n')}`;
-      const blob = new Blob([contenido], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `catalogo_voltech_${new Date().toISOString().split('T')[0]}.txt`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success('Catálogo descargado');
-    };
+        const generarPDFCatalogo = () => {
+          const productosPublicados = productos.filter(p => p.publicado);
+          const contenido = `CATALOGO VOLTECH STORE\n======================\nFecha: ${new Date().toLocaleDateString()}\n\nTotal Productos: ${productosPublicados.length}\n\n${productosPublicados.map(p => `${p.plataforma} ${p.tipo === 'streaming' ? '(Streaming)' : ''} ${p.esCombo ? '(Combo)' : ''}\nSKU: ${p.sku}\nCategoría: ${p.categoria}\nMarca: ${p.marca || 'N/A'}\nEstado: ${p.estado || 'nuevo'}\nPrecio Detal: $${(p.precioDetal || p.precioMayor).toFixed(2)}\n${p.precioOferta > 0 ? `Precio Oferta: $${p.precioOferta.toFixed(2)}\n` : ''}(Bs ${p.precioBs.toFixed(2)})\nStock: ${p.cantidad} unidades\nDuración: ${p.duracion || 'N/A'}\nOferta: ${p.tipoOferta || 'N/A'}\nComisión: ${p.porcentaje_comision || 5}%\n---`).join('\n')}`;
+          const blob = new Blob([contenido], { type: 'text/plain' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `catalogo_voltech_${new Date().toISOString().split('T')[0]}.txt`;
+          a.click();
+          URL.revokeObjectURL(url);
+          toast.success('Catálogo descargado');
+        };
 
-    const productosFiltrados = productos
-      .filter(p =>
-        p.plataforma?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.categoria?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.marca?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-      .sort((a, b) => {
-        // 1. Primero ordenar por categoría
-        const catA = (a.categoria || '').toUpperCase();
-        const catB = (b.categoria || '').toUpperCase();
-        if (catA !== catB) return catA.localeCompare(catB, 'es', { sensitivity: 'base' });
-        
-        // 2. Luego por marca
-        const marcaA = (a.marca || '').toUpperCase();
-        const marcaB = (b.marca || '').toUpperCase();
-        if (marcaA !== marcaB) return marcaA.localeCompare(marcaB, 'es', { sensitivity: 'base' });
-        
-        // 3. Finalmente por nombre del producto/plataforma
-        return (a.plataforma || a.producto || '').localeCompare(b.plataforma || b.producto || '', 'es', { sensitivity: 'base' });
-      });
+        const productosFiltrados = productos
+          .filter(p =>
+            p.plataforma?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.categoria?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            p.marca?.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+          .sort((a, b) => {
+            // 1. Primero ordenar por categoría
+            const catA = (a.categoria || '').toUpperCase();
+            const catB = (b.categoria || '').toUpperCase();
+            if (catA !== catB) return catA.localeCompare(catB, 'es', { sensitivity: 'base' });
+            
+            // 2. Luego por marca
+            const marcaA = (a.marca || '').toUpperCase();
+            const marcaB = (b.marca || '').toUpperCase();
+            if (marcaA !== marcaB) return marcaA.localeCompare(marcaB, 'es', { sensitivity: 'base' });
+            
+            // 3. Finalmente por nombre del producto/plataforma
+            return (a.plataforma || a.producto || '').localeCompare(b.plataforma || b.producto || '', 'es', { sensitivity: 'base' });
+          });
 
-    const totalProductos = productos.length;
-    // ✅ LOTE A: los "Compra al momento" (bajo_pedido) NO cuentan como stock bajo ni agotados
-    const stockBajo = productos.filter(p => p.disponibilidad !== 'bajo_pedido' && p.cantidad <= 2).length;
-    const agotados = productos.filter(p => p.disponibilidad !== 'bajo_pedido' && p.cantidad === 0).length;
-    const porComprar = productos.filter(p => p.disponibilidad === 'bajo_pedido').length;
-    const valorInventario = productos.reduce((acc, p) => acc + (parseFloat(p.precioMayor || 0) * (parseFloat(p.cantidad) || 0)), 0);
+        const totalProductos = productos.length;
+        // ✅ LOTE A: los "Compra al momento" (bajo_pedido) NO cuentan como stock bajo ni agotados
+        const stockBajo = productos.filter(p => p.disponibilidad !== 'bajo_pedido' && p.cantidad <= 2).length;
+        const agotados = productos.filter(p => p.disponibilidad !== 'bajo_pedido' && p.cantidad === 0).length;
+        const porComprar = productos.filter(p => p.disponibilidad === 'bajo_pedido').length;
+        const valorInventario = productos.reduce((acc, p) => acc + (parseFloat(p.precioMayor || 0) * (parseFloat(p.cantidad) || 0)), 0);
 
-    const getEstadoBadge = (estado) => {
-      const estilos = { nuevo: 'bg-voltech-success/20 text-voltech-success', oferta: 'bg-voltech-warning/20 text-voltech-warning', kit: 'bg-voltech-cyan/20 text-voltech-cyan', agotado: 'bg-voltech-error/20 text-voltech-error', combo: 'bg-voltech-purple/20 text-voltech-purple' };
-      return estilos[estado] || estilos.nuevo;
-    };
+        const getEstadoBadge = (estado) => {
+          const estilos = { nuevo: 'bg-voltech-success/20 text-voltech-success', oferta: 'bg-voltech-warning/20 text-voltech-warning', kit: 'bg-voltech-cyan/20 text-voltech-cyan', agotado: 'bg-voltech-error/20 text-voltech-error', combo: 'bg-voltech-purple/20 text-voltech-purple' };
+          return estilos[estado] || estilos.nuevo;
+        };
 
-    // ✅ Helper: imagen con respaldo para kits y combos en el panel
-    const getImagenProducto = (p) => {
-      if (p.imagen) return p.imagen;
-      if (Array.isArray(p.imagenes) && p.imagenes.length > 0) return p.imagenes[0];
-      if (Array.isArray(p.productos_kit) && p.productos_kit.length > 0) {
-        for (const item of p.productos_kit) {
-          if (item.imagen) return item.imagen;
-          const prod = productos.find(x => x.id === item.producto_id);
-          if (prod && prod.imagen) return prod.imagen;
-        }
-      }
-      if (p.esCombo && Array.isArray(p.plataformasCombo) && p.plataformasCombo.length > 0) {
-        for (const nombre of p.plataformasCombo) {
-          const prod = productos.find(x => (x.plataforma === nombre || x.producto === nombre) && x.imagen);
-          if (prod) return prod.imagen;
-        }
-      }
-      return '';
-    };
+        // ✅ Helper: imagen con respaldo para kits y combos en el panel
+        const getImagenProducto = (p) => {
+          if (p.imagen) return p.imagen;
+          if (Array.isArray(p.imagenes) && p.imagenes.length > 0) return p.imagenes[0];
+          if (Array.isArray(p.productos_kit) && p.productos_kit.length > 0) {
+            for (const item of p.productos_kit) {
+              if (item.imagen) return item.imagen;
+              const prod = productos.find(x => x.id === item.producto_id);
+              if (prod && prod.imagen) return prod.imagen;
+            }
+          }
+          if (p.esCombo && Array.isArray(p.plataformasCombo) && p.plataformasCombo.length > 0) {
+            for (const nombre of p.plataformasCombo) {
+              const prod = productos.find(x => (x.plataforma === nombre || x.producto === nombre) && x.imagen);
+              if (prod) return prod.imagen;
+            }
+          }
+          return '';
+        };
 
-    const productosParaKit = productos.filter(p => p.tipo === 'fisico' && p.cantidad > 0 && (p.plataforma?.toLowerCase().includes(busquedaKit.toLowerCase()) || p.sku?.toLowerCase().includes(busquedaKit.toLowerCase())));
+        const productosParaKit = productos.filter(p => p.tipo === 'fisico' && p.cantidad > 0 && (p.plataforma?.toLowerCase().includes(busquedaKit.toLowerCase()) || p.sku?.toLowerCase().includes(busquedaKit.toLowerCase())));
 
-    const productosFisicos = [...new Set(productos.filter(p => p.tipo === 'fisico' && p.disponibilidad !== 'kit' && (p.categoria || '').toUpperCase() !== 'KIT').map(p => p.plataforma).filter(Boolean))];
-    const plataformasStreaming = [...new Set(productos.filter(p => p.tipo === 'streaming' && !p.esCombo && p.disponibilidad !== 'combo' && (p.categoria || '').toUpperCase() !== 'COMBO').map(p => p.plataforma).filter(Boolean))];
-    const nombresKits = [...new Set([...nombresKitsGuardados, ...productos.filter(p => p.tipo === 'kit' || p.disponibilidad === 'kit' || (p.categoria || '').toUpperCase() === 'KIT').map(p => p.plataforma).filter(Boolean)])];
-    const nombresCombos = [...new Set([...nombresCombosGuardados, ...productos.filter(p => p.esCombo || p.disponibilidad === 'combo' || (p.categoria || '').toUpperCase() === 'COMBO').map(p => p.plataforma).filter(Boolean)])];
-    const nombresFisicos = [...new Set([...nombresProductosGuardados, ...productosFisicos])];
+        const productosFisicos = [...new Set(productos.filter(p => p.tipo === 'fisico' && p.disponibilidad !== 'kit' && (p.categoria || '').toUpperCase() !== 'KIT').map(p => p.plataforma).filter(Boolean))];
+        const plataformasStreaming = [...new Set(productos.filter(p => p.tipo === 'streaming' && !p.esCombo && p.disponibilidad !== 'combo' && (p.categoria || '').toUpperCase() !== 'COMBO').map(p => p.plataforma).filter(Boolean))];
+        const nombresKits = [...new Set([...nombresKitsGuardados, ...productos.filter(p => p.tipo === 'kit' || p.disponibilidad === 'kit' || (p.categoria || '').toUpperCase() === 'KIT').map(p => p.plataforma).filter(Boolean)])];
+        const nombresCombos = [...new Set([...nombresCombosGuardados, ...productos.filter(p => p.esCombo || p.disponibilidad === 'combo' || (p.categoria || '').toUpperCase() === 'COMBO').map(p => p.plataforma).filter(Boolean)])];
+        const nombresFisicos = [...new Set([...nombresProductosGuardados, ...productosFisicos])];
 
-    const categoriasFisico = useMemo(() => {
-      return [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.categoria).filter(Boolean))];
-    }, [productos]);
+        const categoriasFisico = useMemo(() => {
+          return [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.categoria).filter(Boolean))];
+        }, [productos]);
 
-    const marcasFisico = useMemo(() => {
-      return [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.marca).filter(Boolean))];
-    }, [productos]);
+        const marcasFisico = useMemo(() => {
+          return [...new Set(productos.filter(p => p.tipo === 'fisico').map(p => p.marca).filter(Boolean))];
+        }, [productos]);
 
-    const getProductosFisicosFiltrados = (categoria, marca) => {
-      return productosFisicos.filter(nombre => {
-        const registros = productos.filter(x => x.tipo === 'fisico' && normalizarTexto(x.plataforma) === normalizarTexto(nombre));
-        if (registros.length === 0) return false;
-        return registros.some(prod =>
-          (!categoria || !prod.categoria || normalizarTexto(prod.categoria) === normalizarTexto(categoria)) &&
-          (!marca || !prod.marca || normalizarTexto(prod.marca) === normalizarTexto(marca))
-        );
-      });
-    };
+        const getProductosFisicosFiltrados = (categoria, marca) => {
+          return productosFisicos.filter(nombre => {
+            const registros = productos.filter(x => x.tipo === 'fisico' && normalizarTexto(x.plataforma) === normalizarTexto(nombre));
+            if (registros.length === 0) return false;
+            return registros.some(prod =>
+              (!categoria || !prod.categoria || normalizarTexto(prod.categoria) === normalizarTexto(categoria)) &&
+              (!marca || !prod.marca || normalizarTexto(prod.marca) === normalizarTexto(marca))
+            );
+          });
+        };
 
-    const getCategoriasFiltradas = (marca) => {
-      const asociadas = marca
-        ? [...new Set(
-            productos
-              .filter(p => p.tipo === 'fisico' && p.categoria && normalizarTexto(p.marca) === normalizarTexto(marca))
-              .map(p => p.categoria)
-          )]
-        : [];
-      return [...new Set([...asociadas, ...categorias])];
-    };
+        const getCategoriasFiltradas = (marca) => {
+          const asociadas = marca
+            ? [...new Set(
+                productos
+                  .filter(p => p.tipo === 'fisico' && p.categoria && normalizarTexto(p.marca) === normalizarTexto(marca))
+                  .map(p => p.categoria)
+              )]
+            : [];
+          return [...new Set([...asociadas, ...categorias])];
+        };
 
-    const getMarcasFiltradas = (categoria) => {
-      const asociadas = categoria
-        ? [...new Set(
-            productos
-              .filter(p => p.tipo === 'fisico' && p.marca && normalizarTexto(p.categoria) === normalizarTexto(categoria))
-              .map(p => p.marca)
-          )]
-        : [];
-      return [...new Set([...asociadas, ...marcas])];
-    };
+        const getMarcasFiltradas = (categoria) => {
+          const asociadas = categoria
+            ? [...new Set(
+                productos
+                  .filter(p => p.tipo === 'fisico' && p.marca && normalizarTexto(p.categoria) === normalizarTexto(categoria))
+                  .map(p => p.marca)
+              )]
+            : [];
+          return [...new Set([...asociadas, ...marcas])];
+        };
 
-    // ✅ LOTE A: deduplicar proveedores (evita opciones repetidas en el selector)
-    const opcionesProveedores = [...new Set(proveedores
-      .map(pr => pr.nombre || pr.name || pr.razon_social || pr.proveedor || '')
-      .filter(Boolean))]
-      .map(n => ({ value: n, label: n }));
+        // ✅ LOTE A: deduplicar proveedores (evita opciones repetidas en el selector)
+        const opcionesProveedores = [...new Set(proveedores
+          .map(pr => pr.nombre || pr.name || pr.razon_social || pr.proveedor || '')
+          .filter(Boolean))]
+          .map(n => ({ value: n, label: n }));
 
-    // ✅ Opciones de Métodos de Pago sincronizadas con Ajustes
-    const opcionesMetodosPago = metodosPago.length > 0
-      ? metodosPago.map(m => ({
-          value: m.id || String(m.nombre || '').toLowerCase().replace(/\s+/g, '_'),
-          label: m.nombre || m.id || ''
-        }))
-      : [
-          { value: 'efectivo', label: 'Efectivo' },
-          { value: 'pago_movil', label: 'Pago Móvil' },
-          { value: 'transferencia', label: 'Transferencia' },
-          { value: 'binance', label: 'Binance' },
-        ];
+        // ✅ Opciones de Métodos de Pago sincronizadas con Ajustes
+        const opcionesMetodosPago = metodosPago.length > 0
+          ? metodosPago.map(m => ({
+              value: m.id || String(m.nombre || '').toLowerCase().replace(/\s+/g, '_'),
+              label: m.nombre || m.id || ''
+            }))
+          : [
+              { value: 'efectivo', label: 'Efectivo' },
+              { value: 'pago_movil', label: 'Pago Móvil' },
+              { value: 'transferencia', label: 'Transferencia' },
+              { value: 'binance', label: 'Binance' },
+            ];
 
-    return (
-      <div className="space-y-6">
-        <Toaster position="top-right" toastOptions={{ style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' }, success: { iconTheme: { primary: '#00ff88', secondary: '#fff' } }, error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } } }} />
+        return (
+          <div className="space-y-6">
+            <Toaster position="top-right" toastOptions={{ style: { background: '#12121a', color: '#fff', border: '1px solid #1e1e2e' }, success: { iconTheme: { primary: '#00ff88', secondary: '#fff' } }, error: { iconTheme: { primary: '#ff3366', secondary: '#fff' } } }} />
 
-        <div className="relative z-0 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white">Productos</h1>
-            <p className="text-sm text-voltech-muted mt-1">Gestiona tu catálogo e inventario</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <button onClick={generarPDFCatalogo} className="flex-1 sm:flex-none px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center justify-center gap-2"><Download className="w-4 h-4" /> Catálogo</button>
-            <Link href="/panel/compras" className={`flex-1 sm:flex-none px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center justify-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}><Database className="w-4 h-4" /> Compras</Link>
-            {!showForm && tienePermiso('puedeVerInventarioCompleto') && (
-              <button onClick={() => setShowForm(true)} className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center justify-center gap-2"><Plus className="w-4 h-4" /> Nuevo Producto</button>
-            )}
-          </div>
-        </div>
-
-        <AnimatePresence>
-          {showGestionModal && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-              <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-voltech-surface border border-voltech-border rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-bold text-white">
-                      Gestionar {gestionTipo === 'categoria' ? 'Categorías' : gestionTipo === 'marca' ? 'Marcas' : gestionTipo === 'modelo' ? 'Modelos' : gestionTipo === 'variante' ? 'Variantes / Tipos' : gestionTipo === 'potencia' ? 'Potencias' : gestionTipo === 'nombre_kit' ? 'Nombres de Kit' : gestionTipo === 'nombre_combo' ? 'Nombres de Combo Streaming' : 'Nombres de Producto'}
-                    </h3>
-                    <button onClick={() => { setShowGestionModal(false); setGestionTipo(''); }} className="p-2 rounded-lg hover:bg-voltech-border"><X className="w-5 h-5" /></button>
-                  </div>
-                  
-                  <div className="mb-6 p-4 bg-voltech-dark/50 rounded-lg border border-voltech-border">
-                    <h4 className="text-sm font-semibold text-voltech-cyan mb-3">Agregar Nuevo</h4>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <input 
-                        type="text" 
-                        value={gestionValor}
-                        onChange={(e) => setGestionValor(e.target.value)}
-                        placeholder="Ingresa el nombre..."
-                        className="input-voltech flex-1 min-w-0 rounded-lg px-4 py-2 text-sm"
-                        onKeyDown={(e) => e.key === 'Enter' && agregarDesdeGestion()}
-                      />
-                      <button onClick={agregarDesdeGestion} className="w-full sm:w-auto px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors flex items-center justify-center gap-2 shrink-0">
-                        <Plus className="w-4 h-4" /> Agregar
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-sm font-semibold text-voltech-purple mb-3">
-                      {gestionTipo === 'categoria' ? 'Categorías Existentes' : gestionTipo === 'marca' ? 'Marcas Existentes' : gestionTipo === 'modelo' ? 'Modelos Existentes' : gestionTipo === 'variante' ? 'Variantes Existentes' : gestionTipo === 'potencia' ? 'Potencias Existentes' : gestionTipo === 'nombre_fisico' ? 'Nombres de Productos Existentes' : 'Nombres Existentes'}
-                    </h4>
-                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                      {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : gestionTipo === 'modelo' ? modelos : gestionTipo === 'variante' ? variantes : gestionTipo === 'potencia' ? potencias : gestionTipo === 'nombre_fisico' ? nombresProductosGuardados : gestionTipo === 'nombre_kit' ? nombresKits : gestionTipo === 'nombre_combo' ? nombresCombos :
-                        (gestionSubtipo === 'streaming' ? plataformasStreaming : 
-                        gestionSubtipo === 'kit' ? nombresKits : productosFisicos)
-                      ).map((valor, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-voltech-dark/50 p-3 rounded-lg border border-voltech-border">
-                          <span className="text-sm text-white flex-1">{valor}</span>
-                          <button 
-                            onClick={() => eliminarDesdeGestion(gestionTipo, valor)}
-                            className="p-2 text-voltech-error hover:bg-voltech-error/10 rounded transition-colors"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                      {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : gestionTipo === 'modelo' ? modelos : gestionTipo === 'variante' ? variantes : gestionTipo === 'potencia' ? potencias : gestionTipo === 'nombre_fisico' ? nombresProductosGuardados : gestionTipo === 'nombre_kit' ? nombresKits : gestionTipo === 'nombre_combo' ? nombresCombos :
-                        (gestionSubtipo === 'streaming' ? plataformasStreaming : 
-                        gestionSubtipo === 'kit' ? nombresKits : productosFisicos)
-                      ).length === 0 && (
-                        <p className="text-xs text-voltech-muted text-center py-4">No hay registros</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
-          <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-voltech-cyan/20"><Package className="w-5 h-5 text-voltech-cyan" /></div>
-              <div><p className="text-xs text-voltech-muted">Total Productos</p><p className="text-xl font-bold text-white">{totalProductos}</p></div>
-            </div>
-          </div>
-          <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-voltech-warning/20"><AlertTriangle className="w-5 h-5 text-voltech-warning" /></div>
-              <div><p className="text-xs text-voltech-muted">Stock Bajo</p><p className="text-xl font-bold text-white">{stockBajo}</p></div>
-            </div>
-          </div>
-          <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-voltech-error/20"><X className="w-5 h-5 text-voltech-error" /></div>
-              <div><p className="text-xs text-voltech-muted">Agotados</p><p className="text-xl font-bold text-white">{agotados}</p></div>
-            </div>
-          </div>
-          <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-voltech-success/20"><TrendingUp className="w-5 h-5 text-voltech-success" /></div>
-              <div><p className="text-xs text-voltech-muted">Valor Inventario</p><p className="text-xl font-bold text-white">{tienePermiso('puedeVerInventarioCompleto') ? `$${valorInventario.toFixed(2)}` : '---'}</p></div>
-            </div>
-          </div>
-          <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-voltech-warning/20"><ShoppingCart className="w-5 h-5 text-voltech-warning" /></div>
-              <div><p className="text-xs text-voltech-muted">Por Comprar</p><p className="text-xl font-bold text-white">{porComprar}</p></div>
-            </div>
-          </div>
-        </div>
-
-        {tienePermiso('puedeVerConfiguracion') && (
-          <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div><h3 className="text-sm font-semibold text-white">Tasa de Cambio</h3><p className="text-xs text-voltech-muted">Configura la tasa para calcular precios en Bs</p></div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={usarTasaBCV} onChange={(e) => setUsarTasaBCV(e.target.checked)} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" /><span className="text-xs text-voltech-muted">Usar tasa BCV</span></label>
-                <div className="flex items-center gap-2"><span className="text-xs text-voltech-muted">Tasa:</span><input type="number" step="0.01" value={usarTasaBCV ? tasaBCV : tasaPersonalizada} onChange={(e) => usarTasaBCV ? setTasaBCV(parseFloat(e.target.value)) : setTasaPersonalizada(parseFloat(e.target.value))} className="input-voltech w-20 md:w-24 rounded-lg px-2 md:px-3 py-1 text-sm min-w-0" /><span className="text-xs text-voltech-muted shrink-0">Bs/$</span></div>
-                <button onClick={guardarTasa} className="px-3 py-1 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors">Guardar</button>
+            <div className="relative z-0 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-white">Productos</h1>
+                <p className="text-sm text-voltech-muted mt-1">Gestiona tu catálogo e inventario</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <button onClick={generarPDFCatalogo} className="flex-1 sm:flex-none px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center justify-center gap-2"><Download className="w-4 h-4" /> Catálogo</button>
+                <Link href="/panel/compras" className={`flex-1 sm:flex-none px-4 py-2 bg-voltech-surface border border-voltech-border rounded-lg text-sm text-voltech-muted hover:text-white hover:border-voltech-cyan transition-all flex items-center justify-center gap-2 ${!tienePermiso('puedeVerConfiguracion') ? 'hidden' : ''}`}><Database className="w-4 h-4" /> Compras</Link>
+                {!showForm && tienePermiso('puedeVerInventarioCompleto') && (
+                  <button onClick={() => setShowForm(true)} className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-voltech-cyan to-voltech-purple text-white rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-voltech-cyan/30 transition-all flex items-center justify-center gap-2"><Plus className="w-4 h-4" /> Nuevo Producto</button>
+                )}
               </div>
             </div>
-          </div>
-        )}
 
-        {selectedProducts.length > 0 && tienePermiso('puedeVerInventarioCompleto') && (
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="bg-voltech-purple/20 border border-voltech-purple rounded-xl p-3 md:p-4 flex flex-col gap-2 w-full max-w-full md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-3 min-w-0">
-              <CheckCircle className="w-5 h-5 text-voltech-purple shrink-0" />
-              <span className="text-sm text-white font-medium truncate">{selectedProducts.length} producto(s) seleccionado(s)</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 w-full md:w-auto md:flex md:items-center">
-              <button onClick={() => setShowBulkCommissionModal(true)} className="text-xs py-2 px-2 text-center w-full md:w-auto md:text-sm md:px-4 md:py-2 bg-voltech-purple text-white rounded-lg font-medium hover:bg-voltech-purple/80 transition-colors flex items-center justify-center gap-1.5"><Percent className="w-4 h-4 shrink-0" /> Asignar % Comisión</button>
-              <button onClick={eliminarSeleccionados} className="text-xs py-2 px-2 text-center w-full md:w-auto md:text-sm md:px-4 md:py-2 bg-voltech-error/20 text-voltech-error rounded-lg font-medium hover:bg-voltech-error/30 transition-colors flex items-center justify-center gap-1.5"><Trash2 className="w-4 h-4 shrink-0" /> Eliminar Seleccionados</button>
-              <button onClick={() => setSelectedProducts([])} className="col-span-2 md:col-span-1 w-full md:w-auto px-2 py-2 bg-voltech-surface border border-voltech-border text-voltech-muted rounded-lg text-xs md:text-sm hover:text-white transition-colors flex items-center justify-center"><X className="w-4 h-4" /></button>
-            </div>
-          </motion.div>
-        )}
+            <AnimatePresence>
+              {showGestionModal && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+                  <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-voltech-surface border border-voltech-border rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-lg font-bold text-white">
+                          Gestionar {gestionTipo === 'categoria' ? 'Categorías' : gestionTipo === 'marca' ? 'Marcas' : gestionTipo === 'modelo' ? 'Modelos' : gestionTipo === 'variante' ? 'Variantes / Tipos' : gestionTipo === 'potencia' ? 'Potencias' : gestionTipo === 'nombre_kit' ? 'Nombres de Kit' : gestionTipo === 'nombre_combo' ? 'Nombres de Combo Streaming' : 'Nombres de Producto'}
+                        </h3>
+                        <button onClick={() => { setShowGestionModal(false); setGestionTipo(''); }} className="p-2 rounded-lg hover:bg-voltech-border"><X className="w-5 h-5" /></button>
+                      </div>
+                      
+                      <div className="mb-6 p-4 bg-voltech-dark/50 rounded-lg border border-voltech-border">
+                        <h4 className="text-sm font-semibold text-voltech-cyan mb-3">Agregar Nuevo</h4>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <input 
+                            type="text" 
+                            value={gestionValor}
+                            onChange={(e) => setGestionValor(e.target.value)}
+                            placeholder="Ingresa el nombre..."
+                            className="input-voltech flex-1 min-w-0 rounded-lg px-4 py-2 text-sm"
+                            onKeyDown={(e) => e.key === 'Enter' && agregarDesdeGestion()}
+                          />
+                          <button onClick={agregarDesdeGestion} className="w-full sm:w-auto px-4 py-2 bg-voltech-cyan/20 text-voltech-cyan rounded-lg hover:bg-voltech-cyan/30 transition-colors flex items-center justify-center gap-2 shrink-0">
+                            <Plus className="w-4 h-4" /> Agregar
+                          </button>
+                        </div>
+                      </div>
 
-        <AnimatePresence>
-          {showBulkCommissionModal && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-              <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-voltech-surface border border-voltech-border rounded-2xl w-full max-w-md p-6">
-                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Percent className="w-5 h-5 text-voltech-purple" /> Asignar Comisión Masiva</h3>
-                <p className="text-sm text-voltech-muted mb-4">Asignando a {selectedProducts.length} producto(s)</p>
-                <div className="mb-6">
-                  <label className="block text-xs text-voltech-muted mb-2">Porcentaje de Comisión (%)</label>
-                  <input type="number" step="0.01" value={bulkCommissionPercent} onChange={(e) => setBulkCommissionPercent(parseFloat(e.target.value))} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" placeholder="5" />
+                      <div>
+                        <h4 className="text-sm font-semibold text-voltech-purple mb-3">
+                          {gestionTipo === 'categoria' ? 'Categorías Existentes' : gestionTipo === 'marca' ? 'Marcas Existentes' : gestionTipo === 'modelo' ? 'Modelos Existentes' : gestionTipo === 'variante' ? 'Variantes Existentes' : gestionTipo === 'potencia' ? 'Potencias Existentes' : gestionTipo === 'nombre_fisico' ? 'Nombres de Productos Existentes' : 'Nombres Existentes'}
+                        </h4>
+                        <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                          {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : gestionTipo === 'modelo' ? modelos : gestionTipo === 'variante' ? variantes : gestionTipo === 'potencia' ? potencias : gestionTipo === 'nombre_fisico' ? nombresProductosGuardados : gestionTipo === 'nombre_kit' ? nombresKits : gestionTipo === 'nombre_combo' ? nombresCombos :
+                            (gestionSubtipo === 'streaming' ? plataformasStreaming : 
+                            gestionSubtipo === 'kit' ? nombresKits : productosFisicos)
+                          ).map((valor, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-voltech-dark/50 p-3 rounded-lg border border-voltech-border">
+                              <span className="text-sm text-white flex-1">{valor}</span>
+                              <button 
+                                onClick={() => eliminarDesdeGestion(gestionTipo, valor)}
+                                className="p-2 text-voltech-error hover:bg-voltech-error/10 rounded transition-colors"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                          {(gestionTipo === 'categoria' ? categorias : gestionTipo === 'marca' ? marcas : gestionTipo === 'modelo' ? modelos : gestionTipo === 'variante' ? variantes : gestionTipo === 'potencia' ? potencias : gestionTipo === 'nombre_fisico' ? nombresProductosGuardados : gestionTipo === 'nombre_kit' ? nombresKits : gestionTipo === 'nombre_combo' ? nombresCombos :
+                            (gestionSubtipo === 'streaming' ? plataformasStreaming : 
+                            gestionSubtipo === 'kit' ? nombresKits : productosFisicos)
+                          ).length === 0 && (
+                            <p className="text-xs text-voltech-muted text-center py-4">No hay registros</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
+              <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-voltech-cyan/20"><Package className="w-5 h-5 text-voltech-cyan" /></div>
+                  <div><p className="text-xs text-voltech-muted">Total Productos</p><p className="text-xl font-bold text-white">{totalProductos}</p></div>
                 </div>
-                <div className="flex gap-3">
-                  <button onClick={asignarComisionMasiva} className="flex-1 btn-neon text-white font-bold py-3 rounded-lg">Asignar Comisión</button>
-                  <button onClick={() => { setShowBulkCommissionModal(false); setBulkCommissionPercent(5); }} className="px-6 py-3 bg-voltech-surface border border-voltech-border rounded-lg text-voltech-muted hover:text-white">Cancelar</button>
+              </div>
+              <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-voltech-warning/20"><AlertTriangle className="w-5 h-5 text-voltech-warning" /></div>
+                  <div><p className="text-xs text-voltech-muted">Stock Bajo</p><p className="text-xl font-bold text-white">{stockBajo}</p></div>
+                </div>
+              </div>
+              <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-voltech-error/20"><X className="w-5 h-5 text-voltech-error" /></div>
+                  <div><p className="text-xs text-voltech-muted">Agotados</p><p className="text-xl font-bold text-white">{agotados}</p></div>
+                </div>
+              </div>
+              <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-voltech-success/20"><TrendingUp className="w-5 h-5 text-voltech-success" /></div>
+                  <div><p className="text-xs text-voltech-muted">Valor Inventario</p><p className="text-xl font-bold text-white">{tienePermiso('puedeVerInventarioCompleto') ? `$${valorInventario.toFixed(2)}` : '---'}</p></div>
+                </div>
+              </div>
+              <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-voltech-warning/20"><ShoppingCart className="w-5 h-5 text-voltech-warning" /></div>
+                  <div><p className="text-xs text-voltech-muted">Por Comprar</p><p className="text-xl font-bold text-white">{porComprar}</p></div>
+                </div>
+              </div>
+            </div>
+
+            {tienePermiso('puedeVerConfiguracion') && (
+              <div className="bg-voltech-surface border border-voltech-border rounded-xl p-4">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div><h3 className="text-sm font-semibold text-white">Tasa de Cambio</h3><p className="text-xs text-voltech-muted">Configura la tasa para calcular precios en Bs</p></div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={usarTasaBCV} onChange={(e) => setUsarTasaBCV(e.target.checked)} className="w-4 h-4 rounded border-voltech-border bg-voltech-dark text-voltech-cyan" /><span className="text-xs text-voltech-muted">Usar tasa BCV</span></label>
+                    <div className="flex items-center gap-2"><span className="text-xs text-voltech-muted">Tasa:</span><input type="number" step="0.01" value={usarTasaBCV ? tasaBCV : tasaPersonalizada} onChange={(e) => usarTasaBCV ? setTasaBCV(parseFloat(e.target.value)) : setTasaPersonalizada(parseFloat(e.target.value))} className="input-voltech w-20 md:w-24 rounded-lg px-2 md:px-3 py-1 text-sm min-w-0" /><span className="text-xs text-voltech-muted shrink-0">Bs/$</span></div>
+                    <button onClick={guardarTasa} className="px-3 py-1 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors">Guardar</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedProducts.length > 0 && tienePermiso('puedeVerInventarioCompleto') && (
+              <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="bg-voltech-purple/20 border border-voltech-purple rounded-xl p-3 md:p-4 flex flex-col gap-2 w-full max-w-full md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-3 min-w-0">
+                  <CheckCircle className="w-5 h-5 text-voltech-purple shrink-0" />
+                  <span className="text-sm text-white font-medium truncate">{selectedProducts.length} producto(s) seleccionado(s)</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 w-full md:w-auto md:flex md:items-center">
+                  <button onClick={() => setShowBulkCommissionModal(true)} className="text-xs py-2 px-2 text-center w-full md:w-auto md:text-sm md:px-4 md:py-2 bg-voltech-purple text-white rounded-lg font-medium hover:bg-voltech-purple/80 transition-colors flex items-center justify-center gap-1.5"><Percent className="w-4 h-4 shrink-0" /> Asignar % Comisión</button>
+                  <button onClick={eliminarSeleccionados} className="text-xs py-2 px-2 text-center w-full md:w-auto md:text-sm md:px-4 md:py-2 bg-voltech-error/20 text-voltech-error rounded-lg font-medium hover:bg-voltech-error/30 transition-colors flex items-center justify-center gap-1.5"><Trash2 className="w-4 h-4 shrink-0" /> Eliminar Seleccionados</button>
+                  <button onClick={() => setSelectedProducts([])} className="col-span-2 md:col-span-1 w-full md:w-auto px-2 py-2 bg-voltech-surface border border-voltech-border text-voltech-muted rounded-lg text-xs md:text-sm hover:text-white transition-colors flex items-center justify-center"><X className="w-4 h-4" /></button>
                 </div>
               </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
 
-        <AnimatePresence>
-          {showForm && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-bold text-white flex items-center gap-2"><Package className="w-5 h-5 text-voltech-cyan" />Nuevo Producto{items.length > 1 && `s (${items.length} items)`}</h2>
-                  <button onClick={() => { setShowForm(false); setItems([{ id: crypto.randomUUID(), tipo: 'fisico', imagen: '', imagenFile: null, sku: '', fecha: new Date().toISOString().split('T')[0], comprador: '', proveedor: '', plataforma: '', categoria: '', marca: '', cantidad: 1, metodoPago: 'efectivo', cartera: '', precioMayor: 0, precioDetal: 0, precioOferta: 0, estado: 'nuevo', precioBs: 0, total: 0, monedaCompra: 'usd', duracion: '', tipoOferta: '', esCombo: false, plataformasCombo: [], porcentaje_comision: 5, productos_kit: [], precio_costo_total: 0, precio_individual_total: 0, descripcion_detallada: '' }]); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"><X className="w-5 h-5" /></button>
-                </div>
-                <div className="space-y-6">
-                  {items.map((item, itemIndex) => {
-                    const categoriasDisponibles = item.tipo === 'fisico' 
-                      ? getCategoriasFiltradas(item.marca)
-                      : [];
-                    const marcasDisponibles = item.tipo === 'fisico'
-                      ? getMarcasFiltradas(item.categoria)
-                      : [];
-                    const productosDisponibles = (() => {
-                      if (item.disponibilidad === 'kit') return nombresKits;
-                      if (item.disponibilidad === 'combo') return nombresCombos;
-                      if (item.tipo === 'streaming') return plataformasStreaming;
-                      return nombresFisicos;
-                      })();
+            <AnimatePresence>
+              {showBulkCommissionModal && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+                  <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-voltech-surface border border-voltech-border rounded-2xl w-full max-w-md p-6">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Percent className="w-5 h-5 text-voltech-purple" /> Asignar Comisión Masiva</h3>
+                    <p className="text-sm text-voltech-muted mb-4">Asignando a {selectedProducts.length} producto(s)</p>
+                    <div className="mb-6">
+                      <label className="block text-xs text-voltech-muted mb-2">Porcentaje de Comisión (%)</label>
+                      <input type="number" step="0.01" value={bulkCommissionPercent} onChange={(e) => setBulkCommissionPercent(parseFloat(e.target.value))} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" placeholder="5" />
+                    </div>
+                    <div className="flex gap-3">
+                      <button onClick={asignarComisionMasiva} className="flex-1 btn-neon text-white font-bold py-3 rounded-lg">Asignar Comisión</button>
+                      <button onClick={() => { setShowBulkCommissionModal(false); setBulkCommissionPercent(5); }} className="px-6 py-3 bg-voltech-surface border border-voltech-border rounded-lg text-voltech-muted hover:text-white">Cancelar</button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-                    return (
-                    <div key={item.id} className="border border-voltech-border rounded-lg p-4 relative">
-                      {items.length > 1 && (<button onClick={() => eliminarItem(itemIndex)} className="absolute top-2 right-2 p-2 rounded-lg hover:bg-voltech-error/10 text-voltech-muted hover:text-voltech-error transition-colors"><Minus className="w-4 h-4" /></button>)}
-                      <h3 className="text-sm font-semibold text-voltech-muted mb-4">Producto {itemIndex + 1}</h3>
-                      
-                      <div className="mb-4">
-                        <label className="block text-xs text-voltech-muted mb-2 ml-1">Tipo de Producto</label>
-                        <div className="grid grid-cols-2 gap-1.5 w-full md:flex md:gap-3">
-                          <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'fisico')} className={`flex-1 py-2 md:py-3 px-1 md:px-3 rounded-lg border flex items-center justify-center gap-1 md:gap-2 transition-all text-xs md:text-sm ${item.tipo === 'fisico' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Package className="w-3 h-3 md:w-4 md:h-4 shrink-0" /><span className="truncate">Producto</span></button>
-                          <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'streaming')} className={`flex-1 py-2 md:py-3 px-1 md:px-3 rounded-lg border flex items-center justify-center gap-1 md:gap-2 transition-all text-xs md:text-sm ${item.tipo === 'streaming' ? 'bg-voltech-purple/20 border-voltech-purple text-voltech-purple' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-purple'}`}><MonitorPlay className="w-3 h-3 md:w-4 md:h-4 shrink-0" /><span className="truncate">Streaming</span></button>
-                        </div>
-                      </div>
+            <AnimatePresence>
+              {showForm && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="bg-voltech-surface border border-voltech-border rounded-xl overflow-hidden">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-lg font-bold text-white flex items-center gap-2"><Package className="w-5 h-5 text-voltech-cyan" />Nuevo Producto{items.length > 1 && `s (${items.length} items)`}</h2>
+                      <button onClick={() => { setShowForm(false); setItems([{ id: crypto.randomUUID(), tipo: 'fisico', imagen: '', imagenFile: null, sku: '', fecha: new Date().toISOString().split('T')[0], comprador: '', proveedor: '', plataforma: '', categoria: '', marca: '', cantidad: 1, metodoPago: 'efectivo', cartera: '', precioMayor: 0, precioDetal: 0, precioOferta: 0, estado: 'nuevo', precioBs: 0, total: 0, monedaCompra: 'usd', duracion: '', tipoOferta: '', esCombo: false, plataformasCombo: [], porcentaje_comision: 5, productos_kit: [], precio_costo_total: 0, precio_individual_total: 0, descripcion_detallada: '' }]); }} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors"><X className="w-5 h-5" /></button>
+                    </div>
+                    <div className="space-y-6">
+                      {items.map((item, itemIndex) => {
+                        const categoriasDisponibles = item.tipo === 'fisico' 
+                          ? getCategoriasFiltradas(item.marca)
+                          : [];
+                        const marcasDisponibles = item.tipo === 'fisico'
+                          ? getMarcasFiltradas(item.categoria)
+                          : [];
+                        const productosDisponibles = (() => {
+                          if (item.disponibilidad === 'kit') return nombresKits;
+                          if (item.disponibilidad === 'combo') return nombresCombos;
+                          if (item.tipo === 'streaming') return plataformasStreaming;
+                          return nombresFisicos;
+                          })();
 
-                      <div className="mb-4">
-                      <label className="block text-xs text-voltech-muted mb-2 ml-1">{item.tipo === 'streaming' ? '💿 Disponibilidad / Stock' : '📦 Disponibilidad / Stock'}</label>
-                      <div className="grid grid-cols-3 gap-1.5 w-full">
-                      <button type="button" onClick={() => handleChange(itemIndex, 'disponibilidad', 'stock')} className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all text-xs md:text-sm ${item.disponibilidad === 'stock' ? 'bg-voltech-success/20 border-voltech-success text-voltech-success' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-success'}`}>
-                      {item.tipo === 'streaming' ? <MonitorPlay className="w-4 h-4 shrink-0" /> : <Package className="w-4 h-4 shrink-0" />}<span className="truncate">{item.tipo === 'streaming' ? 'Stock digital' : 'Stock físico'}</span>
-                      </button>
-                      <button type="button" onClick={() => handleChange(itemIndex, 'disponibilidad', 'bajo_pedido')} className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all text-xs md:text-sm ${item.disponibilidad === 'bajo_pedido' ? 'bg-voltech-warning/20 border-voltech-warning text-voltech-warning' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-warning'}`}>
-                      <ShoppingCart className="w-4 h-4 shrink-0" /><span className="truncate">Compra al momento</span>
-                      </button>
-                      <button type="button" onClick={() => handleChange(itemIndex, 'disponibilidad', item.tipo === 'streaming' ? 'combo' : 'kit')} className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all text-xs md:text-sm ${(item.disponibilidad === 'kit' || item.disponibilidad === 'combo') ? 'bg-voltech-purple/20 border-voltech-purple text-voltech-purple' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-purple'}`}>
-                      {item.tipo === 'streaming' ? <Layers className="w-4 h-4 shrink-0" /> : <Gift className="w-4 h-4 shrink-0" />}<span className="truncate">{item.tipo === 'streaming' ? 'Combo' : 'Kit'}</span>
-                      </button>
-                      </div> 
-                       {item.disponibilidad === 'bajo_pedido' && (
-                          <p className="text-[10px] text-voltech-warning mt-1">ℹ️ Se publicará en el catálogo aunque el stock sea 0. Lo compras al proveedor cuando se venda.</p>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                              <div className="lg:col-span-3">
-                        <label className="block text-xs text-voltech-muted mb-1 ml-1">
-                          🖼️ Imágenes del Producto <span className="text-[10px]">(agrega todas las que quieras)</span>
-                        </label>
-                        <div
-                          onDragOver={(e) => { e.preventDefault(); }}
-                          onDrop={(e) => { e.preventDefault(); handleImagenesItem(itemIndex, e.dataTransfer.files); }}
-                          onClick={() => fileInputItemRefs.current[itemIndex]?.click()}
-                          className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer border-voltech-border hover:border-voltech-cyan transition-colors"
-                        >
-                          <div className="flex flex-col items-center gap-2">
-                            <Upload className="w-6 h-6 text-voltech-muted" />
-                            <p className="text-sm text-voltech-muted">Arrastra o haz clic (puedes elegir varias)</p>
+                        return (
+                        <div key={item.id} className="border border-voltech-border rounded-lg p-4 relative">
+                          {items.length > 1 && (<button onClick={() => eliminarItem(itemIndex)} className="absolute top-2 right-2 p-2 rounded-lg hover:bg-voltech-error/10 text-voltech-muted hover:text-voltech-error transition-colors"><Minus className="w-4 h-4" /></button>)}
+                          <h3 className="text-sm font-semibold text-voltech-muted mb-4">Producto {itemIndex + 1}</h3>
+                          
+                          <div className="mb-4">
+                            <label className="block text-xs text-voltech-muted mb-2 ml-1">Tipo de Producto</label>
+                            <div className="grid grid-cols-2 gap-1.5 w-full md:flex md:gap-3">
+                              <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'fisico')} className={`flex-1 py-2 md:py-3 px-1 md:px-3 rounded-lg border flex items-center justify-center gap-1 md:gap-2 transition-all text-xs md:text-sm ${item.tipo === 'fisico' ? 'bg-voltech-cyan/20 border-voltech-cyan text-voltech-cyan' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-cyan'}`}><Package className="w-3 h-3 md:w-4 md:h-4 shrink-0" /><span className="truncate">Producto</span></button>
+                              <button type="button" onClick={() => handleChange(itemIndex, 'tipo', 'streaming')} className={`flex-1 py-2 md:py-3 px-1 md:px-3 rounded-lg border flex items-center justify-center gap-1 md:gap-2 transition-all text-xs md:text-sm ${item.tipo === 'streaming' ? 'bg-voltech-purple/20 border-voltech-purple text-voltech-purple' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-purple'}`}><MonitorPlay className="w-3 h-3 md:w-4 md:h-4 shrink-0" /><span className="truncate">Streaming</span></button>
+                            </div>
                           </div>
-                        </div>
-                        <input
-                          ref={(el) => (fileInputItemRefs.current[itemIndex] = el)}
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={(e) => { handleImagenesItem(itemIndex, e.target.files); e.target.value = ''; }}
-                          className="hidden"
-                        />
-                        {(item.imagenes?.length || 0) > 0 && (
-                          <div className="flex gap-3 flex-wrap mt-3">
-                            {(item.imagenes || []).map((img, i) => {
-                              const esPortada = item.imagen === img;
-                              return (
-                                <div key={i} className="w-28">
-                                  <div className="relative">
-                                    <img
-                                      src={img}
-                                      alt={`Img ${i + 1}`}
-                                      className={`w-28 h-28 object-cover rounded-lg border-2 ${esPortada ? 'border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.6)]' : 'border-voltech-border'}`}
-                                    />
-                                    <button
-                                      type="button"
-                                      title="Quitar"
-                                      onClick={() => quitarImagenItem(itemIndex, img)}
-                                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] hover:bg-red-600"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => setPortadaItem(itemIndex, img)}
-                                    className={`w-full text-[9px] px-1.5 py-1 rounded-full transition-all mt-1.5 ${esPortada ? 'bg-cyan-500 text-black font-bold shadow-[0_0_10px_rgba(34,211,238,0.6)]' : 'bg-gray-800/80 text-gray-400 opacity-70 hover:opacity-100'}`}
-                                  >
-                                    {esPortada ? '★ Portada' : 'Portada'}
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                        <div><label className="block text-xs text-voltech-muted mb-1 ml-1">SKU (automático)</label><input type="text" value={item.sku} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-mono text-voltech-cyan bg-voltech-dark/50" /></div>
-                        
-                        <div className="flex flex-col gap-1 w-full lg:col-span-2">
-                          <label className="text-xs text-voltech-muted font-medium">
-                            {item.disponibilidad === 'kit' ? 'Nombre del Kit *' : item.disponibilidad === 'combo' ? 'Nombre del Combo Streaming *' : item.tipo === 'streaming' ? 'Nombre Plataforma *' : 'Nombre del Producto *'}
-                          </label>
-                          <div className="flex items-center gap-2 w-full min-w-0">
-                            {item.disponibilidad === 'kit' ? (
-                              <ComboboxEditable
-                                value={item.plataforma}
-                                onChange={(value) => handleChange(itemIndex, 'plataforma', value)}
-                                options={productosDisponibles.map(nombre => ({ value: nombre, label: nombre }))}
-                                onAdd={(val) => agregarOpcionLista('nombre_kit', val)}
-                                onRename={(old, nw) => renombrarOpcionLista('nombre_kit', old, nw)}
-                                onDelete={(val) => eliminarOpcionLista('nombre_kit', val)}
-                                onCheckUsage={(val) => verificarUso('nombre_kit', val)}
-                                placeholder="-- Selecciona o escribe --"
-                                className="flex-1 min-w-0"
-                              />
-                            ) : item.disponibilidad === 'combo' ? (
-                              <ComboboxEditable
-                                value={item.plataforma}
-                                onChange={(value) => handleChange(itemIndex, 'plataforma', value)}
-                                options={productosDisponibles.map(nombre => ({ value: nombre, label: nombre }))}
-                                onAdd={(val) => agregarOpcionLista('nombre_combo', val)}
-                                onRename={(old, nw) => renombrarOpcionLista('nombre_combo', old, nw)}
-                                onDelete={(val) => eliminarOpcionLista('nombre_combo', val)}
-                                onCheckUsage={(val) => verificarUso('nombre_combo', val)}
-                                placeholder="-- Selecciona o escribe --"
-                                className="flex-1 min-w-0"
-                              />
-                            ) : (
-                              <ComboboxEditable
-                                value={item.plataforma}
-                                onChange={(value) => handleChange(itemIndex, 'plataforma', value)}
-                                options={productosDisponibles.map(nombre => ({ value: nombre, label: nombre }))}
-                                onAdd={(val) => agregarOpcionLista(item.tipo === 'streaming' ? 'plataforma_streaming' : 'nombre_fisico', val)}
-                                onRename={(old, nw) => renombrarOpcionLista(item.tipo === 'streaming' ? 'plataforma' : 'nombre_fisico', old, nw)}
-                                onDelete={(val) => eliminarOpcionLista(item.tipo === 'streaming' ? 'plataforma_streaming' : 'nombre_fisico', val)}
-                                onCheckUsage={(val) => verificarUso('plataforma', val)}
-                                placeholder="-- Selecciona o escribe --"
-                                className="flex-1 min-w-0"
-                              />
+
+                          <div className="mb-4">
+                          <label className="block text-xs text-voltech-muted mb-2 ml-1">{item.tipo === 'streaming' ? '💿 Disponibilidad / Stock' : '📦 Disponibilidad / Stock'}</label>
+                          <div className="grid grid-cols-3 gap-1.5 w-full">
+                          <button type="button" onClick={() => handleChange(itemIndex, 'disponibilidad', 'stock')} className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all text-xs md:text-sm ${item.disponibilidad === 'stock' ? 'bg-voltech-success/20 border-voltech-success text-voltech-success' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-success'}`}>
+                          {item.tipo === 'streaming' ? <MonitorPlay className="w-4 h-4 shrink-0" /> : <Package className="w-4 h-4 shrink-0" />}<span className="truncate">{item.tipo === 'streaming' ? 'Stock digital' : 'Stock físico'}</span>
+                          </button>
+                          <button type="button" onClick={() => handleChange(itemIndex, 'disponibilidad', 'bajo_pedido')} className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all text-xs md:text-sm ${item.disponibilidad === 'bajo_pedido' ? 'bg-voltech-warning/20 border-voltech-warning text-voltech-warning' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-warning'}`}>
+                          <ShoppingCart className="w-4 h-4 shrink-0" /><span className="truncate">Compra al momento</span>
+                          </button>
+                          <button type="button" onClick={() => handleChange(itemIndex, 'disponibilidad', item.tipo === 'streaming' ? 'combo' : 'kit')} className={`py-2 px-2 rounded-lg border flex items-center justify-center gap-2 transition-all text-xs md:text-sm ${(item.disponibilidad === 'kit' || item.disponibilidad === 'combo') ? 'bg-voltech-purple/20 border-voltech-purple text-voltech-purple' : 'bg-voltech-dark border-voltech-border text-voltech-muted hover:border-voltech-purple'}`}>
+                          {item.tipo === 'streaming' ? <Layers className="w-4 h-4 shrink-0" /> : <Gift className="w-4 h-4 shrink-0" />}<span className="truncate">{item.tipo === 'streaming' ? 'Combo' : 'Kit'}</span>
+                          </button>
+                          </div> 
+                          {item.disponibilidad === 'bajo_pedido' && (
+                              <p className="text-[10px] text-voltech-warning mt-1">ℹ️ Se publicará en el catálogo aunque el stock sea 0. Lo compras al proveedor cuando se venda.</p>
                             )}
-                            <button 
-                              type="button" 
-                              onClick={() => abrirGestionModal(
-                                item.disponibilidad === 'kit' ? 'nombre_kit' : 
-                                item.disponibilidad === 'combo' ? 'nombre_combo' : 
-                                item.tipo === 'streaming' ? 'plataforma' : 'nombre_fisico', 
-                                item.tipo
-                              )} 
-                              className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
-                              title="Gestionar"
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                  <div className="lg:col-span-3">
+                            <label className="block text-xs text-voltech-muted mb-1 ml-1">
+                              🖼️ Imágenes del Producto <span className="text-[10px]">(agrega todas las que quieras)</span>
+                            </label>
+                            <div
+                              onDragOver={(e) => { e.preventDefault(); }}
+                              onDrop={(e) => { e.preventDefault(); handleImagenesItem(itemIndex, e.dataTransfer.files); }}
+                              onClick={() => fileInputItemRefs.current[itemIndex]?.click()}
+                              className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer border-voltech-border hover:border-voltech-cyan transition-colors"
                             >
-                              <Plus className="w-5 h-5"/>
-                            </button>
-                          </div>
-                        </div>
-                        
-                          {item.tipo === 'fisico' && item.disponibilidad !== 'kit' ? (
-                          <div className="flex flex-col gap-1 w-full">
-                          <label className="text-xs text-voltech-muted font-medium">Categoría *</label>
-                            <div className="flex items-center gap-2 w-full min-w-0">
-                              <ComboboxEditable
-                                value={item.categoria}
-                                onChange={(value) => handleChange(itemIndex, 'categoria', value)}
-                                options={categoriasDisponibles.map(cat => ({ value: cat, label: cat }))}
-                                onAdd={(val) => agregarOpcionLista('categoria', val)}
-                                onRename={(old, nw) => renombrarOpcionLista('categoria', old, nw)}
-                                onDelete={(val) => eliminarOpcionLista('categoria', val)}
-                                onCheckUsage={(val) => verificarUso('categoria', val)}
-                                placeholder="-- Selecciona o escribe --"
-                                className="flex-1 min-w-0"
-                              />
-                              <button 
-                                type="button" 
-                                onClick={() => abrirGestionModal('categoria')} 
-                                className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
-                                title="Gestionar"
-                              >
-                                <Plus className="w-5 h-5"/>
-                              </button>
-                            </div>
-                          </div>
-                          ) : (
-                          <div className="flex flex-col gap-1 w-full">
-                          <label className="text-xs text-voltech-muted font-medium">Categoría (Fija)</label>
-                          <input type="text" value={item.disponibilidad === 'kit' ? 'KIT' : item.categoria} readOnly className="input-voltech w-full rounded-md px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed border border-voltech-border" />
-                          </div>
-                          )}
-
-                        {item.tipo === 'fisico' && (
-                          <div className="flex flex-col gap-1 w-full">
-                            <label className="text-xs text-voltech-muted font-medium">Marca *</label>
-                            <div className="flex items-center gap-2 w-full min-w-0">
-                              <ComboboxEditable
-                                value={item.marca}
-                                onChange={(value) => handleChange(itemIndex, 'marca', value)}
-                                options={marcasDisponibles.map(marca => ({ value: marca, label: marca }))}
-                                onAdd={(val) => agregarOpcionLista('marca', val)}
-                                onRename={(old, nw) => renombrarOpcionLista('marca', old, nw)}
-                                onDelete={(val) => eliminarOpcionLista('marca', val)}
-                                onCheckUsage={(val) => verificarUso('marca', val)}
-                                placeholder="-- Selecciona o escribe --"
-                                className="flex-1 min-w-0"
-                              />
-                              <button 
-                                type="button" 
-                                onClick={() => abrirGestionModal('marca')} 
-                                className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
-                                title="Gestionar"
-                              >
-                                <Plus className="w-5 h-5"/>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {item.tipo === 'fisico' && item.disponibilidad !== 'kit' && (
-                          <div className="flex flex-col gap-1 w-full">
-                            <label className="text-xs text-voltech-muted font-medium">Modelo</label>
-                            <div className="flex items-center gap-2 w-full min-w-0">
-                              <ComboboxEditable
-                                value={item.modelo}
-                                onChange={(value) => handleChange(itemIndex, 'modelo', value)}
-                                options={modelos.map(m => ({ value: m, label: m }))}
-                                onAdd={(val) => agregarOpcionLista('modelo', val)}
-                                onRename={(old, nw) => renombrarOpcionLista('modelo', old, nw)}
-                                onDelete={(val) => eliminarOpcionLista('modelo', val)}
-                                onCheckUsage={(val) => verificarUso('modelo', val)}
-                                placeholder="-- Selecciona o escribe --"
-                                className="flex-1 min-w-0"
-                              />
-                              <button 
-                                type="button" 
-                                onClick={() => abrirGestionModal('modelo')} 
-                                className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
-                                title="Gestionar"
-                              >
-                                <Plus className="w-5 h-5"/>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {item.tipo === 'fisico' && item.disponibilidad !== 'kit' && (
-                          <div className="flex flex-col gap-1 w-full">
-                            <label className="text-xs text-voltech-muted font-medium">Variante / Tipo</label>
-                            <div className="flex items-center gap-2 w-full min-w-0">
-                              <ComboboxEditable
-                                value={item.variante}
-                                onChange={(value) => handleChange(itemIndex, 'variante', value)}
-                                options={variantes.map(v => ({ value: v, label: v }))}
-                                onAdd={(val) => agregarOpcionLista('variante', val)}
-                                onRename={(old, nw) => renombrarOpcionLista('variante', old, nw)}
-                                onDelete={(val) => eliminarOpcionLista('variante', val)}
-                                onCheckUsage={(val) => verificarUso('variante', val)}
-                                placeholder="-- Selecciona o escribe --"
-                                className="flex-1 min-w-0"
-                              />
-                              <button 
-                                type="button" 
-                                onClick={() => abrirGestionModal('variante')} 
-                                className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
-                                title="Gestionar"
-                              >
-                                <Plus className="w-5 h-5"/>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {item.tipo === 'fisico' && item.disponibilidad !== 'kit' && (
-                          <div className="flex flex-col gap-1 w-full lg:col-span-2">
-                            <label className="text-xs text-voltech-muted font-medium">Potencia (selección múltiple)</label>
-                            <div className="flex items-center gap-2 w-full min-w-0">
-                              <ComboboxMultiple
-                                value={item.potencia}
-                                onChange={(value) => handleChange(itemIndex, 'potencia', value)}
-                                options={potencias.map(p => ({ value: p, label: p }))}
-                                onAdd={(val) => agregarOpcionLista('potencia', val)}
-                                onRename={(old, nw) => renombrarOpcionLista('potencia', old, nw)}
-                                onDelete={(val) => eliminarOpcionLista('potencia', val)}
-                                onCheckUsage={(val) => verificarUso('potencia', val)}
-                                placeholder="-- Selecciona varias --"
-                                className="flex-1 min-w-0"
-                              />
-                              <button 
-                                type="button" 
-                                onClick={() => abrirGestionModal('potencia')} 
-                                className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
-                                title="Gestionar"
-                              >
-                                <Plus className="w-5 h-5"/>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {item.disponibilidad === 'kit' && (
-                          <div className="lg:col-span-3 space-y-3">
-                            <label className="block text-xs text-voltech-muted mb-1 ml-1">Seleccionar Productos del Inventario</label>
-                            <div className="relative">
-                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
-                              <input type="text" value={busquedaKit} onChange={(e) => setBusquedaKit(e.target.value)} placeholder="Buscar por nombre o SKU..." className="input-voltech w-full rounded-lg pl-10 pr-4 py-2 text-sm" />
-                            </div>
-                            <div className="max-h-60 overflow-y-auto border border-voltech-border rounded-lg bg-voltech-dark/30 p-2 space-y-2">
-                              {((productosParaKit && productosParaKit.length > 0) ? productosParaKit : (productos || []).filter(p => p.tipo !== 'streaming' && !p.esCombo && !p.esKit && ((p.plataforma || p.producto || '').toLowerCase().includes((busquedaKit || '').toLowerCase()) || (p.sku || '').toLowerCase().includes((busquedaKit || '').toLowerCase())))).map((prod, idx) => {
-                                const enKit = (item.productos_kit || []).find(p => p.producto_id === prod.id);
-                                return (
-                                  <div key={idx} className={`flex items-center justify-between p-3 rounded-lg border transition-all ${enKit ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-surface border-voltech-border hover:border-voltech-cyan/50'}`}>
-                                    <div className="flex items-center gap-3 flex-1">
-                                      <input type="checkbox" checked={!!enKit} onChange={() => toggleProductoKit(itemIndex, prod)} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" />
-                                      {prod.imagen ? <img src={prod.imagen} alt={prod.plataforma} className="w-10 h-10 rounded object-cover" /> : <div className="w-10 h-10 rounded bg-voltech-dark flex items-center justify-center"><ImageIcon className="w-5 h-5 text-voltech-muted" /></div>}
-                                      <div>
-                                        <p className="text-sm font-medium text-white">{prod.plataforma || prod.producto}</p>
-                                        <p className="text-xs text-voltech-muted">SKU: {prod.sku} | Stock: {prod.cantidad}</p>
-                                      </div>
-                                    </div>
-                                    {enKit && (
-                                      <div className="flex items-center gap-2">
-                                        <button onClick={() => actualizarCantidadKit(itemIndex, prod.id, enKit.cantidad - 1)} className="p-1 hover:bg-voltech-border rounded"><Minus className="w-3 h-3" /></button>
-                                        <span className="text-sm font-bold w-6 text-center">{enKit.cantidad}</span>
-                                        <button onClick={() => actualizarCantidadKit(itemIndex, prod.id, enKit.cantidad + 1)} className="p-1 hover:bg-voltech-border rounded"><Plus className="w-3 h-3" /></button>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                              {((productosParaKit && productosParaKit.length > 0) ? productosParaKit : (productos || []).filter(p => p.tipo !== 'streaming' && !p.esCombo && !p.esKit)).length === 0 && <p className="text-center text-xs text-voltech-muted py-4">No se encontraron productos</p>}
-                            </div>
-                          </div>
-                        )}
-
-                        {item.disponibilidad === 'combo' && (
-                          <div className="lg:col-span-3 space-y-3">
-                            <label className="block text-xs text-voltech-muted mb-1 ml-1">Seleccionar Plataformas del Inventario (Streaming)</label>
-                            <div className="max-h-60 overflow-y-auto border border-voltech-border rounded-lg bg-voltech-dark/30 p-2 space-y-2">
-                              {productos.filter(p => p.tipo === 'streaming' && !p.esCombo && p.disponibilidad !== 'combo' && p.id !== item.id).map((prod, idx) => {
-                                const enCombo = (item.productos_kit || []).find(p => p.producto_id === prod.id);
-                                return (
-                                  <div key={idx} className={`flex items-center justify-between p-3 rounded-lg border transition-all ${enCombo ? 'bg-voltech-purple/10 border-voltech-purple' : 'bg-voltech-surface border-voltech-border hover:border-voltech-purple/50'}`}>
-                                    <div className="flex items-center gap-3 flex-1">
-                                      <input type="checkbox" checked={!!enCombo} onChange={() => toggleProductoKit(itemIndex, prod)} className="w-4 h-4 rounded border-voltech-border text-voltech-purple" />
-                                      {prod.imagen ? <img src={prod.imagen} alt={prod.plataforma} className="w-10 h-10 rounded object-cover" /> : <div className="w-10 h-10 rounded bg-voltech-dark flex items-center justify-center"><MonitorPlay className="w-5 h-5 text-voltech-muted" /></div>}
-                                      <div>
-                                        <p className="text-sm font-medium text-white">{prod.plataforma || prod.producto}</p>
-                                        <p className="text-xs text-voltech-muted">SKU: {prod.sku} | Precio: ${prod.precioDetal || 0}</p>
-                                      </div>
-                                    </div>
-                                    {enCombo && (
-                                      <div className="flex items-center gap-2">
-                                        <button onClick={() => actualizarCantidadKit(itemIndex, prod.id, enCombo.cantidad - 1)} className="p-1 hover:bg-voltech-border rounded"><Minus className="w-3 h-3" /></button>
-                                        <span className="text-sm font-bold w-6 text-center">{enCombo.cantidad}</span>
-                                        <button onClick={() => actualizarCantidadKit(itemIndex, prod.id, enCombo.cantidad + 1)} className="p-1 hover:bg-voltech-border rounded"><Plus className="w-3 h-3" /></button>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                              {productos.filter(p => p.tipo === 'streaming' && !p.esCombo && p.disponibilidad !== 'combo').length === 0 && <p className="text-center text-xs text-voltech-muted py-4">No hay plataformas streaming cargadas. Cárgalas individualmente primero.</p>}
-                            </div>
-                          </div>
-                        )}
-
-                        <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cantidad</label><input type="number" value={item.cantidad} onChange={(e) => handleChange(itemIndex, 'cantidad', e.target.value)} min="0" className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
-                        
-                        {(item.disponibilidad === 'kit' || item.disponibilidad === 'combo') && (item.productos_kit || []).length > 0 && (
-                          <div className="lg:col-span-3 bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 space-y-2">
-                            <h4 className="text-sm font-bold text-voltech-cyan flex items-center gap-2"><DollarSign className="w-4 h-4" /> Resumen Financiero del {item.disponibilidad === 'combo' ? 'Combo' : 'Kit'}</h4>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                              <div><p className="text-xs text-voltech-muted">Inversión Total:</p><p className="font-bold text-white">${(item.precio_costo_total || 0).toFixed(2)}</p></div>
-                              <div><p className="text-xs text-voltech-muted">Valor Individual:</p><p className="font-bold text-white">${(item.precio_individual_total || 0).toFixed(2)}</p></div>
-                              <div>
-                                <label className="text-xs text-voltech-muted block">Precio del Kit ($):</label>
-                                <input type="number" step="0.01" value={item.precioDetal} onChange={(e) => handleChange(itemIndex, 'precioDetal', e.target.value)} className="input-voltech w-full rounded px-2 py-1 text-sm font-bold text-voltech-success" />
+                              <div className="flex flex-col items-center gap-2">
+                                <Upload className="w-6 h-6 text-voltech-muted" />
+                                <p className="text-sm text-voltech-muted">Arrastra o haz clic (puedes elegir varias)</p>
                               </div>
-                              <div><p className="text-xs text-voltech-muted">Ganancia Estimada:</p><p className="font-bold text-voltech-success">${(item.precioDetal - (item.precio_costo_total || 0)).toFixed(2)}</p></div>
                             </div>
-                          </div>
-                        )}
-
-                        {item.tipo !== 'kit' && (
-                          <>
-                            {item.tipo === 'fisico' && tienePermiso('puedeVerInventarioCompleto') && (
-                              <div className="lg:col-span-3 bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <label className="block text-xs text-voltech-muted font-semibold flex items-center gap-2">
-                                    <DollarSign className="w-4 h-4 text-voltech-cyan" />
-                                    Precios por Proveedor (compara y marca el MEJOR)
-                                  </label>
-                                  <button type="button" onClick={() => agregarPrecioProveedor(itemIndex)} className="px-3 py-1 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors flex items-center gap-1">
-                                    <Plus className="w-3 h-3" /> Agregar precio
-                                  </button>
-                                </div>
-                                {(item.precios_proveedor || []).length === 0 && (
-                                  <p className="text-xs text-voltech-muted text-center py-2">No hay precios registrados. Haz clic en "Agregar precio".</p>
-                                )}
-                                {(item.precios_proveedor || []).map((precioRow, idxPrecio) => {
-                                  const precioNum = parseFloat(precioRow.precio) || 0;
-                                  const preciosValidos = (item.precios_proveedor || []).map(p => parseFloat(p.precio) || 0).filter(p => p > 0);
-                                  const precioMinimo = preciosValidos.length > 0 ? Math.min(...preciosValidos) : 0;
-                                  const esMejor = precioNum > 0 && precioNum === precioMinimo;
+                            <input
+                              ref={(el) => (fileInputItemRefs.current[itemIndex] = el)}
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={(e) => { handleImagenesItem(itemIndex, e.target.files); e.target.value = ''; }}
+                              className="hidden"
+                            />
+                            {(item.imagenes?.length || 0) > 0 && (
+                              <div className="flex gap-3 flex-wrap mt-3">
+                                {(item.imagenes || []).map((img, i) => {
+                                  const esPortada = item.imagen === img;
                                   return (
-                                    <div key={idxPrecio} className={`grid grid-cols-[1fr_100px_auto] gap-2 items-end p-3 rounded-lg border transition-all ${esMejor ? 'bg-voltech-success/10 border-voltech-success' : 'bg-voltech-surface border-voltech-border'}`}>
-                                      <div>
-                                        <label className="block text-[10px] text-voltech-muted mb-1">Proveedor</label>
-                                        <CustomSelect
-                                          value={precioRow.proveedor}
-                                          onChange={(val) => cambiarPrecioProveedor(itemIndex, idxPrecio, 'proveedor', val)}
-                                          options={[{ value: '', label: '-- Selecciona --' }, ...opcionesProveedores]}
-                                          placeholder="-- Selecciona --"
+                                    <div key={i} className="w-28">
+                                      <div className="relative">
+                                        <img
+                                          src={img}
+                                          alt={`Img ${i + 1}`}
+                                          className={`w-28 h-28 object-cover rounded-lg border-2 ${esPortada ? 'border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.6)]' : 'border-voltech-border'}`}
                                         />
-                                      </div>
-                                      <div>
-                                        <label className="block text-[10px] text-voltech-muted mb-1">Precio ($)</label>
-                                        <input type="number" step="0.01" value={precioRow.precio} onChange={(e) => cambiarPrecioProveedor(itemIndex, idxPrecio, 'precio', e.target.value)} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        {esMejor && (
-                                          <span className="px-2 py-1 bg-voltech-success text-white text-[9px] font-bold rounded-full flex items-center gap-1">
-                                            <Trophy className="w-3 h-3" /> MEJOR
-                                          </span>
-                                        )}
-                                        <button type="button" onClick={() => quitarPrecioProveedor(itemIndex, idxPrecio)} className="p-1.5 text-voltech-error hover:bg-voltech-error/10 rounded transition-colors">
-                                          <Trash2 className="w-4 h-4" />
+                                        <button
+                                          type="button"
+                                          title="Quitar"
+                                          onClick={() => quitarImagenItem(itemIndex, img)}
+                                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] hover:bg-red-600"
+                                        >
+                                          <X className="w-3 h-3" />
                                         </button>
                                       </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => setPortadaItem(itemIndex, img)}
+                                        className={`w-full text-[9px] px-1.5 py-1 rounded-full transition-all mt-1.5 ${esPortada ? 'bg-cyan-500 text-black font-bold shadow-[0_0_10px_rgba(34,211,238,0.6)]' : 'bg-gray-800/80 text-gray-400 opacity-70 hover:opacity-100'}`}
+                                      >
+                                        {esPortada ? '★ Portada' : 'Portada'}
+                                      </button>
                                     </div>
                                   );
                                 })}
-                                {item.precioMayor > 0 && (
-                                  <div className="flex items-center justify-between pt-2 border-t border-voltech-border">
-                                    <span className="text-xs text-voltech-muted">Precio Mayor (MEJOR):</span>
-                                    <span className="text-sm font-bold text-voltech-success">${item.precioMayor.toFixed(2)}</span>
+                              </div>
+                            )}
+                          </div>
+                            <div><label className="block text-xs text-voltech-muted mb-1 ml-1">SKU (automático)</label><input type="text" value={item.sku} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-mono text-voltech-cyan bg-voltech-dark/50" /></div>
+                            
+                            <div className="flex flex-col gap-1 w-full lg:col-span-2">
+                              <label className="text-xs text-voltech-muted font-medium">
+                                {item.disponibilidad === 'kit' ? 'Nombre del Kit *' : item.disponibilidad === 'combo' ? 'Nombre del Combo Streaming *' : item.tipo === 'streaming' ? 'Nombre Plataforma *' : 'Nombre del Producto *'}
+                              </label>
+                              <div className="flex items-center gap-2 w-full min-w-0">
+                                {item.disponibilidad === 'kit' ? (
+                                  <ComboboxEditable
+                                    value={item.plataforma}
+                                    onChange={(value) => handleChange(itemIndex, 'plataforma', value)}
+                                    options={productosDisponibles.map(nombre => ({ value: nombre, label: nombre }))}
+                                    onAdd={(val) => agregarOpcionLista('nombre_kit', val)}
+                                    onRename={(old, nw) => renombrarOpcionLista('nombre_kit', old, nw)}
+                                    onDelete={(val) => eliminarOpcionLista('nombre_kit', val)}
+                                    onCheckUsage={(val) => verificarUso('nombre_kit', val)}
+                                    placeholder="-- Selecciona o escribe --"
+                                    className="flex-1 min-w-0"
+                                  />
+                                ) : item.disponibilidad === 'combo' ? (
+                                  <ComboboxEditable
+                                    value={item.plataforma}
+                                    onChange={(value) => handleChange(itemIndex, 'plataforma', value)}
+                                    options={productosDisponibles.map(nombre => ({ value: nombre, label: nombre }))}
+                                    onAdd={(val) => agregarOpcionLista('nombre_combo', val)}
+                                    onRename={(old, nw) => renombrarOpcionLista('nombre_combo', old, nw)}
+                                    onDelete={(val) => eliminarOpcionLista('nombre_combo', val)}
+                                    onCheckUsage={(val) => verificarUso('nombre_combo', val)}
+                                    placeholder="-- Selecciona o escribe --"
+                                    className="flex-1 min-w-0"
+                                  />
+                                ) : (
+                                  <ComboboxEditable
+                                    value={item.plataforma}
+                                    onChange={(value) => handleChange(itemIndex, 'plataforma', value)}
+                                    options={productosDisponibles.map(nombre => ({ value: nombre, label: nombre }))}
+                                    onAdd={(val) => agregarOpcionLista(item.tipo === 'streaming' ? 'plataforma_streaming' : 'nombre_fisico', val)}
+                                    onRename={(old, nw) => renombrarOpcionLista(item.tipo === 'streaming' ? 'plataforma' : 'nombre_fisico', old, nw)}
+                                    onDelete={(val) => eliminarOpcionLista(item.tipo === 'streaming' ? 'plataforma_streaming' : 'nombre_fisico', val)}
+                                    onCheckUsage={(val) => verificarUso('plataforma', val)}
+                                    placeholder="-- Selecciona o escribe --"
+                                    className="flex-1 min-w-0"
+                                  />
+                                )}
+                                <button 
+                                  type="button" 
+                                  onClick={() => abrirGestionModal(
+                                    item.disponibilidad === 'kit' ? 'nombre_kit' : 
+                                    item.disponibilidad === 'combo' ? 'nombre_combo' : 
+                                    item.tipo === 'streaming' ? 'plataforma' : 'nombre_fisico', 
+                                    item.tipo
+                                  )} 
+                                  className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
+                                  title="Gestionar"
+                                >
+                                  <Plus className="w-5 h-5"/>
+                                </button>
+                              </div>
+                            </div>
+                            
+                              {item.tipo === 'fisico' && item.disponibilidad !== 'kit' ? (
+                              <div className="flex flex-col gap-1 w-full">
+                              <label className="text-xs text-voltech-muted font-medium">Categoría *</label>
+                                <div className="flex items-center gap-2 w-full min-w-0">
+                                  <ComboboxEditable
+                                    value={item.categoria}
+                                    onChange={(value) => handleChange(itemIndex, 'categoria', value)}
+                                    options={categoriasDisponibles.map(cat => ({ value: cat, label: cat }))}
+                                    onAdd={(val) => agregarOpcionLista('categoria', val)}
+                                    onRename={(old, nw) => renombrarOpcionLista('categoria', old, nw)}
+                                    onDelete={(val) => eliminarOpcionLista('categoria', val)}
+                                    onCheckUsage={(val) => verificarUso('categoria', val)}
+                                    placeholder="-- Selecciona o escribe --"
+                                    className="flex-1 min-w-0"
+                                  />
+                                  <button 
+                                    type="button" 
+                                    onClick={() => abrirGestionModal('categoria')} 
+                                    className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
+                                    title="Gestionar"
+                                  >
+                                    <Plus className="w-5 h-5"/>
+                                  </button>
+                                </div>
+                              </div>
+                              ) : (
+                              <div className="flex flex-col gap-1 w-full">
+                              <label className="text-xs text-voltech-muted font-medium">Categoría (Fija)</label>
+                              <input type="text" value={item.disponibilidad === 'kit' ? 'KIT' : item.categoria} readOnly className="input-voltech w-full rounded-md px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed border border-voltech-border" />
+                              </div>
+                              )}
+
+                            {item.tipo === 'fisico' && (
+                              <div className="flex flex-col gap-1 w-full">
+                                <label className="text-xs text-voltech-muted font-medium">Marca *</label>
+                                <div className="flex items-center gap-2 w-full min-w-0">
+                                  <ComboboxEditable
+                                    value={item.marca}
+                                    onChange={(value) => handleChange(itemIndex, 'marca', value)}
+                                    options={marcasDisponibles.map(marca => ({ value: marca, label: marca }))}
+                                    onAdd={(val) => agregarOpcionLista('marca', val)}
+                                    onRename={(old, nw) => renombrarOpcionLista('marca', old, nw)}
+                                    onDelete={(val) => eliminarOpcionLista('marca', val)}
+                                    onCheckUsage={(val) => verificarUso('marca', val)}
+                                    placeholder="-- Selecciona o escribe --"
+                                    className="flex-1 min-w-0"
+                                  />
+                                  <button 
+                                    type="button" 
+                                    onClick={() => abrirGestionModal('marca')} 
+                                    className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
+                                    title="Gestionar"
+                                  >
+                                    <Plus className="w-5 h-5"/>
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {item.tipo === 'fisico' && item.disponibilidad !== 'kit' && (
+                              <div className="flex flex-col gap-1 w-full">
+                                <label className="text-xs text-voltech-muted font-medium">Modelo</label>
+                                <div className="flex items-center gap-2 w-full min-w-0">
+                                  <ComboboxEditable
+                                    value={item.modelo}
+                                    onChange={(value) => handleChange(itemIndex, 'modelo', value)}
+                                    options={modelos.map(m => ({ value: m, label: m }))}
+                                    onAdd={(val) => agregarOpcionLista('modelo', val)}
+                                    onRename={(old, nw) => renombrarOpcionLista('modelo', old, nw)}
+                                    onDelete={(val) => eliminarOpcionLista('modelo', val)}
+                                    onCheckUsage={(val) => verificarUso('modelo', val)}
+                                    placeholder="-- Selecciona o escribe --"
+                                    className="flex-1 min-w-0"
+                                  />
+                                  <button 
+                                    type="button" 
+                                    onClick={() => abrirGestionModal('modelo')} 
+                                    className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
+                                    title="Gestionar"
+                                  >
+                                    <Plus className="w-5 h-5"/>
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {item.tipo === 'fisico' && item.disponibilidad !== 'kit' && (
+                              <div className="flex flex-col gap-1 w-full">
+                                <label className="text-xs text-voltech-muted font-medium">Variante / Tipo</label>
+                                <div className="flex items-center gap-2 w-full min-w-0">
+                                  <ComboboxEditable
+                                    value={item.variante}
+                                    onChange={(value) => handleChange(itemIndex, 'variante', value)}
+                                    options={variantes.map(v => ({ value: v, label: v }))}
+                                    onAdd={(val) => agregarOpcionLista('variante', val)}
+                                    onRename={(old, nw) => renombrarOpcionLista('variante', old, nw)}
+                                    onDelete={(val) => eliminarOpcionLista('variante', val)}
+                                    onCheckUsage={(val) => verificarUso('variante', val)}
+                                    placeholder="-- Selecciona o escribe --"
+                                    className="flex-1 min-w-0"
+                                  />
+                                  <button 
+                                    type="button" 
+                                    onClick={() => abrirGestionModal('variante')} 
+                                    className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
+                                    title="Gestionar"
+                                  >
+                                    <Plus className="w-5 h-5"/>
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {item.tipo === 'fisico' && item.disponibilidad !== 'kit' && (
+                              <div className="flex flex-col gap-1 w-full lg:col-span-2">
+                                <label className="text-xs text-voltech-muted font-medium">Potencia (selección múltiple)</label>
+                                <div className="flex items-center gap-2 w-full min-w-0">
+                                  <ComboboxMultiple
+                                    value={item.potencia}
+                                    onChange={(value) => handleChange(itemIndex, 'potencia', value)}
+                                    options={potencias.map(p => ({ value: p, label: p }))}
+                                    onAdd={(val) => agregarOpcionLista('potencia', val)}
+                                    onRename={(old, nw) => renombrarOpcionLista('potencia', old, nw)}
+                                    onDelete={(val) => eliminarOpcionLista('potencia', val)}
+                                    onCheckUsage={(val) => verificarUso('potencia', val)}
+                                    placeholder="-- Selecciona varias --"
+                                    className="flex-1 min-w-0"
+                                  />
+                                  <button 
+                                    type="button" 
+                                    onClick={() => abrirGestionModal('potencia')} 
+                                    className="h-[42px] w-[42px] flex items-center justify-center shrink-0 rounded-md bg-voltech-cyan/10 text-voltech-cyan border border-voltech-cyan/30 hover:bg-voltech-cyan/20 transition-all"
+                                    title="Gestionar"
+                                  >
+                                    <Plus className="w-5 h-5"/>
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {item.disponibilidad === 'kit' && (
+                              <div className="lg:col-span-3 space-y-3">
+                                <label className="block text-xs text-voltech-muted mb-1 ml-1">Seleccionar Productos del Inventario</label>
+                                <div className="relative">
+                                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-voltech-muted w-4 h-4" />
+                                  <input type="text" value={busquedaKit} onChange={(e) => setBusquedaKit(e.target.value)} placeholder="Buscar por nombre o SKU..." className="input-voltech w-full rounded-lg pl-10 pr-4 py-2 text-sm" />
+                                </div>
+                                <div className="max-h-60 overflow-y-auto border border-voltech-border rounded-lg bg-voltech-dark/30 p-2 space-y-2">
+                                  {((productosParaKit && productosParaKit.length > 0) ? productosParaKit : (productos || []).filter(p => p.tipo !== 'streaming' && !p.esCombo && !p.esKit && ((p.plataforma || p.producto || '').toLowerCase().includes((busquedaKit || '').toLowerCase()) || (p.sku || '').toLowerCase().includes((busquedaKit || '').toLowerCase())))).map((prod, idx) => {
+                                    const enKit = (item.productos_kit || []).find(p => p.producto_id === prod.id);
+                                    return (
+                                      <div key={idx} className={`flex items-center justify-between p-3 rounded-lg border transition-all ${enKit ? 'bg-voltech-cyan/10 border-voltech-cyan' : 'bg-voltech-surface border-voltech-border hover:border-voltech-cyan/50'}`}>
+                                        <div className="flex items-center gap-3 flex-1">
+                                          <input type="checkbox" checked={!!enKit} onChange={() => toggleProductoKit(itemIndex, prod)} className="w-4 h-4 rounded border-voltech-border text-voltech-cyan" />
+                                          {prod.imagen ? <img src={prod.imagen} alt={prod.plataforma} className="w-10 h-10 rounded object-cover" /> : <div className="w-10 h-10 rounded bg-voltech-dark flex items-center justify-center"><ImageIcon className="w-5 h-5 text-voltech-muted" /></div>}
+                                          <div>
+                                            <p className="text-sm font-medium text-white">{prod.plataforma || prod.producto}</p>
+                                            <p className="text-xs text-voltech-muted">SKU: {prod.sku} | Stock: {prod.cantidad}</p>
+                                          </div>
+                                        </div>
+                                        {enKit && (
+                                          <div className="flex items-center gap-2">
+                                            <button onClick={() => actualizarCantidadKit(itemIndex, prod.id, enKit.cantidad - 1)} className="p-1 hover:bg-voltech-border rounded"><Minus className="w-3 h-3" /></button>
+                                            <span className="text-sm font-bold w-6 text-center">{enKit.cantidad}</span>
+                                            <button onClick={() => actualizarCantidadKit(itemIndex, prod.id, enKit.cantidad + 1)} className="p-1 hover:bg-voltech-border rounded"><Plus className="w-3 h-3" /></button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                  {((productosParaKit && productosParaKit.length > 0) ? productosParaKit : (productos || []).filter(p => p.tipo !== 'streaming' && !p.esCombo && !p.esKit)).length === 0 && <p className="text-center text-xs text-voltech-muted py-4">No se encontraron productos</p>}
+                                </div>
+                              </div>
+                            )}
+
+                            {item.disponibilidad === 'combo' && (
+                              <div className="lg:col-span-3 space-y-3">
+                                <label className="block text-xs text-voltech-muted mb-1 ml-1">Seleccionar Plataformas del Inventario (Streaming)</label>
+                                <div className="max-h-60 overflow-y-auto border border-voltech-border rounded-lg bg-voltech-dark/30 p-2 space-y-2">
+                                  {productos.filter(p => p.tipo === 'streaming' && !p.esCombo && p.disponibilidad !== 'combo' && p.id !== item.id).map((prod, idx) => {
+                                    const enCombo = (item.productos_kit || []).find(p => p.producto_id === prod.id);
+                                    return (
+                                      <div key={idx} className={`flex items-center justify-between p-3 rounded-lg border transition-all ${enCombo ? 'bg-voltech-purple/10 border-voltech-purple' : 'bg-voltech-surface border-voltech-border hover:border-voltech-purple/50'}`}>
+                                        <div className="flex items-center gap-3 flex-1">
+                                          <input type="checkbox" checked={!!enCombo} onChange={() => toggleProductoKit(itemIndex, prod)} className="w-4 h-4 rounded border-voltech-border text-voltech-purple" />
+                                          {prod.imagen ? <img src={prod.imagen} alt={prod.plataforma} className="w-10 h-10 rounded object-cover" /> : <div className="w-10 h-10 rounded bg-voltech-dark flex items-center justify-center"><MonitorPlay className="w-5 h-5 text-voltech-muted" /></div>}
+                                          <div>
+                                            <p className="text-sm font-medium text-white">{prod.plataforma || prod.producto}</p>
+                                            <p className="text-xs text-voltech-muted">SKU: {prod.sku} | Precio: ${prod.precioDetal || 0}</p>
+                                          </div>
+                                        </div>
+                                        {enCombo && (
+                                          <div className="flex items-center gap-2">
+                                            <button onClick={() => actualizarCantidadKit(itemIndex, prod.id, enCombo.cantidad - 1)} className="p-1 hover:bg-voltech-border rounded"><Minus className="w-3 h-3" /></button>
+                                            <span className="text-sm font-bold w-6 text-center">{enCombo.cantidad}</span>
+                                            <button onClick={() => actualizarCantidadKit(itemIndex, prod.id, enCombo.cantidad + 1)} className="p-1 hover:bg-voltech-border rounded"><Plus className="w-3 h-3" /></button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                  {productos.filter(p => p.tipo === 'streaming' && !p.esCombo && p.disponibilidad !== 'combo').length === 0 && <p className="text-center text-xs text-voltech-muted py-4">No hay plataformas streaming cargadas. Cárgalas individualmente primero.</p>}
+                                </div>
+                              </div>
+                            )}
+
+                            <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Cantidad</label><input type="number" value={item.cantidad} onChange={(e) => handleChange(itemIndex, 'cantidad', e.target.value)} min="0" className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
+                            
+                            {(item.disponibilidad === 'kit' || item.disponibilidad === 'combo') && (item.productos_kit || []).length > 0 && (
+                              <div className="lg:col-span-3 bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 space-y-2">
+                                <h4 className="text-sm font-bold text-voltech-cyan flex items-center gap-2"><DollarSign className="w-4 h-4" /> Resumen Financiero del {item.disponibilidad === 'combo' ? 'Combo' : 'Kit'}</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                  <div><p className="text-xs text-voltech-muted">Inversión Total:</p><p className="font-bold text-white">${(item.precio_costo_total || 0).toFixed(2)}</p></div>
+                                  <div><p className="text-xs text-voltech-muted">Valor Individual:</p><p className="font-bold text-white">${(item.precio_individual_total || 0).toFixed(2)}</p></div>
+                                  <div>
+                                    <label className="text-xs text-voltech-muted block">Precio del Kit ($):</label>
+                                    <input type="number" step="0.01" value={item.precioDetal} onChange={(e) => handleChange(itemIndex, 'precioDetal', e.target.value)} className="input-voltech w-full rounded px-2 py-1 text-sm font-bold text-voltech-success" />
+                                  </div>
+                                  <div><p className="text-xs text-voltech-muted">Ganancia Estimada:</p><p className="font-bold text-voltech-success">${(item.precioDetal - (item.precio_costo_total || 0)).toFixed(2)}</p></div>
+                                </div>
+                              </div>
+                            )}
+
+                            {item.tipo !== 'kit' && (
+                              <>
+                                {item.tipo === 'fisico' && tienePermiso('puedeVerInventarioCompleto') && (
+                                  <div className="lg:col-span-3 bg-voltech-dark/50 border border-voltech-border rounded-lg p-4 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <label className="block text-xs text-voltech-muted font-semibold flex items-center gap-2">
+                                        <DollarSign className="w-4 h-4 text-voltech-cyan" />
+                                        Precios por Proveedor (compara y marca el MEJOR)
+                                      </label>
+                                      <button type="button" onClick={() => agregarPrecioProveedor(itemIndex)} className="px-3 py-1 bg-voltech-cyan/20 text-voltech-cyan rounded-lg text-xs hover:bg-voltech-cyan/30 transition-colors flex items-center gap-1">
+                                        <Plus className="w-3 h-3" /> Agregar precio
+                                      </button>
+                                    </div>
+                                    {(item.precios_proveedor || []).length === 0 && (
+                                      <p className="text-xs text-voltech-muted text-center py-2">No hay precios registrados. Haz clic en "Agregar precio".</p>
+                                    )}
+                                    {(item.precios_proveedor || []).map((precioRow, idxPrecio) => {
+                                      const precioNum = parseFloat(precioRow.precio) || 0;
+                                      const preciosValidos = (item.precios_proveedor || []).map(p => parseFloat(p.precio) || 0).filter(p => p > 0);
+                                      const precioMinimo = preciosValidos.length > 0 ? Math.min(...preciosValidos) : 0;
+                                      const esMejor = precioNum > 0 && precioNum === precioMinimo;
+                                      return (
+                                        <div key={idxPrecio} className={`grid grid-cols-[1fr_100px_auto] gap-2 items-end p-3 rounded-lg border transition-all ${esMejor ? 'bg-voltech-success/10 border-voltech-success' : 'bg-voltech-surface border-voltech-border'}`}>
+                                          <div>
+                                            <label className="block text-[10px] text-voltech-muted mb-1">Proveedor</label>
+                                            <CustomSelect
+                                              value={precioRow.proveedor}
+                                              onChange={(val) => cambiarPrecioProveedor(itemIndex, idxPrecio, 'proveedor', val)}
+                                              options={[{ value: '', label: '-- Selecciona --' }, ...opcionesProveedores]}
+                                              placeholder="-- Selecciona --"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-[10px] text-voltech-muted mb-1">Precio ($)</label>
+                                            <input type="number" step="0.01" value={precioRow.precio} onChange={(e) => cambiarPrecioProveedor(itemIndex, idxPrecio, 'precio', e.target.value)} className="input-voltech w-full rounded px-2 py-1.5 text-sm" />
+                                          </div>
+                                          <div className="flex items-center gap-1">
+                                            {esMejor && (
+                                              <span className="px-2 py-1 bg-voltech-success text-white text-[9px] font-bold rounded-full flex items-center gap-1">
+                                                <Trophy className="w-3 h-3" /> MEJOR
+                                              </span>
+                                            )}
+                                            <button type="button" onClick={() => quitarPrecioProveedor(itemIndex, idxPrecio)} className="p-1.5 text-voltech-error hover:bg-voltech-error/10 rounded transition-colors">
+                                              <Trash2 className="w-4 h-4" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                    {item.precioMayor > 0 && (
+                                      <div className="flex items-center justify-between pt-2 border-t border-voltech-border">
+                                        <span className="text-xs text-voltech-muted">Precio Mayor (MEJOR):</span>
+                                        <span className="text-sm font-bold text-voltech-success">${item.precioMayor.toFixed(2)}</span>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
-                              </div>
-                            )}
-                            <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Detal ($) <span className="text-voltech-success">(Venta al público)</span></label><input type="number" step="0.01" value={item.precioDetal} onChange={(e) => handleChange(itemIndex, 'precioDetal', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Precio de venta" />{item.tipo === 'fisico' && tienePermiso('puedeVerInventarioCompleto') && item.precioMayor > 0 && item.precioDetal > 0 && (<p className="text-xs text-voltech-success mt-1">Ganancia: ${(item.precioDetal - item.precioMayor).toFixed(2)} ({((item.precioDetal - item.precioMayor) / item.precioMayor * 100).toFixed(0)}%)</p>)}</div>
-                          </>
-                        )}                        
-                        <div>
-                          <CustomSelect
-                            label="Estado"
-                            value={item.estado}
-                            onChange={(value) => handleChange(itemIndex, 'estado', value)}
-                            options={[
-                              { value: 'nuevo', label: 'Nuevo' },
-                              { value: 'oferta', label: 'Oferta' },
-                              ...(item.tipo === 'streaming' ? [{ value: 'combo', label: 'Combo Streaming' }] : [{ value: 'kit', label: 'Kit' }]),
-                              { value: 'agotado', label: 'Agotado' }
-                            ]}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Oferta ($) <span className="text-voltech-warning">(Opcional)</span></label>
-                          <input type="number" step="0.01" value={item.precioOferta} onChange={(e) => handleChange(itemIndex, 'precioOferta', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="0.00" />
-                        </div>
+                                <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Detal ($) <span className="text-voltech-success">(Venta al público)</span></label><input type="number" step="0.01" value={item.precioDetal} onChange={(e) => handleChange(itemIndex, 'precioDetal', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="Precio de venta" />{item.tipo === 'fisico' && tienePermiso('puedeVerInventarioCompleto') && item.precioMayor > 0 && item.precioDetal > 0 && (<p className="text-xs text-voltech-success mt-1">Ganancia: ${(item.precioDetal - item.precioMayor).toFixed(2)} ({((item.precioDetal - item.precioMayor) / item.precioMayor * 100).toFixed(0)}%)</p>)}</div>
+                              </>
+                            )}                        
+                            <div>
+                              <CustomSelect
+                                label="Estado"
+                                value={item.estado}
+                                onChange={(value) => handleChange(itemIndex, 'estado', value)}
+                                options={[
+                                  { value: 'nuevo', label: 'Nuevo' },
+                                  { value: 'oferta', label: 'Oferta' },
+                                  ...(item.tipo === 'streaming' ? [{ value: 'combo', label: 'Combo Streaming' }] : [{ value: 'kit', label: 'Kit' }]),
+                                  { value: 'agotado', label: 'Agotado' }
+                                ]}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-voltech-muted mb-1 ml-1">Precio Oferta ($) <span className="text-voltech-warning">(Opcional)</span></label>
+                              <input type="number" step="0.01" value={item.precioOferta} onChange={(e) => handleChange(itemIndex, 'precioOferta', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" placeholder="0.00" />
+                            </div>
 
-                        <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio (Bs)</label><input type="number" step="0.01" value={item.precioBs} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-cyan bg-voltech-dark/50" /></div>
-                        <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Total</label><input type="number" step="0.01" value={item.total} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-success bg-voltech-dark/50" /></div>
-                        
-                        {/* ✅ DATOS DE COMPRA: NO aplican en Kits (se arman con inventario existente) */}
-                        {item.tipo !== 'kit' && (
-                          <>
-                            <div>
-                              <CustomSelect
-                                label="Método de Pago"
-                                value={item.metodoPago}
-                                onChange={(value) => handleChange(itemIndex, 'metodoPago', value)}
-                                options={[...opcionesMetodosPago, { value: 'por_comprar', label: 'Se compra al momento' }]}
-                              />
-                            </div>
-                            <div>
-                              <CustomSelect
-                                label="Cartera"
-                                value={item.cartera}
-                                onChange={(value) => handleChange(itemIndex, 'cartera', value)}
-                                options={[{ value: '', label: '-- Selecciona --' }, ...carteras.map(c => ({ value: c.nombre, label: c.nombre })), { value: 'por_comprar', label: 'Por comprar (al momento)' }]}
-                              />
-                            </div>
-                            {tienePermiso('puedeVerInventarioCompleto') && (
-                              <div>
-                                <CustomSelect
-                                  label="Proveedor (Compra)"
-                                  value={item.proveedor}
-                                  onChange={(value) => handleChange(itemIndex, 'proveedor', value)}
-                                  options={[{ value: '', label: '-- Selecciona --' }, ...opcionesProveedores]}
-                                />
-                              </div>
+                            <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Precio (Bs)</label><input type="number" step="0.01" value={item.precioBs} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-cyan bg-voltech-dark/50" /></div>
+                            <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Total</label><input type="number" step="0.01" value={item.total} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm font-bold text-voltech-success bg-voltech-dark/50" /></div>
+                            
+                            {/* ✅ DATOS DE COMPRA: NO aplican en Kits (se arman con inventario existente) */}
+                            {item.tipo !== 'kit' && (
+                              <>
+                                <div>
+                                  <CustomSelect
+                                    label="Método de Pago"
+                                    value={item.metodoPago}
+                                    onChange={(value) => handleChange(itemIndex, 'metodoPago', value)}
+                                    options={[...opcionesMetodosPago, { value: 'por_comprar', label: 'Se compra al momento' }]}
+                                  />
+                                </div>
+                                <div>
+                                  <CustomSelect
+                                    label="Cartera"
+                                    value={item.cartera}
+                                    onChange={(value) => handleChange(itemIndex, 'cartera', value)}
+                                    options={[{ value: '', label: '-- Selecciona --' }, ...carteras.map(c => ({ value: c.nombre, label: c.nombre })), { value: 'por_comprar', label: 'Por comprar (al momento)' }]}
+                                  />
+                                </div>
+                                {tienePermiso('puedeVerInventarioCompleto') && (
+                                  <div>
+                                    <CustomSelect
+                                      label="Proveedor (Compra)"
+                                      value={item.proveedor}
+                                      onChange={(value) => handleChange(itemIndex, 'proveedor', value)}
+                                      options={[{ value: '', label: '-- Selecciona --' }, ...opcionesProveedores]}
+                                    />
+                                  </div>
+                                )}
+                                {tienePermiso('puedeVerInventarioCompleto') && (
+                                  <div>
+                                    <label className="block text-xs text-voltech-muted mb-1 ml-1">Comprador (automático)</label>
+                                    <input type="text" value={usuarioActual || 'Administrador'} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed" />
+                                  </div>
+                                )}
+                              </>
                             )}
-                            {tienePermiso('puedeVerInventarioCompleto') && (
-                              <div>
-                                <label className="block text-xs text-voltech-muted mb-1 ml-1">Comprador (automático)</label>
-                                <input type="text" value={usuarioActual || 'Administrador'} readOnly className="input-voltech w-full rounded-lg px-4 py-2 text-sm bg-voltech-dark/50 cursor-not-allowed" />
-                              </div>
-                            )}
-                          </>
-                        )}
 
                         <div><label className="block text-xs text-voltech-muted mb-1 ml-1">% Comisión por Venta</label><input type="number" step="0.01" value={item.porcentaje_comision} onChange={(e) => handleChange(itemIndex, 'porcentaje_comision', e.target.value)} className="input-voltech w-full rounded-lg px-4 py-2 text-sm" /></div>
                         
