@@ -41,12 +41,9 @@ import {
 const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', iconoVacio = null, onZoom }) => {
   const [idx, setIdx] = useState(0);
   const todas = (imagenes || []).filter(Boolean);
-  if (todas.length === 0) {
-    return iconoVacio || <Package className="w-12 h-12 text-slate-300" />;
-  }
-  const actual = todas[Math.min(idx, todas.length - 1)];
   
-  // ✅ Limpieza automática de caché cuando cambia la estructura de datos
+  // ✅ IMPORTANTE: Este useEffect debe estar ANTES de cualquier return condicional
+  // para cumplir las reglas de React Hooks
   useEffect(() => {
     const DATA_VERSION = '2.0';
     const storedVersion = localStorage.getItem('voltech_data_version');
@@ -58,6 +55,13 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
       localStorage.setItem('voltech_data_version', DATA_VERSION);
     }
   }, []);
+
+  // ✅ Ahora sí podemos hacer el return temprano (después de todos los hooks)
+  if (todas.length === 0) {
+    return iconoVacio || <Package className="w-12 h-12 text-slate-300" />;
+  }
+  
+  const actual = todas[Math.min(idx, todas.length - 1)];
 
   return (
     <>
@@ -90,7 +94,6 @@ const CarruselImagen = ({ imagenes, alt, className = '', objectFit = 'cover', ic
     </>
   );
 };
-
   export default function CatalogoPage() {
     const [activeSection, setActiveSection] = useState('productos');
     // ✅ NUEVO: Navegación global (bottom-nav móvil + tabs desktop)
@@ -1579,17 +1582,18 @@ const calcularPrecioBs = (precioUsd) => {
         ].filter(Boolean)));
         return (
         <div key={p.id || p.producto || `prod-${idx}`} onClick={() => setSelectedProduct(p)} className={`${cardBg} rounded-xl shadow-md border ${cardBorder} overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 flex flex-col cursor-pointer group h-full`}>
-          <div className="relative bg-slate-900 flex items-center justify-center overflow-hidden aspect-square w-full">
+          <div className="relative w-full aspect-square overflow-hidden rounded-t-xl bg-slate-100 dark:bg-slate-800">
             <CarruselImagen
               imagenes={todasImagenes}
               alt={p.producto || p.plataforma}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              iconoVacio={<Package className="w-12 h-12 text-slate-300" />}
-            />
+              className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
+              objectFit="cover"
+              iconoVacio={<Package className="w-12 h-12 text-slate-400 dark:text-slate-500" />}
+            />          
             {p.categoria_promo && <div className="absolute top-2 left-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-2 py-0.5 rounded-full text-[9px] font-bold shadow-md z-10">{p.categoria_promo}</div>}
             {precioInfo.tieneOferta && <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">OFERTA</div>}
             {p.tipo === 'kit' && !p.categoria_promo && <div className="absolute top-2 left-2 bg-voltech-cyan text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md">KIT</div>}
-            </div>
+          </div>
           <div className="p-3 flex flex-col flex-1">
             <div className="mb-1"><p className={`text-[10px] font-medium uppercase tracking-wide ${mutedText} truncate`}>{p.marca} • {p.categoria}</p></div>
             <h3 className={`font-semibold text-sm mb-2 line-clamp-2 leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>{p.producto}</h3>
@@ -1712,7 +1716,7 @@ const calcularPrecioBs = (precioUsd) => {
         href={pub.url_destino || '#'}
         target={esLinkInterno(pub.url_destino) ? '_self' : '_blank'}
         onClick={(e) => manejarClickPub(e, pub)}
-        className={`block ${cardBg} border ${cardBorder} rounded-xl overflow-hidden hover:border-voltech-cyan/50 transition-all grHoup`}
+        className={`block ${cardBg} border ${cardBorder} rounded-xl overflow-hidden hover:border-voltech-cyan/50 transition-all group`}
       >
         <div className="bg-voltech-dark relative overflow-hidden">
           {pub.url_video ? (
@@ -2801,36 +2805,37 @@ const calcularPrecioBs = (precioUsd) => {
               <div className="flex-1 overflow-y-auto p-4 md:p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                   
-                  {/* ✅ COLUMNA IZQUIERDA: IMAGEN (altura adaptable, sin recortes) */}                  <div className="flex flex-col items-center px-0 md:px-2">
-                    <div className={`w-full rounded-xl overflow-hidden flex items-center justify-center relative bg-slate-900`} style={{ minHeight: '300px', maxHeight: '450px' }}>
-                      <CarruselImagen
-                        imagenes={Array.from(new Set([
-                          selectedProduct.imagen,
-                          ...(Array.isArray(selectedProduct.imagenes) ? selectedProduct.imagenes : []),
-                          ...(Array.isArray(selectedProduct.productos_kit) ? selectedProduct.productos_kit.map(k => k.imagen).filter(Boolean) : [])
-                        ].filter(Boolean)))}
-                        alt={selectedProduct.producto || selectedProduct.plataforma}
-                        className="w-full h-full object-contain"
-                        objectFit="contain"
-                        iconoVacio={<Package className="w-24 h-24 text-slate-300" />}
-                        onZoom={(img) => {
-                          setZoomedImage(img);
-                          setShowImageZoom(true);
-                        }}
-                      />
-                      {selectedProduct.categoria_promo && <div className="absolute top-4 left-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md z-20">{selectedProduct.categoria_promo}</div>}
-                      {getPrecioMostrar(selectedProduct).tieneOferta && (
-                        <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md">OFERTA</div>
-                      )}
-                    </div>
-                    {selectedProduct.colores && selectedProduct.colores.length > 0 && (
-                      <div className="flex gap-2 justify-center mt-3">
-                        {selectedProduct.colores.map((color, idx) => (
-                          <div key={idx} className="w-8 h-8 rounded-full border-2 border-voltech-border cursor-pointer hover:scale-110 transition-transform shadow-sm" style={{ backgroundColor: color }} title={color} />
-                        ))}
-                      </div>
-                    )}
+              {/* ✅ COLUMNA IZQUIERDA: IMAGEN (completa, sin recortes) */}
+              <div className="flex flex-col items-center px-0 md:px-2">
+                <div className="relative w-full h-64 md:h-80 bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-2 rounded-xl">
+                  <CarruselImagen
+                    imagenes={Array.from(new Set([
+                      selectedProduct.imagen,
+                      ...(Array.isArray(selectedProduct.imagenes) ? selectedProduct.imagenes : []),
+                      ...(Array.isArray(selectedProduct.productos_kit) ? selectedProduct.productos_kit.map(k => k.imagen).filter(Boolean) : [])
+                    ].filter(Boolean)))}
+                    alt={selectedProduct.producto || selectedProduct.plataforma}
+                    className="max-h-full max-w-full object-contain"
+                    objectFit="contain"
+                    iconoVacio={<Package className="w-24 h-24 text-slate-400 dark:text-slate-500" />}
+                    onZoom={(img) => {
+                      setZoomedImage(img);
+                      setShowImageZoom(true);
+                    }}
+                  />
+                  {selectedProduct.categoria_promo && <div className="absolute top-4 left-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-md z-20">{selectedProduct.categoria_promo}</div>}
+                  {getPrecioMostrar(selectedProduct).tieneOferta && (
+                    <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md z-20">OFERTA</div>
+                  )}
+                </div>
+                {selectedProduct.colores && selectedProduct.colores.length > 0 && (
+                  <div className="flex gap-2 justify-center mt-3">
+                    {selectedProduct.colores.map((color, idx) => (
+                      <div key={idx} className="w-8 h-8 rounded-full border-2 border-voltech-border cursor-pointer hover:scale-110 transition-transform shadow-sm" style={{ backgroundColor: color }} title={color} />
+                    ))}
                   </div>
+                )}
+              </div>
                   
                   {/* ✅ COLUMNA DERECHA: INFORMACIÓN con botón fijo abajo */}
                   <div className="flex flex-col h-full min-h-[300px] md:min-h-[400px]">
@@ -2978,18 +2983,18 @@ const calcularPrecioBs = (precioUsd) => {
                 };
 
                 return (
-                  <div className={`border-t ${cardBorder} p-3 flex items-center justify-between bg-voltech-dark/50`}>
+                  <div className={`border-t ${cardBorder} p-3 flex items-center justify-between bg-slate-50 dark:bg-slate-900`}>
                     {/* Botón Anterior - Solo desktop */}
                     <button
                       onClick={(e) => { e.stopPropagation(); irAnterior(); }}
                       disabled={esPrimerProducto}
-                      className="hidden md:flex px-4 py-2 rounded-lg text-sm font-medium items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-voltech-cyan/20 text-voltech-cyan hover:bg-voltech-cyan/30"
+                      className="hidden md:flex px-4 py-2 rounded-lg text-sm font-medium items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-white"
                     >
                       <span>←</span> Anterior
                     </button>
 
                     {/* Contador centrado */}
-                    <span className="text-xs text-voltech-muted font-medium mx-auto md:mx-0">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 font-medium mx-auto md:mx-0">
                       {indiceGlobal + 1} de {productosOrdenadosModal.length}
                     </span>
 
@@ -2997,7 +3002,7 @@ const calcularPrecioBs = (precioUsd) => {
                     <button
                       onClick={(e) => { e.stopPropagation(); irSiguiente(); }}
                       disabled={esUltimoProducto}
-                      className="hidden md:flex px-4 py-2 rounded-lg text-sm font-medium items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-voltech-cyan/20 text-voltech-cyan hover:bg-voltech-cyan/30"
+                      className="hidden md:flex px-4 py-2 rounded-lg text-sm font-medium items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-white"
                     >
                       Siguiente <span>→</span>
                     </button>
@@ -3123,7 +3128,13 @@ const calcularPrecioBs = (precioUsd) => {
                         
                         {deliveryMethod === 'delivery' && (
                           <>
-                            <input type="text" value={customerLocation} onChange={(e) => setCustomerLocation(e.target.value)} placeholder="Tu ubicación exacta" className={`w-full mt-3 px-3 py-2 border rounded-lg text-sm ${inputBg}`} />
+                            <input 
+                          type="text" 
+                          value={customerLocation} 
+                          onChange={(e) => setCustomerLocation(e.target.value)} 
+                          placeholder="Tu ubicación exacta" 
+                          className={`w-full mt-3 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${inputBg} placeholder-slate-400`} 
+                        />
                             {cart.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0) >= (settings.envios?.deliveryGratisDesde || 5) && (<p className="text-xs text-green-600 mt-2 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Envío GRATIS (supera ${settings.envios?.deliveryGratisDesde || 5})</p>)}
                           </>
                         )}
@@ -3148,7 +3159,13 @@ const calcularPrecioBs = (precioUsd) => {
                               placeholder="Selecciona agencia"
                               className="w-full"
                             />
-                            <input type="text" value={oficinaDestino} onChange={(e) => setOficinaDestino(e.target.value)} placeholder="Ej: Oficina MRW Centro, Valencia" className={`w-full px-3 py-2 border rounded-lg text-sm ${inputBg}`} />
+                            <input 
+                          type="text" 
+                          value={oficinaDestino} 
+                          onChange={(e) => setOficinaDestino(e.target.value)} 
+                          placeholder="Ej: Oficina MRW Centro, Valencia" 
+                          className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${inputBg} placeholder-slate-400`} 
+                        />
                           </div>
                         )}
                       </div>
@@ -3159,11 +3176,27 @@ const calcularPrecioBs = (precioUsd) => {
                       </div>
                     )}
 
-                    <div className="mb-4 grid grid-cols-1 gap-2">
-                    <label className={`block text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}> Tus Datos *</label>
-                    <input type="text" value={clienteNombre} onChange={(e) => setClienteNombre(e.target.value)} placeholder="Nombre y apellido *" className={`w-full px-3 py-2 border rounded-lg text-sm ${inputBg}`} />
-                    <input type="tel" value={clienteTelefono} onChange={(e) => setClienteTelefono(e.target.value)} placeholder="Teléfono (WhatsApp) *" className={`w-full px-3 py-2 border rounded-lg text-sm ${inputBg}`} />
-                    </div>
+                <div className="mb-4 grid grid-cols-1 gap-3">
+                  <div>
+                    <label className={`block text-sm font-medium mb-1.5 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}> Tus Datos *</label>
+                    <input 
+                      type="text" 
+                      value={clienteNombre} 
+                      onChange={(e) => setClienteNombre(e.target.value)} 
+                      placeholder="Nombre y apellido *" 
+                      className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${inputBg} placeholder-slate-400`} 
+                    />
+                  </div>
+                  <div>
+                    <input 
+                      type="tel" 
+                      value={clienteTelefono} 
+                      onChange={(e) => setClienteTelefono(e.target.value)} 
+                      placeholder="Teléfono (WhatsApp) *" 
+                      className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors ${inputBg} placeholder-slate-400`} 
+                    />
+                  </div>
+                </div>
                     <div className="mb-4">
                       <CustomSelect
                         label="Método de Pago"
@@ -3211,60 +3244,38 @@ const calcularPrecioBs = (precioUsd) => {
                       
                     {/* ✅ Referido ahora es 100% interno: el cliente no lo ve (sigue yendo en el mensaje al equipo) */}                    </div>
 
-                    {(() => {
-                          const hayStreaming = cart.some(item => item.tipo === 'streaming' || (item.categoria || '').toUpperCase() === 'STREAMING');
-                          const hayFisicos = cart.some(item => item.tipo !== 'streaming' && (item.categoria || '').toUpperCase() !== 'STREAMING');
-                          const terminosFisicos = settings.politicas?.terminos || '';
-                          const terminosStreaming = settings.politicas?.terminos_streaming || '';
-                          return (
-                            <div className={`mb-4 p-3 rounded-lg border ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                              <label className="flex items-start gap-2 cursor-pointer">
+                {(() => {
+                      const hayStreaming = cart.some(item => item.tipo === 'streaming' || (item.categoria || '').toUpperCase() === 'STREAMING');
+                      const hayFisicos = cart.some(item => item.tipo !== 'streaming' && (item.categoria || '').toUpperCase() !== 'STREAMING');
+                      return (
+                        <div className={`mb-4 p-3 rounded-lg border ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                              <label className="flex items-start gap-3 cursor-pointer group">
                                 <input
                                   type="checkbox"
                                   checked={terminosAceptados}
                                   onChange={(e) => setTerminosAceptados(e.target.checked)}
-                                  className="w-4 h-4 rounded border-slate-600 text-purple-600 focus:ring-purple-500 mt-0.5 flex-shrink-0"
+                                  className="w-5 h-5 rounded border-slate-400 dark:border-slate-600 text-purple-600 focus:ring-purple-500 mt-0.5 flex-shrink-0 cursor-pointer"
                                 />
-                                <span className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-700'} leading-relaxed`}>
-                                  <span className="font-bold text-red-500">*</span> He leído y acepto los{' '}
+                                <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'} leading-relaxed`}>
+                                  <span className="font-bold text-red-600 dark:text-red-400">*</span> He leído y acepto los{' '}
                                   <button
                                     type="button"
                                     onClick={(e) => { e.preventDefault(); setShowTermsModal(true); }}
-                                    className="text-purple-600 font-semibold hover:underline"
+                                    className="text-purple-600 dark:text-purple-400 font-semibold hover:underline focus:outline-none"
                                   >
                                     Términos y Condiciones
                                   </button>
                                   {hayStreaming && hayFisicos && ' (aplican tanto para productos físicos como digitales)'}
                                   {hayStreaming && !hayFisicos && ' para productos streaming'}
                                   {!hayStreaming && hayFisicos && ' para productos físicos'}
-                                  <span className="block text-[10px] text-red-500 mt-1 font-medium">Obligatorio para habilitar el botón de compra</span>
+                                  <span className="block text-[11px] text-red-600 dark:text-red-400 mt-1 font-medium">
+                                    Obligatorio para habilitar el botón de compra
+                                  </span>
                                 </span>
                               </label>
-<div className={`mt-2 text-[10px] ${mutedText} border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'} pt-2`}>
-<div className={`${verTerminosCompletos ? 'max-h-56 overflow-y-auto pr-1' : 'max-h-14 overflow-hidden'} space-y-2`}>
-{(hayFisicos || (!hayStreaming && !hayFisicos)) && terminosFisicos && (
-<div>
-<p className="font-semibold text-purple-600 mb-1">📦 Productos Físicos:</p>
-<p className="whitespace-pre-line">{terminosFisicos}</p>
-</div>
-)}
-{hayStreaming && terminosStreaming && (
-<div>
-<p className="font-semibold text-purple-600 mb-1">📺 Streaming:</p>
-<p className="whitespace-pre-line">{terminosStreaming}</p>
-</div>
-)}
-</div>
-<button
-type="button"
-onClick={() => setVerTerminosCompletos(!verTerminosCompletos)}
-className="mt-1.5 text-purple-600 font-semibold hover:underline"
->
-{verTerminosCompletos ? '▲ Ver menos' : '▼ Ver más'}
-</button>
-</div>                            </div>
-                          );
-                        })()}
+                        </div>
+                      );
+                    })()}
                         <div className={`border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'} pt-4 mb-4 space-y-1 text-sm`}>
                         <div className="flex justify-between"><span className={mutedText}>Subtotal:</span><span className={darkMode ? 'text-white' : 'text-slate-900'}>${cart.reduce((s, i) => s + ((getPrecioMostrar(i).precioPrincipal || 0) * i.cantidad), 0).toFixed(2)}</span></div>
                         {appliedCoupon && (
@@ -3296,14 +3307,18 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
                         <div className="flex justify-between"><span className={mutedText}>Bs:</span><span className={mutedText}>Bs {calcularPrecioBs(calculateTotal())}</span></div>
                       </div>
 
-                    <button 
-                      onClick={finalizarPedido} 
-                      disabled={!terminosAceptados}
-                      className={`w-full py-2.5 px-3 font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md mb-2 ${terminosAceptados ? 'bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer' : 'bg-slate-600 text-slate-400 cursor-not-allowed opacity-50'}`}
-                    >
-                      <WhatsAppIcon className="w-4 h-4 shrink-0" />
-                      <span className="whitespace-nowrap">Finalizar por WhatsApp</span>
-                    </button>
+                <button 
+                  onClick={finalizarPedido} 
+                  disabled={!terminosAceptados}
+                  className={`w-full py-3 px-3 font-semibold text-sm rounded-xl flex items-center justify-center gap-2 transition-all shadow-md mb-2 ${
+                    terminosAceptados 
+                      ? 'bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer shadow-emerald-500/20' 
+                      : 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed opacity-70 shadow-none'
+                  }`}
+                >
+                  <WhatsAppIcon className="w-5 h-5 shrink-0" />
+                  <span className="whitespace-nowrap">Finalizar por WhatsApp</span>
+                </button>
                     <button onClick={() => setCart([])} className={`w-full py-2 rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}>Vaciar Carrito</button>
                   </>
                 )}
@@ -3376,8 +3391,8 @@ className="mt-1.5 text-purple-600 font-semibold hover:underline"
         />
       </motion.div>
           </motion.div>
-            )}
-            </AnimatePresence>
-            </div>
-            );
-            };
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
