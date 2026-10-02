@@ -407,11 +407,26 @@
   };
   // ✅ Subir imagen a Supabase Storage (CDN) en lugar de base64
 const subirImagenACDN = async (file, productoId = 'temp') => {
-  if (!supabase || !file) return null;
+  console.log('🔍 subirImagenACDN iniciado', { file: file.name, productoId });
+  
+  if (!supabase) {
+    console.error('❌ Supabase no está inicializado');
+    toast.error('Error de conexión con Supabase');
+    return null;
+  }
+  
+  if (!file) {
+    console.error('❌ No hay archivo para subir');
+    return null;
+  }
+  
   try {
     const timestamp = Date.now();
     const extension = file.name.split('.').pop() || 'jpg';
     const fileName = `${productoId}/${timestamp}.${extension}`;
+    
+    console.log('📤 Subiendo a:', { bucket: 'productos', fileName });
+    
     const { data, error } = await supabase.storage
       .from('productos')
       .upload(fileName, file, {
@@ -419,18 +434,25 @@ const subirImagenACDN = async (file, productoId = 'temp') => {
         upsert: false,
         contentType: file.type
       });
+    
     if (error) {
-      console.error('❌ Error subiendo imagen:', error.message);
+      console.error('❌ Error de Supabase Storage:', error);
+      toast.error(`Error al subir: ${error.message}`);
       return null;
     }
+    
+    console.log('✅ Upload exitoso:', data);
+    
     const { data: urlData } = supabase.storage.from('productos').getPublicUrl(data.path);
+    console.log(' URL pública:', urlData.publicUrl);
+    
     return urlData.publicUrl;
   } catch (err) {
-    console.error('❌ Error en subirImagenACDN:', err);
+    console.error(' Error inesperado en subirImagenACDN:', err);
+    toast.error('Error inesperado al subir imagen');
     return null;
   }
 };
-
   export default function ProductosPage() {
     const { tienePermiso } = usePermissions();
     const { agregarNotificacion } = useNotificaciones();
@@ -477,6 +499,7 @@ const subirImagenACDN = async (file, productoId = 'temp') => {
     const [isDragOverEdit, setIsDragOverEdit] = useState(false);
     const fileInputEditRef = useRef(null);
     const fileInputItemRefs = useRef({});
+    const [uploadingImage, setUploadingImage] = useState(false);
 
     const [items, setItems] = useState([{
       id: crypto.randomUUID(),
@@ -977,29 +1000,53 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
     };
 
     // ✅ Subidor múltiple NUEVO PRODUCTO (por item) - Sube al CDN
-    const handleImagenesItem = async (index, files) => {
-      const nuevosItems = [...items];
-      const item = nuevosItems[index];
-      let arr = Array.isArray(item.imagenes) ? item.imagenes : (item.imagen ? [item.imagen] : []);
-      
-      for (const file of Array.from(files)) {
-        if (!file.type.startsWith('image/')) { toast.error('Solo se permiten imágenes'); continue; }
-        if (file.size > 5 * 1024 * 1024) { toast.error('Cada imagen máximo 5MB'); continue; }
-        
-        const toastId = toast.loading(`Subiendo ${file.name.substring(0, 20)}...`);
-        const url = await subirImagenACDN(file, item.id || 'temp');
-        toast.dismiss(toastId);
-        
-        if (url && !arr.includes(url)) {
-          arr.push(url);
-        }
-      }
-      
-      item.imagenes = arr;
-      if (!item.imagen && arr.length > 0) item.imagen = arr[0];
-      setItems(nuevosItems);
-    };
-
+const handleImagenesItem = async (index, files) => {
+  console.log('🚀 handleImagenesItem iniciado', { index, filesCount: files?.length });
+  
+  if (!files || files.length === 0) {
+    console.warn('⚠️ No hay archivos para subir');
+    return;
+  }
+  
+  const nuevosItems = [...items];
+  const item = nuevosItems[index];
+  console.log('📦 Item actual:', { id: item.id, plataforma: item.plataforma });
+  
+  let arr = Array.isArray(item.imagenes) ? item.imagenes : (item.imagen ? [item.imagen] : []);
+  
+  for (const file of Array.from(files)) {
+    console.log('📄 Procesando archivo:', { name: file.name, size: file.size, type: file.type });
+    
+    if (!file.type.startsWith('image/')) { 
+      toast.error('Solo se permiten imágenes'); 
+      continue; 
+    }
+    if (file.size > 5 * 1024 * 1024) { 
+      toast.error('Cada imagen máximo 5MB'); 
+      continue; 
+    }
+    
+    const toastId = toast.loading(`Subiendo ${file.name.substring(0, 20)}...`);
+    console.log('️ Llamando a subirImagenACDN con productoId:', item.id || 'temp');
+    
+    const url = await subirImagenACDN(file, item.id || 'temp');
+    toast.dismiss(toastId);
+    
+    console.log('️ URL recibida:', url);
+    
+    if (url && !arr.includes(url)) {
+      arr.push(url);
+      toast.success(`✅ Imagen subida: ${file.name}`);
+    } else {
+      toast.error(' Error al subir imagen');
+    }
+  }
+  
+  item.imagenes = arr;
+  if (!item.imagen && arr.length > 0) item.imagen = arr[0];
+  setItems(nuevosItems);
+  console.log('✅ Items actualizados:', nuevosItems);
+};
   const quitarImagenItem = (index, img) => {
     const nuevosItems = [...items];
     const item = nuevosItems[index];
@@ -2644,30 +2691,48 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
                           </div>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                  <div className="lg:col-span-3">
-                            <label className="block text-xs text-voltech-muted mb-1 ml-1">
-                              🖼️ Imágenes del Producto <span className="text-[10px]">(agrega todas las que quieras)</span>
-                            </label>
-                            <div
-                              onDragOver={(e) => { e.preventDefault(); }}
-                              onDrop={(e) => { e.preventDefault(); handleImagenesItem(itemIndex, e.dataTransfer.files); }}
-                              onClick={() => fileInputItemRefs.current[itemIndex]?.click()}
-                              className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer border-voltech-border hover:border-voltech-cyan transition-colors"
-                            >
-                              <div className="flex flex-col items-center gap-2">
-                                <Upload className="w-6 h-6 text-voltech-muted" />
-                                <p className="text-sm text-voltech-muted">Arrastra o haz clic (puedes elegir varias)</p>
+                            <div className="lg:col-span-3">
+                              <label className="block text-xs text-voltech-muted mb-1 ml-1">
+                                🖼️ Imágenes del Producto <span className="text-[10px]">(agrega todas las que quieras)</span>
+                              </label>
+                              <div
+                                onDragOver={(e) => { e.preventDefault(); }}
+                                onDrop={(e) => { e.preventDefault(); handleImagenesItem(itemIndex, e.dataTransfer.files); }}
+                                onClick={() => {
+                                  const input = document.getElementById(`file-input-item-${itemIndex}`);
+                                  if (input) input.click();
+                                  else console.error('❌ No se encontró el input file para item', itemIndex);
+                                }}
+                                className="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer border-voltech-border hover:border-voltech-cyan transition-colors"
+                              >
+                                <div className="flex flex-col items-center gap-2">
+                                  {uploadingImage ? (
+                                    <>
+                                      <div className="w-6 h-6 border-2 border-voltech-cyan border-t-transparent rounded-full animate-spin" />
+                                      <p className="text-sm text-voltech-cyan">Subiendo imagen...</p>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Upload className="w-6 h-6 text-voltech-muted" />
+                                      <p className="text-sm text-voltech-muted">Arrastra o haz clic (puedes elegir varias)</p>
+                                    </>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                            <input
-                              ref={(el) => (fileInputItemRefs.current[itemIndex] = el)}
-                              type="file"
-                              accept="image/*"
-                              multiple
-                              onChange={(e) => { handleImagenesItem(itemIndex, e.target.files); e.target.value = ''; }}
-                              className="hidden"
-                            />
-                            {(item.imagenes?.length || 0) > 0 && (
+                              <input
+                                id={`file-input-item-${itemIndex}`}
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                onChange={(e) => {
+                                  console.log('📸 Archivos seleccionados:', e.target.files);
+                                  if (e.target.files && e.target.files.length > 0) {
+                                    handleImagenesItem(itemIndex, e.target.files);
+                                  }
+                                  e.target.value = '';
+                                }}
+                                className="hidden"
+                              />                            {(item.imagenes?.length || 0) > 0 && (
                               <div className="flex gap-3 flex-wrap mt-3">
                                 {(item.imagenes || []).map((img, i) => {
                                   const esPortada = item.imagen === img;
