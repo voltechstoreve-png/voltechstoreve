@@ -1,7 +1,7 @@
 'use client';
 
 import BannerCard from '@/components/BannerCard';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { usePermissions } from '@/app/context/PermissionsContext';
 import { useNotificaciones } from '@/app/context/NotificationContext';
@@ -331,48 +331,46 @@ cargarDatos();
     }
   }, [formDataCupon.fecha_inicio, formDataCupon.duracion_dias]);
 
-  useEffect(() => {
-    if (!productoSeleccionado || clientesSeleccionados.length === 0) {
-      setMensajePersonalizadoWa('');
-      return;
-    }
-    
-    const primerCliente = clientes.find(c => String(c.id) === String(clientesSeleccionados[0]));
-    const nombreCliente = primerCliente ? primerCliente.nombre : '{{nombre_cliente}}';
-    const nombreProducto = productoSeleccionado.nombre || productoSeleccionado.plataforma || 'Producto';
-    const precioProducto = precioPromocion ? parseFloat(precioPromocion).toFixed(2) : (Number(productoSeleccionado.precioDetal) || 0).toFixed(2);
-    
-    let mensaje = `¡Hola ${nombreCliente}! \n\n`;
-    
-    if (plantillaWhatsappSeleccionada) {
-      const plantilla = plantillas.find(p => String(p.id) === String(plantillaWhatsappSeleccionada));
-      if (plantilla && plantilla.nombre) {
-        mensaje += ` *${plantilla.nombre}* 🔥\n\n`;
-      }
-    }
-    
-    mensaje += ` *Producto:* ${nombreProducto}\n`;
-    mensaje += `💰 *Precio Especial:* $${precioProducto}\n`;
-    mensaje += `🔗 *Ver promoción:* ${window.location.origin}/catalogo?producto=${productoSeleccionado.id}\n\n`;
-    
-    if (plantillaWhatsappSeleccionada) {
-      const plantilla = plantillas.find(p => String(p.id) === String(plantillaWhatsappSeleccionada));
-      if (plantilla && plantilla.contenido && plantilla.contenido.trim() !== '' && plantilla.contenido.trim() !== 'Sin plantilla') {
-        mensaje += `${plantilla.contenido}\n\n`;
-      }
-    }
-    
-    if (plantillaContactoWaSeleccionada) {
-      const plantilla = plantillas.find(p => String(p.id) === String(plantillaContactoWaSeleccionada));
-      if (plantilla && plantilla.contenido && plantilla.contenido.trim() !== '' && plantilla.contenido.trim() !== 'Sin plantilla') {
-        mensaje += `${plantilla.contenido}`;
-      }
-    } else {
-      mensaje += `📲 ¡Escríbenos para coordinar tu entrega y aprovechar esta oferta!`;
-    }
-    
-    setMensajePersonalizadoWa(mensaje.trim());
-  }, [productoSeleccionado, precioPromocion, plantillaWhatsappSeleccionada, plantillaContactoWaSeleccionada, clientesSeleccionados, clientes, plantillas]);
+useEffect(() => {
+if (!productoSeleccionado || clientesSeleccionados.length === 0) {
+setMensajePersonalizadoWa('');
+return;
+}
+const primerCliente = clientes.find(c => String(c.id) === String(clientesSeleccionados[0]));
+const nombreCliente = primerCliente ? primerCliente.nombre : '{{nombre_cliente}}';
+const nombreProducto = productoSeleccionado.nombre || productoSeleccionado.plataforma || 'Producto';
+const precioProducto = precioPromocion ? parseFloat(precioPromocion).toFixed(2) : (Number(productoSeleccionado.precioDetal) || 0).toFixed(2);
+
+// ✅ Generar URL amigable con slug (fallback a generar uno limpio si la columna no existe aún)
+const baseSlug = productoSeleccionado.slug || productoSeleccionado.plataforma || productoSeleccionado.producto || 'producto';
+const slug = baseSlug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+let mensaje = `¡Hola ${nombreCliente}!\n`;
+if (plantillaWhatsappSeleccionada) {
+const plantilla = plantillas.find(p => String(p.id) === String(plantillaWhatsappSeleccionada));
+if (plantilla && plantilla.nombre) {
+mensaje += ` *${plantilla.nombre}* 🔥\n`;
+}
+}
+mensaje += ` *Producto:* ${nombreProducto}\n`;
+mensaje += `💰 *Precio Especial:* $${precioProducto}\n`;
+mensaje += `🔗 *Ver promoción:* ${window.location.origin}/catalogo/${slug}\n`;
+if (plantillaWhatsappSeleccionada) {
+const plantilla = plantillas.find(p => String(p.id) === String(plantillaWhatsappSeleccionada));
+if (plantilla && plantilla.contenido && plantilla.contenido.trim() !== '' && plantilla.contenido.trim() !== 'Sin plantilla') {
+mensaje += `${plantilla.contenido}\n`;
+}
+}
+if (plantillaContactoWaSeleccionada) {
+const plantilla = plantillas.find(p => String(p.id) === String(plantillaContactoWaSeleccionada));
+if (plantilla && plantilla.contenido && plantilla.contenido.trim() !== '' && plantilla.contenido.trim() !== 'Sin plantilla') {
+mensaje += `${plantilla.contenido}`;
+}
+} else {
+mensaje += `📲 ¡Escríbenos para coordinar tu entrega y aprovechar esta oferta!`;
+}
+setMensajePersonalizadoWa(mensaje.trim());
+}, [productoSeleccionado, precioPromocion, plantillaWhatsappSeleccionada, plantillaContactoWaSeleccionada, clientesSeleccionados, clientes, plantillas]);
 
   useEffect(() => {
     if (!productoMarketplace) {
@@ -862,11 +860,17 @@ const enviarResumenDiario = () => {
 
   const urlDestinoType = ((formDataPublicidad.url_destino || '').startsWith('/producto/') || (formDataPublicidad.url_destino || '').startsWith('/catalogo?producto=')) ? 'producto' : 'manual';
 
-  const productosParaCupon = productos.filter(p => 
+  const productosParaCupon = productos.filter(p =>
     (p.plataforma || p.nombre || '').toLowerCase().includes(busquedaProductoCupon.toLowerCase()) ||
     (p.marca || '').toLowerCase().includes(busquedaProductoCupon.toLowerCase())
   );
 
+  // ✅ PRODUCTOS ÚNICOS PARA DIFUSIÓN (Elimina duplicados por ID y muestra solo activos/publicados)
+  const productosUnicos = useMemo(() => {
+    return productos.filter((p, index, self) => 
+      index === self.findIndex((t) => t.id === p.id) && p.publicado !== false
+    );
+  }, [productos]);
   // ✅ TABS POR ROL: vendedor SIN Publicidad ni Más Vendidos; Calendario ELIMINADO
   const tabsDisponibles = [
     { id: 'whatsapp', icon: WhatsAppIcon, label: 'WhatsApp' },
@@ -966,20 +970,19 @@ const enviarResumenDiario = () => {
               <div className="p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                   <div className="lg:col-span-7 space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-voltech-muted mb-2">1. Seleccionar Producto</label>
-                      <CustomSelect
-                        value={productoSeleccionado ? String(productoSeleccionado.id) : ''}
-                        onChange={(v) => { const prod = productos.find(p => String(p.id) === String(v)); setProductoSeleccionado(prod || null); setPrecioPromocion(''); }}
-                        options={[
-                          { value: '', label: 'Buscar producto...' },
-                          ...productos.filter(p => p.cantidad > 0).map(p => ({ value: String(p.id), label: `${p.plataforma || p.producto || p.nombre || 'Sin nombre'} - $${Number(p.precioDetal || 0).toFixed(2)}` }))
-                        ]}
-                        placeholder="Buscar producto..."
-                        className="w-full"
-                      />
+                   <div>
+                    <label className="block text-sm font-medium text-voltech-muted mb-2">1. Seleccionar Producto</label>
+                    <CustomSelect
+                    value={productoSeleccionado ? String(productoSeleccionado.id) : ''}
+                    onChange={(v) => { const prod = productosUnicos.find(p => String(p.id) === String(v)); setProductoSeleccionado(prod || null); setPrecioPromocion(''); }}
+                    options={[
+                    { value: '', label: 'Buscar producto...' },
+                    ...productosUnicos.map(p => ({ value: String(p.id), label: `${p.plataforma || p.producto || p.nombre || 'Sin nombre'} - $${Number(p.precioDetal || 0).toFixed(2)}` }))
+                    ]}
+                    placeholder="Buscar producto..."
+                    className="w-full"
+                    />
                     </div>
-                    {productoSeleccionado && (
                       <>
                         <div>
                           <label className="text-xs text-voltech-muted block mb-1">💰 Precio para esta promoción (opcional):</label>
@@ -1052,7 +1055,7 @@ const enviarResumenDiario = () => {
                           </div>
                         </div>
                       </>
-                    )}
+                    )
                   </div>
                   <div className="lg:col-span-5 space-y-3">
                     {productoSeleccionado ? (
@@ -1211,17 +1214,17 @@ const enviarResumenDiario = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                   <div className="lg:col-span-7 space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-voltech-muted mb-2">1. Seleccionar Producto</label>
-                      <CustomSelect
-                        value={productoMarketplace ? String(productoMarketplace.id) : ''}
-                        onChange={(v) => { const prod = productos.find(p => String(p.id) === String(v)); setProductoMarketplace(prod || null); setPrecioPromocionMarketplace(''); }}
-                        options={[
-                          { value: '', label: 'Buscar producto...' },
-                          ...productos.map(p => ({ value: String(p.id), label: `${p.plataforma || p.producto || p.nombre || 'Sin nombre'} - $${Number(p.precioDetal || 0).toFixed(2)}` }))
-                        ]}
-                        placeholder="Buscar producto..."
-                        className="w-full"
-                      />
+                    <label className="block text-sm font-medium text-voltech-muted mb-2">1. Seleccionar Producto</label>
+                    <CustomSelect
+                    value={productoMarketplace ? String(productoMarketplace.id) : ''}
+                    onChange={(v) => { const prod = productosUnicos.find(p => String(p.id) === String(v)); setProductoMarketplace(prod || null); setPrecioPromocionMarketplace(''); }}
+                    options={[
+                    { value: '', label: 'Buscar producto...' },
+                    ...productosUnicos.map(p => ({ value: String(p.id), label: `${p.plataforma || p.producto || p.nombre || 'Sin nombre'} - $${Number(p.precioDetal || 0).toFixed(2)}` }))
+                    ]}
+                    placeholder="Buscar producto..."
+                    className="w-full"
+                    />
                     </div>
                     {productoMarketplace && (
                       <>
