@@ -2270,48 +2270,83 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
           }
         };
 
-        // ✅ COMPARTIR PRODUCTO: Modal con opciones para PC y Móvil
+                // ✅ Helper para generar slugs amigables (ej: "Airpods Pro 2da G" -> "airpods-pro-2da-g")
+        const generarSlug = (texto) => {
+          if (!texto) return 'producto';
+          return texto.toString().toLowerCase().trim()
+            .replace(/\s+/g, '-')
+            .replace(/[^\w\-]+/g, '')
+            .replace(/\-\-+/g, '-')
+            .replace(/^-+/, '')
+            .replace(/-+$/, '');
+        };
+
+        // ✅ COMPARTIR PRODUCTO: URL amigable + Web Share API nativa + Fallback WhatsApp
         const compartirProducto = async (producto) => {
-          const url = `${window.location.origin}/catalogo?producto=${producto.id}`;
-          const nombre = producto.plataforma || producto.producto || 'Producto';
+          // 1. Generar URL amigable con slug
+          const nombreProducto = producto.plataforma || producto.producto || 'Producto';
+          const slug = generarSlug(nombreProducto);
+          const url = `${window.location.origin}/catalogo/${slug}`; // Ej: https://voltechstoreve.com/catalogo/airpods-pro
+          
           const precio = Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2);
           const precioBs = Number(producto.precioBs || 0).toFixed(2);
           const stock = producto.cantidad || 0;
-          const texto = `🔥 ${nombre}\n💰 $${precio} (Bs ${precioBs})\n📦 Stock: ${stock} unid.\n🔗 ${url}`;
-          const titulo = `${nombre} - $${precio}`;
+          const texto = `🔥 *${nombreProducto}*\n💰 $${precio} (Bs ${precioBs})\n📦 Stock: ${stock} unid.\n🔗 ${url}`;
+          const titulo = `${nombreProducto} - $${precio}`;
 
-          const esMovil = /Mobi|Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
-          
-          // En móvil, intentar primero la API nativa
-          if (esMovil && navigator.share) {
+          // 2. Intentar usar la API Nativa de Compartir (Móviles Android/iOS abren el menú con WhatsApp, IG, etc.)
+          if (navigator.share) {
             try {
               const img = getImagenProducto(producto);
               let file = null;
+              
               if (img) {
                 try {
                   const res = await fetch(img);
                   const blob = await res.blob();
                   const extension = blob.type?.split('/')[1] || 'jpg';
-                  file = new File([blob], `${nombre.replace(/[^a-z0-9]/gi, '_')}.${extension}`, { type: blob.type || 'image/jpeg' });
-                } catch (imgErr) { console.warn('⚠️ No se pudo convertir la imagen:', imgErr.message); }
+                  file = new File([blob], `${slug}.${extension}`, { type: blob.type || 'image/jpeg' });
+                } catch (imgErr) {
+                  console.warn('⚠️ No se pudo procesar la imagen:', imgErr.message);
+                }
               }
-              
+
+              // Si el dispositivo permite compartir archivos (imágenes)
               if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({ files: [file], text: texto, title: titulo });
                 toast.success('¡Compartido con imagen!');
                 return;
               }
+
+              // Fallback de Web Share solo con texto y URL
               await navigator.share({ text: texto, title: titulo, url: url });
               toast.success('¡Compartido!');
               return;
-            } catch (e) {
-              if (e?.name === 'AbortError') return;
+            } catch (error) {
+              if (error.name === 'AbortError') return; // El usuario canceló la acción
+              console.warn('Web Share API falló, usando fallback de WhatsApp:', error);
             }
           }
-          
-          // En PC o si falla el share nativo: mostrar modal con opciones
-          setShareData({ producto, texto, titulo, url });
-          setShowShareModal(true);
+
+          // 3. Fallback para Escritorio: Abrir WhatsApp Web / App directamente
+          try {
+            const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+            window.open(whatsappUrl, '_blank');
+          } catch (e) {
+            // Último recurso: copiar al portapapeles
+            try {
+              await navigator.clipboard.writeText(texto);
+              toast.success('📋 Texto copiado al portapapeles. Pégalo en WhatsApp.');
+            } catch {
+              const textarea = document.createElement('textarea');
+              textarea.value = texto;
+              document.body.appendChild(textarea);
+              textarea.select();
+              document.execCommand('copy');
+              document.body.removeChild(textarea);
+              toast.success('📋 Texto copiado manualmente.');
+            }
+          }
         };
 
         const copiarAlPortapapeles = async (texto) => {
