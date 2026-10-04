@@ -332,15 +332,12 @@ cargarDatos();
   }, [formDataCupon.fecha_inicio, formDataCupon.duracion_dias]);
 
 useEffect(() => {
-if (!productoSeleccionado || clientesSeleccionados.length === 0) {
-setMensajePersonalizadoWa('');
+if (!productoMarketplace) {
+setTextoMarketplace('');
 return;
 }
-const primerCliente = clientes.find(c => String(c.id) === String(clientesSeleccionados[0]));
-const nombreCliente = primerCliente ? primerCliente.nombre : '{{nombre_cliente}}';
-const nombreProducto = productoSeleccionado?.nombre || productoSeleccionado?.plataforma || 'Producto';
-const precioProducto = precioPromocion ? parseFloat(precioPromocion).toFixed(2) : (Number(productoSeleccionado?.precioDetal || productoSeleccionado?.precioMayor || 0)).toFixed(2);
-
+const nombreProducto = productoMarketplace?.nombre || productoMarketplace?.plataforma || 'Producto';
+const precioProducto = precioPromocionMarketplace ? parseFloat(precioPromocionMarketplace).toFixed(2) : (Number(productoMarketplace?.precioDetal || productoMarketplace?.precioMayor || 0)).toFixed(2);
 // ✅ Generar URL amigable con slug (fallback a generar uno limpio si la columna no existe aún)
 const baseSlug = productoSeleccionado.slug || productoSeleccionado.plataforma || productoSeleccionado.producto || 'producto';
 const slug = baseSlug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -971,15 +968,15 @@ const enviarResumenDiario = () => {
                    <div>
                     <label className="block text-sm font-medium text-voltech-muted mb-2">1. Seleccionar Producto</label>
                     <CustomSelect
-                    value={productoSeleccionado ? String(productoSeleccionado.id) : ''}
-                    onChange={(v) => { const prod = productos.find(p => String(p.id) === String(v)); setProductoSeleccionado(prod || null); setPrecioPromocion(''); }}
-                    options={[
-                    { value: '', label: 'Buscar producto...' },
-                    ...productos.filter(p => p && p.cantidad > 0).map(p => ({ value: String(p.id), label: `${p.plataforma || p.producto || p.nombre || 'Sin nombre'} - $${Number(p?.precioDetal || p?.precioMayor || 0).toFixed(2)}` }))
-                    ]}
-                    placeholder="Buscar producto..."
-                    className="w-full"
-                    />                    
+value={productoSeleccionado ? String(productoSeleccionado.id) : ''}
+onChange={(v) => { const prod = productos.find(p => String(p.id) === String(v)); setProductoSeleccionado(prod || null); setPrecioPromocion(''); }}
+options={[
+{ value: '', label: 'Buscar producto...' },
+...productos.filter(p => p && p.cantidad > 0).map(p => ({ value: String(p.id), label: `${p.plataforma || p.producto || p.nombre || 'Sin nombre'} - $${Number(p?.precioDetal || p?.precioMayor || 0).toFixed(2)}` }))
+]}
+placeholder="Buscar producto..."
+className="w-full"
+/>                   
                      </div>
                       <>
                         <div>
@@ -1214,15 +1211,15 @@ const enviarResumenDiario = () => {
                     <div>
                     <label className="block text-sm font-medium text-voltech-muted mb-2">1. Seleccionar Producto</label>
                    <CustomSelect
-                    value={productoMarketplace ? String(productoMarketplace.id) : ''}
-                    onChange={(v) => { const prod = productos.find(p => String(p.id) === String(v)); setProductoMarketplace(prod || null); setPrecioPromocionMarketplace(''); }}
-                    options={[
-                    { value: '', label: 'Buscar producto...' },
-                    ...productos.filter(p => p).map(p => ({ value: String(p.id), label: `${p.plataforma || p.producto || p.nombre || 'Sin nombre'} - $${Number(p?.precioDetal || p?.precioMayor || 0).toFixed(2)}` }))
-                    ]}
-                    placeholder="Buscar producto..."
-                    className="w-full"
-                    />
+value={productoMarketplace ? String(productoMarketplace.id) : ''}
+onChange={(v) => { const prod = productos.find(p => String(p.id) === String(v)); setProductoMarketplace(prod || null); setPrecioPromocionMarketplace(''); }}
+options={[
+{ value: '', label: 'Buscar producto...' },
+...productos.filter(p => p).map(p => ({ value: String(p.id), label: `${p.plataforma || p.producto || p.nombre || 'Sin nombre'} - $${Number(p?.precioDetal || p?.precioMayor || 0).toFixed(2)}` }))
+]}
+placeholder="Buscar producto..."
+className="w-full"
+/>
                     </div>
                     {productoMarketplace && (
                       <>
