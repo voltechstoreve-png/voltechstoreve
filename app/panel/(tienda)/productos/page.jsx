@@ -493,6 +493,10 @@ const subirImagenACDN = async (file, productoId = 'temp') => {
     const [nombresCombosGuardados, setNombresCombosGuardados] = useState([]);
     const [nuevoCampo, setNuevoCampo] = useState({ tipo: '', valor: '' });
     const [showNuevoCampo, setShowNuevoCampo] = useState({ tipo: '', show: false });
+    
+    // ✅ Estados para el Modal de Compartir (PC y Móvil)
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [shareData, setShareData] = useState(null);
 
     // ✅ Subidor múltiple de imágenes (edición)
     const [imagenesExtraEdit, setImagenesExtraEdit] = useState([]);
@@ -1000,7 +1004,7 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
     };
 
     // ✅ Subidor múltiple NUEVO PRODUCTO (por item) - Sube al CDN
-const handleImagenesItem = async (index, files) => {
+  const handleImagenesItem = async (index, files) => {
   console.log('🚀 handleImagenesItem iniciado', { index, filesCount: files?.length });
   
   if (!files || files.length === 0) {
@@ -1064,17 +1068,32 @@ const handleImagenesItem = async (index, files) => {
 
     // ✅ Subidor múltiple EDICIÓN - Sube al CDN
     const handleImagenesEdit = async (files) => {
+      if (!files || files.length === 0) return;
+      
       for (const file of Array.from(files)) {
-        if (!file.type.startsWith('image/')) { toast.error('Solo se permiten imágenes'); continue; }
-        if (file.size > 5 * 1024 * 1024) { toast.error('Cada imagen máximo 5MB'); continue; }
+        if (!file.type.startsWith('image/')) { 
+          toast.error('Solo se permiten imágenes'); 
+          continue; 
+        }
+        if (file.size > 5 * 1024 * 1024) { 
+          toast.error('Cada imagen máximo 5MB'); 
+          continue; 
+        }
         
         const toastId = toast.loading(`Subiendo ${file.name.substring(0, 20)}...`);
+        console.log('📤 Editando: Llamando a subirImagenACDN con editandoId:', editandoId || 'temp');
+        
         const url = await subirImagenACDN(file, editandoId || 'temp');
         toast.dismiss(toastId);
+        
+        console.log('📥 Editando: URL recibida:', url);
         
         if (url) {
           setImagenesExtraEdit(prev => prev.includes(url) ? prev : [...prev, url]);
           setEditData(prev => prev.imagen ? prev : { ...prev, imagen: url });
+          toast.success(`✅ Imagen subida: ${file.name}`);
+        } else {
+          toast.error('❌ Error al subir imagen. Revisa el bucket "productos" en Supabase.');
         }
       }
     };
@@ -2251,7 +2270,7 @@ const handleImagenesItem = async (index, files) => {
           }
         };
 
-        // ✅ COMPARTIR PRODUCTO: imagen + info + link en cualquier red social
+        // ✅ COMPARTIR PRODUCTO: Modal con opciones para PC y Móvil
         const compartirProducto = async (producto) => {
           const url = `${window.location.origin}/catalogo?producto=${producto.id}`;
           const nombre = producto.plataforma || producto.producto || 'Producto';
@@ -2261,79 +2280,67 @@ const handleImagenesItem = async (index, files) => {
           const texto = `🔥 ${nombre}\n💰 $${precio} (Bs ${precioBs})\n📦 Stock: ${stock} unid.\n🔗 ${url}`;
           const titulo = `${nombre} - $${precio}`;
 
-          try {
-            const img = getImagenProducto(producto);
-            let file = null;
-
-            // Convertir imagen a File (maneja base64 Y URLs)
-            if (img) {
-              try {
-                let blob;
-                if (img.startsWith('data:image')) {
-                  // Imagen base64 → convertir a blob directamente
+          const esMovil = /Mobi|Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
+          
+          // En móvil, intentar primero la API nativa
+          if (esMovil && navigator.share) {
+            try {
+              const img = getImagenProducto(producto);
+              let file = null;
+              if (img) {
+                try {
                   const res = await fetch(img);
-                  blob = await res.blob();
-                } else {
-                  // URL externa → fetch
-                  const res = await fetch(img, { mode: 'cors' });
-                  blob = await res.blob();
-                }
-                const extension = blob.type?.split('/')[1] || 'jpg';
-                file = new File([blob], `${nombre.replace(/[^a-z0-9]/gi, '_')}.${extension}`, {
-                  type: blob.type || 'image/jpeg',
-                });
-              } catch (imgErr) {
-                console.warn('⚠️ No se pudo convertir la imagen:', imgErr.message);
+                  const blob = await res.blob();
+                  const extension = blob.type?.split('/')[1] || 'jpg';
+                  file = new File([blob], `${nombre.replace(/[^a-z0-9]/gi, '_')}.${extension}`, { type: blob.type || 'image/jpeg' });
+                } catch (imgErr) { console.warn('⚠️ No se pudo convertir la imagen:', imgErr.message); }
               }
-            }
-
-            // Opción 1: Web Share API con imagen (móviles y navegadores compatibles)
-            if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-              await navigator.share({
-                files: [file],
-                text: texto,
-                title: titulo,
-              });
-              toast.success('¡Compartido con imagen!');
-              return;
-            }
-
-            // Opción 2: Web Share API solo texto (desktop o sin soporte de archivos)
-            if (navigator.share) {
-              await navigator.share({
-                text: texto,
-                title: titulo,
-                url: url,
-              });
+              
+              if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], text: texto, title: titulo });
+                toast.success('¡Compartido con imagen!');
+                return;
+              }
+              await navigator.share({ text: texto, title: titulo, url: url });
               toast.success('¡Compartido!');
               return;
-            }
-
-            // Opción 3: Fallback - copiar al portapapeles
-            throw new Error('Web Share no disponible');
-          } catch (e) {
-            if (e?.name === 'AbortError') return;
-
-            // Fallback: copiar texto + link al portapapeles
-            try {
-              await navigator.clipboard.writeText(texto);
-              toast.success(' Texto copiado al portapapeles. Pégalo donde quieras.');
-            } catch {
-              // Último recurso: seleccionar texto manualmente
-              const textarea = document.createElement('textarea');
-              textarea.value = texto;
-              document.body.appendChild(textarea);
-              textarea.select();
-              try {
-                document.execCommand('copy');
-                toast.success('📋 Texto copiado.');
-              } catch {
-                toast.error('No se pudo compartir. Copia manualmente: ' + url);
-              }
-              document.body.removeChild(textarea);
+            } catch (e) {
+              if (e?.name === 'AbortError') return;
             }
           }
-    };
+          
+          // En PC o si falla el share nativo: mostrar modal con opciones
+          setShareData({ producto, texto, titulo, url });
+          setShowShareModal(true);
+        };
+
+        const copiarAlPortapapeles = async (texto) => {
+          try {
+            await navigator.clipboard.writeText(texto);
+            toast.success('📋 Texto copiado al portapapeles');
+          } catch {
+            const textarea = document.createElement('textarea');
+            textarea.value = texto;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            toast.success('📋 Texto copiado');
+          }
+        };
+
+        const compartirEnWhatsApp = (texto, url) => {
+          window.open(`https://wa.me/?text=${encodeURIComponent(texto + '\n' + url)}`, '_blank');
+        };
+
+        const compartirEnFacebook = (url) => {
+          window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
+        };
+
+        const compartirEnTwitter = (texto, url) => {
+          window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(texto)}&url=${encodeURIComponent(url)}`, '_blank');
+        };
+
         const guardarTasa = async () => {
           const tasaData = { tasa: usarTasaBCV ? tasaBCV : tasaPersonalizada, usarBCV: usarTasaBCV, tasaPersonalizada };
           if (supabase) await supabase.from('settings').upsert({ clave: 'tasa_bcv', valor: tasaData }, { onConflict: 'clave' });
@@ -3777,6 +3784,90 @@ const handleImagenesItem = async (index, files) => {
                 <div className="p-6 space-y-4">
                   <div><label className="block text-xs text-voltech-muted mb-1 ml-1">Nombre</label><input type="text" value={nuevoCampo.valor} onChange={(e) => setNuevoCampo({ ...nuevoCampo, valor: e.target.value })} className="input-voltech w-full rounded-lg px-4 py-3 text-sm" placeholder="Ingresa el nombre" autoFocus /></div>
                   <button onClick={() => { /* Legacy */ }} className="w-full btn-neon text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2"><Plus className="w-4 h-4" />Agregar</button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ✅ MODAL DE COMPARTIR (Para PC y Móvil) */}
+        <AnimatePresence>
+          {showShareModal && shareData && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+              onClick={() => setShowShareModal(false)}
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+                animate={{ scale: 1, opacity: 1, y: 0 }} 
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl max-w-md w-full p-6"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Share2 className="w-5 h-5 text-voltech-cyan" />
+                    Compartir Producto
+                  </h3>
+                  <button 
+                    onClick={() => setShowShareModal(false)} 
+                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-slate-500" />
+                  </button>
+                </div>
+
+                <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 mb-4 border border-slate-200 dark:border-slate-700">
+                  <p className="font-semibold text-slate-900 dark:text-white text-sm mb-1">{shareData.titulo}</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-line">{shareData.texto}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <button
+                    onClick={() => { compartirEnWhatsApp(shareData.texto, shareData.url); setShowShareModal(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                    </svg>
+                    Compartir en WhatsApp
+                  </button>
+
+                  <button
+                    onClick={() => { compartirEnFacebook(shareData.url); setShowShareModal(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                    Compartir en Facebook
+                  </button>
+
+                  <button
+                    onClick={() => { compartirEnTwitter(shareData.texto, shareData.url); setShowShareModal(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 dark:hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                    </svg>
+                    Compartir en X (Twitter)
+                  </button>
+
+                  <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                    <button
+                      onClick={() => { copiarAlPortapapeles(shareData.texto); setShowShareModal(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-900 dark:text-white rounded-lg font-medium transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                      </svg>
+                      Copiar texto al portapapeles
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             </motion.div>

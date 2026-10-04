@@ -11,12 +11,39 @@ import ClearSW from './ClearSW' // ✅ NUEVO: Importamos el limpiador
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  title: 'Voltech Store',
-  description: 'Tienda de productos tecnológicos y streaming',
+  title: {
+    default: 'Voltech Store | Tecnología y Streaming al Mejor Precio en Venezuela',
+    template: '%s | Voltech Store'
+  },
+  description: 'Tienda líder en Venezuela de productos tecnológicos, accesorios, cornetas, audífonos y servicios de streaming. Envíos rápidos, garantía asegurada y las mejores ofertas.',
+  keywords: ['tecnología', 'streaming', 'voltech', 'accesorios', 'cornetas', 'audífonos', 'venezuela', 'cargadores', 'kits'],
+  authors: [{ name: 'Voltech Store' }],
+  creator: 'Voltech Store',
+  publisher: 'Voltech Store',
   manifest: '/manifest.json',
   appleMobileWebAppCapable: 'yes',
   appleMobileWebAppStatusBarStyle: 'black-translucent',
   appleMobileWebAppTitle: 'Voltech Store',
+  openGraph: {
+    type: 'website',
+    locale: 'es_VE',
+    url: 'https://voltechstoreve.com',
+    siteName: 'Voltech Store',
+    title: 'Voltech Store | Tecnología y Streaming',
+    description: 'Los mejores productos tecnológicos y servicios de streaming en Venezuela. Calidad, garantía y los mejores precios.',
+    images: [{ url: 'https://voltechstoreve.com/voltechstore.png', width: 1200, height: 630, alt: 'Voltech Store' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Voltech Store | Tecnología y Streaming',
+    description: 'Los mejores productos tecnológicos y servicios de streaming en Venezuela.',
+    images: ['https://voltechstoreve.com/voltechstore.png'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
+  },
 }
 
 export const viewport = {
