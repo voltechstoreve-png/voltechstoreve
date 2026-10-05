@@ -2281,73 +2281,53 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
             .replace(/-+$/, '');
         };
 
-        // ✅ COMPARTIR PRODUCTO: URL amigable + Web Share API nativa + Fallback WhatsApp
-        const compartirProducto = async (producto) => {
-          // 1. Generar URL amigable con slug
-          const nombreProducto = producto.plataforma || producto.producto || 'Producto';
-          const slug = generarSlug(nombreProducto);
-          const url = `${window.location.origin}/catalogo/${slug}`; // Ej: https://voltechstoreve.com/catalogo/airpods-pro
-          
-          const precio = Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2);
-          const precioBs = Number(producto.precioBs || 0).toFixed(2);
-          const stock = producto.cantidad || 0;
-          const texto = `🔥 *${nombreProducto}*\n💰 $${precio} (Bs ${precioBs})\n📦 Stock: ${stock} unid.\n🔗 ${url}`;
-          const titulo = `${nombreProducto} - $${precio}`;
+ // ✅ COMPARTIR PRODUCTO: URL amigable + Web Share API nativa + Modal en PC
+const compartirProducto = async (producto) => {
+// 1. Generar URL amigable con slug
+const nombreProducto = producto.plataforma || producto.producto || 'Producto';
+const slug = generarSlug(nombreProducto);
+const url = `${window.location.origin}/catalogo/${slug}`;
+const precio = Number(producto.precioDetal || producto.precioMayor || 0).toFixed(2);
+const precioBs = Number(producto.precioBs || 0).toFixed(2);
+const stock = producto.cantidad || 0;
+const texto = `🔥 *${nombreProducto}*\n💰 $${precio} (Bs ${precioBs})\n📦 Stock: ${stock} unid.\n🔗 ${url}`;
+const titulo = `${nombreProducto} - $${precio}`;
 
-          // 2. Intentar usar la API Nativa de Compartir (Móviles Android/iOS abren el menú con WhatsApp, IG, etc.)
-          if (navigator.share) {
-            try {
-              const img = getImagenProducto(producto);
-              let file = null;
-              
-              if (img) {
-                try {
-                  const res = await fetch(img);
-                  const blob = await res.blob();
-                  const extension = blob.type?.split('/')[1] || 'jpg';
-                  file = new File([blob], `${slug}.${extension}`, { type: blob.type || 'image/jpeg' });
-                } catch (imgErr) {
-                  console.warn('⚠️ No se pudo procesar la imagen:', imgErr.message);
-                }
-              }
+// 2. Intentar usar la API Nativa de Compartir (Móviles Android/iOS abren el menú con WhatsApp, IG, etc.)
+if (navigator.share) {
+try {
+const img = getImagenProducto(producto);
+let file = null;
+if (img) {
+try {
+const res = await fetch(img);
+const blob = await res.blob();
+const extension = blob.type?.split('/')[1] || 'jpg';
+file = new File([blob], `${slug}.${extension}`, { type: blob.type || 'image/jpeg' });
+} catch (imgErr) {
+console.warn('⚠️ No se pudo procesar la imagen:', imgErr.message);
+}
+}
+// Si el dispositivo permite compartir archivos (imágenes)
+if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+await navigator.share({ files: [file], text: texto, title: titulo });
+toast.success('¡Compartido con imagen!');
+return;
+}
+// Fallback de Web Share solo con texto y URL
+await navigator.share({ text: texto, title: titulo, url: url });
+toast.success('¡Compartido!');
+return;
+} catch (error) {
+if (error.name === 'AbortError') return; // El usuario canceló la acción
+console.warn('Web Share API falló, mostrando modal:', error);
+}
+}
 
-              // Si el dispositivo permite compartir archivos (imágenes)
-              if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({ files: [file], text: texto, title: titulo });
-                toast.success('¡Compartido con imagen!');
-                return;
-              }
-
-              // Fallback de Web Share solo con texto y URL
-              await navigator.share({ text: texto, title: titulo, url: url });
-              toast.success('¡Compartido!');
-              return;
-            } catch (error) {
-              if (error.name === 'AbortError') return; // El usuario canceló la acción
-              console.warn('Web Share API falló, usando fallback de WhatsApp:', error);
-            }
-          }
-
-          // 3. Fallback para Escritorio: Abrir WhatsApp Web / App directamente
-          try {
-            const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
-            window.open(whatsappUrl, '_blank');
-          } catch (e) {
-            // Último recurso: copiar al portapapeles
-            try {
-              await navigator.clipboard.writeText(texto);
-              toast.success('📋 Texto copiado al portapapeles. Pégalo en WhatsApp.');
-            } catch {
-              const textarea = document.createElement('textarea');
-              textarea.value = texto;
-              document.body.appendChild(textarea);
-              textarea.select();
-              document.execCommand('copy');
-              document.body.removeChild(textarea);
-              toast.success('📋 Texto copiado manualmente.');
-            }
-          }
-        };
+// 3. Fallback para Escritorio (PC): Mostrar modal con opciones de redes sociales
+setShareData({ producto, texto, titulo, url });
+setShowShareModal(true);
+};
 
         const copiarAlPortapapeles = async (texto) => {
           try {
@@ -3336,21 +3316,23 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
                           )}
                           <p className="text-[10px] text-slate-400">Bs {producto.precioBs.toFixed(2)}</p>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => compartirProducto(producto)} className="p-1.5 rounded-lg bg-voltech-cyan/20 text-voltech-cyan" title="Compartir en WhatsApp">
-                            <Share2 size={14} />
-                          </button>
-                          <button onClick={() => togglePublicado(producto.id)} className={`p-1.5 rounded-lg transition-colors ${producto.publicado ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700/50 text-slate-400'}`} title={producto.publicado ? 'Ocultar' : 'Publicar'}>
-                            {producto.publicado ? <Globe size={14} /> : <EyeOff size={14} />}
-                          </button>
-                          {tienePermiso('puedeVerInventarioCompleto') && (
-                            <>
-                              <button onClick={() => abrirEdicion(producto)} className="p-1.5 text-slate-400 hover:text-cyan-400" title="Editar"><Edit size={14} /></button>
-                              <button onClick={() => eliminarProducto(producto.id)} className="p-1.5 text-slate-400 hover:text-rose-400" title="Eliminar"><Trash2 size={14} /></button>
-                            </>
-                          )}
-                        </div>
-                      </div>
+<div className="flex items-center gap-1">
+{tienePermiso('puedeVerInventarioCompleto') && (
+<button onClick={() => compartirProducto(producto)} className="p-1.5 rounded-lg bg-voltech-cyan/20 text-voltech-cyan" title="Compartir producto">
+<Share2 size={14} />
+</button>
+)}
+<button onClick={() => togglePublicado(producto.id)} className={`p-1.5 rounded-lg transition-colors ${producto.publicado ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700/50 text-slate-400'}`} title={producto.publicado ? 'Ocultar' : 'Publicar'}>
+{producto.publicado ? <Globe size={14} /> : <EyeOff size={14} />}
+</button>
+{tienePermiso('puedeVerInventarioCompleto') && (
+<>
+<button onClick={() => abrirEdicion(producto)} className="p-1.5 text-slate-400 hover:text-cyan-400" title="Editar"><Edit size={14} /></button>
+<button onClick={() => eliminarProducto(producto.id)} className="p-1.5 text-slate-400 hover:text-rose-400" title="Eliminar"><Trash2 size={14} /></button>
+</>
+)}
+</div>                     
+ </div>
 
                       {/* ✅ FORMULARIO INLINE DE EDICIÓN (MÓVIL) */}
                       {editandoId === producto.id && tienePermiso('puedeVerInventarioCompleto') && (
@@ -3425,16 +3407,16 @@ const tasa = usarTasaBCV ? tasaBCV : tasaPersonalizada;
                           <td className="px-4 py-3 text-center">
                             <button onClick={() => togglePublicado(producto.id)} className={`p-2 rounded-lg transition-colors ${producto.publicado ? 'bg-voltech-success/20 text-voltech-success hover:bg-voltech-success/30' : 'bg-voltech-dark text-voltech-muted hover:bg-voltech-border'}`} title={producto.publicado ? 'Ocultar de la tienda' : 'Publicar en la tienda'}>{producto.publicado ? <Globe className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
                           </td>
-                          {tienePermiso('puedeVerInventarioCompleto') && (
-                            <td className="px-4 py-3 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <button onClick={() => compartirProducto(producto)} className="p-2 rounded-lg hover:bg-voltech-cyan/20 text-voltech-muted hover:text-voltech-cyan transition-colors" title="Compartir en WhatsApp"><Share2 className="w-4 h-4" /></button>
-                                <button onClick={() => abrirEdicion(producto)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors" title="Editar"><Edit className="w-4 h-4" /></button>
-                                <button onClick={() => eliminarProducto(producto.id)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
-                              </div>
-                            </td>
-                          )}
-                        </tr>
+{tienePermiso('puedeVerInventarioCompleto') && (
+<td className="px-4 py-3 text-right">
+<div className="flex items-center justify-end gap-2">
+<button onClick={() => compartirProducto(producto)} className="p-2 rounded-lg hover:bg-voltech-cyan/20 text-voltech-muted hover:text-voltech-cyan transition-colors" title="Compartir producto"><Share2 className="w-4 h-4" /></button>
+<button onClick={() => abrirEdicion(producto)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-cyan transition-colors" title="Editar"><Edit className="w-4 h-4" /></button>
+<button onClick={() => eliminarProducto(producto.id)} className="p-2 rounded-lg hover:bg-voltech-border text-voltech-muted hover:text-voltech-error transition-colors" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
+</div>
+</td>
+)}                        
+</tr>
 
                         {/* ✅ FORMULARIO INLINE DE EDICIÓN (DESKTOP) */}
                         {editandoId === producto.id && tienePermiso('puedeVerInventarioCompleto') && (

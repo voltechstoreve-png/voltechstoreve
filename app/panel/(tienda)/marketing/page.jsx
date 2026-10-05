@@ -338,36 +338,40 @@ return;
 }
 const nombreProducto = productoMarketplace?.nombre || productoMarketplace?.plataforma || 'Producto';
 const precioProducto = precioPromocionMarketplace ? parseFloat(precioPromocionMarketplace).toFixed(2) : (Number(productoMarketplace?.precioDetal || productoMarketplace?.precioMayor || 0)).toFixed(2);
-// ✅ Generar URL amigable con slug (fallback a generar uno limpio si la columna no existe aún)
-const baseSlug = productoSeleccionado.slug || productoSeleccionado.plataforma || productoSeleccionado.producto || 'producto';
+
+// ✅ Generar URL amigable con slug
+const baseSlug = productoMarketplace?.slug || productoMarketplace?.plataforma || productoMarketplace?.producto || 'producto';
 const slug = baseSlug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-let mensaje = `¡Hola ${nombreCliente}!\n`;
-if (plantillaWhatsappSeleccionada) {
-const plantilla = plantillas.find(p => String(p.id) === String(plantillaWhatsappSeleccionada));
+let mensaje = '';
+if (plantillaMarketplaceSeleccionada) {
+const plantilla = plantillas.find(p => String(p.id) === String(plantillaMarketplaceSeleccionada));
 if (plantilla && plantilla.nombre) {
-mensaje += ` *${plantilla.nombre}* 🔥\n`;
+mensaje += `${plantilla.nombre.toUpperCase()}\n\n`;
 }
 }
-mensaje += ` *Producto:* ${nombreProducto}\n`;
-mensaje += `💰 *Precio Especial:* $${precioProducto}\n`;
-mensaje += `🔗 *Ver promoción:* ${window.location.origin}/catalogo/${slug}\n`;
-if (plantillaWhatsappSeleccionada) {
-const plantilla = plantillas.find(p => String(p.id) === String(plantillaWhatsappSeleccionada));
+mensaje += ` ${nombreProducto.toUpperCase()} 🔥\n`;
+mensaje += ` PRECIO: $${precioProducto}\n`;
+mensaje += `🔗 *Ver promoción:* ${window.location.origin}/catalogo/${slug}\n\n`;
+if (plantillaMarketplaceSeleccionada) {
+const plantilla = plantillas.find(p => String(p.id) === String(plantillaMarketplaceSeleccionada));
 if (plantilla && plantilla.contenido && plantilla.contenido.trim() !== '' && plantilla.contenido.trim() !== 'Sin plantilla') {
-mensaje += `${plantilla.contenido}\n`;
+mensaje += `${plantilla.contenido}\n\n`;
 }
 }
-if (plantillaContactoWaSeleccionada) {
-const plantilla = plantillas.find(p => String(p.id) === String(plantillaContactoWaSeleccionada));
+mensaje += `📍 ENTREGAS Y CONTACTO:\n`;
+if (plantillaContactoMpSeleccionada) {
+const plantilla = plantillas.find(p => String(p.id) === String(plantillaContactoMpSeleccionada));
 if (plantilla && plantilla.contenido && plantilla.contenido.trim() !== '' && plantilla.contenido.trim() !== 'Sin plantilla') {
 mensaje += `${plantilla.contenido}`;
+} else {
+mensaje += `Entregas personales o envíos a todo el país. ¡Escríbenos al DM!`;
 }
 } else {
-mensaje += `📲 ¡Escríbenos para coordinar tu entrega y aprovechar esta oferta!`;
+mensaje += `Entregas personales o envíos a todo el país. ¡Escríbenos al DM!`;
 }
-setMensajePersonalizadoWa(mensaje.trim());
-}, [productoSeleccionado, precioPromocion, plantillaWhatsappSeleccionada, plantillaContactoWaSeleccionada, clientesSeleccionados, clientes, plantillas]);
+setTextoMarketplace(mensaje.trim());
+}, [productoMarketplace, precioPromocionMarketplace, plantillaMarketplaceSeleccionada, plantillaContactoMpSeleccionada, plantillas]);
 
 useEffect(() => {
 if (!productoMarketplace) {
@@ -980,9 +984,9 @@ className="w-full"
                      </div>
                       <>
                         <div>
-                          <label className="text-xs text-voltech-muted block mb-1">💰 Precio para esta promoción (opcional):</label>
-                          <input type="number" step="0.01" placeholder={Number(productoSeleccionado.precioDetal || 0).toFixed(2)} value={precioPromocion} onChange={(e) => setPrecioPromocion(e.target.value)} className="input-voltech w-full rounded px-3 py-1.5 text-xs" />
-                        </div>
+<label className="text-xs text-voltech-muted block mb-1">💰 Precio para esta promoción (opcional):</label>
+<input type="number" step="0.01" placeholder={Number(productoSeleccionado?.precioDetal || 0).toFixed(2)} value={precioPromocion} onChange={(e) => setPrecioPromocion(e.target.value)} className="input-voltech w-full rounded px-3 py-1.5 text-xs" />
+</div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div>
                             <label className="block text-sm font-medium text-voltech-muted mb-2">2. Plantilla WhatsApp (Opcional)</label>
